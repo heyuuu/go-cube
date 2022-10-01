@@ -39,7 +39,7 @@ to quickly create a Cobra application.`,
 		}
 
 		for index, proj := range projects {
-			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, 20), proj.Path)
+			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, maxNameLen), proj.Path)
 		}
 	},
 }
