@@ -13,9 +13,15 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var projectSearchFlags = struct {
+	workspace string
+	status    bool
+	alfred    bool
+}{}
+
 // projectSearchCmd represents the projectSearch command
 var projectSearchCmd = &cobra.Command{
-	Use:   "project:search",
+	Use:   "project:search [query]",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -23,9 +29,11 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
+	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		query := strings.Join(args, " ")
 		manager := project.DefaultManager()
-		projects := manager.Projects()
+		projects := manager.Search(query)
 
 		sort.Slice(projects, func(i, j int) bool {
 			return projects[i].Name < projects[j].Name
@@ -48,6 +56,9 @@ func init() {
 	rootCmd.AddCommand(projectSearchCmd)
 
 	// Here you will define your flags and configuration settings.
+	projectSearchCmd.Flags().StringVarP(&projectSearchFlags.workspace, "workspace", "w", "", "项目名，支持模糊匹配")
+	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.status, "status", false, "分析项目")
+	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.alfred, "alfred", false, "来自 alfred 的请求")
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:

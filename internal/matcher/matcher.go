@@ -21,10 +21,14 @@ func NewMatcher[T any](targets []T, keywordGetter func(T) []Keyword, scorer Scor
 	return &Matcher[T]{targets: targets, scorer: scorer, keywords: targetKeywords}
 }
 
-func NewStringMatcher(targets []string, scorer Scorer) *Matcher[string] {
-	return NewMatcher(targets, func(t string) []Keyword {
-		return []Keyword{{String: t, Weight: 1.0}}
+func NewKeywordMatcher[T any](targets []T, keywordGetter func(T) string, scorer Scorer) *Matcher[T] {
+	return NewMatcher(targets, func(t T) []Keyword {
+		return []Keyword{{String: keywordGetter(t), Weight: 1.0}}
 	}, scorer)
+}
+
+func NewStringMatcher(targets []string, scorer Scorer) *Matcher[string] {
+	return NewKeywordMatcher(targets, func(t string) string { return t }, scorer)
 }
 
 func (m *Matcher[T]) Match(query string) []T {
