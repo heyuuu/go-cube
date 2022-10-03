@@ -1,7 +1,3 @@
-/*
-Copyright © 2022 NAME HERE <EMAIL ADDRESS>
-
-*/
 package cmd
 
 import (
@@ -32,9 +28,9 @@ to quickly create a Cobra application.`,
 	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		query := strings.Join(args, " ")
-		manager := project.DefaultManager()
-		projects := manager.Search(query)
+		projects := project.DefaultManager().Search(query)
 
+		// 排序
 		sort.Slice(projects, func(i, j int) bool {
 			return projects[i].Name < projects[j].Name
 		})
@@ -46,6 +42,7 @@ to quickly create a Cobra application.`,
 			}
 		}
 
+		// 展示数据
 		for index, proj := range projects {
 			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, maxNameLen), proj.Path)
 		}
@@ -56,7 +53,7 @@ func init() {
 	rootCmd.AddCommand(projectSearchCmd)
 
 	// Here you will define your flags and configuration settings.
-	projectSearchCmd.Flags().StringVarP(&projectSearchFlags.workspace, "workspace", "w", "", "项目名，支持模糊匹配")
+	projectSearchCmd.Flags().StringVarP(&projectSearchFlags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.status, "status", false, "分析项目")
 	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.alfred, "alfred", false, "来自 alfred 的请求")
 
