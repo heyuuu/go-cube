@@ -6,7 +6,9 @@ type Scorer interface {
 	Score(target []Keyword, query string) float64
 }
 
-type StringScorer func(target string, query string) float64
+type StringScorer interface {
+	StringScore(target string, query string) float64
+}
 
 const (
 	scoreFailed  float64 = 0.0
@@ -14,13 +16,17 @@ const (
 )
 
 var (
-	DefaultScorer Scorer = &baseScorer{stringScorer: simpleScorer, isSplitQuery: true}
+	DefaultScorer Scorer = &baseScorer{stringScorer: defaultBonusScorer, isSplitQuery: true}
 )
 
 // baseScorer Scorer 的默认实现
 type baseScorer struct {
 	stringScorer StringScorer
 	isSplitQuery bool
+}
+
+func NewBaseScorer(stringScorer StringScorer, isSplitQuery bool) Scorer {
+	return &baseScorer{stringScorer: stringScorer, isSplitQuery: isSplitQuery}
 }
 
 func (d *baseScorer) Score(keywords []Keyword, query string) float64 {
@@ -34,7 +40,7 @@ func (d *baseScorer) Score(keywords []Keyword, query string) float64 {
 	for _, word := range queryWords {
 		var wordScore float64 = 0
 		for _, keyword := range keywords {
-			wordScore += keyword.Weight * d.stringScorer(keyword.String, word)
+			wordScore += keyword.Weight * d.stringScorer.StringScore(keyword.String, word)
 		}
 		score *= wordScore
 		if score == 0 {
@@ -62,9 +68,11 @@ func (d *baseScorer) splitQuery(query string) []string {
 	return queryWords
 }
 
-// SimpleScorer 简单计分器
+// SimpleStringScorer 简单计分器
 // 仅当目标字符串有查询字符串所有字符的顺序出现(不要求连续)即为匹配，否则为不匹配；没有具体分数，无法表达匹配程度
-func simpleScorer(target string, query string) float64 {
+type SimpleStringScorer struct{}
+
+func (s SimpleStringScorer) StringScore(target string, query string) float64 {
 	if len(query) == 0 {
 		return scoreSuccess
 	}
@@ -90,11 +98,4 @@ func simpleScorer(target string, query string) float64 {
 	} else {
 		return scoreFailed
 	}
-}
-
-// BonusScorer Bonus计分器
-// 根据不同匹配方式计算不同的得分(Bonus)，总计得分的计分器. 可以支持首字母、连续匹配等匹配方法得分更高的需求
-func bonusScorer(target string, query string) float64 {
-	// todo 实现计分器
-	return 0
 }

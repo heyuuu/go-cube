@@ -19,7 +19,9 @@ func InitConfigFile(cfgFile string) error {
 
 	viper.SetConfigFile(cfgFile)
 
-	fmt.Println("cfgFile =", cfgFile)
+	if IsDebug() {
+		fmt.Println("cfgFile =", cfgFile)
+	}
 
 	return viper.ReadInConfig()
 }

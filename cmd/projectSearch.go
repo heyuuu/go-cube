@@ -25,15 +25,19 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Args: cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		query := strings.Join(args, " ")
-		projects := project.DefaultManager().Search(query)
-
-		// 排序
-		sort.Slice(projects, func(i, j int) bool {
-			return projects[i].Name < projects[j].Name
-		})
+		var projects []project.Project
+		if len(args) == 0 {
+			// 未设定搜索词时，获取全部项目并按名称排序
+			projects = project.DefaultManager().Projects()
+			sort.Slice(projects, func(i, j int) bool {
+				return projects[i].Name < projects[j].Name
+			})
+		} else {
+			// 指定搜索词时，获取匹配项目
+			query := strings.Join(args, " ")
+			projects = project.DefaultManager().Search(query)
+		}
 
 		var maxNameLen int
 		for _, proj := range projects {

@@ -8,6 +8,7 @@ import (
 )
 
 var cfgFile string
+var debug bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -23,6 +24,7 @@ to quickly create a Cobra application.`,
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		config.SetDebug(debug)
 		return config.InitConfigFile(cfgFile)
 	},
 }
@@ -43,6 +45,7 @@ func init() {
 
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go-cube.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.go-cube.yaml)")
+	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
