@@ -17,7 +17,7 @@ var projectSearchFlags = struct {
 
 // projectSearchCmd represents the projectSearch command
 var projectSearchCmd = &cobra.Command{
-	Use:   "project:search [query]",
+	Use:   "project:search [query]*",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
