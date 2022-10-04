@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"go-cube/internal/project"
-	"sort"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -17,39 +16,55 @@ var projectSearchFlags = struct {
 
 // projectSearchCmd represents the projectSearch command
 var projectSearchCmd = &cobra.Command{
-	Use:   "project:search [query]*",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "project:search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}  {--alfred : 来自 alfred 的请求}",
+	Short: "搜索项目列表",
 	Run: func(cmd *cobra.Command, args []string) {
-		var projects []project.Project
-		if len(args) == 0 {
-			// 未设定搜索词时，获取全部项目并按名称排序
-			projects = project.DefaultManager().Projects()
-			sort.Slice(projects, func(i, j int) bool {
-				return projects[i].Name < projects[j].Name
-			})
-		} else {
-			// 指定搜索词时，获取匹配项目
-			query := strings.Join(args, " ")
-			projects = project.DefaultManager().Search(query)
-		}
+		// 获取输入参数
+		query := strings.Join(args, " ")
+		//status := projectSearchFlags.status // todo
+		alfred := projectSearchFlags.alfred
 
-		var maxNameLen int
-		for _, proj := range projects {
-			if maxNameLen < len(proj.Name) {
-				maxNameLen = len(proj.Name)
+		// 项目列表
+		projects := project.DefaultManager().Search(query)
+
+		// 返回结果
+		if alfred {
+			var items []any
+			for _, proj := range projects {
+				items = append(items, map[string]string{
+					"title":    proj.Name,
+					"subtitle": proj.GitRepoUrl,
+					"arg":      proj.Name,
+				})
 			}
+			alfredSearchResult(items)
+		} else {
+			header := []string{
+				fmt.Sprintf("项目(%d)", len(projects)),
+				"路径",
+			}
+			body := make([][]string, len(projects))
+			for index, proj := range projects {
+				body[index] = []string{
+					proj.Name,
+					proj.Path,
+				}
+			}
+
+			printTable(header, body)
 		}
 
-		// 展示数据
-		for index, proj := range projects {
-			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, maxNameLen), proj.Path)
-		}
+		//var maxNameLen int
+		//for _, proj := range projects {
+		//	if maxNameLen < len(proj.Name) {
+		//		maxNameLen = len(proj.Name)
+		//	}
+		//}
+		//
+		//// 展示数据
+		//for index, proj := range projects {
+		//	fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, maxNameLen), proj.Path)
+		//}
 	},
 }
 

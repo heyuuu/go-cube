@@ -9,26 +9,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var commandSearchFlags = struct {
+	project string
+	alfred  bool
+}{}
+
 // commandSearchCmd represents the commandSearch command
 var commandSearchCmd = &cobra.Command{
-	Use:   "command:search [query]*",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Use:   "command:search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
+	Short: "搜索可用命令列表",
 	Run: func(cmd *cobra.Command, args []string) {
+		query := args
+		projectName := commandSearchFlags.project
+		alfred := commandSearchFlags.alfred
+
+		// 获取匹配的命令列表
 		var commands []command.Command
-		if len(args) == 0 {
+		if len(query) == 0 {
 			commands = command.DefaultManager().Commands()
 			sort.Slice(commands, func(i, j int) bool {
 				return commands[i].Name < commands[j].Name
 			})
 		} else {
-			query := strings.Join(args, " ")
-			commands = command.DefaultManager().Search(query)
+			commands = command.DefaultManager().Search(strings.Join(query, " "))
+		}
+
+		// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
+		if len(projectName) > 0 {
+			// todo
 		}
 
 		// 返回结果
@@ -43,10 +51,18 @@ to quickly create a Cobra application.`,
 			}
 			alfredSearchResult(items)
 		} else {
-			// 展示数据
-			for index, cmd := range commands {
-				fmt.Printf("[%3d] %s %s\n", index, cmd.Name, cmd.Bin)
+			header := []string{
+				fmt.Sprintf("项目(%d)", len(commands)),
+				"路径",
 			}
+			body := make([][]string, len(commands))
+			for index, cmd := range commands {
+				body[index] = []string{
+					cmd.Name,
+					cmd.Bin,
+				}
+			}
+			printTable(header, body)
 		}
 	},
 }
@@ -55,6 +71,8 @@ func init() {
 	rootCmd.AddCommand(commandSearchCmd)
 
 	// Here you will define your flags and configuration settings.
+	rootCmd.PersistentFlags().StringVar(&commandSearchFlags.project, "project", "", "项目名")
+	rootCmd.PersistentFlags().BoolVar(&commandSearchFlags.alfred, "alfred", false, "来自 alfred 的请求")
 
 	// Cobra supports Persistent Flags which will work for this command
 	// and all subcommands, e.g.:

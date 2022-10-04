@@ -9,7 +9,6 @@ import (
 
 var cfgFile string
 var debug bool
-var alfred bool
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
@@ -47,7 +46,6 @@ func init() {
 	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.go-cube.yaml)")
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.go-cube.yaml)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
-	rootCmd.PersistentFlags().BoolVarP(&alfred, "alfred", "", false, "来自 alfred 的请求")
 
 	// Cobra also supports local flags, which will only run
 	// when this action is called directly.
