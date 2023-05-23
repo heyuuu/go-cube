@@ -12,7 +12,7 @@ var projectInfoFlags = struct {
 
 // projectInfoCmd represents the projectInfo command
 var projectInfoCmd = &cobra.Command{
-	Use:   "project:info [project]",
+	Use:   "info [project]",
 	Short: "A brief description of your command",
 	Long: `A longer description that spans multiple lines and likely contains examples
 and usage of using your command. For example:
@@ -38,16 +38,8 @@ to quickly create a Cobra application.`,
 }
 
 func init() {
-	rootCmd.AddCommand(projectInfoCmd)
+	projectCmd.AddCommand(projectInfoCmd)
 
 	// Here you will define your flags and configuration settings.
-	projectInfoCmd.Flags().StringVarP(&projectSearchFlags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// projectInfoCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// projectInfoCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	projectInfoCmd.Flags().StringVarP(&projectInfoFlags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 }

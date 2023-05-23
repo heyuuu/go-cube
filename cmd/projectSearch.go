@@ -16,7 +16,7 @@ var projectSearchFlags = struct {
 
 // projectSearchCmd represents the projectSearch command
 var projectSearchCmd = &cobra.Command{
-	Use:   "project:search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}  {--alfred : 来自 alfred 的请求}",
+	Use:   "search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}  {--alfred : 来自 alfred 的请求}",
 	Short: "搜索项目列表",
 	Run: func(cmd *cobra.Command, args []string) {
 		// 获取输入参数
@@ -69,20 +69,12 @@ var projectSearchCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(projectSearchCmd)
+	projectCmd.AddCommand(projectSearchCmd)
 
 	// Here you will define your flags and configuration settings.
 	projectSearchCmd.Flags().StringVarP(&projectSearchFlags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.status, "status", false, "分析项目")
 	projectSearchCmd.Flags().BoolVar(&projectSearchFlags.alfred, "alfred", false, "来自 alfred 的请求")
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// projectSearchCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// projectSearchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }
 
 func strRightPad(s string, minLen int) string {
