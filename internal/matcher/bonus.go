@@ -127,6 +127,8 @@ func (b BonusScorer) calcScore(targetRunes []rune, matches []int) int {
 		}
 	}
 
+	//fmt.Printf("bonus: %d, target: %s, matches: %v\n", bonus, string(targetRunes), matches)
+
 	return bonus
 }
 

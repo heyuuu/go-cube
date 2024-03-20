@@ -58,7 +58,7 @@ func (m *Matcher[T]) Match(query string) []T {
 
 	// 按分数排序
 	slices.SortFunc(result, func(a, b scoredTarget) int {
-		return cmp.Compare(a.score, b.score)
+		return cmp.Compare(b.score, a.score)
 	})
 
 	return slicekit.Map(result, func(t scoredTarget) T {
