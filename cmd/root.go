@@ -16,7 +16,7 @@ var rootCmd = &cobra.Command{
 	Short: "go-cube v0.2.0",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		config.SetDebug(debug)
-		return config.InitConfigFile(cfgFile)
+		return config.InitConfig(cfgFile)
 	},
 }
 
@@ -30,6 +30,6 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $HOME/.go-cube.yaml)")
+	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is ~/.go-cube/config.json)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
 }

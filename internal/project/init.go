@@ -1,8 +1,7 @@
 package project
 
 import (
-	"github.com/spf13/viper"
-	"log"
+	"go-cube/internal/config"
 	"sync"
 )
 
@@ -34,17 +33,11 @@ func initDefaultManager() {
 		return
 	}
 
-	// 读取配置
-	config := projectConfig{}
-	err := viper.UnmarshalKey("project", &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
 	// 初始化 manager
-	var workspaces []Workspace
-	for wsName, wsConfig := range config.Workspaces {
-		workspaces = append(workspaces, NewDirWorkspace(wsName, wsConfig.Path, wsConfig.MaxDepth, GitProjectChecker))
+	workspacesConf := config.Default().Workspaces
+	workspaces := make([]Workspace, len(workspacesConf))
+	for _, wsConf := range workspacesConf {
+		workspaces = append(workspaces, NewDirWorkspace(wsConf.Name, wsConf.Path, wsConf.MaxDepth, GitProjectChecker))
 	}
 
 	defaultManager = NewManager(workspaces)

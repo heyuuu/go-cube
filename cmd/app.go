@@ -9,19 +9,36 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var commandSearchFlags = struct {
+var appCmd = initCmd(cmdOpts[any]{
+	Use: "app",
+})
+
+// cmd `app list`
+var appListCmd = initCmd(cmdOpts[any]{
+	Root: appCmd,
+	Use:  "list",
+	Run: func(cmd *cobra.Command, flags *any, args []string) {
+		fmt.Println("app list called")
+	},
+})
+
+// cmd `app search`
+type appSearchFlags struct {
 	project string
 	alfred  bool
-}{}
+}
 
-// commandSearchCmd represents the commandSearch command
-var commandSearchCmd = &cobra.Command{
-	Use:   "command:search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
+var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
+	Use:   "search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
 	Short: "搜索可用命令列表",
-	Run: func(cmd *cobra.Command, args []string) {
+	Init: func(cmd *cobra.Command, flags *appSearchFlags) {
+		cmd.PersistentFlags().StringVar(&flags.project, "project", "", "项目名")
+		cmd.PersistentFlags().BoolVar(&flags.alfred, "alfred", false, "来自 alfred 的请求")
+	},
+	Run: func(cmd *cobra.Command, flags *appSearchFlags, args []string) {
 		query := args
-		projectName := commandSearchFlags.project
-		alfred := commandSearchFlags.alfred
+		projectName := flags.project
+		alfred := flags.alfred
 
 		// 获取匹配的命令列表
 		var commands []command.Command
@@ -65,20 +82,4 @@ var commandSearchCmd = &cobra.Command{
 			printTable(header, body)
 		}
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(commandSearchCmd)
-
-	// Here you will define your flags and configuration settings.
-	rootCmd.PersistentFlags().StringVar(&commandSearchFlags.project, "project", "", "项目名")
-	rootCmd.PersistentFlags().BoolVar(&commandSearchFlags.alfred, "alfred", false, "来自 alfred 的请求")
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// commandSearchCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// commandSearchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-}
+})

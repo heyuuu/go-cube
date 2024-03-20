@@ -1,15 +1,12 @@
 package command
 
 import (
-	"github.com/spf13/viper"
-	"log"
+	"go-cube/internal/config"
 	"sync"
 )
 
 var defaultManager *Manager
 var defaultLock sync.Mutex
-
-type applicationConfig map[string]struct{ Bin string }
 
 func DefaultManager() *Manager {
 	initDefaultManager()
@@ -29,16 +26,12 @@ func initDefaultManager() {
 	}
 
 	// 读取配置
-	config := applicationConfig{}
-	err := viper.UnmarshalKey("application", &config)
-	if err != nil {
-		log.Fatal(err)
-	}
+	conf := config.Default().Applications
 
 	// 初始化 manager
 	var commands []Command
-	for cmdName, cmdConfig := range config {
-		commands = append(commands, Command{Name: cmdName, Bin: cmdConfig.Bin})
+	for _, app := range conf {
+		commands = append(commands, Command{Name: app.Name, Bin: app.Bin})
 	}
 
 	defaultManager = NewManager(commands)
