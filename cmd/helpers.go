@@ -3,9 +3,49 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/spf13/cobra"
 	"log"
 	"strings"
 )
+
+type cmdOpts[T any] struct {
+	Root    *cobra.Command
+	Use     string
+	Short   string
+	Aliases []string
+	Args    cobra.PositionalArgs
+	Init    func(cmd *cobra.Command, flags *T)
+	Run     func(cmd *cobra.Command, flags *T, args []string)
+}
+
+func initCmd[T any](opts cmdOpts[T]) *cobra.Command {
+	var flags T
+
+	// cmd
+	cmd := &cobra.Command{
+		Use:     opts.Use,
+		Short:   opts.Short,
+		Aliases: opts.Aliases,
+		Args:    opts.Args,
+	}
+	if opts.Run != nil {
+		cmd.Run = func(cmd *cobra.Command, args []string) {
+			opts.Run(cmd, &flags, args)
+		}
+	}
+
+	// init
+	if opts.Root != nil {
+		opts.Root.AddCommand(cmd)
+	} else {
+		rootCmd.AddCommand(cmd)
+	}
+	if opts.Init != nil {
+		opts.Init(cmd, &flags)
+	}
+
+	return cmd
+}
 
 func printTable(headers []string, body [][]string) {
 	// 计算列数
@@ -98,4 +138,12 @@ func alfredSearchResult(items []any) {
 	}
 
 	fmt.Println(string(bytes))
+}
+
+func strRightPad(s string, minLen int) string {
+	if len(s) >= minLen {
+		return s
+	} else {
+		return s + strings.Repeat(" ", minLen-len(s))
+	}
 }
