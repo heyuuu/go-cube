@@ -1,7 +1,8 @@
-package command
+package app
 
 import (
 	"go-cube/internal/config"
+	"go-cube/internal/slicekit"
 	"sync"
 )
 
@@ -29,10 +30,9 @@ func initDefaultManager() {
 	conf := config.Default().Applications
 
 	// 初始化 manager
-	var commands []Command
-	for _, app := range conf {
-		commands = append(commands, Command{Name: app.Name, Bin: app.Bin})
-	}
+	apps := slicekit.Map(conf, func(c config.ApplicationConfig) App {
+		return App{Name: c.Name, Bin: c.Bin}
+	})
 
-	defaultManager = NewManager(commands)
+	defaultManager = NewManager(apps)
 }

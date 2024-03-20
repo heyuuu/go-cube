@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"go-cube/internal/command"
+	"go-cube/internal/app"
 	"sort"
 	"strings"
 
@@ -41,14 +41,14 @@ var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
 		alfred := flags.alfred
 
 		// 获取匹配的命令列表
-		var commands []command.Command
+		var commands []app.App
 		if len(query) == 0 {
-			commands = command.DefaultManager().Commands()
+			commands = app.DefaultManager().Apps()
 			sort.Slice(commands, func(i, j int) bool {
 				return commands[i].Name < commands[j].Name
 			})
 		} else {
-			commands = command.DefaultManager().Search(strings.Join(query, " "))
+			commands = app.DefaultManager().Search(strings.Join(query, " "))
 		}
 
 		// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
