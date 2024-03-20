@@ -59,14 +59,18 @@ func InitConfig(cfgFile string) error {
 		cfgFile = "~/.go-cube/config.json"
 	}
 
-	// 支持 ~ 前缀
-	if strings.HasPrefix(cfgFile, "~/") {
-		cfgFile = filepath.Join(os.Getenv("HOME"), cfgFile[2:])
-	}
-
 	if IsDebug() {
 		log.Println("cfgFile = " + cfgFile)
 	}
 
+	cfgFile = RealPath(cfgFile)
 	return ParseConfigFile(cfgFile, &defaultConf)
+}
+
+func RealPath(path string) string {
+	// 支持 ~ 前缀
+	if strings.HasPrefix(path, "~/") {
+		path = filepath.Join(os.Getenv("HOME"), path[2:])
+	}
+	return path
 }

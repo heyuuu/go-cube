@@ -8,14 +8,6 @@ import (
 var defaultManager *Manager
 var defaultLock sync.Mutex
 
-type projectConfig struct {
-	Workspaces map[string]struct {
-		Path                 string
-		MaxDepth             int
-		PriorityApplications []string
-	}
-}
-
 func DefaultManager() *Manager {
 	initDefaultManager()
 	return defaultManager
@@ -36,8 +28,8 @@ func initDefaultManager() {
 	// 初始化 manager
 	workspacesConf := config.Default().Workspaces
 	workspaces := make([]Workspace, len(workspacesConf))
-	for _, wsConf := range workspacesConf {
-		workspaces = append(workspaces, NewDirWorkspace(wsConf.Name, wsConf.Path, wsConf.MaxDepth, GitProjectChecker))
+	for i, wsConf := range workspacesConf {
+		workspaces[i] = NewDirWorkspace(wsConf.Name, config.RealPath(wsConf.Path), wsConf.MaxDepth, GitProjectChecker)
 	}
 
 	defaultManager = NewManager(workspaces)

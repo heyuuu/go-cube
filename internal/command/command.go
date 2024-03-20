@@ -28,5 +28,5 @@ func (m Manager) Search(query string) []Command {
 }
 
 func (m Manager) matcher() *matcher.Matcher[Command] {
-	return matcher.NewKeywordMatcher(m.commands, func(c Command) string { return c.Name }, matcher.DefaultScorer)
+	return matcher.NewKeywordMatcher(m.commands, func(c Command) string { return c.Name }, nil)
 }

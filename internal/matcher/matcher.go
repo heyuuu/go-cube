@@ -1,52 +1,67 @@
 package matcher
 
-import "sort"
-
-type Keyword struct {
-	String string
-	Weight float64
-}
+import (
+	"cmp"
+	"go-cube/internal/slicekit"
+	"slices"
+)
 
 type Matcher[T any] struct {
 	targets  []T
 	scorer   Scorer
-	keywords [][]Keyword // targets 对应的 keywords 列表
+	keywords []string // targets 对应的 keyword 列表
 }
 
-func NewMatcher[T any](targets []T, keywordGetter func(T) []Keyword, scorer Scorer) *Matcher[T] {
-	var targetKeywords = make([][]Keyword, len(targets))
-	for index, target := range targets {
-		targetKeywords[index] = keywordGetter(target)
+func newMatcher[T any](targets []T, keywords []string, scorer Scorer) *Matcher[T] {
+	if scorer == nil {
+		scorer = defaultScorer
 	}
-	return &Matcher[T]{targets: targets, scorer: scorer, keywords: targetKeywords}
+
+	return &Matcher[T]{
+		targets:  targets,
+		scorer:   scorer,
+		keywords: keywords,
+	}
 }
 
 func NewKeywordMatcher[T any](targets []T, keywordGetter func(T) string, scorer Scorer) *Matcher[T] {
-	return NewMatcher(targets, func(t T) []Keyword {
-		return []Keyword{{String: keywordGetter(t), Weight: 1.0}}
-	}, scorer)
+	keywords := slicekit.Map(targets, keywordGetter)
+	return newMatcher(targets, keywords, scorer)
 }
 
 func NewStringMatcher(targets []string, scorer Scorer) *Matcher[string] {
-	return NewKeywordMatcher(targets, func(t string) string { return t }, scorer)
+	keywords := targets
+	return newMatcher(targets, keywords, scorer)
 }
 
 func (m *Matcher[T]) Match(query string) []T {
+	if query == "" {
+		return slices.Clone(m.targets)
+	}
+
+	type scoredTarget struct {
+		target T
+		score  float64
+	}
+
 	// 记录匹配的对象和分数
-	var result []T
-	var scores []float64
+	result := make([]scoredTarget, 0, len(m.targets))
 	for i, keyword := range m.keywords {
 		score := m.scorer.Score(keyword, query)
 		if score > 0 {
-			result = append(result, m.targets[i])
-			scores = append(scores, score)
+			result = append(result, scoredTarget{
+				target: m.targets[i],
+				score:  score,
+			})
 		}
 	}
 
 	// 按分数排序
-	sort.Slice(result, func(i, j int) bool {
-		return scores[i] > scores[j]
+	slices.SortFunc(result, func(a, b scoredTarget) int {
+		return cmp.Compare(a.score, b.score)
 	})
 
-	return result
+	return slicekit.Map(result, func(t scoredTarget) T {
+		return t.target
+	})
 }
