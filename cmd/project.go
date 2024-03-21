@@ -43,9 +43,9 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 			var items []any
 			for _, proj := range projects {
 				items = append(items, map[string]string{
-					"title":    proj.Name,
-					"subtitle": proj.GitRepoUrl,
-					"arg":      proj.Name,
+					"title":    proj.Name(),
+					"subtitle": proj.RepoUrl(),
+					"arg":      proj.Name(),
 				})
 			}
 			alfredSearchResult(items)
@@ -57,8 +57,8 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 			body := make([][]string, len(projects))
 			for index, proj := range projects {
 				body[index] = []string{
-					proj.Name,
-					proj.Path,
+					proj.Name(),
+					proj.Path(),
 				}
 			}
 
@@ -103,7 +103,7 @@ var projectInfoCmd = initCmd(cmdOpts[projectInfoFlags]{
 		}
 
 		for index, proj := range projects {
-			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, 20), proj.Path)
+			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name(), 20), proj.Path())
 		}
 	},
 })

@@ -29,7 +29,7 @@ func initDefaultManager() {
 	workspacesConf := config.Default().Workspaces
 	workspaces := make([]Workspace, len(workspacesConf))
 	for i, wsConf := range workspacesConf {
-		workspaces[i] = NewDirWorkspace(wsConf.Name, config.RealPath(wsConf.Path), wsConf.MaxDepth, GitProjectChecker)
+		workspaces[i] = NewDirWorkspace(wsConf.Name, config.RealPath(wsConf.Path), wsConf.MaxDepth)
 	}
 
 	defaultManager = NewManager(workspaces)
