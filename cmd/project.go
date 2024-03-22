@@ -107,25 +107,42 @@ type projectInfoFlags struct {
 
 var projectInfoCmd = initCmd(cmdOpts[projectInfoFlags]{
 	Root:  projectCmd,
-	Use:   "info [project]",
-	Short: "",
+	Use:   "info {project : 项目名，支持模糊匹配} {--w|workspace= : 指定工作区，默认针对所有工作区}",
+	Short: "打开项目",
 	Args:  cobra.ExactArgs(1),
 	Init: func(cmd *cobra.Command, flags *projectInfoFlags) {
 		cmd.Flags().StringVarP(&flags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 	},
 	Run: func(cmd *cobra.Command, flags *projectInfoFlags, args []string) {
 		query := args[0]
-		projects := project.DefaultManager().Search(query)
+
+		var projects []*project.Project
+		if flags.workspace == "" {
+			projects = project.DefaultManager().Search(query)
+		} else {
+			projects = project.DefaultManager().SearchInWorkspace(query, flags.workspace)
+		}
 
 		// 没有匹配时结束命令
-		if len(projects) == 0 {
+		var proj *project.Project
+		switch len(projects) {
+		case 0:
 			fmt.Println("没有匹配的项目")
 			return
+		case 1:
+			proj = projects[0]
+		default:
+			var ok bool
+			proj, ok = choiceItem("选择项目", projects, (*project.Project).Name)
+			if !ok {
+				fmt.Println("选择项目失败")
+				return
+			}
 		}
 
-		for index, proj := range projects {
-			fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name(), 20), proj.Path())
-		}
+		fmt.Printf("project: %s\n", proj.Name())
+		fmt.Printf("path   : %s\n", proj.Path())
+		fmt.Printf("git-url: %s\n", proj.RepoUrl())
 	},
 })
 
