@@ -8,6 +8,7 @@ import (
 )
 
 var cfgFile string
+var isAlfred bool
 var debug bool
 
 // rootCmd represents the base command when called without any subcommands
@@ -32,4 +33,5 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is ~/.go-cube/config.json)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
+	rootCmd.PersistentFlags().BoolVar(&isAlfred, "alfred", false, "open debug mode")
 }

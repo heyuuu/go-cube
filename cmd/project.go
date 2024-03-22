@@ -9,7 +9,8 @@ import (
 
 // cmd group `project *`
 var projectCmd = initCmd(cmdOpts[any]{
-	Use: "project",
+	Use:     "project",
+	Aliases: []string{"proj", "p"},
 })
 
 // cmd `project search`
@@ -40,29 +41,13 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 
 		// 返回结果
 		if alfred {
-			var items []any
-			for _, proj := range projects {
-				items = append(items, map[string]string{
-					"title":    proj.Name(),
-					"subtitle": proj.RepoUrl(),
-					"arg":      proj.Name(),
-				})
-			}
-			alfredSearchResult(items)
+			alfredSearchResultFunc(projects, (*project.Project).Name, (*project.Project).RepoUrl, (*project.Project).Name)
 		} else {
 			header := []string{
 				fmt.Sprintf("项目(%d)", len(projects)),
 				"路径",
 			}
-			body := make([][]string, len(projects))
-			for index, proj := range projects {
-				body[index] = []string{
-					proj.Name(),
-					proj.Path(),
-				}
-			}
-
-			printTable(header, body)
+			printTableFunc(projects, header, (*project.Project).Name, (*project.Project).RepoUrl)
 		}
 
 		//var maxNameLen int

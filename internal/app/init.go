@@ -31,7 +31,7 @@ func initDefaultManager() {
 
 	// 初始化 manager
 	apps := slicekit.Map(conf, func(c config.ApplicationConfig) App {
-		return App{Name: c.Name, Bin: c.Bin}
+		return MakeApp(c.Name, c.Bin)
 	})
 
 	defaultManager = NewManager(apps)

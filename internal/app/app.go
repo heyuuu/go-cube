@@ -3,9 +3,16 @@ package app
 import "go-cube/internal/matcher"
 
 type App struct {
-	Name string
-	Bin  string
+	name string
+	bin  string
 }
+
+func MakeApp(name string, bin string) App {
+	return App{name: name, bin: bin}
+}
+
+func (app App) Name() string { return app.name }
+func (app App) Bin() string  { return app.bin }
 
 type Manager struct {
 	apps    []App
@@ -15,7 +22,7 @@ type Manager struct {
 func NewManager(apps []App) *Manager {
 	return &Manager{
 		apps:    apps,
-		matcher: matcher.NewKeywordMatcher(apps, func(app App) string { return app.Name }, nil),
+		matcher: matcher.NewKeywordMatcher(apps, func(app App) string { return app.name }, nil),
 	}
 }
 

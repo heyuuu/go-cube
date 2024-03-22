@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/spf13/cobra"
+	"go-cube/internal/slicekit"
 	"log"
 	"strings"
 )
@@ -45,6 +46,15 @@ func initCmd[T any](opts cmdOpts[T]) *cobra.Command {
 	}
 
 	return cmd
+}
+
+func printTableFunc[T any](items []T, headers []string, valueGetters ...func(T) string) {
+	body := slicekit.Map(items, func(item T) []string {
+		return slicekit.Map(valueGetters, func(valueGetter func(T) string) string {
+			return valueGetter(item)
+		})
+	})
+	printTable(headers, body)
 }
 
 func printTable(headers []string, body [][]string) {
@@ -90,7 +100,6 @@ func printTable(headers []string, body [][]string) {
 		printTableLine(columnCount, line, maxLen)
 	}
 	fmt.Println(splitLine)
-
 }
 
 func printTableLine(columnCount int, fields []string, maxLen []int) {
@@ -127,10 +136,10 @@ func unicodeWidth(str string) int {
 	return width
 }
 
-func alfredSearchResult(items []any) {
-	result := struct {
-		Items []any `json:"items"`
-	}{items}
+func alfredSearchResult(items []AlfredListItem) {
+	result := H{
+		"items": items,
+	}
 
 	bytes, err := json.Marshal(result)
 	if err != nil {
@@ -138,6 +147,17 @@ func alfredSearchResult(items []any) {
 	}
 
 	fmt.Println(string(bytes))
+}
+
+func alfredSearchResultFunc[T any](items []T, title func(T) string, subTitle func(T) string, arg func(T) string) {
+	listItems := slicekit.Map(items, func(item T) AlfredListItem {
+		return AlfredListItem{
+			Title:    title(item),
+			SubTitle: subTitle(item),
+			Arg:      arg(item),
+		}
+	})
+	alfredSearchResult(listItems)
 }
 
 func strRightPad(s string, minLen int) string {
