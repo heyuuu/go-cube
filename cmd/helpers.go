@@ -50,9 +50,11 @@ func initCmd[T any](opts cmdOpts[T]) *cobra.Command {
 
 func printTableFunc[T any](items []T, headers []string, valueGetters ...func(T) string) {
 	body := slicekit.Map(items, func(item T) []string {
-		return slicekit.Map(valueGetters, func(valueGetter func(T) string) string {
-			return valueGetter(item)
-		})
+		line := make([]string, len(valueGetters))
+		for i, getter := range valueGetters {
+			line[i] = getter(item)
+		}
+		return line
 	})
 	printTable(headers, body)
 }

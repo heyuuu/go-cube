@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/spf13/cobra"
 	"go-cube/internal/project"
+	"go-cube/internal/slicekit"
 	"strings"
 )
 
@@ -27,40 +28,54 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 	Init: func(cmd *cobra.Command, flags *projectSearchFlags) {
 		cmd.Flags().StringVarP(&flags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 		cmd.Flags().BoolVar(&flags.status, "status", false, "分析项目")
-		cmd.Flags().BoolVar(&flags.alfred, "alfred", false, "来自 alfred 的请求")
 	},
 	Run: func(cmd *cobra.Command, flags *projectSearchFlags, args []string) {
-
 		// 获取输入参数
 		query := strings.Join(args, " ")
-		//status := flags.status // todo
-		alfred := flags.alfred
+		showStatus := flags.status
 
 		// 项目列表
 		projects := project.DefaultManager().Search(query)
+		fmt.Printf("%v", args)
 
 		// 返回结果
-		if alfred {
+		if isAlfred {
 			alfredSearchResultFunc(projects, (*project.Project).Name, (*project.Project).RepoUrl, (*project.Project).Name)
 		} else {
-			header := []string{
-				fmt.Sprintf("项目(%d)", len(projects)),
-				"路径",
+			if !showStatus {
+				printTable(
+					[]string{
+						fmt.Sprintf("项目(%d)", len(projects)),
+						"路径",
+					},
+					slicekit.Map(projects, func(p *project.Project) []string {
+						return []string{
+							p.Name(),
+							p.RepoUrl(),
+						}
+					}),
+				)
+			} else {
+				printTable(
+					[]string{
+						fmt.Sprintf("项目(%d)", len(projects)),
+						"路径",
+						"当前分支",
+						"Master差异",
+						"当前工作区是否干净",
+					},
+					slicekit.Map(projects, func(p *project.Project) []string {
+						return []string{
+							p.Name(),
+							p.RepoUrl(),
+							"", // todo 获取当前分支
+							"", // todo 获取当前分支差异
+							"", // todo 当前工作区是否干净
+						}
+					}),
+				)
 			}
-			printTableFunc(projects, header, (*project.Project).Name, (*project.Project).RepoUrl)
 		}
-
-		//var maxNameLen int
-		//for _, proj := range projects {
-		//	if maxNameLen < len(proj.Name) {
-		//		maxNameLen = len(proj.Name)
-		//	}
-		//}
-		//
-		//// 展示数据
-		//for index, proj := range projects {
-		//	fmt.Printf("[%3d] %s %s\n", index, strRightPad(proj.Name, maxNameLen), proj.Path)
-		//}
 	},
 })
 
