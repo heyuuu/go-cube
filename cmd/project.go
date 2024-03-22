@@ -3,8 +3,11 @@ package cmd
 import (
 	"fmt"
 	"github.com/spf13/cobra"
+	"go-cube/internal/git"
 	"go-cube/internal/project"
 	"go-cube/internal/slicekit"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -36,7 +39,6 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 
 		// 项目列表
 		projects := project.DefaultManager().Search(query)
-		fmt.Printf("%v", args)
 
 		// 返回结果
 		if isAlfred {
@@ -65,12 +67,31 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 						"当前工作区是否干净",
 					},
 					slicekit.Map(projects, func(p *project.Project) []string {
+						branches, currBranch, _ := git.Branches(p.Path(), true, true)
+
+						var branchDiff string
+						if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
+							forward, _ := git.LogBetweenCount(p.Path(), "master", "origin/master")
+							backward, _ := git.LogBetweenCount(p.Path(), "origin/master", "master")
+							if forward != 0 {
+								branchDiff += "+" + strconv.Itoa(forward)
+							}
+							if backward != 0 {
+								branchDiff += "-" + strconv.Itoa(backward)
+							}
+						}
+
+						var statusText string
+						if isDirty, _ := git.IsDirty(p.Path()); isDirty {
+							statusText = "dirty"
+						}
+
 						return []string{
 							p.Name(),
-							p.RepoUrl(),
-							"", // todo 获取当前分支
-							"", // todo 获取当前分支差异
-							"", // todo 当前工作区是否干净
+							p.Path(),
+							currBranch,
+							branchDiff,
+							statusText,
 						}
 					}),
 				)

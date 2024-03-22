@@ -100,7 +100,8 @@ func (ws *DirWorkspace) Scan() error {
 		if checkErr != nil {
 			return checkErr
 		} else if isProject {
-			projects = append(projects, NewProject(ws.name+":"+d.Name(), path))
+			name, _ := filepath.Rel(ws.root, path)
+			projects = append(projects, NewProject(ws.name+":"+name, path))
 			return fs.SkipDir
 		}
 
