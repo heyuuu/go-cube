@@ -33,3 +33,14 @@ func (m *Manager) Apps() []App {
 func (m *Manager) Search(query string) []App {
 	return m.matcher.Match(query)
 }
+
+func (m *Manager) FindApp(appName string) (App, bool) {
+	for _, app := range m.apps {
+		if app.Name() == appName {
+			return app, true
+		}
+	}
+
+	var tmp App
+	return tmp, false
+}

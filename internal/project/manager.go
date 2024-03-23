@@ -35,22 +35,11 @@ func (m *Manager) FindWorkspace(name string) Workspace {
 }
 
 func (m *Manager) Search(query string) []*Project {
-	projects := m.Projects()
-	if len(query) == 0 {
-		return projects
-	}
-
-	projectMatcher := matcher.NewKeywordMatcher(projects, (*Project).Name, nil)
-	return projectMatcher.Match(query)
+	return m.SearchInWorkspace(query, "")
 }
 
 func (m *Manager) SearchInWorkspace(query string, workspaceName string) []*Project {
-	ws := m.FindWorkspace(workspaceName)
-	if ws == nil {
-		return nil
-	}
-
-	projects := ws.Projects()
+	projects := m.projectsInWorkspace(workspaceName)
 	if len(projects) == 0 {
 		return nil
 	}
@@ -61,4 +50,17 @@ func (m *Manager) SearchInWorkspace(query string, workspaceName string) []*Proje
 
 	projectMatcher := matcher.NewKeywordMatcher(projects, (*Project).Name, nil)
 	return projectMatcher.Match(query)
+}
+
+func (m *Manager) projectsInWorkspace(workspaceName string) []*Project {
+	if workspaceName == "" {
+		return m.Projects()
+	} else {
+		ws := m.FindWorkspace(workspaceName)
+		if ws == nil {
+			return nil
+		}
+
+		return ws.Projects()
+	}
 }

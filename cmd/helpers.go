@@ -6,6 +6,8 @@ import (
 	"github.com/spf13/cobra"
 	"go-cube/internal/slicekit"
 	"log"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
 )
@@ -205,4 +207,20 @@ func choiceItemIndex(title string, items []string) int {
 			return inputNum
 		}
 	}
+}
+
+func isInteractive() bool {
+	fileInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	return (fileInfo.Mode() & os.ModeCharDevice) != 0
+}
+
+func passthruRun(bin string, args ...string) error {
+	cmd := exec.Command(bin, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
