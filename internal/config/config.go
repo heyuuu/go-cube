@@ -19,6 +19,8 @@ type HubConfig struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 	Host string `json:"host"`
+
+	DefaultPath string `json:"defaultPath"`
 }
 
 type ApplicationConfig struct {

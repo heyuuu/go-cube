@@ -29,7 +29,7 @@ func initDefaultManager() {
 	// 初始化 manager
 	hubConf := config.Default().Repositories.Hubs
 	hubs := slicekit.Map(hubConf, func(c config.HubConfig) *Hub {
-		return NewHub(c.Name, c.Host)
+		return NewHub(c.Name, c.Host, c.DefaultPath)
 	})
 
 	defaultManager = NewManager(hubs)

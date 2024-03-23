@@ -11,3 +11,12 @@ func NewManager(hubs []*Hub) *Manager {
 func (m *Manager) Hubs() []*Hub {
 	return m.hubs
 }
+
+func (m *Manager) FindHubByHost(host string) *Hub {
+	for _, hub := range m.hubs {
+		if hub.host == host {
+			return hub
+		}
+	}
+	return nil
+}

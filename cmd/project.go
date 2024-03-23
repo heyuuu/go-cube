@@ -6,8 +6,11 @@ import (
 	"go-cube/internal/app"
 	"go-cube/internal/git"
 	"go-cube/internal/project"
+	"go-cube/internal/repo"
 	"go-cube/internal/slicekit"
 	"log"
+	"os"
+	"os/exec"
 	"slices"
 	"strconv"
 	"strings"
@@ -203,15 +206,55 @@ var projectCloneCmd = initCmd(cmdOpts[projectCloneFlags]{
 		cmd.Flags().StringVarP(&flags.branch, "branch", "b", "", "分支名，默认为master")
 	},
 	Run: func(cmd *cobra.Command, flags *projectCloneFlags, args []string) {
-		//repoUrlStr := args[0]
-		//depth := flags.depth
-		//branch := flags.branch
-		//if len(branch) != 0 && depth < 0 {
-		//	depth = 1 // 指定分支情况下，默认深度为1
-		//}
-		//
-		//// 匹配hub
-		//repoUrl =
+		rawRepoUrl := args[0]
+		depth := flags.depth
+		branch := flags.branch
+		if branch != "" && depth == 0 {
+			depth = 1 // // 指定分支情况下，默认深度为1
+		}
 
+		// 解析 repoUrl
+		u, err := git.ParseRepoUrl(rawRepoUrl)
+		if err != nil {
+			log.Fatalf("repoUrl 不是合法地址: url=%s", rawRepoUrl)
+			return
+		}
+
+		// 匹配hub
+		hub := repo.DefaultManager().FindHubByHost(u.Host)
+		if hub == nil {
+			log.Fatalf("repoUrl 没有对应 hub 配置: host=%s", u.Host)
+			return
+		}
+
+		// 匹配本地地址
+		localPath, ok := hub.MapDefaultPath(u)
+		if !ok {
+			log.Fatalf("对应 hub 未支持此路径: hub=%s, path=%s", hub.Name(), u.Path)
+			return
+		}
+
+		// 执行命令
+		err = passthruGitClone(localPath, rawRepoUrl, depth, branch)
+		if err != nil {
+			log.Fatalf("执行 clone 命令失败: " + err.Error())
+		}
 	},
 })
+
+func passthruGitClone(localPath string, repoUrl string, depth int, branch string) error {
+	args := []string{"git", "clone", repoUrl, localPath}
+	if depth > 0 {
+		args = append(args, "--depth="+strconv.Itoa(depth))
+	}
+	if branch != "" {
+		args = append(args, "--branch="+branch)
+	}
+
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	log.Println("Run Cmd >>> " + cmd.String())
+	return cmd.Run()
+}
