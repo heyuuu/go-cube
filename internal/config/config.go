@@ -10,9 +10,10 @@ import (
 )
 
 type WorkspaceConfig struct {
-	Name     string `json:"name"`
-	Path     string `json:"path"`
-	MaxDepth int    `json:"maxDepth"`
+	Name       string   `json:"name"`
+	Path       string   `json:"path"`
+	MaxDepth   int      `json:"maxDepth"`
+	PreferApps []string `json:"preferApps"`
 }
 
 type HubConfig struct {

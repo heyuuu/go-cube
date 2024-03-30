@@ -33,6 +33,7 @@ type Workspace interface {
 	Name() string
 	Projects() []*Project
 	Scan() error
+	PreferApps() []string
 }
 
 // DirWorkspace 通过目录管理的项目空间
@@ -40,6 +41,7 @@ type DirWorkspace struct {
 	name        string      // 工作区名
 	root        string      // 根目录
 	maxDepth    int         // 扫描最大深度
+	preferApps  []string    // 倾向的app列表
 	pathChecker pathChecker // 用于判断目录是否为项目或是否应跳过
 	scanned     bool        // 是否已扫描
 	scanLock    sync.Mutex
@@ -48,18 +50,20 @@ type DirWorkspace struct {
 
 type pathChecker func(path string) (isProject bool, err error)
 
-func NewDirWorkspace(name string, root string, maxDepth int) *DirWorkspace {
+func NewDirWorkspace(name string, root string, maxDepth int, preferApps []string) *DirWorkspace {
 	return &DirWorkspace{
 		name:        name,
 		root:        root,
 		maxDepth:    maxDepth,
+		preferApps:  preferApps,
 		pathChecker: gitProjectChecker,
 	}
 }
 
-func (ws *DirWorkspace) Name() string  { return ws.name }
-func (ws *DirWorkspace) Root() string  { return ws.root }
-func (ws *DirWorkspace) MaxDepth() int { return ws.maxDepth }
+func (ws *DirWorkspace) Name() string         { return ws.name }
+func (ws *DirWorkspace) Root() string         { return ws.root }
+func (ws *DirWorkspace) MaxDepth() int        { return ws.maxDepth }
+func (ws *DirWorkspace) PreferApps() []string { return ws.preferApps }
 
 func (ws *DirWorkspace) Projects() []*Project {
 	err := ws.Scan()

@@ -3,6 +3,8 @@ package cmd
 import (
 	"fmt"
 	"go-cube/internal/app"
+	"go-cube/internal/project"
+	"go-cube/internal/slicekit"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -48,9 +50,13 @@ var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
 		}
 
 		// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
+		var preferApps []string
 		if len(projectName) > 0 {
-			// todo
+			pm := project.DefaultManager()
+			ws := pm.FindWorkspaceByProjectName(projectName)
+			preferApps = ws.PreferApps()
 		}
+		apps = sortApps(apps, preferApps)
 
 		// 返回结果
 		showApps(apps)
@@ -67,4 +73,23 @@ func showApps(apps []app.App) {
 		}
 		printTableFunc(apps, header, app.App.Name, app.App.Bin)
 	}
+}
+
+func sortApps(apps []app.App, preferAppNames []string) []app.App {
+	if len(apps) <= 1 || len(preferAppNames) == 0 {
+		return apps
+	}
+
+	preferAppNameMap := make(map[string]int, len(preferAppNames))
+	for i, appName := range preferAppNames {
+		preferAppNameMap[appName] = i
+	}
+
+	return slicekit.SortByWithIndex(apps, func(i int, app app.App) int {
+		if idx, ok := preferAppNameMap[app.Name()]; ok {
+			return idx
+		} else {
+			return i + len(preferAppNames)
+		}
+	})
 }

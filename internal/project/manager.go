@@ -4,6 +4,7 @@ import (
 	"go-cube/internal/matcher"
 	"go-cube/internal/slicekit"
 	"slices"
+	"strings"
 )
 
 type Manager struct {
@@ -32,6 +33,13 @@ func (m *Manager) FindWorkspace(name string) Workspace {
 	}
 
 	return m.workspaces[idx]
+}
+
+func (m *Manager) FindWorkspaceByProjectName(projectName string) Workspace {
+	if wsName, _, ok := strings.Cut(projectName, ":"); ok {
+		return m.FindWorkspace(wsName)
+	}
+	return nil
 }
 
 func (m *Manager) Search(query string) []*Project {
