@@ -6,9 +6,10 @@ type Project struct {
 	name string
 	path string
 	repo repo.Repo
+	tags []string
 }
 
-func NewProject(name string, path string) *Project {
+func NewProject(name string, path string, tags []string) *Project {
 	return &Project{name: name, path: path}
 }
 

@@ -10,21 +10,29 @@ import (
 )
 
 var (
-	gitProjectChecker pathChecker = func(path string) (isProject bool, err error) {
+	combineProjectChecker pathChecker = func(path string) (isProject bool, tags []string, err error) {
 		// 跳过特殊前缀的目录
 		var name = filepath.Base(path)
 		if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
-			return false, fs.SkipDir
+			return false, nil, fs.SkipDir
 		}
 
-		// 判断若 .git 目录存在则认为是一个 project
-		var gitPath = path + "/.git"
-		stat, err := os.Stat(gitPath)
-		if err == nil && stat.IsDir() {
-			return true, nil
+		// 获取子文件/子目录用于判断是否是项目及对应tag
+		dirEntries, err := os.ReadDir(path)
+		if err != nil {
+			return false, nil, err
 		}
-
-		return false, nil
+		for _, entry := range dirEntries {
+			if entry.IsDir() && entry.Name() == ".git" { // 若 .git 目录存在则认为是一个 project
+				tags = append(tags, TagGit)
+			} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
+				tags = append(tags, TagGodot)
+			}
+		}
+		if len(tags) > 0 {
+			return true, tags, nil
+		}
+		return false, nil, nil
 	}
 )
 
@@ -35,6 +43,8 @@ type Workspace interface {
 	Scan() error
 	PreferApps() []string
 }
+
+// pathChecker  用于判断目录是否为项目或是否应跳过
 
 // DirWorkspace 通过目录管理的项目空间
 type DirWorkspace struct {
@@ -48,7 +58,7 @@ type DirWorkspace struct {
 	projects    []*Project
 }
 
-type pathChecker func(path string) (isProject bool, err error)
+type pathChecker func(path string) (isProject bool, tags []string, err error)
 
 func NewDirWorkspace(name string, root string, maxDepth int, preferApps []string) *DirWorkspace {
 	return &DirWorkspace{
@@ -56,7 +66,7 @@ func NewDirWorkspace(name string, root string, maxDepth int, preferApps []string
 		root:        root,
 		maxDepth:    maxDepth,
 		preferApps:  preferApps,
-		pathChecker: gitProjectChecker,
+		pathChecker: combineProjectChecker,
 	}
 }
 
@@ -100,7 +110,7 @@ func (ws *DirWorkspace) Scan() error {
 		}
 
 		// 检查目录，返回此目录为项目或跳过目录或nil
-		isProject, checkErr := ws.pathChecker(path)
+		isProject, tags, checkErr := ws.pathChecker(path)
 		if checkErr != nil {
 			return checkErr
 		} else if isProject {
@@ -108,7 +118,7 @@ func (ws *DirWorkspace) Scan() error {
 			if name == "." {
 				name = filepath.Base(path)
 			}
-			projects = append(projects, NewProject(ws.name+":"+name, path))
+			projects = append(projects, NewProject(ws.name+":"+name, path, tags))
 			return fs.SkipDir
 		}
 
