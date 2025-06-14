@@ -1,14 +1,10 @@
-package repo
+package entities
 
 import (
-	"github.com/heyuuu/go-cube/internal/git"
+	"github.com/heyuuu/go-cube/internal/util/git"
 	"path/filepath"
 	"strings"
 )
-
-type Repo interface {
-	Url() string
-}
 
 type Hub struct {
 	name        string

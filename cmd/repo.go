@@ -2,7 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"github.com/heyuuu/go-cube/internal/repo"
+	"github.com/heyuuu/go-cube/internal/app"
+	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/spf13/cobra"
 )
 
@@ -16,19 +17,21 @@ var repoListCmd = initCmd(cmdOpts[any]{
 	Use:   "list-hub",
 	Short: "列出可用 repo-hub 列表",
 	Run: func(cmd *cobra.Command, flags *any, args []string) {
-		hubs := repo.DefaultManager().Hubs()
+		service := app.Default().RepoService()
+
+		hubs := service.Hubs()
 		showHubs(hubs)
 	},
 })
 
-func showHubs(hubs []*repo.Hub) {
+func showHubs(hubs []*entities.Hub) {
 	if isAlfred {
-		alfredSearchResultFunc(hubs, (*repo.Hub).Name, (*repo.Hub).Host, (*repo.Hub).Name)
+		alfredSearchResultFunc(hubs, (*entities.Hub).Name, (*entities.Hub).Host, (*entities.Hub).Name)
 	} else {
 		header := []string{
 			fmt.Sprintf("Hub(%d)", len(hubs)),
 			"Path",
 		}
-		printTableFunc(hubs, header, (*repo.Hub).Name, (*repo.Hub).Host)
+		printTableFunc(hubs, header, (*entities.Hub).Name, (*entities.Hub).Host)
 	}
 }

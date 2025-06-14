@@ -1,4 +1,4 @@
-package project
+package common
 
 const (
 	TagGit   = "git"

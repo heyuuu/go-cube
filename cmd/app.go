@@ -3,8 +3,8 @@ package cmd
 import (
 	"fmt"
 	"github.com/heyuuu/go-cube/internal/app"
-	"github.com/heyuuu/go-cube/internal/project"
-	"github.com/heyuuu/go-cube/internal/slicekit"
+	"github.com/heyuuu/go-cube/internal/entities"
+	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,7 +20,8 @@ var appListCmd = initCmd(cmdOpts[any]{
 	Use:   "list",
 	Short: "列出可用命令列表",
 	Run: func(cmd *cobra.Command, flags *any, args []string) {
-		apps := app.DefaultManager().Apps()
+		service := app.Default().ApplicationService()
+		apps := service.Apps()
 		showApps(apps)
 	},
 })
@@ -42,18 +43,14 @@ var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
 		projectName := flags.project
 
 		// 获取匹配的命令列表
-		var apps []app.App
-		if len(query) == 0 {
-			apps = app.DefaultManager().Apps()
-		} else {
-			apps = app.DefaultManager().Search(strings.Join(query, " "))
-		}
+		service := app.Default().ApplicationService()
+		apps := service.Search(strings.Join(query, " "))
 
 		// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
 		var preferApps []string
 		if len(projectName) > 0 {
-			pm := project.DefaultManager()
-			ws := pm.FindWorkspaceByProjectName(projectName)
+			service := app.Default().ProjectService()
+			ws := service.FindWorkspaceByProjectName(projectName)
 			preferApps = ws.PreferApps()
 		}
 		apps = sortApps(apps, preferApps)
@@ -63,19 +60,19 @@ var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
 	},
 })
 
-func showApps(apps []app.App) {
+func showApps(apps []*entities.Application) {
 	if isAlfred {
-		alfredSearchResultFunc(apps, app.App.Name, app.App.Bin, app.App.Name)
+		alfredSearchResultFunc(apps, (*entities.Application).Name, (*entities.Application).Bin, (*entities.Application).Name)
 	} else {
 		header := []string{
 			fmt.Sprintf("项目(%d)", len(apps)),
 			"路径",
 		}
-		printTableFunc(apps, header, app.App.Name, app.App.Bin)
+		printTableFunc(apps, header, (*entities.Application).Name, (*entities.Application).Bin)
 	}
 }
 
-func sortApps(apps []app.App, preferAppNames []string) []app.App {
+func sortApps(apps []*entities.Application, preferAppNames []string) []*entities.Application {
 	if len(apps) <= 1 || len(preferAppNames) == 0 {
 		return apps
 	}
@@ -85,7 +82,7 @@ func sortApps(apps []app.App, preferAppNames []string) []app.App {
 		preferAppNameMap[appName] = i
 	}
 
-	return slicekit.SortByWithIndex(apps, func(i int, app app.App) int {
+	return slicekit.SortByWithIndex(apps, func(i int, app *entities.Application) int {
 		if idx, ok := preferAppNameMap[app.Name()]; ok {
 			return idx
 		} else {

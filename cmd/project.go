@@ -3,10 +3,9 @@ package cmd
 import (
 	"fmt"
 	"github.com/heyuuu/go-cube/internal/app"
-	"github.com/heyuuu/go-cube/internal/git"
-	"github.com/heyuuu/go-cube/internal/project"
-	"github.com/heyuuu/go-cube/internal/repo"
-	"github.com/heyuuu/go-cube/internal/slicekit"
+	"github.com/heyuuu/go-cube/internal/entities"
+	git2 "github.com/heyuuu/go-cube/internal/util/git"
+	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -43,11 +42,12 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 		showStatus := flags.status
 
 		// 项目列表
-		projects := project.DefaultManager().SearchInWorkspace(query, flags.workspace)
+		service := app.Default().ProjectService()
+		projects := service.SearchInWorkspace(query, flags.workspace)
 
 		// 返回结果
 		if isAlfred {
-			alfredSearchResultFunc(projects, (*project.Project).Name, (*project.Project).RepoUrl, (*project.Project).Name)
+			alfredSearchResultFunc(projects, (*entities.Project).Name, (*entities.Project).RepoUrl, (*entities.Project).Name)
 		} else {
 			if !showStatus {
 				printTable(
@@ -55,7 +55,7 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 						fmt.Sprintf("项目(%d)", len(projects)),
 						"路径",
 					},
-					slicekit.Map(projects, func(p *project.Project) []string {
+					slicekit.Map(projects, func(p *entities.Project) []string {
 						return []string{
 							p.Name(),
 							p.Path(),
@@ -71,13 +71,13 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 						"Master差异",
 						"当前工作区是否干净",
 					},
-					slicekit.Map(projects, func(p *project.Project) []string {
-						branches, currBranch, _ := git.Branches(p.Path(), true, true)
+					slicekit.Map(projects, func(p *entities.Project) []string {
+						branches, currBranch, _ := git2.Branches(p.Path(), true, true)
 
 						var branchDiff string
 						if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
-							forward, _ := git.LogBetweenCount(p.Path(), "master", "origin/master")
-							backward, _ := git.LogBetweenCount(p.Path(), "origin/master", "master")
+							forward, _ := git2.LogBetweenCount(p.Path(), "master", "origin/master")
+							backward, _ := git2.LogBetweenCount(p.Path(), "origin/master", "master")
 							if forward != 0 {
 								branchDiff += "+" + strconv.Itoa(forward)
 							}
@@ -87,7 +87,7 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 						}
 
 						var statusText string
-						if isDirty, _ := git.IsDirty(p.Path()); isDirty {
+						if isDirty, _ := git2.IsDirty(p.Path()); isDirty {
 							statusText = "dirty"
 						}
 
@@ -152,8 +152,9 @@ var projectOpenCmd = initCmd(cmdOpts[projectOpenFlags]{
 		query := args[0]
 
 		// 获取打开项目的app
-		openApp, ok := app.DefaultManager().FindApp(flags.app)
-		if !ok {
+		applicationService := app.Default().ApplicationService()
+		openApp := applicationService.FindApp(flags.app)
+		if openApp == nil {
 			log.Fatal("未找到指定app: " + flags.app)
 			return
 		}
@@ -172,8 +173,9 @@ var projectOpenCmd = initCmd(cmdOpts[projectOpenFlags]{
 	},
 })
 
-func selectProject(query string, workspace string) *project.Project {
-	projects := project.DefaultManager().SearchInWorkspace(query, workspace)
+func selectProject(query string, workspace string) *entities.Project {
+	service := app.Default().ProjectService()
+	projects := service.SearchInWorkspace(query, workspace)
 	switch len(projects) {
 	case 0:
 		fmt.Println("没有匹配的项目")
@@ -181,7 +183,7 @@ func selectProject(query string, workspace string) *project.Project {
 	case 1:
 		return projects[0]
 	default:
-		proj, ok := choiceItem("选择项目", projects, (*project.Project).Name)
+		proj, ok := choiceItem("选择项目", projects, (*entities.Project).Name)
 		if !ok {
 			fmt.Println("选择项目失败")
 			return nil
@@ -214,14 +216,15 @@ var projectCloneCmd = initCmd(cmdOpts[projectCloneFlags]{
 		}
 
 		// 解析 repoUrl
-		u, err := git.ParseRepoUrl(rawRepoUrl)
+		u, err := git2.ParseRepoUrl(rawRepoUrl)
 		if err != nil {
 			log.Fatalf("repoUrl 不是合法地址: url=%s", rawRepoUrl)
 			return
 		}
 
 		// 匹配hub
-		hub := repo.DefaultManager().FindHubByHost(u.Host)
+		repoService := app.Default().RepoService()
+		hub := repoService.FindHubByHost(u.Host)
 		if hub == nil {
 			log.Fatalf("repoUrl 没有对应 hub 配置: host=%s", u.Host)
 			return

@@ -1,46 +1,23 @@
 package app
 
-import "github.com/heyuuu/go-cube/internal/matcher"
+import (
+	"github.com/heyuuu/go-cube/internal/services"
+)
 
 type App struct {
-	name string
-	bin  string
+	projectService     *services.ProjectService
+	applicationService *services.ApplicationService
+	repoService        *services.RepoService
 }
 
-func MakeApp(name string, bin string) App {
-	return App{name: name, bin: bin}
+func (app *App) ProjectService() *services.ProjectService {
+	return app.projectService
 }
 
-func (app App) Name() string { return app.name }
-func (app App) Bin() string  { return app.bin }
-
-type Manager struct {
-	apps    []App
-	matcher *matcher.Matcher[App]
+func (app *App) ApplicationService() *services.ApplicationService {
+	return app.applicationService
 }
 
-func NewManager(apps []App) *Manager {
-	return &Manager{
-		apps:    apps,
-		matcher: matcher.NewKeywordMatcher(apps, func(app App) string { return app.name }, nil),
-	}
-}
-
-func (m *Manager) Apps() []App {
-	return m.apps
-}
-
-func (m *Manager) Search(query string) []App {
-	return m.matcher.Match(query)
-}
-
-func (m *Manager) FindApp(appName string) (App, bool) {
-	for _, app := range m.apps {
-		if app.Name() == appName {
-			return app, true
-		}
-	}
-
-	var tmp App
-	return tmp, false
+func (app *App) RepoService() *services.RepoService {
+	return app.repoService
 }

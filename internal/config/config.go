@@ -3,10 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
-	"path/filepath"
-	"strings"
 )
 
 type WorkspaceConfig struct {
@@ -49,31 +46,4 @@ func ParseConfigFile(cfgFile string, cfg *Config) error {
 	}
 
 	return nil
-}
-
-// default
-
-var defaultConf Config
-
-func Default() Config { return defaultConf }
-
-func InitConfig(cfgFile string) error {
-	if len(cfgFile) == 0 {
-		cfgFile = "~/.go-cube/config.json"
-	}
-
-	if IsDebug() {
-		log.Println("cfgFile = " + cfgFile)
-	}
-
-	cfgFile = RealPath(cfgFile)
-	return ParseConfigFile(cfgFile, &defaultConf)
-}
-
-func RealPath(path string) string {
-	// 支持 ~ 前缀
-	if strings.HasPrefix(path, "~/") {
-		path = filepath.Join(os.Getenv("HOME"), path[2:])
-	}
-	return path
 }

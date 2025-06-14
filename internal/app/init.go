@@ -1,38 +1,15 @@
 package app
 
-import (
-	"github.com/heyuuu/go-cube/internal/config"
-	"github.com/heyuuu/go-cube/internal/slicekit"
-	"sync"
+import "sync"
+
+var (
+	defaultApp  *App
+	defaultOnce sync.Once
 )
 
-var defaultManager *Manager
-var defaultLock sync.Mutex
-
-func DefaultManager() *Manager {
-	initDefaultManager()
-	return defaultManager
-}
-
-func initDefaultManager() {
-	if defaultManager != nil {
-		return
-	}
-
-	defaultLock.Lock()
-	defer defaultLock.Unlock()
-
-	if defaultManager != nil {
-		return
-	}
-
-	// 读取配置
-	conf := config.Default().Applications
-
-	// 初始化 manager
-	apps := slicekit.Map(conf, func(c config.ApplicationConfig) App {
-		return MakeApp(c.Name, c.Bin)
+func Default() *App {
+	defaultOnce.Do(func() {
+		defaultApp = InitApp()
 	})
-
-	defaultManager = NewManager(apps)
+	return defaultApp
 }

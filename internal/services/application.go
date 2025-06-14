@@ -1,0 +1,47 @@
+package services
+
+import (
+	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/entities"
+	"github.com/heyuuu/go-cube/internal/util/matcher"
+	"github.com/heyuuu/go-cube/internal/util/slicekit"
+)
+
+type ApplicationService struct {
+	apps []*entities.Application
+}
+
+func NewApplicationService() *ApplicationService {
+	// 读取配置
+	conf := config.Default().Applications
+	apps := slicekit.Map(conf, func(c config.ApplicationConfig) *entities.Application {
+		return entities.NewApp(c.Name, c.Bin)
+	})
+
+	return &ApplicationService{apps: apps}
+}
+
+func (s *ApplicationService) Apps() []*entities.Application {
+	return s.apps
+}
+
+func (s *ApplicationService) Search(query string) []*entities.Application {
+	if len(s.apps) == 0 {
+		return s.apps
+	}
+
+	m := matcher.NewKeywordMatcher(s.apps, func(app *entities.Application) string {
+		return app.Name()
+	}, nil)
+	return m.Match(query)
+}
+
+func (s *ApplicationService) FindApp(appName string) *entities.Application {
+	for _, app := range s.apps {
+		if app.Name() == appName {
+			return app
+		}
+	}
+
+	return nil
+}

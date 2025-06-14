@@ -1,6 +1,7 @@
-package project
+package entities
 
 import (
+	"github.com/heyuuu/go-cube/internal/common"
 	"io/fs"
 	"log"
 	"os"
@@ -24,9 +25,9 @@ var (
 		}
 		for _, entry := range dirEntries {
 			if entry.IsDir() && entry.Name() == ".git" { // 若 .git 目录存在则认为是一个 project
-				tags = append(tags, TagGit)
+				tags = append(tags, common.TagGit)
 			} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
-				tags = append(tags, TagGodot)
+				tags = append(tags, common.TagGodot)
 			}
 		}
 		if len(tags) > 0 {
