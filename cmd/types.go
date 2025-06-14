@@ -1,6 +1,6 @@
 package cmd
 
-import "go-cube/internal/slicekit"
+import "github.com/heyuuu/go-cube/internal/slicekit"
 
 type H map[string]any
 

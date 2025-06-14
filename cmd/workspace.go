@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/project"
 	"github.com/spf13/cobra"
-	"go-cube/internal/project"
 )
 
 var workspaceCmd = initCmd(cmdOpts[any]{

@@ -3,8 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/slicekit"
 	"github.com/spf13/cobra"
-	"go-cube/internal/slicekit"
 	"log"
 	"os"
 	"os/exec"

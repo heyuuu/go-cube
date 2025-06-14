@@ -1,7 +1,7 @@
 package repo
 
 import (
-	"go-cube/internal/git"
+	"github.com/heyuuu/go-cube/internal/git"
 	"path/filepath"
 	"strings"
 )

@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/config"
 	"os"
 
 	"github.com/spf13/cobra"

@@ -1,4 +1,4 @@
-module go-cube
+module github.com/heyuuu/go-cube
 
 go 1.22
 

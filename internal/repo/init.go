@@ -1,8 +1,8 @@
 package repo
 
 import (
-	"go-cube/internal/config"
-	"go-cube/internal/slicekit"
+	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/slicekit"
 	"sync"
 )
 

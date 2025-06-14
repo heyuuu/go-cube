@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"go-cube/internal/app"
-	"go-cube/internal/project"
-	"go-cube/internal/slicekit"
+	"github.com/heyuuu/go-cube/internal/app"
+	"github.com/heyuuu/go-cube/internal/project"
+	"github.com/heyuuu/go-cube/internal/slicekit"
 	"strings"
 
 	"github.com/spf13/cobra"

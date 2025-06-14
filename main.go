@@ -1,6 +1,6 @@
 package main
 
-import "go-cube/cmd"
+import "github.com/heyuuu/go-cube/cmd"
 
 func main() {
 	cmd.Execute()

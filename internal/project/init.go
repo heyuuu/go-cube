@@ -1,7 +1,7 @@
 package project
 
 import (
-	"go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/config"
 	"sync"
 )
 

@@ -1,6 +1,6 @@
 package app
 
-import "go-cube/internal/matcher"
+import "github.com/heyuuu/go-cube/internal/matcher"
 
 type App struct {
 	name string

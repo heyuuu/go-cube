@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/app"
+	"github.com/heyuuu/go-cube/internal/git"
+	"github.com/heyuuu/go-cube/internal/project"
+	"github.com/heyuuu/go-cube/internal/repo"
+	"github.com/heyuuu/go-cube/internal/slicekit"
 	"github.com/spf13/cobra"
-	"go-cube/internal/app"
-	"go-cube/internal/git"
-	"go-cube/internal/project"
-	"go-cube/internal/repo"
-	"go-cube/internal/slicekit"
 	"log"
 	"os"
 	"os/exec"

@@ -1,6 +1,6 @@
 package project
 
-import "go-cube/internal/repo"
+import "github.com/heyuuu/go-cube/internal/repo"
 
 type Project struct {
 	name string

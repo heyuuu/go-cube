@@ -2,8 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/repo"
 	"github.com/spf13/cobra"
-	"go-cube/internal/repo"
 )
 
 var repoCmd = initCmd(cmdOpts[any]{
