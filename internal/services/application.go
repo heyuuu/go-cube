@@ -26,10 +26,11 @@ func (s *ApplicationService) Apps() []*entities.Application {
 }
 
 func (s *ApplicationService) Search(query string) []*entities.Application {
-	if len(s.apps) == 0 {
+	if len(query) == 0 || len(s.apps) == 0 {
 		return s.apps
 	}
 
+	// match
 	m := matcher.NewKeywordMatcher(s.apps, func(app *entities.Application) string {
 		return app.Name()
 	}, nil)

@@ -1,13 +1,20 @@
 package app
 
 import (
+	"github.com/heyuuu/go-cube/internal/server"
 	"github.com/heyuuu/go-cube/internal/services"
 )
 
 type App struct {
+	server *server.Server
+
 	projectService     *services.ProjectService
 	applicationService *services.ApplicationService
 	remoteService      *services.RemoteService
+}
+
+func (app *App) Server() *server.Server {
+	return app.server
 }
 
 func (app *App) ProjectService() *services.ProjectService {

@@ -28,12 +28,12 @@ var remoteListCmd = &easycobra.Command{
 	},
 }
 
-func showRemotes(hubs []*entities.Remote) {
+func showRemotes(remotes []*entities.Remote) {
 	header := []string{
-		fmt.Sprintf("Remote(%d)", len(hubs)),
+		fmt.Sprintf("Remote(%d)", len(remotes)),
 		"Path",
 	}
-	console.PrintTableFunc(hubs, header, func(hub *entities.Remote) []string {
+	console.PrintTableFunc(remotes, header, func(hub *entities.Remote) []string {
 		return []string{
 			hub.Name(),
 			hub.Host(),

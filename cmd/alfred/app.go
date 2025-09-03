@@ -11,7 +11,7 @@ import (
 
 // cmd `alfred app-search`
 var appSearchCmd = &easycobra.Command{
-	Use:   "app-search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
+	Use:   "app-search {query? : 命令名，支持模糊匹配} {--project= : 项目名}",
 	Short: "搜索可用命令列表",
 	InitRun: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) {
 		// init flags

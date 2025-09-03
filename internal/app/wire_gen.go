@@ -8,6 +8,8 @@ package app
 
 import (
 	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/handlers"
+	"github.com/heyuuu/go-cube/internal/server"
 	"github.com/heyuuu/go-cube/internal/services"
 )
 
@@ -15,10 +17,15 @@ import (
 
 func InitApp() *App {
 	configConfig := config.Default()
+	configService := services.NewConfigService(configConfig)
+	configHandler := handlers.NewConfigHandler(configService)
+	v := handlers.AllHandlers(configHandler)
+	serverServer := server.NewServer(v)
 	projectService := services.NewProjectService(configConfig)
 	applicationService := services.NewApplicationService(configConfig)
 	remoteService := services.NewRemoteService(configConfig)
 	app := &App{
+		server:             serverServer,
 		projectService:     projectService,
 		applicationService: applicationService,
 		remoteService:      remoteService,

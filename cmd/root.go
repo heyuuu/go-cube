@@ -7,6 +7,7 @@ import (
 	"github.com/heyuuu/go-cube/cmd/remote"
 	"github.com/heyuuu/go-cube/cmd/workspace"
 	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/cube"
 	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"os"
 
@@ -16,7 +17,7 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &easycobra.Command{
 	Use:   "go-cube",
-	Short: "go-cube " + Version,
+	Short: "go-cube " + cube.Version,
 	InitPersistentPreRunE: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) error {
 		// persistent flags
 		var cfgPath string
@@ -50,6 +51,7 @@ func init() {
 		alfred.AlfredCmd,
 		// simple commands
 		versionCmd,
+		serverCmd,
 	)
 }
 
