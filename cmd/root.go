@@ -16,29 +16,40 @@ import (
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &easycobra.Command{
 	Use:   "go-cube",
-	Short: "go-cube v0.2.0",
+	Short: "go-cube " + Version,
 	InitPersistentPreRunE: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) error {
 		// persistent flags
-		var cfgFile string
+		var cfgPath string
 		var debug bool
-		cmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is ~/.go-cube/config.json)")
+		cmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "config folder path (default is ~/.go-cube/)")
 		cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
 
 		// persistent pre run
-		return func(cmd *cobra.Command, args []string) error {
+		return func(cmd *cobra.Command, args []string) (err error) {
+			// 设置 debug 环境
 			config.SetDebug(debug)
-			return config.InitConfig(cfgFile)
+
+			// 初始化配置
+			err = config.InitConfig(cfgPath)
+			if err != nil {
+				return err
+			}
+
+			return nil
 		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(
+		// group commands
 		project.ProjectCmd,
 		application.AppCmd,
 		remote.RemoteCmd,
 		workspace.WorkspaceCmd,
 		alfred.AlfredCmd,
+		// simple commands
+		versionCmd,
 	)
 }
 
