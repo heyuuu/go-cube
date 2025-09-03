@@ -2,9 +2,9 @@ package services
 
 import (
 	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/converter"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/matcher"
-	"github.com/heyuuu/go-cube/internal/util/pathkit"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"slices"
 	"strings"
@@ -14,12 +14,8 @@ type ProjectService struct {
 	workspaces []entities.Workspace
 }
 
-func NewProjectService() *ProjectService {
-	workspacesConf := config.Default().Workspaces
-	workspaces := make([]entities.Workspace, len(workspacesConf))
-	for i, wsConf := range workspacesConf {
-		workspaces[i] = entities.NewDirWorkspace(wsConf.Name, pathkit.RealPath(wsConf.Path), wsConf.MaxDepth, wsConf.PreferApps)
-	}
+func NewProjectService(conf config.Config) *ProjectService {
+	workspaces := slicekit.Map(conf.Workspaces, converter.ToWorkspaceEntity)
 
 	return &ProjectService{
 		workspaces: workspaces,

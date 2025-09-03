@@ -7,15 +7,17 @@
 package app
 
 import (
+	"github.com/heyuuu/go-cube/internal/config"
 	"github.com/heyuuu/go-cube/internal/services"
 )
 
 // Injectors from wire.go:
 
 func InitApp() *App {
-	projectService := services.NewProjectService()
-	applicationService := services.NewApplicationService()
-	remoteService := services.NewRemoteService()
+	configConfig := config.Default()
+	projectService := services.NewProjectService(configConfig)
+	applicationService := services.NewApplicationService(configConfig)
+	remoteService := services.NewRemoteService(configConfig)
 	app := &App{
 		projectService:     projectService,
 		applicationService: applicationService,

@@ -218,7 +218,7 @@ var projectCloneCmd = &easycobra.Command[projectCloneFlags]{
 
 		// 匹配hub
 		repoService := app.Default().RemoteService()
-		hub := repoService.FindHubByHost(u.Host)
+		hub := repoService.FindByHost(u.Host)
 		if hub == nil {
 			log.Fatalf("repoUrl 没有对应 hub 配置: host=%s", u.Host)
 			return

@@ -2,6 +2,7 @@ package services
 
 import (
 	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/converter"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/matcher"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
@@ -11,14 +12,13 @@ type ApplicationService struct {
 	apps []*entities.Application
 }
 
-func NewApplicationService() *ApplicationService {
+func NewApplicationService(conf config.Config) *ApplicationService {
 	// 读取配置
-	conf := config.Default().Applications
-	apps := slicekit.Map(conf, func(c config.ApplicationConfig) *entities.Application {
-		return entities.NewApp(c.Name, c.Bin)
-	})
+	apps := slicekit.Map(conf.Applications, converter.ToApplicationEntity)
 
-	return &ApplicationService{apps: apps}
+	return &ApplicationService{
+		apps: apps,
+	}
 }
 
 func (s *ApplicationService) Apps() []*entities.Application {

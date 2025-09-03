@@ -1,3 +1,2 @@
 #/bin/bash
-go build -o tmp/cube
-./tmp/cube $@
+go build -o tmp/cube && ./tmp/cube $@
