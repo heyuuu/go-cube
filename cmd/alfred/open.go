@@ -14,8 +14,7 @@ import (
 
 // cmd `project open`
 type projectOpenFlags struct {
-	workspace string
-	app       string
+	app string
 }
 
 var projectOpenCmd = &easycobra.Command[projectOpenFlags]{
@@ -23,7 +22,6 @@ var projectOpenCmd = &easycobra.Command[projectOpenFlags]{
 	Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",
 	Args:  cobra.ExactArgs(1),
 	Init: func(cmd *cobra.Command, flags *projectOpenFlags) {
-		cmd.Flags().StringVarP(&flags.workspace, "workspace", "w", "", "指定工作区，默认针对所有工作区")
 		cmd.Flags().StringVar(&flags.app, "app", "", "打开项目的App")
 	},
 	Run: func(cmd *cobra.Command, flags *projectOpenFlags, args []string) {
@@ -38,7 +36,7 @@ var projectOpenCmd = &easycobra.Command[projectOpenFlags]{
 		}
 
 		// 匹配项目
-		proj := selectProject(query, flags.workspace)
+		proj := selectProject(query, "")
 		if proj == nil {
 			return
 		}

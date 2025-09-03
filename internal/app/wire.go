@@ -12,7 +12,7 @@ func InitApp() *App {
 		// services
 		services.NewProjectService,
 		services.NewApplicationService,
-		services.NewRepoService,
+		services.NewRemoteService,
 
 		// app
 		wire.Struct(new(App), "*"),

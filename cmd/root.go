@@ -40,7 +40,7 @@ func init() {
 
 	rootCmd.AddCommand(project.ProjectCmd.CobraCommand())
 	rootCmd.AddCommand(application.AppCmd.CobraCommand())
-	rootCmd.AddCommand(remote.RepoCmd.CobraCommand())
+	rootCmd.AddCommand(remote.RemoteCmd.CobraCommand())
 	rootCmd.AddCommand(workspace.WorkspaceCmd.CobraCommand())
 	rootCmd.AddCommand(alfred.AlfredCmd.CobraCommand())
 }

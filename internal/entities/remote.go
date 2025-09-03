@@ -6,25 +6,25 @@ import (
 	"strings"
 )
 
-type Hub struct {
+type Remote struct {
 	name        string
 	host        string
 	defaultPath string
 }
 
-func NewHub(name string, host string, defaultPath string) *Hub {
-	return &Hub{name: name, host: host, defaultPath: defaultPath}
+func NewHub(name string, host string, defaultPath string) *Remote {
+	return &Remote{name: name, host: host, defaultPath: defaultPath}
 }
 
-func (h *Hub) Name() string {
+func (h *Remote) Name() string {
 	return h.name
 }
 
-func (h *Hub) Host() string {
+func (h *Remote) Host() string {
 	return h.host
 }
 
-func (h *Hub) MapDefaultPath(url *git.RepoUrl) (string, bool) {
+func (h *Remote) MapDefaultPath(url *git.RepoUrl) (string, bool) {
 	if h.defaultPath == "" {
 		return "", false
 	}

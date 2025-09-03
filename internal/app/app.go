@@ -7,7 +7,7 @@ import (
 type App struct {
 	projectService     *services.ProjectService
 	applicationService *services.ApplicationService
-	repoService        *services.RepoService
+	remoteService      *services.RemoteService
 }
 
 func (app *App) ProjectService() *services.ProjectService {
@@ -18,6 +18,6 @@ func (app *App) ApplicationService() *services.ApplicationService {
 	return app.applicationService
 }
 
-func (app *App) RepoService() *services.RepoService {
-	return app.repoService
+func (app *App) RemoteService() *services.RemoteService {
+	return app.remoteService
 }

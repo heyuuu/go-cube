@@ -17,7 +17,6 @@ func init() {
 	easycobra.AddCommand(AlfredCmd, projectSearchCmd)
 	easycobra.AddCommand(AlfredCmd, projectOpenCmd)
 	easycobra.AddCommand(AlfredCmd, appSearchCmd)
-
 }
 
 // helpers

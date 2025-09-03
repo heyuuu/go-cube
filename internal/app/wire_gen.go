@@ -15,11 +15,11 @@ import (
 func InitApp() *App {
 	projectService := services.NewProjectService()
 	applicationService := services.NewApplicationService()
-	repoService := services.NewRepoService()
+	remoteService := services.NewRemoteService()
 	app := &App{
 		projectService:     projectService,
 		applicationService: applicationService,
-		repoService:        repoService,
+		remoteService:      remoteService,
 	}
 	return app
 }
