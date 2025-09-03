@@ -1,11 +1,13 @@
-package cmd
+package project
 
 import (
 	"fmt"
+	"github.com/heyuuu/go-cube/cmd/alfred"
 	"github.com/heyuuu/go-cube/internal/app"
 	"github.com/heyuuu/go-cube/internal/entities"
-	git2 "github.com/heyuuu/go-cube/internal/util/git"
-	"github.com/heyuuu/go-cube/internal/util/slicekit"
+	console2 "github.com/heyuuu/go-cube/internal/util/console"
+	"github.com/heyuuu/go-cube/internal/util/easycobra"
+	"github.com/heyuuu/go-cube/internal/util/git"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -16,10 +18,17 @@ import (
 )
 
 // cmd group `project *`
-var projectCmd = initCmd(cmdOpts[any]{
+var ProjectCmd = &easycobra.Command[any]{
 	Use:     "project",
 	Aliases: []string{"proj", "p"},
-})
+}
+
+func init() {
+	easycobra.AddCommand(ProjectCmd, projectSearchCmd)
+	easycobra.AddCommand(ProjectCmd, projectInfoCmd)
+	easycobra.AddCommand(ProjectCmd, projectOpenCmd)
+	easycobra.AddCommand(ProjectCmd, projectCloneCmd)
+}
 
 // cmd `project search`
 type projectSearchFlags struct {
@@ -28,8 +37,7 @@ type projectSearchFlags struct {
 	alfred    bool
 }
 
-var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
-	Root:  projectCmd,
+var projectSearchCmd = &easycobra.Command[projectSearchFlags]{
 	Use:   "search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}  {--alfred : 来自 alfred 的请求}",
 	Short: "搜索项目列表",
 	Init: func(cmd *cobra.Command, flags *projectSearchFlags) {
@@ -46,72 +54,71 @@ var projectSearchCmd = initCmd(cmdOpts[projectSearchFlags]{
 		projects := service.SearchInWorkspace(query, flags.workspace)
 
 		// 返回结果
-		if isAlfred {
-			alfredSearchResultFunc(projects, (*entities.Project).Name, (*entities.Project).RepoUrl, (*entities.Project).Name)
+		if alfred.IsAlfred {
+			alfred.PrintResultFunc(projects, func(item *entities.Project) alfred.Item {
+				return alfred.Item{
+					Title:    item.Name(),
+					SubTitle: item.RepoUrl(),
+					Arg:      item.Name(),
+				}
+			})
 		} else {
 			if !showStatus {
-				printTable(
-					[]string{
-						fmt.Sprintf("项目(%d)", len(projects)),
-						"路径",
-					},
-					slicekit.Map(projects, func(p *entities.Project) []string {
-						return []string{
-							p.Name(),
-							p.Path(),
-						}
-					}),
-				)
+				console2.PrintTableFunc(projects, []string{
+					fmt.Sprintf("项目(%d)", len(projects)),
+					"路径",
+				}, func(p *entities.Project) []string {
+					return []string{
+						p.Name(),
+						p.Path(),
+					}
+				})
 			} else {
-				printTable(
-					[]string{
-						fmt.Sprintf("项目(%d)", len(projects)),
-						"路径",
-						"当前分支",
-						"Master差异",
-						"当前工作区是否干净",
-					},
-					slicekit.Map(projects, func(p *entities.Project) []string {
-						branches, currBranch, _ := git2.Branches(p.Path(), true, true)
+				console2.PrintTableFunc(projects, []string{
+					fmt.Sprintf("项目(%d)", len(projects)),
+					"路径",
+					"当前分支",
+					"Master差异",
+					"当前工作区是否干净",
+				}, func(p *entities.Project) []string {
+					branches, currBranch, _ := git.Branches(p.Path(), true, true)
 
-						var branchDiff string
-						if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
-							forward, _ := git2.LogBetweenCount(p.Path(), "master", "origin/master")
-							backward, _ := git2.LogBetweenCount(p.Path(), "origin/master", "master")
-							if forward != 0 {
-								branchDiff += "+" + strconv.Itoa(forward)
-							}
-							if backward != 0 {
-								branchDiff += "-" + strconv.Itoa(backward)
-							}
+					var branchDiff string
+					if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
+						forward, _ := git.LogBetweenCount(p.Path(), "master", "origin/master")
+						backward, _ := git.LogBetweenCount(p.Path(), "origin/master", "master")
+						if forward != 0 {
+							branchDiff += "+" + strconv.Itoa(forward)
 						}
+						if backward != 0 {
+							branchDiff += "-" + strconv.Itoa(backward)
+						}
+					}
 
-						var statusText string
-						if isDirty, _ := git2.IsDirty(p.Path()); isDirty {
-							statusText = "dirty"
-						}
+					var statusText string
+					if isDirty, _ := git.IsDirty(p.Path()); isDirty {
+						statusText = "dirty"
+					}
 
-						return []string{
-							p.Name(),
-							p.Path(),
-							currBranch,
-							branchDiff,
-							statusText,
-						}
-					}),
-				)
+					return []string{
+						p.Name(),
+						p.Path(),
+						currBranch,
+						branchDiff,
+						statusText,
+					}
+				})
 			}
 		}
 	},
-})
+}
 
 // cmd `project info`
 type projectInfoFlags struct {
 	workspace string
 }
 
-var projectInfoCmd = initCmd(cmdOpts[projectInfoFlags]{
-	Root:  projectCmd,
+var projectInfoCmd = &easycobra.Command[projectInfoFlags]{
 	Use:   "info {project : 项目名，支持模糊匹配} {--w|workspace= : 指定工作区，默认针对所有工作区}",
 	Short: "打开项目",
 	Args:  cobra.ExactArgs(1),
@@ -131,7 +138,7 @@ var projectInfoCmd = initCmd(cmdOpts[projectInfoFlags]{
 		fmt.Printf("path   : %s\n", proj.Path())
 		fmt.Printf("git-url: %s\n", proj.RepoUrl())
 	},
-})
+}
 
 // cmd `project open`
 type projectOpenFlags struct {
@@ -139,8 +146,7 @@ type projectOpenFlags struct {
 	app       string
 }
 
-var projectOpenCmd = initCmd(cmdOpts[projectOpenFlags]{
-	Root:  projectCmd,
+var projectOpenCmd = &easycobra.Command[projectOpenFlags]{
 	Use:   "open {project : 项目名} {--app= : 打开项目的App} {--w|workspace= : 指定工作区，仅交互模式有意义}",
 	Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",
 	Args:  cobra.ExactArgs(1),
@@ -171,7 +177,7 @@ var projectOpenCmd = initCmd(cmdOpts[projectOpenFlags]{
 			log.Fatalf("打开失败: " + err.Error())
 		}
 	},
-})
+}
 
 func selectProject(query string, workspace string) *entities.Project {
 	service := app.Default().ProjectService()
@@ -183,7 +189,7 @@ func selectProject(query string, workspace string) *entities.Project {
 	case 1:
 		return projects[0]
 	default:
-		proj, ok := choiceItem("选择项目", projects, (*entities.Project).Name)
+		proj, ok := console2.ChoiceItem("选择项目", projects, (*entities.Project).Name)
 		if !ok {
 			fmt.Println("选择项目失败")
 			return nil
@@ -198,8 +204,7 @@ type projectCloneFlags struct {
 	branch string
 }
 
-var projectCloneCmd = initCmd(cmdOpts[projectCloneFlags]{
-	Root:  projectCmd,
+var projectCloneCmd = &easycobra.Command[projectCloneFlags]{
 	Use:   "clone {repoUrl} {--depth= : 克隆深度，默认为不限制} {--b|branch=}",
 	Short: "使用 RepoUrl 初始化项目",
 	Args:  cobra.ExactArgs(1),
@@ -216,7 +221,7 @@ var projectCloneCmd = initCmd(cmdOpts[projectCloneFlags]{
 		}
 
 		// 解析 repoUrl
-		u, err := git2.ParseRepoUrl(rawRepoUrl)
+		u, err := git.ParseRepoUrl(rawRepoUrl)
 		if err != nil {
 			log.Fatalf("repoUrl 不是合法地址: url=%s", rawRepoUrl)
 			return
@@ -243,7 +248,7 @@ var projectCloneCmd = initCmd(cmdOpts[projectCloneFlags]{
 			log.Fatalf("执行 clone 命令失败: " + err.Error())
 		}
 	},
-})
+}
 
 func passthruGitClone(localPath string, repoUrl string, depth int, branch string) error {
 	args := []string{"git", "clone", repoUrl, localPath}

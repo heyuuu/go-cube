@@ -1,6 +1,11 @@
 package cmd
 
 import (
+	"github.com/heyuuu/go-cube/cmd/alfred"
+	"github.com/heyuuu/go-cube/cmd/application"
+	"github.com/heyuuu/go-cube/cmd/project"
+	"github.com/heyuuu/go-cube/cmd/remote"
+	"github.com/heyuuu/go-cube/cmd/workspace"
 	"github.com/heyuuu/go-cube/internal/config"
 	"os"
 
@@ -8,7 +13,6 @@ import (
 )
 
 var cfgFile string
-var isAlfred bool
 var debug bool
 
 // rootCmd represents the base command when called without any subcommands
@@ -33,5 +37,10 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is ~/.go-cube/config.json)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
-	rootCmd.PersistentFlags().BoolVar(&isAlfred, "alfred", false, "open debug mode")
+	rootCmd.PersistentFlags().BoolVar(&alfred.IsAlfred, "alfred", false, "open debug mode")
+
+	rootCmd.AddCommand(project.ProjectCmd.CobraCommand())
+	rootCmd.AddCommand(application.AppCmd.CobraCommand())
+	rootCmd.AddCommand(remote.RepoCmd.CobraCommand())
+	rootCmd.AddCommand(workspace.WorkspaceCmd.CobraCommand())
 }

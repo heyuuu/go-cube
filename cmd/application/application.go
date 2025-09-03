@@ -1,22 +1,29 @@
-package cmd
+package application
 
 import (
 	"fmt"
+	"github.com/heyuuu/go-cube/cmd/alfred"
 	"github.com/heyuuu/go-cube/internal/app"
 	"github.com/heyuuu/go-cube/internal/entities"
+	"github.com/heyuuu/go-cube/internal/util/console"
+	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
-	"strings"
-
 	"github.com/spf13/cobra"
+	"strings"
 )
 
-var appCmd = initCmd(cmdOpts[any]{
-	Use: "app",
-})
+var AppCmd = &easycobra.Command[any]{
+	Use:     "application",
+	Aliases: []string{"app"},
+}
+
+func init() {
+	easycobra.AddCommand(AppCmd, appListCmd)
+	easycobra.AddCommand(AppCmd, appSearchCmd)
+}
 
 // cmd `app list`
-var appListCmd = initCmd(cmdOpts[any]{
-	Root:  appCmd,
+var appListCmd = &easycobra.Command[any]{
 	Use:   "list",
 	Short: "列出可用命令列表",
 	Run: func(cmd *cobra.Command, flags *any, args []string) {
@@ -24,15 +31,14 @@ var appListCmd = initCmd(cmdOpts[any]{
 		apps := service.Apps()
 		showApps(apps)
 	},
-})
+}
 
 // cmd `app search`
 type appSearchFlags struct {
 	project string
 }
 
-var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
-	Root:  appCmd,
+var appSearchCmd = &easycobra.Command[appSearchFlags]{
 	Use:   "search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
 	Short: "搜索可用命令列表",
 	Init: func(cmd *cobra.Command, flags *appSearchFlags) {
@@ -58,17 +64,28 @@ var appSearchCmd = initCmd(cmdOpts[appSearchFlags]{
 		// 返回结果
 		showApps(apps)
 	},
-})
+}
 
 func showApps(apps []*entities.Application) {
-	if isAlfred {
-		alfredSearchResultFunc(apps, (*entities.Application).Name, (*entities.Application).Bin, (*entities.Application).Name)
+	if alfred.IsAlfred {
+		alfred.PrintResultFunc(apps, func(item *entities.Application) alfred.Item {
+			return alfred.Item{
+				Title:    item.Name(),
+				SubTitle: item.Bin(),
+				Arg:      item.Name(),
+			}
+		})
 	} else {
 		header := []string{
 			fmt.Sprintf("项目(%d)", len(apps)),
 			"路径",
 		}
-		printTableFunc(apps, header, (*entities.Application).Name, (*entities.Application).Bin)
+		console.PrintTableFunc(apps, header, func(app *entities.Application) []string {
+			return []string{
+				app.Name(),
+				app.Bin(),
+			}
+		})
 	}
 }
 
