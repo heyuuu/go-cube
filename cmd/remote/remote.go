@@ -9,19 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var RemoteCmd = &easycobra.Command[any]{
+var RemoteCmd = &easycobra.Command{
 	Use: "remote",
 }
 
 func init() {
-	easycobra.AddCommand(RemoteCmd, remoteListCmd)
+	RemoteCmd.AddCommand(remoteListCmd)
 }
 
 // cmd `remote list`
-var remoteListCmd = &easycobra.Command[any]{
+var remoteListCmd = &easycobra.Command{
 	Use:   "list",
 	Short: "列出可用远端仓库列表",
-	Run: func(cmd *cobra.Command, flags *any, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		service := app.Default().RemoteService()
 		remotes := service.Remotes()
 		showRemotes(remotes)

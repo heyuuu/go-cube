@@ -9,12 +9,10 @@ import (
 )
 
 // cmd `alfred search`
-type projectSearchFlags struct{}
-
-var projectSearchCmd = &easycobra.Command[projectSearchFlags]{
+var projectSearchCmd = &easycobra.Command{
 	Use:   "project-search {query?* : 项目名，支持模糊匹配}",
 	Short: "搜索项目列表",
-	Run: func(cmd *cobra.Command, _ *projectSearchFlags, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		// 获取输入参数
 		query := strings.Join(args, " ")
 

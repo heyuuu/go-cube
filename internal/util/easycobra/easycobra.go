@@ -2,22 +2,19 @@ package easycobra
 
 import "github.com/spf13/cobra"
 
-func AddCommand[T1, T2 any](root *Command[T1], sub *Command[T2]) {
-	root.CobraCommand().AddCommand(sub.CobraCommand())
-}
-
-type Command[T any] struct {
-	Use     string
-	Short   string
-	Aliases []string
-	Args    cobra.PositionalArgs
-	Init    func(cmd *cobra.Command, flags *T)
-	Run     func(cmd *cobra.Command, flags *T, args []string)
+type Command struct {
+	Use                   string
+	Short                 string
+	Aliases               []string
+	Args                  cobra.PositionalArgs
+	InitPersistentPreRunE func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) error
+	Run                   func(cmd *cobra.Command, args []string)
+	InitRun               func(cmd *cobra.Command) func(cmd *cobra.Command, args []string)
 	// private
 	cmd *cobra.Command
 }
 
-func (c *Command[T]) CobraCommand() *cobra.Command {
+func (c *Command) CobraCommand() *cobra.Command {
 	if c.cmd != nil {
 		return c.cmd
 	}
@@ -27,17 +24,20 @@ func (c *Command[T]) CobraCommand() *cobra.Command {
 		Short:   c.Short,
 		Aliases: c.Aliases,
 		Args:    c.Args,
+		Run:     c.Run,
 	}
-
-	var flags T
-	if c.Run != nil {
-		c.cmd.Run = func(cmd *cobra.Command, args []string) {
-			c.Run(cmd, &flags, args)
-		}
+	if c.InitPersistentPreRunE != nil {
+		c.cmd.PersistentPreRunE = c.InitPersistentPreRunE(c.cmd)
 	}
-	if c.Init != nil {
-		c.Init(c.cmd, &flags)
+	if c.InitRun != nil {
+		c.cmd.Run = c.InitRun(c.cmd)
 	}
 
 	return c.cmd
+}
+
+func (c *Command) AddCommand(cmds ...*Command) {
+	for _, cmd := range cmds {
+		c.CobraCommand().AddCommand(cmd.CobraCommand())
+	}
 }

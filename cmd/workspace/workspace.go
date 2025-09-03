@@ -7,19 +7,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var WorkspaceCmd = &easycobra.Command[any]{
+var WorkspaceCmd = &easycobra.Command{
 	Use:     "workspace",
 	Aliases: []string{"ws"},
 }
 
 func init() {
-	easycobra.AddCommand(WorkspaceCmd, workspaceListCmd)
+	WorkspaceCmd.AddCommand(workspaceListCmd)
 }
 
 // cmd `workspace list`
-var workspaceListCmd = &easycobra.Command[any]{
+var workspaceListCmd = &easycobra.Command{
 	Use: "list",
-	Run: func(cmd *cobra.Command, flags *any, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		service := app.Default().ProjectService()
 		for _, ws := range service.Workspaces() {
 			fmt.Println(ws.Name())

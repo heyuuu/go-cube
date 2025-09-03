@@ -11,21 +11,21 @@ import (
 	"strings"
 )
 
-var AppCmd = &easycobra.Command[any]{
+var AppCmd = &easycobra.Command{
 	Use:     "application",
 	Aliases: []string{"app"},
 }
 
 func init() {
-	easycobra.AddCommand(AppCmd, appListCmd)
-	easycobra.AddCommand(AppCmd, appSearchCmd)
+	AppCmd.AddCommand(appListCmd)
+	AppCmd.AddCommand(appSearchCmd)
 }
 
 // cmd `app list`
-var appListCmd = &easycobra.Command[any]{
+var appListCmd = &easycobra.Command{
 	Use:   "list",
 	Short: "列出可用命令列表",
-	Run: func(cmd *cobra.Command, flags *any, args []string) {
+	Run: func(cmd *cobra.Command, args []string) {
 		service := app.Default().ApplicationService()
 		apps := service.Apps()
 		showApps(apps)
@@ -33,35 +33,34 @@ var appListCmd = &easycobra.Command[any]{
 }
 
 // cmd `app search`
-type appSearchFlags struct {
-	project string
-}
-
-var appSearchCmd = &easycobra.Command[appSearchFlags]{
+var appSearchCmd = &easycobra.Command{
 	Use:   "search {query? : 命令名，支持模糊匹配} {--project= : 项目名} {--alfred : 来自 alfred 的请求}",
 	Short: "搜索可用命令列表",
-	Init: func(cmd *cobra.Command, flags *appSearchFlags) {
-		cmd.PersistentFlags().StringVar(&flags.project, "project", "", "项目名")
-	},
-	Run: func(cmd *cobra.Command, flags *appSearchFlags, args []string) {
-		query := args
-		projectName := flags.project
+	InitRun: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) {
+		// init flags
+		var projectName string
+		cmd.Flags().StringVar(&projectName, "project", "", "项目名")
 
-		// 获取匹配的命令列表
-		service := app.Default().ApplicationService()
-		apps := service.Search(strings.Join(query, " "))
+		// run
+		return func(cmd *cobra.Command, args []string) {
+			query := args
 
-		// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
-		var preferApps []string
-		if len(projectName) > 0 {
-			service := app.Default().ProjectService()
-			ws := service.FindWorkspaceByProjectName(projectName)
-			preferApps = ws.PreferApps()
+			// 获取匹配的命令列表
+			service := app.Default().ApplicationService()
+			apps := service.Search(strings.Join(query, " "))
+
+			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
+			var preferApps []string
+			if len(projectName) > 0 {
+				service := app.Default().ProjectService()
+				ws := service.FindWorkspaceByProjectName(projectName)
+				preferApps = ws.PreferApps()
+			}
+			apps = sortApps(apps, preferApps)
+
+			// 返回结果
+			showApps(apps)
 		}
-		apps = sortApps(apps, preferApps)
-
-		// 返回结果
-		showApps(apps)
 	},
 }
 

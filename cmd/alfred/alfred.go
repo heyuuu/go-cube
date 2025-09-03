@@ -9,14 +9,14 @@ import (
 )
 
 // alfred root cmd
-var AlfredCmd = &easycobra.Command[any]{
+var AlfredCmd = &easycobra.Command{
 	Use: "alfred",
 }
 
 func init() {
-	easycobra.AddCommand(AlfredCmd, projectSearchCmd)
-	easycobra.AddCommand(AlfredCmd, projectOpenCmd)
-	easycobra.AddCommand(AlfredCmd, appSearchCmd)
+	AlfredCmd.AddCommand(projectSearchCmd)
+	AlfredCmd.AddCommand(projectOpenCmd)
+	AlfredCmd.AddCommand(appSearchCmd)
 }
 
 // helpers
