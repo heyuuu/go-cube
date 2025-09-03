@@ -2,7 +2,6 @@ package remote
 
 import (
 	"fmt"
-	"github.com/heyuuu/go-cube/cmd/alfred"
 	"github.com/heyuuu/go-cube/internal/app"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/console"
@@ -32,24 +31,14 @@ var repoListCmd = &easycobra.Command[any]{
 }
 
 func showHubs(hubs []*entities.Hub) {
-	if alfred.IsAlfred {
-		alfred.PrintResultFunc(hubs, func(item *entities.Hub) alfred.Item {
-			return alfred.Item{
-				Title:    item.Name(),
-				SubTitle: item.Host(),
-				Arg:      item.Name(),
-			}
-		})
-	} else {
-		header := []string{
-			fmt.Sprintf("Hub(%d)", len(hubs)),
-			"Path",
-		}
-		console.PrintTableFunc(hubs, header, func(hub *entities.Hub) []string {
-			return []string{
-				hub.Name(),
-				hub.Host(),
-			}
-		})
+	header := []string{
+		fmt.Sprintf("Hub(%d)", len(hubs)),
+		"Path",
 	}
+	console.PrintTableFunc(hubs, header, func(hub *entities.Hub) []string {
+		return []string{
+			hub.Name(),
+			hub.Host(),
+		}
+	})
 }

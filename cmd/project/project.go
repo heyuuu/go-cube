@@ -2,10 +2,9 @@ package project
 
 import (
 	"fmt"
-	"github.com/heyuuu/go-cube/cmd/alfred"
 	"github.com/heyuuu/go-cube/internal/app"
 	"github.com/heyuuu/go-cube/internal/entities"
-	console2 "github.com/heyuuu/go-cube/internal/util/console"
+	"github.com/heyuuu/go-cube/internal/util/console"
 	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"github.com/heyuuu/go-cube/internal/util/git"
 	"github.com/spf13/cobra"
@@ -54,61 +53,51 @@ var projectSearchCmd = &easycobra.Command[projectSearchFlags]{
 		projects := service.SearchInWorkspace(query, flags.workspace)
 
 		// 返回结果
-		if alfred.IsAlfred {
-			alfred.PrintResultFunc(projects, func(item *entities.Project) alfred.Item {
-				return alfred.Item{
-					Title:    item.Name(),
-					SubTitle: item.RepoUrl(),
-					Arg:      item.Name(),
+		if !showStatus {
+			console.PrintTableFunc(projects, []string{
+				fmt.Sprintf("项目(%d)", len(projects)),
+				"路径",
+			}, func(p *entities.Project) []string {
+				return []string{
+					p.Name(),
+					p.Path(),
 				}
 			})
 		} else {
-			if !showStatus {
-				console2.PrintTableFunc(projects, []string{
-					fmt.Sprintf("项目(%d)", len(projects)),
-					"路径",
-				}, func(p *entities.Project) []string {
-					return []string{
-						p.Name(),
-						p.Path(),
-					}
-				})
-			} else {
-				console2.PrintTableFunc(projects, []string{
-					fmt.Sprintf("项目(%d)", len(projects)),
-					"路径",
-					"当前分支",
-					"Master差异",
-					"当前工作区是否干净",
-				}, func(p *entities.Project) []string {
-					branches, currBranch, _ := git.Branches(p.Path(), true, true)
+			console.PrintTableFunc(projects, []string{
+				fmt.Sprintf("项目(%d)", len(projects)),
+				"路径",
+				"当前分支",
+				"Master差异",
+				"当前工作区是否干净",
+			}, func(p *entities.Project) []string {
+				branches, currBranch, _ := git.Branches(p.Path(), true, true)
 
-					var branchDiff string
-					if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
-						forward, _ := git.LogBetweenCount(p.Path(), "master", "origin/master")
-						backward, _ := git.LogBetweenCount(p.Path(), "origin/master", "master")
-						if forward != 0 {
-							branchDiff += "+" + strconv.Itoa(forward)
-						}
-						if backward != 0 {
-							branchDiff += "-" + strconv.Itoa(backward)
-						}
+				var branchDiff string
+				if slices.Contains(branches, "master") && slices.Contains(branches, "origin/master") {
+					forward, _ := git.LogBetweenCount(p.Path(), "master", "origin/master")
+					backward, _ := git.LogBetweenCount(p.Path(), "origin/master", "master")
+					if forward != 0 {
+						branchDiff += "+" + strconv.Itoa(forward)
 					}
+					if backward != 0 {
+						branchDiff += "-" + strconv.Itoa(backward)
+					}
+				}
 
-					var statusText string
-					if isDirty, _ := git.IsDirty(p.Path()); isDirty {
-						statusText = "dirty"
-					}
+				var statusText string
+				if isDirty, _ := git.IsDirty(p.Path()); isDirty {
+					statusText = "dirty"
+				}
 
-					return []string{
-						p.Name(),
-						p.Path(),
-						currBranch,
-						branchDiff,
-						statusText,
-					}
-				})
-			}
+				return []string{
+					p.Name(),
+					p.Path(),
+					currBranch,
+					branchDiff,
+					statusText,
+				}
+			})
 		}
 	},
 }
@@ -189,7 +178,7 @@ func selectProject(query string, workspace string) *entities.Project {
 	case 1:
 		return projects[0]
 	default:
-		proj, ok := console2.ChoiceItem("选择项目", projects, (*entities.Project).Name)
+		proj, ok := console.ChoiceItem("选择项目", projects, (*entities.Project).Name)
 		if !ok {
 			fmt.Println("选择项目失败")
 			return nil

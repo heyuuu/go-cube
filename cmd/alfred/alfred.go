@@ -3,9 +3,24 @@ package alfred
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"log"
 )
+
+// alfred root cmd
+var AlfredCmd = &easycobra.Command[any]{
+	Use: "alfred",
+}
+
+func init() {
+	easycobra.AddCommand(AlfredCmd, projectSearchCmd)
+	easycobra.AddCommand(AlfredCmd, projectOpenCmd)
+	easycobra.AddCommand(AlfredCmd, appSearchCmd)
+
+}
+
+// helpers
 
 type H map[string]any
 

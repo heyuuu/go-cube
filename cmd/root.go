@@ -37,10 +37,10 @@ func Execute() {
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is ~/.go-cube/config.json)")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
-	rootCmd.PersistentFlags().BoolVar(&alfred.IsAlfred, "alfred", false, "open debug mode")
 
 	rootCmd.AddCommand(project.ProjectCmd.CobraCommand())
 	rootCmd.AddCommand(application.AppCmd.CobraCommand())
 	rootCmd.AddCommand(remote.RepoCmd.CobraCommand())
 	rootCmd.AddCommand(workspace.WorkspaceCmd.CobraCommand())
+	rootCmd.AddCommand(alfred.AlfredCmd.CobraCommand())
 }
