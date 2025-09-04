@@ -37,18 +37,11 @@ var (
 	}
 )
 
-// Workspace 项目空间
-type Workspace interface {
-	Name() string
-	Projects() []*Project
-	Scan() error
-	PreferApps() []string
-}
-
 // pathChecker  用于判断目录是否为项目或是否应跳过
+type pathChecker func(path string) (isProject bool, tags []string, err error)
 
-// DirWorkspace 通过目录管理的项目空间
-type DirWorkspace struct {
+// Workspace 工作区
+type Workspace struct {
 	name        string      // 工作区名
 	root        string      // 根目录
 	maxDepth    int         // 扫描最大深度
@@ -59,10 +52,8 @@ type DirWorkspace struct {
 	projects    []*Project
 }
 
-type pathChecker func(path string) (isProject bool, tags []string, err error)
-
-func NewDirWorkspace(name string, root string, maxDepth int, preferApps []string) *DirWorkspace {
-	return &DirWorkspace{
+func NewWorkspace(name string, root string, maxDepth int, preferApps []string) *Workspace {
+	return &Workspace{
 		name:        name,
 		root:        root,
 		maxDepth:    maxDepth,
@@ -71,12 +62,12 @@ func NewDirWorkspace(name string, root string, maxDepth int, preferApps []string
 	}
 }
 
-func (ws *DirWorkspace) Name() string         { return ws.name }
-func (ws *DirWorkspace) Root() string         { return ws.root }
-func (ws *DirWorkspace) MaxDepth() int        { return ws.maxDepth }
-func (ws *DirWorkspace) PreferApps() []string { return ws.preferApps }
+func (ws *Workspace) Name() string         { return ws.name }
+func (ws *Workspace) Root() string         { return ws.root }
+func (ws *Workspace) MaxDepth() int        { return ws.maxDepth }
+func (ws *Workspace) PreferApps() []string { return ws.preferApps }
 
-func (ws *DirWorkspace) Projects() []*Project {
+func (ws *Workspace) Projects() []*Project {
 	err := ws.Scan()
 	if err != nil {
 		log.Fatal(err)
@@ -85,7 +76,7 @@ func (ws *DirWorkspace) Projects() []*Project {
 	return ws.projects
 }
 
-func (ws *DirWorkspace) Scan() error {
+func (ws *Workspace) Scan() error {
 	// 已扫描直接返回
 	if ws.scanned {
 		return nil

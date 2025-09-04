@@ -8,6 +8,7 @@ import (
 type App struct {
 	server *server.Server
 
+	workspaceService   *services.WorkspaceService
 	projectService     *services.ProjectService
 	applicationService *services.ApplicationService
 	remoteService      *services.RemoteService
@@ -15,6 +16,10 @@ type App struct {
 
 func (app *App) Server() *server.Server {
 	return app.server
+}
+
+func (app *App) WorkspaceService() *services.WorkspaceService {
+	return app.workspaceService
 }
 
 func (app *App) ProjectService() *services.ProjectService {

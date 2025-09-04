@@ -1,52 +1,28 @@
 package services
 
 import (
-	"github.com/heyuuu/go-cube/internal/config"
-	"github.com/heyuuu/go-cube/internal/converter"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/matcher"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"slices"
-	"strings"
 )
 
 type ProjectService struct {
-	workspaces []entities.Workspace
+	workspaceService *WorkspaceService
 }
 
-func NewProjectService(conf config.Config) *ProjectService {
-	workspaces := slicekit.Map(conf.Workspaces, converter.ToWorkspaceEntity)
-
+func NewProjectService(workspaceService *WorkspaceService) *ProjectService {
 	return &ProjectService{
-		workspaces: workspaces,
+		workspaceService: workspaceService,
 	}
-}
-
-func (s *ProjectService) Workspaces() []entities.Workspace {
-	return s.workspaces
 }
 
 func (s *ProjectService) Projects() []*entities.Project {
-	projectsGroup := slicekit.Map(s.workspaces, entities.Workspace.Projects)
-	return slices.Concat(projectsGroup...)
-}
-
-func (s *ProjectService) FindWorkspace(name string) entities.Workspace {
-	idx := slices.IndexFunc(s.workspaces, func(ws entities.Workspace) bool {
-		return ws.Name() == name
+	workspaces := s.workspaceService.Workspaces()
+	projectsGroup := slicekit.Map(workspaces, func(ws *entities.Workspace) []*entities.Project {
+		return ws.Projects()
 	})
-	if idx < 0 {
-		return nil
-	}
-
-	return s.workspaces[idx]
-}
-
-func (s *ProjectService) FindWorkspaceByProjectName(projectName string) entities.Workspace {
-	if wsName, _, ok := strings.Cut(projectName, ":"); ok {
-		return s.FindWorkspace(wsName)
-	}
-	return nil
+	return slices.Concat(projectsGroup...)
 }
 
 func (s *ProjectService) Search(query string) []*entities.Project {
@@ -71,7 +47,7 @@ func (s *ProjectService) projectsInWorkspace(workspaceName string) []*entities.P
 	if workspaceName == "" {
 		return s.Projects()
 	} else {
-		ws := s.FindWorkspace(workspaceName)
+		ws := s.workspaceService.FindByName(workspaceName)
 		if ws == nil {
 			return nil
 		}

@@ -145,7 +145,7 @@ var projectOpenCmd = &easycobra.Command{
 
 			// 获取打开项目的app
 			applicationService := app.Default().ApplicationService()
-			openApp := applicationService.FindApp(appName)
+			openApp := applicationService.FindByName(appName)
 			if openApp == nil {
 				log.Fatal("未找到指定app: " + appName)
 				return

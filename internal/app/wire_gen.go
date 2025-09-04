@@ -19,9 +19,10 @@ func InitApp() *App {
 	configConfig := config.Default()
 	configService := services.NewConfigService(configConfig)
 	configHandler := handlers.NewConfigHandler(configService)
-	v := handlers.AllHandlers(configHandler)
-	serverServer := server.NewServer(v)
 	projectService := services.NewProjectService(configConfig)
+	projectHandler := handlers.NewProjectHandler(projectService)
+	v := handlers.AllHandlers(configHandler, projectHandler)
+	serverServer := server.NewServer(v)
 	applicationService := services.NewApplicationService(configConfig)
 	remoteService := services.NewRemoteService(configConfig)
 	app := &App{

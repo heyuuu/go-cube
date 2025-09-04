@@ -25,6 +25,16 @@ func (s *ApplicationService) Apps() []*entities.Application {
 	return s.apps
 }
 
+func (s *ApplicationService) FindByName(name string) *entities.Application {
+	for _, app := range s.apps {
+		if app.Name() == name {
+			return app
+		}
+	}
+
+	return nil
+}
+
 func (s *ApplicationService) Search(query string) []*entities.Application {
 	if len(query) == 0 || len(s.apps) == 0 {
 		return s.apps
@@ -35,14 +45,4 @@ func (s *ApplicationService) Search(query string) []*entities.Application {
 		return app.Name()
 	}, nil)
 	return m.Match(query)
-}
-
-func (s *ApplicationService) FindApp(appName string) *entities.Application {
-	for _, app := range s.apps {
-		if app.Name() == appName {
-			return app
-		}
-	}
-
-	return nil
 }

@@ -29,8 +29,8 @@ var appSearchCmd = &easycobra.Command{
 			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
 			var preferApps []string
 			if len(projectName) > 0 {
-				service := app.Default().ProjectService()
-				ws := service.FindWorkspaceByProjectName(projectName)
+				wsService := app.Default().WorkspaceService()
+				ws := wsService.FindByProjectName(projectName)
 				preferApps = ws.PreferApps()
 			}
 			apps = sortApps(apps, preferApps)
