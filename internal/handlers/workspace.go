@@ -17,11 +17,27 @@ func NewWorkspaceHandler(service *services.WorkspaceService) *WorkspaceHandler {
 }
 
 func (h *WorkspaceHandler) Register(register func(name string, handler HandleFunc)) {
-	register("workspaces", h.Workspaces)
+	register("workspace/list", h.List)
+	register("workspace/info", h.Info)
 }
 
-func (h *WorkspaceHandler) Workspaces(params any) (result any, err error) {
+func (h *WorkspaceHandler) List(params any) (result any, err error) {
 	workspaces := h.service.Workspaces()
 	list := slicekit.Map(workspaces, converter.ToWorkspaceResponseDto)
 	return listResult(list), nil
+}
+
+func (h *WorkspaceHandler) Info(params any) (result any, err error) {
+	type infoParams struct {
+		Name string `json:"name"`
+	}
+
+	// 将 params 转换为结构体
+	p, err := parseParam[infoParams](params)
+	if err != nil {
+		return nil, err
+	}
+
+	app := h.service.FindByName(p.Name)
+	return itemResult(app, converter.ToWorkspaceResponseDto)
 }

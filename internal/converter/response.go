@@ -34,3 +34,18 @@ func toScannerResponseData(scanner entities.ProjectScanner) map[string]any {
 		return nil
 	}
 }
+
+func ToApplicationResponseDto(entity *entities.Application) response.ApplicationDto {
+	return response.ApplicationDto{
+		Name: entity.Name(),
+		Bin:  entity.Bin(),
+	}
+}
+
+func ToRemoteResponseDto(entity *entities.Remote) response.RemoteDto {
+	return response.RemoteDto{
+		Name:        entity.Name(),
+		Host:        entity.Host(),
+		DefaultPath: entity.DefaultPath(),
+	}
+}

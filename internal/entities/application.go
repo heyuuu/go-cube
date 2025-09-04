@@ -3,7 +3,7 @@ package entities
 import "github.com/heyuuu/go-cube/internal/config"
 
 type Application struct {
-	name string // 应用展示名，默认值为应用code
+	name string // 应用名, 唯一标识符
 	bin  string // 应用路径
 }
 

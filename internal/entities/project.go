@@ -4,7 +4,7 @@ import "path/filepath"
 
 type Project struct {
 	workspaceName string // 所属工作区名
-	name          string // 项目名，展示用
+	name          string // 项目名，唯一标识符
 	path          string // 项目路径
 	repoUrl       string
 	tags          []string // 标签列表

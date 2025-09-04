@@ -22,6 +22,8 @@ func InitApp() *App {
 		handlers.NewConfigHandler,
 		handlers.NewWorkspaceHandler,
 		handlers.NewProjectHandler,
+		handlers.NewApplicationHandler,
+		handlers.NewRemoteHandler,
 		handlers.AllHandlers,
 
 		// services

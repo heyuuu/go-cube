@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-// cmd `alfred search`
+// cmd `alfred project-search`
 var projectSearchCmd = &easycobra.Command{
 	Use:   "project-search {query?* : 项目名，支持模糊匹配}",
 	Short: "搜索项目列表",

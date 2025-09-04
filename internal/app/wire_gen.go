@@ -20,13 +20,15 @@ func InitApp() *App {
 	configService := services.NewConfigService(configConfig)
 	configHandler := handlers.NewConfigHandler(configService)
 	workspaceService := services.NewWorkspaceService(configConfig)
+	workspaceHandler := handlers.NewWorkspaceHandler(workspaceService)
 	projectService := services.NewProjectService(workspaceService)
 	projectHandler := handlers.NewProjectHandler(projectService)
-	workspaceHandler := handlers.NewWorkspaceHandler(workspaceService)
-	v := handlers.AllHandlers(configHandler, projectHandler, workspaceHandler)
-	serverServer := server.NewServer(v)
 	applicationService := services.NewApplicationService(configConfig)
+	applicationHandler := handlers.NewApplicationHandler(applicationService)
 	remoteService := services.NewRemoteService(configConfig)
+	remoteHandler := handlers.NewRemoteHandler(remoteService)
+	v := handlers.AllHandlers(configHandler, workspaceHandler, projectHandler, applicationHandler, remoteHandler)
+	serverServer := server.NewServer(v)
 	app := &App{
 		server:             serverServer,
 		workspaceService:   workspaceService,

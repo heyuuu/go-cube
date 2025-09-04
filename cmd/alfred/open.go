@@ -9,7 +9,7 @@ import (
 	"os/exec"
 )
 
-// cmd `project open`
+// cmd `alfred project-open`
 var projectOpenCmd = &easycobra.Command{
 	Use:   "project-open {project : 项目名} {--app= : 打开项目的App}",
 	Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",

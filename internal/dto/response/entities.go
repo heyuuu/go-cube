@@ -13,3 +13,14 @@ type WorkspaceDto struct {
 	PreferApps []string `json:"preferApps"`
 	Scanner    any      `json:"scanner"`
 }
+
+type ApplicationDto struct {
+	Name string `json:"name"`
+	Bin  string `json:"bin"`
+}
+
+type RemoteDto struct {
+	Name        string `json:"name"`
+	Host        string `json:"host"`
+	DefaultPath string `json:"defaultPath"`
+}

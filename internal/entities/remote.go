@@ -21,8 +21,9 @@ func NewRemote(conf config.RemoteConfig) *Remote {
 	}
 }
 
-func (r *Remote) Name() string { return r.name }
-func (r *Remote) Host() string { return r.host }
+func (r *Remote) Name() string        { return r.name }
+func (r *Remote) Host() string        { return r.host }
+func (r *Remote) DefaultPath() string { return r.defaultPath }
 
 func (r *Remote) MapDefaultPath(url *git.RepoUrl) (string, bool) {
 	if r.defaultPath == "" {

@@ -31,7 +31,7 @@ func init() {
 
 // cmd `project search`
 var projectSearchCmd = &easycobra.Command{
-	Use:   "search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}",
+	Use:   "search {query?* : 项目名，支持模糊匹配} {--w|workspace= : 指定工作区，默认针对所有工作区} {--status : 分析项目}",
 	Short: "搜索项目列表",
 	InitRun: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) {
 		// init flags
