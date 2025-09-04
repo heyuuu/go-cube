@@ -1,139 +1,30 @@
 package entities
 
 import (
-	"github.com/heyuuu/go-cube/internal/common"
 	"github.com/heyuuu/go-cube/internal/config"
 	"github.com/heyuuu/go-cube/internal/util/pathkit"
-	"io/fs"
-	"log"
-	"os"
-	"path/filepath"
-	"strings"
-	"sync"
 )
-
-var (
-	combineProjectChecker pathChecker = func(path string) (isProject bool, tags []string, err error) {
-		// 跳过特殊前缀的目录
-		var name = filepath.Base(path)
-		if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
-			return false, nil, fs.SkipDir
-		}
-
-		// 获取子文件/子目录用于判断是否是项目及对应tag
-		dirEntries, err := os.ReadDir(path)
-		if err != nil {
-			return false, nil, err
-		}
-		for _, entry := range dirEntries {
-			if entry.IsDir() && entry.Name() == ".git" { // 若 .git 目录存在则认为是一个 project
-				tags = append(tags, common.TagGit)
-			} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
-				tags = append(tags, common.TagGodot)
-			}
-		}
-		if len(tags) > 0 {
-			return true, tags, nil
-		}
-		return false, nil, nil
-	}
-)
-
-// pathChecker  用于判断目录是否为项目或是否应跳过
-type pathChecker func(path string) (isProject bool, tags []string, err error)
 
 // Workspace 工作区
 type Workspace struct {
-	name       string   // 工作区名，唯一标识
-	path       string   // 工作区根目录
-	maxDepth   int      // 扫描最大深度
-	preferApps []string // 倾向的app列表
-	// private
-	pathChecker pathChecker // 用于判断目录是否为项目或是否应跳过
-	scanned     bool        // 是否已扫描
-	scanLock    sync.Mutex
-	projects    []*Project
+	name       string         // 工作区名，唯一标识
+	path       string         // 工作区根目录，唯一索引
+	preferApps []string       // 倾向的app列表
+	scanner    ProjectScanner // 自动扫描规则
 }
 
 func NewWorkspace(conf config.WorkspaceConfig) *Workspace {
+	scanner := NewGitProjectScanner(conf.MaxDepth)
+
 	return &Workspace{
 		name:       conf.Name,
 		path:       pathkit.RealPath(conf.Path),
-		maxDepth:   conf.MaxDepth,
 		preferApps: conf.PreferApps,
+		scanner:    scanner,
 	}
 }
 
-func (ws *Workspace) Name() string         { return ws.name }
-func (ws *Workspace) Path() string         { return ws.path }
-func (ws *Workspace) MaxDepth() int        { return ws.maxDepth }
-func (ws *Workspace) PreferApps() []string { return ws.preferApps }
-
-func (ws *Workspace) Projects() []*Project {
-	err := ws.Scan()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return ws.projects
-}
-
-func (ws *Workspace) Scan() error {
-	// 已扫描直接返回
-	if ws.scanned {
-		return nil
-	}
-
-	// 获取锁
-	ws.scanLock.Lock()
-	defer ws.scanLock.Unlock()
-
-	// 获取锁后重新判断是否已扫描(避免获取锁阶段其他goroutine已扫描成功)
-	if ws.scanned {
-		return nil
-	}
-
-	var projects []*Project
-	err := filepath.WalkDir(ws.path, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if !d.IsDir() {
-			return nil
-		}
-
-		// 检查目录，返回此目录为项目或跳过目录或nil
-		isProject, tags, checkErr := ws.pathChecker(path)
-		if checkErr != nil {
-			return checkErr
-		} else if isProject {
-			name, _ := filepath.Rel(ws.path, path)
-			if name == "." {
-				name = filepath.Base(path)
-			}
-			projects = append(projects, NewProject(ws.name+":"+name, path, tags))
-			return fs.SkipDir
-		}
-
-		// 检查深度
-		var depth = 0
-		if path != ws.path {
-			depth = strings.Count(path[len(ws.path)-1:], "/")
-		}
-		//fmt.Println("path=", ws.path, "path=", path, "depth=", depth)
-		if depth >= ws.maxDepth {
-			return fs.SkipDir
-		}
-
-		return nil
-	})
-	if err != nil {
-		return err
-	}
-
-	ws.scanned = true
-	ws.projects = projects
-
-	return nil
-}
+func (ws *Workspace) Name() string            { return ws.name }
+func (ws *Workspace) Path() string            { return ws.path }
+func (ws *Workspace) PreferApps() []string    { return ws.preferApps }
+func (ws *Workspace) Scanner() ProjectScanner { return ws.scanner }

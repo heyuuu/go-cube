@@ -18,7 +18,19 @@ func ToWorkspaceResponseDto(entity *entities.Workspace) response.WorkspaceDto {
 	return response.WorkspaceDto{
 		Name:       entity.Name(),
 		Root:       entity.Path(),
-		MaxDepth:   entity.MaxDepth(),
 		PreferApps: entity.PreferApps(),
+		Scanner:    toScannerResponseData(entity.Scanner()),
+	}
+}
+
+func toScannerResponseData(scanner entities.ProjectScanner) map[string]any {
+	switch sc := scanner.(type) {
+	case *entities.GitProjectScanner:
+		return map[string]any{
+			"type":     "git",
+			"maxDepth": sc.MaxDepth(),
+		}
+	default:
+		return nil
 	}
 }

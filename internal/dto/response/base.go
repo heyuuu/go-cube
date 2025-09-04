@@ -1,4 +1,4 @@
-package server
+package response
 
 // API 响应的基础结构
 type ApiResponse struct {

@@ -4,35 +4,41 @@ import (
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/matcher"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
+	"log"
 	"slices"
+	"sync"
 )
 
 type ProjectService struct {
 	workspaceService *WorkspaceService
+
+	scanCache map[string][]*entities.Project
+	lockPool  sync.Map
 }
 
 func NewProjectService(workspaceService *WorkspaceService) *ProjectService {
 	return &ProjectService{
 		workspaceService: workspaceService,
+		scanCache:        make(map[string][]*entities.Project),
 	}
 }
 
 func (s *ProjectService) Projects() []*entities.Project {
 	workspaces := s.workspaceService.Workspaces()
 	projectsGroup := slicekit.Map(workspaces, func(ws *entities.Workspace) []*entities.Project {
-		return ws.Projects()
+		return s.ScanProjects(ws)
 	})
 	return slices.Concat(projectsGroup...)
 }
 
-func (s *ProjectService) FindByName(projectName string) *entities.Project {
-	ws := s.workspaceService.FindByProjectName(projectName)
+func (s *ProjectService) FindByName(name string) *entities.Project {
+	ws := s.workspaceService.FindByProjectName(name)
 	if ws == nil {
 		return nil
 	}
 
-	for _, project := range ws.Projects() {
-		if project.Name() == projectName {
+	for _, project := range s.ScanProjects(ws) {
+		if project.Name() == name {
 			return project
 		}
 	}
@@ -66,6 +72,43 @@ func (s *ProjectService) projectsInWorkspace(workspaceName string) []*entities.P
 			return nil
 		}
 
-		return ws.Projects()
+		return s.ScanProjects(ws)
 	}
+}
+
+func (s *ProjectService) getLock(key string) *sync.RWMutex {
+	lock, _ := s.lockPool.LoadOrStore(key, &sync.RWMutex{})
+	return lock.(*sync.RWMutex)
+}
+
+func (s *ProjectService) ScanProjects(ws *entities.Workspace) []*entities.Project {
+	// 判断是否有扫描规则，若没有直接返回
+	scanner := ws.Scanner()
+	if scanner == nil {
+		return nil
+	}
+
+	// 获取锁
+	lock := s.getLock(ws.Name())
+
+	// 先尝试读缓存
+	lock.RLock()
+	if projects, ok := s.scanCache[ws.Name()]; ok {
+		lock.RUnlock()
+		return projects
+	}
+	lock.RUnlock()
+
+	// 缓存未命中，实际扫描本地文件
+	lock.Lock()
+	defer lock.Unlock()
+
+	projects, err := scanner.Scan(ws)
+	if err != nil {
+		log.Print(err)
+	}
+
+	// 更新缓存(即使有 err 也更新，避免重复扫描)
+	s.scanCache[ws.Name()] = projects
+	return projects
 }

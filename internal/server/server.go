@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/heyuuu/go-cube/internal/dto/response"
 	"github.com/heyuuu/go-cube/internal/handlers"
 	"net/http"
 	"strings"
@@ -92,15 +93,15 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 	}
 
 	// 调用对应的处理函数
-	var response *ApiResponse
+	var res *response.ApiResponse
 	if result, err := handler(args); err == nil {
-		response = NewApiResponse(true, "", result)
+		res = response.NewApiResponse(true, "", result)
 	} else {
-		response = NewApiResponse(false, err.Error(), nil)
+		res = response.NewApiResponse(false, err.Error(), nil)
 	}
 
 	// json 化；若失败，返回 500
-	content, err := json.Marshal(response)
+	content, err := json.Marshal(res)
 	if err != nil {
 		s.fastResponse(writer, http.StatusInternalServerError, err.Error())
 		return
