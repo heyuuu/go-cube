@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/heyuuu/go-cube/internal/util/pathkit"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 )
@@ -17,7 +17,7 @@ func InitConfig(cfgPath string) (err error) {
 		cfgPath = defaultCfgPath
 	}
 	if IsDebug() {
-		log.Println("cfgPath = " + cfgPath)
+		slog.Info("init config", "cfgPath", cfgPath)
 	}
 	cfgPath = pathkit.RealPath(cfgPath)
 
