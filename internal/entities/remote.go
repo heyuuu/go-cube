@@ -13,7 +13,11 @@ type Remote struct {
 }
 
 func NewRemote(name string, host string, defaultPath string) *Remote {
-	return &Remote{name: name, host: host, defaultPath: defaultPath}
+	return &Remote{
+		name:        name,
+		host:        host,
+		defaultPath: defaultPath,
+	}
 }
 
 func (r *Remote) Name() string {

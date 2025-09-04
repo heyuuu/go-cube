@@ -13,8 +13,12 @@ type Handler interface {
 // 返回所有 handlers (用于 wire 生成代码)
 func AllHandlers(
 	configHandler *ConfigHandler,
+	projectHandler *ProjectHandler,
+	workspaceHandler *WorkspaceHandler,
 ) []Handler {
 	return []Handler{
 		configHandler,
+		projectHandler,
+		workspaceHandler,
 	}
 }

@@ -20,6 +20,7 @@ func InitApp() *App {
 
 		// handlers
 		handlers.NewConfigHandler,
+		handlers.NewWorkspaceHandler,
 		handlers.NewProjectHandler,
 		handlers.AllHandlers,
 

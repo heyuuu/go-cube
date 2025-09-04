@@ -48,11 +48,10 @@ var appSearchCmd = &easycobra.Command{
 }
 
 func showApps(apps []*entities.Application) {
-	header := []string{
+	console.PrintTableFunc(apps, []string{
 		fmt.Sprintf("项目(%d)", len(apps)),
 		"路径",
-	}
-	console.PrintTableFunc(apps, header, func(app *entities.Application) []string {
+	}, func(app *entities.Application) []string {
 		return []string{
 			app.Name(),
 			app.Bin(),

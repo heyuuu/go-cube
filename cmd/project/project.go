@@ -31,7 +31,7 @@ func init() {
 
 // cmd `project search`
 var projectSearchCmd = &easycobra.Command{
-	Use:   "search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}  {--alfred : 来自 alfred 的请求}",
+	Use:   "search {query?* : 项目名，支持模糊匹配} {--status : 分析项目}",
 	Short: "搜索项目列表",
 	InitRun: func(cmd *cobra.Command) func(cmd *cobra.Command, args []string) {
 		// init flags
@@ -212,17 +212,17 @@ var projectCloneCmd = &easycobra.Command{
 			}
 
 			// 匹配hub
-			repoService := app.Default().RemoteService()
-			hub := repoService.FindByHost(u.Host)
-			if hub == nil {
-				log.Fatalf("repoUrl 没有对应 hub 配置: host=%s", u.Host)
+			remoteService := app.Default().RemoteService()
+			remote := remoteService.FindByHost(u.Host)
+			if remote == nil {
+				log.Fatalf("repoUrl 没有对应 remote 配置: host=%s", u.Host)
 				return
 			}
 
 			// 匹配本地地址
-			localPath, ok := hub.MapDefaultPath(u)
+			localPath, ok := remote.MapDefaultPath(u)
 			if !ok {
-				log.Fatalf("对应 hub 未支持此路径: hub=%s, path=%s", hub.Name(), u.Path)
+				log.Fatalf("对应 remote 未支持此路径: remote=%s, path=%s", remote.Name(), u.Path)
 				return
 			}
 

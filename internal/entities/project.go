@@ -8,14 +8,25 @@ type Project struct {
 }
 
 func NewProject(name string, path string, tags []string) *Project {
-	return &Project{name: name, path: path, tags: tags}
+	return &Project{
+		name: name,
+		path: path,
+		tags: tags,
+	}
 }
 
-func (t *Project) Name() string { return t.name }
-func (t *Project) Path() string { return t.path }
-func (t *Project) RepoUrl() string {
-	return t.repoUrl
+func (p *Project) Name() string {
+	return p.name
 }
-func (t *Project) Tags() []string {
-	return t.tags
+
+func (p *Project) Path() string {
+	return p.path
+}
+
+func (p *Project) RepoUrl() string {
+	return p.repoUrl
+}
+
+func (p *Project) Tags() []string {
+	return p.tags
 }

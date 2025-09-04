@@ -6,7 +6,10 @@ type Application struct {
 }
 
 func NewApplication(name string, bin string) *Application {
-	return &Application{name: name, bin: bin}
+	return &Application{
+		name: name,
+		bin:  bin,
+	}
 }
 
 func (app *Application) Name() string { return app.name }

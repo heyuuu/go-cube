@@ -18,14 +18,14 @@ var projectSearchCmd = &easycobra.Command{
 
 		// 项目列表
 		service := app.Default().ProjectService()
-		projects := service.SearchInWorkspace(query, "")
+		projects := service.Search(query)
 
 		// 返回结果
-		PrintResultFunc(projects, func(item *entities.Project) Item {
+		PrintResultFunc(projects, func(proj *entities.Project) Item {
 			return Item{
-				Title:    item.Name(),
-				SubTitle: item.RepoUrl(),
-				Arg:      item.Name(),
+				Title:    proj.Name(),
+				SubTitle: proj.RepoUrl(),
+				Arg:      proj.Name(),
 			}
 		})
 	},
