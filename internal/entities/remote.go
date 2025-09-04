@@ -1,32 +1,28 @@
 package entities
 
 import (
+	"github.com/heyuuu/go-cube/internal/config"
 	"github.com/heyuuu/go-cube/internal/util/git"
 	"path/filepath"
 	"strings"
 )
 
 type Remote struct {
-	name        string
-	host        string
+	name        string // 远端名，唯一标识符
+	host        string // 远端域名
 	defaultPath string
 }
 
-func NewRemote(name string, host string, defaultPath string) *Remote {
+func NewRemote(conf config.RemoteConfig) *Remote {
 	return &Remote{
-		name:        name,
-		host:        host,
-		defaultPath: defaultPath,
+		name:        conf.Name,
+		host:        conf.Host,
+		defaultPath: conf.DefaultPath,
 	}
 }
 
-func (r *Remote) Name() string {
-	return r.name
-}
-
-func (r *Remote) Host() string {
-	return r.host
-}
+func (r *Remote) Name() string { return r.name }
+func (r *Remote) Host() string { return r.host }
 
 func (r *Remote) MapDefaultPath(url *git.RepoUrl) (string, bool) {
 	if r.defaultPath == "" {

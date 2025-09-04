@@ -2,7 +2,6 @@ package services
 
 import (
 	"github.com/heyuuu/go-cube/internal/config"
-	"github.com/heyuuu/go-cube/internal/converter"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
 	"strings"
@@ -13,7 +12,7 @@ type WorkspaceService struct {
 }
 
 func NewWorkspaceService(conf config.Config) *WorkspaceService {
-	workspaces := slicekit.Map(conf.Workspaces, converter.ToWorkspaceEntity)
+	workspaces := slicekit.Map(conf.Workspaces, entities.NewWorkspace)
 
 	return &WorkspaceService{
 		workspaces: workspaces,

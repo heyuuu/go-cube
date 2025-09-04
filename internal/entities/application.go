@@ -1,14 +1,16 @@
 package entities
 
+import "github.com/heyuuu/go-cube/internal/config"
+
 type Application struct {
-	name string
-	bin  string
+	name string // 应用展示名，默认值为应用code
+	bin  string // 应用路径
 }
 
-func NewApplication(name string, bin string) *Application {
+func NewApplication(conf config.ApplicationConfig) *Application {
 	return &Application{
-		name: name,
-		bin:  bin,
+		name: conf.Name,
+		bin:  conf.Bin,
 	}
 }
 

@@ -2,7 +2,6 @@ package services
 
 import (
 	"github.com/heyuuu/go-cube/internal/config"
-	"github.com/heyuuu/go-cube/internal/converter"
 	"github.com/heyuuu/go-cube/internal/entities"
 	"github.com/heyuuu/go-cube/internal/util/slicekit"
 )
@@ -12,7 +11,7 @@ type RemoteService struct {
 }
 
 func NewRemoteService(conf config.Config) *RemoteService {
-	remotes := slicekit.Map(conf.Remotes, converter.ToRemoteEntity)
+	remotes := slicekit.Map(conf.Remotes, entities.NewRemote)
 
 	return &RemoteService{
 		remotes: remotes,

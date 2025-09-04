@@ -7,7 +7,6 @@ type Config struct {
 }
 
 type WorkspaceConfig struct {
-	Code       string   `json:"code"`
 	Name       string   `json:"name"`
 	Path       string   `json:"path"`
 	MaxDepth   int      `json:"maxDepth"`
@@ -15,16 +14,13 @@ type WorkspaceConfig struct {
 }
 
 type RemoteConfig struct {
-	Code string `json:"code"`
 	Name string `json:"name"`
-	Type string `json:"type"`
 	Host string `json:"host"`
 
 	DefaultPath string `json:"defaultPath"`
 }
 
 type ApplicationConfig struct {
-	Code string `json:"code"`
 	Name string `json:"name"`
 	Bin  string `json:"bin"`
 }

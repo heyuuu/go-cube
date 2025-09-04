@@ -2,6 +2,8 @@ package entities
 
 import (
 	"github.com/heyuuu/go-cube/internal/common"
+	"github.com/heyuuu/go-cube/internal/config"
+	"github.com/heyuuu/go-cube/internal/util/pathkit"
 	"io/fs"
 	"log"
 	"os"
@@ -42,28 +44,28 @@ type pathChecker func(path string) (isProject bool, tags []string, err error)
 
 // Workspace 工作区
 type Workspace struct {
-	name        string      // 工作区名
-	root        string      // 根目录
-	maxDepth    int         // 扫描最大深度
-	preferApps  []string    // 倾向的app列表
+	name       string   // 工作区名，唯一标识
+	path       string   // 工作区根目录
+	maxDepth   int      // 扫描最大深度
+	preferApps []string // 倾向的app列表
+	// private
 	pathChecker pathChecker // 用于判断目录是否为项目或是否应跳过
 	scanned     bool        // 是否已扫描
 	scanLock    sync.Mutex
 	projects    []*Project
 }
 
-func NewWorkspace(name string, root string, maxDepth int, preferApps []string) *Workspace {
+func NewWorkspace(conf config.WorkspaceConfig) *Workspace {
 	return &Workspace{
-		name:        name,
-		root:        root,
-		maxDepth:    maxDepth,
-		preferApps:  preferApps,
-		pathChecker: combineProjectChecker,
+		name:       conf.Name,
+		path:       pathkit.RealPath(conf.Path),
+		maxDepth:   conf.MaxDepth,
+		preferApps: conf.PreferApps,
 	}
 }
 
 func (ws *Workspace) Name() string         { return ws.name }
-func (ws *Workspace) Root() string         { return ws.root }
+func (ws *Workspace) Path() string         { return ws.path }
 func (ws *Workspace) MaxDepth() int        { return ws.maxDepth }
 func (ws *Workspace) PreferApps() []string { return ws.preferApps }
 
@@ -92,7 +94,7 @@ func (ws *Workspace) Scan() error {
 	}
 
 	var projects []*Project
-	err := filepath.WalkDir(ws.root, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(ws.path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -106,7 +108,7 @@ func (ws *Workspace) Scan() error {
 		if checkErr != nil {
 			return checkErr
 		} else if isProject {
-			name, _ := filepath.Rel(ws.root, path)
+			name, _ := filepath.Rel(ws.path, path)
 			if name == "." {
 				name = filepath.Base(path)
 			}
@@ -116,10 +118,10 @@ func (ws *Workspace) Scan() error {
 
 		// 检查深度
 		var depth = 0
-		if path != ws.root {
-			depth = strings.Count(path[len(ws.root)-1:], "/")
+		if path != ws.path {
+			depth = strings.Count(path[len(ws.path)-1:], "/")
 		}
-		//fmt.Println("root=", ws.root, "path=", path, "depth=", depth)
+		//fmt.Println("path=", ws.path, "path=", path, "depth=", depth)
 		if depth >= ws.maxDepth {
 			return fs.SkipDir
 		}

@@ -17,7 +17,7 @@ func ToProjectResponseDto(entity *entities.Project) response.ProjectDto {
 func ToWorkspaceResponseDto(entity *entities.Workspace) response.WorkspaceDto {
 	return response.WorkspaceDto{
 		Name:       entity.Name(),
-		Root:       entity.Root(),
+		Root:       entity.Path(),
 		MaxDepth:   entity.MaxDepth(),
 		PreferApps: entity.PreferApps(),
 	}

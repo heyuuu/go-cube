@@ -15,18 +15,7 @@ func NewProject(name string, path string, tags []string) *Project {
 	}
 }
 
-func (p *Project) Name() string {
-	return p.name
-}
-
-func (p *Project) Path() string {
-	return p.path
-}
-
-func (p *Project) RepoUrl() string {
-	return p.repoUrl
-}
-
-func (p *Project) Tags() []string {
-	return p.tags
-}
+func (p *Project) Name() string    { return p.name }
+func (p *Project) Path() string    { return p.path }
+func (p *Project) RepoUrl() string { return p.repoUrl }
+func (p *Project) Tags() []string  { return p.tags }
