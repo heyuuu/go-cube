@@ -1,10 +1,7 @@
 package alfred
 
 import (
-	"fmt"
 	"github.com/heyuuu/go-cube/internal/app"
-	"github.com/heyuuu/go-cube/internal/entities"
-	"github.com/heyuuu/go-cube/internal/util/console"
 	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"github.com/spf13/cobra"
 	"log"
@@ -24,19 +21,22 @@ var projectOpenCmd = &easycobra.Command{
 
 		// run
 		return func(cmd *cobra.Command, args []string) {
-			query := args[0]
+			projectName := args[0]
 
-			// 获取打开项目的app
-			applicationService := app.Default().ApplicationService()
-			openApp := applicationService.FindByName(appName)
-			if openApp == nil {
-				log.Fatal("未找到指定app: " + appName)
+			appService := app.Default().ApplicationService()
+			projService := app.Default().ProjectService()
+
+			// 匹配项目
+			proj := projService.FindByName(projectName)
+			if proj == nil {
+				log.Fatalln("未找到指定项目: " + projectName)
 				return
 			}
 
-			// 匹配项目
-			proj := selectProject(query, "")
-			if proj == nil {
+			// 获取打开项目的app
+			openApp := appService.FindByName(appName)
+			if openApp == nil {
+				log.Fatal("未找到指定app: " + appName)
 				return
 			}
 
@@ -47,25 +47,6 @@ var projectOpenCmd = &easycobra.Command{
 			}
 		}
 	},
-}
-
-func selectProject(query string, workspace string) *entities.Project {
-	service := app.Default().ProjectService()
-	projects := service.SearchInWorkspace(query, workspace)
-	switch len(projects) {
-	case 0:
-		fmt.Println("没有匹配的项目")
-		return nil
-	case 1:
-		return projects[0]
-	default:
-		proj, ok := console.ChoiceItem("选择项目", projects, (*entities.Project).Name)
-		if !ok {
-			fmt.Println("选择项目失败")
-			return nil
-		}
-		return proj
-	}
 }
 
 func passthruRun(bin string, args ...string) error {

@@ -25,6 +25,20 @@ func (s *ProjectService) Projects() []*entities.Project {
 	return slices.Concat(projectsGroup...)
 }
 
+func (s *ProjectService) FindByName(projectName string) *entities.Project {
+	ws := s.workspaceService.FindByProjectName(projectName)
+	if ws == nil {
+		return nil
+	}
+
+	for _, project := range ws.Projects() {
+		if project.Name() == projectName {
+			return project
+		}
+	}
+	return nil
+}
+
 func (s *ProjectService) Search(query string) []*entities.Project {
 	return s.SearchInWorkspace(query, "")
 }
