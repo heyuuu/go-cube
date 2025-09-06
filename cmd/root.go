@@ -8,6 +8,7 @@ import (
 	"github.com/heyuuu/go-cube/cmd/workspace"
 	"github.com/heyuuu/go-cube/internal/config"
 	"github.com/heyuuu/go-cube/internal/cube"
+	"github.com/heyuuu/go-cube/internal/logger"
 	"github.com/heyuuu/go-cube/internal/util/easycobra"
 	"log/slog"
 	"os"
@@ -41,7 +42,11 @@ func rootPreExecute() error {
 	// 初始化配置
 	config.InitConfig(cfgPath)
 
+	// 初始化 Logger
+	logger.Init()
+
 	slog.Info("init root env", "debug", debug, "cfgPath", cfgPath)
+	slog.Debug("command args", "args", args)
 
 	return nil
 }

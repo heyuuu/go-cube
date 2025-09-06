@@ -4,6 +4,11 @@ type Config struct {
 	Workspaces   []WorkspaceConfig   `json:"workspaces"`
 	Remotes      []RemoteConfig      `json:"remotes"`
 	Applications []ApplicationConfig `json:"applications"`
+
+	// 日志相关
+	LogPath   string `json:"log_path"`
+	LogLevel  string `json:"log_level"`
+	LogFormat string `json:"log_format"`
 }
 
 type WorkspaceConfig struct {

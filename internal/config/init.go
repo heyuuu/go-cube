@@ -22,11 +22,21 @@ func InitConfig(cfgPath string) {
 	}
 	cfgPath = pathkit.RealPath(cfgPath)
 
+	// 记录日志目录
+	configPath = cfgPath
+
 	// 初始化配置文件 config.json
 	err := initDefaultConf(cfgPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
+}
+
+// config path
+var configPath string
+
+func ConfigPath() string {
+	return configPath
 }
 
 // config file (config.json)

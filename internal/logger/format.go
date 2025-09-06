@@ -66,11 +66,22 @@ func parseFormatRule(s string) formatRule {
 }
 
 func formatRecord(rule formatRule, r slog.Record) []byte {
+	return formatRecordEx(rule, r, "", "")
+}
+
+func formatRecordEx(rule formatRule, r slog.Record, prefix string, suffix string) []byte {
 	// source
 	fs := runtime.CallersFrames([]uintptr{r.PC})
 	f, _ := fs.Next()
 
 	var buf bytes.Buffer
+
+	// prefix
+	if len(prefix) > 0 {
+		buf.WriteString(prefix)
+	}
+
+	// log line
 	for _, seg := range rule {
 		switch seg.typ {
 		case segString:
@@ -101,6 +112,14 @@ func formatRecord(rule formatRule, r slog.Record) []byte {
 			})
 		}
 	}
+
+	// suffix
+	if len(suffix) > 0 {
+		buf.WriteString(suffix)
+	}
+
+	// newline
 	buf.WriteByte('\n')
+
 	return buf.Bytes()
 }
