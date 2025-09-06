@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/heyuuu/go-cube/internal/util/pathkit"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,7 +13,7 @@ import (
 // 默认配置目录
 const defaultCfgPath = "~/.go-cube/"
 
-func InitConfig(cfgPath string) (err error) {
+func InitConfig(cfgPath string) {
 	if len(cfgPath) == 0 {
 		cfgPath = defaultCfgPath
 	}
@@ -22,12 +23,10 @@ func InitConfig(cfgPath string) (err error) {
 	cfgPath = pathkit.RealPath(cfgPath)
 
 	// 初始化配置文件 config.json
-	err = initDefaultConf(cfgPath)
+	err := initDefaultConf(cfgPath)
 	if err != nil {
-		return err
+		log.Fatalln(err)
 	}
-
-	return nil
 }
 
 // config file (config.json)
