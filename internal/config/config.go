@@ -6,9 +6,9 @@ type Config struct {
 	Applications []ApplicationConfig `json:"applications"`
 
 	// 日志相关
-	LogPath   string `json:"log_path"`
-	LogLevel  string `json:"log_level"`
-	LogFormat string `json:"log_format"`
+	LogPath   string `json:"logPath"`
+	LogLevel  string `json:"logLevel"`
+	LogFormat string `json:"logFormat"`
 }
 
 type WorkspaceConfig struct {
