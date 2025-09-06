@@ -86,9 +86,6 @@ func initFileHandler() slog.Handler {
 		})
 		return nil
 	}
-	lazyLog(func() {
-		slog.Debug("init logger file succeed", "logFile", filePath)
-	})
 
 	// level
 	level := parseLogLevel(conf.LogLevel)
@@ -100,7 +97,14 @@ func initFileHandler() slog.Handler {
 	}
 
 	// init handler
-	return newSingleHandler(level, format, file)
+	h := newSingleHandler(level, format, file)
+
+	// 记录 handler 信息
+	lazyLog(func() {
+		slog.Debug("init log file handler succeed", "level", level.String(), "logFile", filePath)
+	})
+
+	return h
 }
 
 func parseLogLevel(level string) slog.Level {

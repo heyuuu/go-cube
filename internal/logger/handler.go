@@ -134,6 +134,10 @@ func (mh *multiHandler) WithGroup(name string) slog.Handler {
 func (mh *multiHandler) Handle(ctx context.Context, record slog.Record) error {
 	var errs []error
 	for _, h := range mh.handlers {
+		if !h.Enabled(ctx, record.Level) {
+			continue
+		}
+
 		err := h.Handle(ctx, record)
 		if err != nil {
 			errs = append(errs, err)
