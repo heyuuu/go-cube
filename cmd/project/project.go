@@ -30,6 +30,7 @@ var RootCmd = &easycobra.Command{
 		projectScanRulesCmd,
 		projectCloneRulesCmd,
 		projectCloneCmd,
+		projectInitCmd,
 		projectRefreshGitCacheCmd,
 		projectCheckCmd,
 	},
