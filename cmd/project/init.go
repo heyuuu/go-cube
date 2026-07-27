@@ -3,13 +3,13 @@ package project
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"github.com/heyuuu/cube/cmd/util/console"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
+	"github.com/heyuuu/cube/util/git"
 	"github.com/heyuuu/cube/util/pathkit"
 )
 
@@ -52,14 +52,14 @@ var projectInitCmd = &easycobra.Command{
 			}
 
 			// 检查：从当前目录向上查找，若任意层级已存在 .git 则报错退出
-			if existingGit := findGitRoot(absPath); existingGit != "" {
+			if existingGit, ok := git.FindGitRoot(absPath); ok {
 				return fmt.Errorf("目录 %s 已处于 git 仓库中 (.git 位于 %s)，无法重复初始化",
 					pathkit.PrettyPath(absPath), pathkit.PrettyPath(existingGit))
 			}
 
 			// 执行 git init
 			fmt.Printf("> 在 %s 执行 git init\n", pathkit.PrettyPath(absPath))
-			if err = runGit(absPath, "init"); err != nil {
+			if err = git.Init(absPath); err != nil {
 				return fmt.Errorf("git init 失败: %w", err)
 			}
 
@@ -77,13 +77,13 @@ var projectInitCmd = &easycobra.Command{
 			// 若当前目录有文件，询问是否 git add . 及是否 git commit -m 'init'
 			if hasFiles(absPath) {
 				if console.Confirm("当前目录存在文件，是否执行 git add . ？") {
-					if err = runGit(absPath, "add", "."); err != nil {
+					if err = git.Add(absPath, "."); err != nil {
 						return fmt.Errorf("git add 失败: %w", err)
 					}
 					fmt.Println("> git add . 完成")
 
 					if console.Confirm("是否执行 git commit -m 'init' ？") {
-						if err = runGit(absPath, "commit", "-m", "init"); err != nil {
+						if err = git.Commit(absPath, "init"); err != nil {
 							return fmt.Errorf("git commit 失败: %w", err)
 						}
 						fmt.Println("> git commit 完成")
@@ -97,21 +97,8 @@ var projectInitCmd = &easycobra.Command{
 	},
 }
 
-// findGitRoot 从 dir 开始向上查找，返回最先出现 .git(文件或目录) 的目录；
-// 一路查到根目录都没找到则返回空串。
-func findGitRoot(dir string) string {
-	for {
-		gitPath := filepath.Join(dir, ".git")
-		if _, err := os.Stat(gitPath); err == nil {
-			return dir
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir { // 已到根目录
-			return ""
-		}
-		dir = parent
-	}
-}
+// findGitRoot / runGit 等 git 操作已合并入 util/git 包
+// （对应 git.FindGitRoot / git.Run / git.Init / git.Add / git.Commit）。
 
 // hasFiles 判断目录下是否存在任何条目（不递归，忽略 .git）。
 func hasFiles(dir string) bool {
@@ -126,13 +113,4 @@ func hasFiles(dir string) bool {
 		return true
 	}
 	return false
-}
-
-// runGit 在指定工作目录下执行 git 命令，stdout/stderr 透传给当前终端。
-func runGit(dir string, args ...string) error {
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }

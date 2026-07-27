@@ -1,6 +1,6 @@
 package gogit
 
-// 本文件封装「读操作」的 go-git 纯 Go 实现，与 git.go 中的系统 git 命令封装相对。
+// 本包封装「读操作」的 go-git 纯 Go 实现，与 git 包中的系统 git 命令封装相对。
 //
 // 为什么读操作要单独用 go-git（而不是统一走系统 git 子进程）：
 //   - cube 是 CLI 模式执行，单次命令里常常要对一批项目采集 git 信息（典型场景：
@@ -10,11 +10,10 @@ package gogit
 //   - go-git 直接读取 .git 目录（config / HEAD / refs / objects），零子进程；配合
 //     缓存层可以做到后台异步采集，前台读命令几乎零开销。
 //
-// 为什么写操作（clone 等）仍然保留系统 git（见 git.go）：
-//   - clone 需要交互式进度输出、SSH 凭据、git hooks 等本地 git 生态，go-git 的兼容性
-//     与体验都不如系统 git；因此写操作继续走 git.go 中的系统 git 子进程封装。
+// 写操作（clone / init / commit 等）以及与具体 git 库无关的 git 辅助能力
+// （仓库根探测、repoUrl 解析等）见独立的 git 包（util/git）。
 //
-// 错误处理约定（全文件一致）：
+// 错误处理约定（全包一致）：
 //   - 非 git 目录、缺失 remote/分支等「业务上可接受的空值」场景：返回零值 + nil，
 //     不向调用方抛 error。上层缓存层依赖此约定统一兜底。
 //   - 真实读取错误（损坏的 .git、IO 异常等）：返回零值 + error，由调用方决定是否记录。

@@ -1,36 +1,48 @@
 package git
 
-// 本文件封装「系统 git 命令」的调用，通过 exec.Command 启动 git 子进程完成操作。
+// 本包封装「写操作」的系统 git 命令调用，以及与具体 git 库无关的 git 辅助能力，
+// 与 gogit 包中的 go-git 纯 Go 读实现相对。
 //
-// 设计原则：本包内将 git 操作按「读 / 写」拆分到两个文件：
-//   - git.go   —— 系统 git 命令封装。主要承载「写操作 / 需要透传输出的操作」。
-//                 子进程能复用用户本地的 git 配置（凭据、SSH agent、hooks 等），
-//                 并能直接把 stdout/stderr 透传给当前终端，体验明显优于纯 Go 实现。
-//                 典型场景：clone（需要交互式进度、SSH 凭据）。
-//   - gogit.go  —— go-git 纯 Go 实现。承载「读操作」。
-//                 读 repoUrl / branches / ahead-behind / status 这类高频、无副作用、
-//                 不需要凭据的操作时，起子进程的 fork/exec 开销会成为性能瓶颈
-//                 （典型场景：scan 出几十上百个项目，每个项目要起 3 次 git 子进程）。
-//                 go-git 直接读 .git 目录，零子进程，配合缓存层把采集从 3N 次子进程
-//                 降为零。
+// 为什么写操作要用系统 git 子进程（而不是统一走 go-git）：
+//   - 写操作（clone / init / add / commit 等）需要透传 stdout/stderr，复用用户本地的
+//     git 配置（凭据、SSH agent、hooks、alias、protocol 等），并支持交互式进度输出。
+//   - 典型场景如 clone：需要 SSH/HTTPS 凭据助手、git-credential-osxkeychain 等本地
+//     git 生态，go-git 在这些场景下兼容性差、体验差，而系统 git 能原生复用。
+//   - 写操作调用频率低（相对于读），子进程的 fork/exec 开销可接受，换来的是完整的
+//     本地 git 生态兼容。
 //
-// 两个文件对外都暴露为 git 包；调用方按功能挑选即可，不需要关心底层实现。
+// 此外，与具体 git 库无关的 git 辅助能力也归在本包：
+//   - FindGitRoot（按 .git 探测仓库根）、ParseRepoUrl（解析 SSH/HTTPS 仓库地址）等。
+//     它们不依赖任何 git 实现，只与 git 的概念/约定相关。
+//
+// 读操作（branches / ahead-behind / status 等）见独立的 gogit 包（util/gogit）。
+// 本包刻意「只写不读」：需要读 git 仓库信息时请用 gogit 包。
 
 import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 )
 
+// Run 在指定工作目录下执行系统 git 命令，stdout/stderr 透传给当前终端。
+//
+// dir 为空串时表示在当前进程工作目录执行。本包内所有「写操作 / 需要透传输出的操作」
+// （Clone / Init / Add / Commit 等）都基于此函数，统一 stdio 接管与 slog 记录。
+func Run(dir string, args ...string) error {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	slog.Info("Run cmd", "cmd", cmd.String())
+	return cmd.Run()
+}
+
 // Clone 使用系统 git 克隆仓库到 localPath，stdout/stderr 透传给当前终端。
-//
-// 为什么不用 go-git：
-//   - clone 需要交互式进度输出（传输速率、剩余时间）
-//   - 需要 SSH 凭据 / HTTPS 凭据助手 / git-credential-osxkeychain 等本地生态
-//   - 需要 respect 用户 ~/.gitconfig 的 hooks、alias、protocol 配置
-//     系统 git 都能原生复用，go-git 在这些场景下兼容性差、体验差。
-//
 // 参数：
 //   - localPath: 克隆目标目录（绝对路径）
 //   - repoUrl:   仓库地址（SSH 或 HTTPS）
@@ -44,11 +56,37 @@ func Clone(localPath string, repoUrl string, depth int, branch string) error {
 	if branch != "" {
 		args = append(args, "--branch="+branch)
 	}
+	return Run("", args...)
+}
 
-	cmd := exec.Command("git", args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+// Init 在 dir 目录初始化一个新的 git 仓库（git init）。
+func Init(dir string) error {
+	return Run(dir, "init")
+}
 
-	slog.Info("Run cmd", "cmd", cmd.String())
-	return cmd.Run()
+// Add 在 dir 仓库中暂存指定路径（git add <paths...>）。
+func Add(dir string, paths ...string) error {
+	return Run(dir, append([]string{"add"}, paths...)...)
+}
+
+// Commit 在 dir 仓库中以指定 message 提交暂存区（git commit -m <message>）。
+func Commit(dir string, message string) error {
+	return Run(dir, "commit", "-m", message)
+}
+
+// FindGitRoot 从 dir 开始向上查找，返回最先出现 .git(文件或目录均可) 的目录。
+//
+// 与 git 自身的向上查找语义一致：能识别普通仓库的 .git 目录，也能识别 worktree /
+// submodule 场景下的 .git 文件。一路查到根目录都未命中则 ok=false。
+func FindGitRoot(dir string) (root string, ok bool) {
+	for {
+		if _, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir { // 已到根目录
+			return "", false
+		}
+		dir = parent
+	}
 }
