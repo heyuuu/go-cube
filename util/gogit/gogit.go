@@ -1,4 +1,4 @@
-package git
+package gogit
 
 // 本文件封装「读操作」的 go-git 纯 Go 实现，与 git.go 中的系统 git 命令封装相对。
 //

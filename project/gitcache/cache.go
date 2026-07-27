@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/heyuuu/cube/util/git"
+	"github.com/heyuuu/cube/util/gogit"
 )
 
 // 当前缓存文件格式版本；结构变更时递增，用于后续做兼容迁移。
@@ -203,15 +203,15 @@ const defaultWorkers = 8
 // collectEntry 采集单个项目的 git 信息。
 // 依赖 util/git 包的错误约定：业务空值场景返回零值+nil，所以这里基本不会拿到 error。
 func collectEntry(path string) *Entry {
-	repoUrl, _ := git.RemoteUrl(path)
-	branches, currBranch, _ := git.Branches(path)
-	defaultBranch, _ := git.DefaultBranch(path)
+	repoUrl, _ := gogit.RemoteUrl(path)
+	branches, currBranch, _ := gogit.Branches(path)
+	defaultBranch, _ := gogit.DefaultBranch(path)
 	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较
 	var ahead, behind int
 	if defaultBranch != "" {
-		ahead, behind, _ = git.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
+		ahead, behind, _ = gogit.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
 	}
-	dirty, _ := git.IsDirty(path)
+	dirty, _ := gogit.IsDirty(path)
 	return &Entry{
 		RepoUrl:       repoUrl,
 		CurrentBranch: currBranch,
