@@ -1,13 +1,8 @@
 package tui
 
 import (
-	"fmt"
-	"os"
-	"strings"
-
 	"charm.land/lipgloss/v2"
 	"charm.land/lipgloss/v2/table"
-	"github.com/charmbracelet/colorprofile"
 )
 
 // TableOption 配置 Table 的渲染样式。传入 nil 表示跳过该项。
@@ -79,22 +74,16 @@ func buildTable(headers []string, rows [][]string, opts ...TableOption) *table.T
 // 的真实环境自动降级（剥离颜色或降到 256 色）。
 func RenderTable(headers []string, rows [][]string, opts ...TableOption) string {
 	t := buildTable(headers, rows, opts...)
-	return strings.TrimRight(t.Render(), "\n")
+	return t.Render()
 }
 
-// PrintTable 把 headers + rows 直接打印到 stdout。
+// PrintTable 把 headers + rows 渲染成表格并打印到 stdout，末尾补一个换行。
 //
-// 与 RenderTable 的区别：经过 colorprofile.Writer 写入，会按 stdout 的真实
-// 环境自动降级颜色——
-//   - 重定向到文件 / 管道（非 TTY）：剥离所有 ANSI，输出纯文本表格；
-//   - NO_COLOR=1 或 TERM=dumb：剥离颜色；
-//   - 真 TTY 但仅支持 256 色：把 truecolor 量化为 256 色；
-//   - 支持 truecolor 的 TTY：原样输出。
+// 等价于 Print(RenderTable(...) + "\n")：颜色降级由 Print 统一处理
+// （非 TTY / NO_COLOR / 256 色等场景会自动剥离或量化），调用方无需关心。
 //
-// 适合绝大多数「我就是要打印这张表」的场景。需要拿字符串拼布局/做测试时，
+// 适合绝大多数「我就是要打印这张表」的场景。需要拿字符串拼布局 / 做测试时，
 // 用 RenderTable。
 func PrintTable(headers []string, rows [][]string, opts ...TableOption) {
-	// colorprofile.NewWriter 在 Write 时按 os.Stdout 探测档位并降级。
-	w := colorprofile.NewWriter(os.Stdout, os.Environ())
-	fmt.Fprintln(w, buildTable(headers, rows, opts...).Render())
+	Print(RenderTable(headers, rows, opts...) + "\n")
 }

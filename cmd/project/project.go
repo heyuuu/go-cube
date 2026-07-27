@@ -33,6 +33,7 @@ var RootCmd = &easycobra.Command{
 		projectInitCmd,
 		projectRefreshGitCacheCmd,
 		projectCheckCmd,
+		projectTreeCmd,
 	},
 }
 
