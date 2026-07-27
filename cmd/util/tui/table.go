@@ -16,36 +16,6 @@ import (
 // 直接暴露 lipgloss 类型会泄漏实现依赖。
 type TableOption func(*table.Table)
 
-// 表格边框预设。
-const (
-	BorderDefault = "" // 默认带框（圆角，见 RenderTable 默认样式）
-	BorderNone    = "none"
-	BorderRounded = "rounded"
-)
-
-// WithBorder 设置表格边框预设。取 BorderNone 去掉所有边框，BorderRounded 圆角，
-// BorderDefault（或空串）使用默认圆角边框。
-func WithBorder(preset string) TableOption {
-	return func(t *table.Table) {
-		switch preset {
-		case BorderNone:
-			t.BorderTop(false).
-				BorderBottom(false).
-				BorderLeft(false).
-				BorderRight(false).
-				BorderColumn(false).
-				BorderHeader(false)
-		case BorderRounded, BorderDefault:
-			t.Border(lipgloss.RoundedBorder())
-		}
-	}
-}
-
-// WithBorderColumn 控制是否渲染列分隔线。
-func WithBorderColumn(on bool) TableOption {
-	return func(t *table.Table) { t.BorderColumn(on) }
-}
-
 // applyDefaultStyle 给 table 套上一组开箱即用的好看样式：
 //   - 圆角边框，边框着色（与表头呼应的紫色调）；
 //   - 表头加粗 + 青色；

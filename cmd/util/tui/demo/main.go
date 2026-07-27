@@ -107,7 +107,6 @@ func main() {
 			{"Rust", "2010", "内存安全、零成本抽象"},
 			{"Python", "1991", "动态、多范式"},
 		},
-		tui.WithBorder(tui.BorderRounded),
 	)
 	fmt.Println(out)
 }
