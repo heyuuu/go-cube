@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/heyuuu/cube/cmd/alfred"
+	cmdConfig "github.com/heyuuu/cube/cmd/config"
 	"github.com/heyuuu/cube/cmd/opener"
 	"github.com/heyuuu/cube/cmd/project"
 	"github.com/heyuuu/cube/cmd/server"
@@ -26,9 +27,9 @@ var rootCmd = &easycobra.Command{
 		server.RootCmd,
 		project.RootCmd,
 		opener.RootCmd,
+		cmdConfig.RootCmd,
 		// simple commands
 		versionCmd,
-		configCmd,
 	},
 }
 
