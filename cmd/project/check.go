@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/heyuuu/cube/app"
-	"github.com/heyuuu/cube/cmd/util/console"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
+	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/project"
 	"github.com/heyuuu/cube/util/pathkit"
 	"github.com/heyuuu/cube/util/slicekit"
@@ -76,7 +76,7 @@ func checkCloneRules() {
 
 	fmt.Printf("> 不符合 clone rules 的项目 %d 个:\n", len(rows))
 
-	console.PrintTable(headers, rows)
+	tui.PrintTable(headers, rows)
 }
 
 // 过滤出所有 remote 但不与 remote 主分支保持一致的项目

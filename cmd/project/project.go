@@ -10,9 +10,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/heyuuu/cube/app"
-	"github.com/heyuuu/cube/cmd/util/console"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
 	"github.com/heyuuu/cube/cmd/util/runner"
+	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/project"
 	"github.com/heyuuu/cube/util/git"
 	"github.com/heyuuu/cube/util/pathkit"
@@ -125,7 +125,7 @@ func showProjects(projects []*project.Project, verbose int) {
 	}
 
 	// 输出表格
-	console.PrintTable(headers, rows)
+	tui.PrintTable(headers, rows)
 }
 
 // cmd `project info`
@@ -202,9 +202,9 @@ func selectProject(query string) *project.Project {
 	case 1:
 		return projects[0]
 	default:
-		proj, ok := console.ChoiceItem("选择项目", projects, (*project.Project).Name)
-		if !ok {
-			fmt.Println("选择项目失败")
+		proj, err := tui.SelectItem("选择项目", projects, (*project.Project).Name)
+		if err != nil {
+			fmt.Printf("选择项目失败: %v\n", err)
 			return nil
 		}
 		return proj
@@ -233,7 +233,7 @@ var projectCloneRulesCmd = &easycobra.Command{
 		rules := service.CloneRules()
 
 		// 显示列表
-		console.PrintTable(
+		tui.PrintTable(
 			[]string{
 				fmt.Sprintf("RepoHost(%d)", len(rules)),
 				"RepoPrefix",

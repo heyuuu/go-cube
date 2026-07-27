@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/heyuuu/cube/app"
-	"github.com/heyuuu/cube/cmd/util/console"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
+	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/opener"
 	"github.com/heyuuu/cube/util/slicekit"
 )
@@ -34,7 +34,7 @@ var openerListCmd = &easycobra.Command{
 }
 
 func showOpeners(apps []*opener.Opener) {
-	console.PrintTable(
+	tui.PrintTable(
 		[]string{
 			fmt.Sprintf("Opener(%d)", len(apps)),
 			"Bin",

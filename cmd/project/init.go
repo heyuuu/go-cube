@@ -7,8 +7,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/heyuuu/cube/cmd/util/console"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
+	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/util/git"
 	"github.com/heyuuu/cube/util/pathkit"
 )
@@ -66,7 +66,11 @@ var projectInitCmd = &easycobra.Command{
 			// 若当前目录没有 .gitignore，询问是否创建一个
 			gitignorePath := filepath.Join(absPath, ".gitignore")
 			if _, err = os.Stat(gitignorePath); os.IsNotExist(err) {
-				if console.Confirm("当前目录没有 .gitignore，是否创建一个？") {
+				ok, err := tui.Confirm("当前目录没有 .gitignore，是否创建一个？")
+				if err != nil {
+					return err
+				}
+				if ok {
 					if err = os.WriteFile(gitignorePath, []byte(defaultGitignore), 0644); err != nil {
 						return fmt.Errorf("创建 .gitignore 失败: %w", err)
 					}
@@ -76,13 +80,21 @@ var projectInitCmd = &easycobra.Command{
 
 			// 若当前目录有文件，询问是否 git add . 及是否 git commit -m 'init'
 			if hasFiles(absPath) {
-				if console.Confirm("当前目录存在文件，是否执行 git add . ？") {
+				ok, err := tui.Confirm("当前目录存在文件，是否执行 git add . ？")
+				if err != nil {
+					return err
+				}
+				if ok {
 					if err = git.Add(absPath, "."); err != nil {
 						return fmt.Errorf("git add 失败: %w", err)
 					}
 					fmt.Println("> git add . 完成")
 
-					if console.Confirm("是否执行 git commit -m 'init' ？") {
+					ok, err := tui.Confirm("是否执行 git commit -m 'init' ？")
+					if err != nil {
+						return err
+					}
+					if ok {
 						if err = git.Commit(absPath, "init"); err != nil {
 							return fmt.Errorf("git commit 失败: %w", err)
 						}
