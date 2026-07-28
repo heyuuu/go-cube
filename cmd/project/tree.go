@@ -135,33 +135,31 @@ func buildDirChildren(dir string, projectSet, skeleton map[string]bool) []tui.Tr
 			continue
 		}
 		absPath := filepath.Join(dir, e.Name())
-		var style tui.TreeNodeStyle
+		var node tui.TreeNode
 		switch {
-		case projectSet[absPath]:
-			style = tui.TreeNodeStyleBlue
-		case skeleton[absPath]:
-			style = tui.TreeNodeStyleGreen
+		case projectSet[absPath]: // 项目节点
+			node = tui.TreeNode{
+				Name:  e.Name(),
+				Style: tui.TreeNodeStyleGreen,
+			}
+		case skeleton[absPath]: // 含项目的目录
+			children := buildDirChildren(filepath.Join(dir, e.Name()), projectSet, skeleton)
+			node = tui.TreeNode{
+				Name:     e.Name(),
+				Style:    tui.TreeNodeStyleBlue,
+				Children: children,
+			}
+		default: // 其他目录
+			node = tui.TreeNode{
+				Name:  e.Name(),
+				Style: tui.TreeNodeStyleNone,
+			}
 		}
-		nodes = append(nodes, tui.TreeNode{
-			Name:  e.Name(),
-			Style: style,
-		})
+		nodes = append(nodes, node)
 	}
 
 	// 同级排序：按名称字典序（本树只渲染目录节点，不存在目录/文件混排）
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Name < nodes[j].Name })
 
-	// 递归构造子节点：
-	//   - 项目目录（Blue）自身不再下钻（它是叶子终点）；
-	//   - 含项目但非项目目录（Green / skeleton 命中）才继续展开。
-	for i, n := range nodes {
-		if n.Style == tui.TreeNodeStyleBlue {
-			continue
-		}
-		absPath := filepath.Join(dir, n.Name)
-		if skeleton[absPath] {
-			nodes[i].Children = buildDirChildren(absPath, projectSet, skeleton)
-		}
-	}
 	return nodes
 }
