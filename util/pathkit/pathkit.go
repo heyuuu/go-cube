@@ -119,3 +119,10 @@ func commonPrefixDir(a, b string) string {
 		return a[:index] // 截到最后一个匹配的分隔符之前（不含分隔符）
 	}
 }
+
+// HasPrefix 判断 path 是否为 parent 或 parent 下的目录
+func HasPrefix(path string, parent string) bool {
+	path = filepath.Clean(path)
+	parent = filepath.Clean(parent)
+	return path == parent || strings.HasPrefix(path, parent+string(filepath.Separator))
+}
