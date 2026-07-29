@@ -11,6 +11,7 @@ type Command struct {
 	Short    string
 	Aliases  []string
 	Args     cobra.PositionalArgs
+	Hidden   bool // 透传给 cobra.Command.Hidden：为 true 时不显示在 help 等输出里
 	Run      Run
 	InitRun  func(cmd *cobra.Command) Run
 	Children []*Command
@@ -28,6 +29,7 @@ func (c *Command) CobraCommand() *cobra.Command {
 		Short:   c.Short,
 		Aliases: c.Aliases,
 		Args:    c.Args,
+		Hidden:  c.Hidden,
 	}
 
 	var run Run
