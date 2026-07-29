@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/spf13/cobra"
+
 	"github.com/heyuuu/cube/cmd/alfred"
 	cmdConfig "github.com/heyuuu/cube/cmd/config"
 	"github.com/heyuuu/cube/cmd/opener"
@@ -33,62 +35,51 @@ var rootCmd = &easycobra.Command{
 	},
 }
 
-// 在 Execute 前执行全局 flags 的解析和应用
-// notice: 不可使用 PersistentPreRun 或 PersistentPreRunE 替代，因为在没有定义 Run 相关操作的 Command 上不会调用 PersistentPreRun.
-func rootPreExecute() error {
+// Execute adds all child commands to the root command and sets flags appropriately.
+// This is called by main.main(). It only needs to happen once to the rootCmd.
+func Execute() {
 	cmd := rootCmd.CobraCommand()
-	args := os.Args[1:]
 
 	// persistent flags
 	var cfgPath string
 	var debug bool
 	cmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "config folder path (default is ~/.config/cube/)")
 	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
-	cmd.PersistentFlags().ParseErrorsAllowlist.UnknownFlags = true
-	err := cmd.PersistentFlags().Parse(args)
-	if err != nil {
-		return err
-	}
 
-	// 设置 debug 环境
-	config.SetDebug(debug)
+	// 初始化：在 cobra 解析完 flag 后、命令执行前触发。
+	// 用 OnInitialize 而非 PersistentPreRunE：后者只在最终命中的 runnable 命令上触发，
+	// 而本项目 cube/project 等是纯分组命令（无 Run），不会触发 PersistentPreRunE；
+	// OnInitialize 在任意命令执行前都会可靠触发。
+	cobra.OnInitialize(func() {
+		// 设置 debug 环境
+		config.SetDebug(debug)
 
-	// 初始化配置
-	err = config.Init(cfgPath)
-	if err != nil {
-		return err
-	}
+		// 初始化配置
+		err := config.Init(cfgPath)
+		checkError(err, "init config failed")
 
-	// 初始化 Logger
-	logger.Init()
+		// 初始化 Logger
+		logger.Init()
 
-	// 初始化 DB
-	err = db.Init(config.Path(),
-		&history.ProjectSelectLog{},
-		&history.ProjectOpenLog{},
-	)
-	if err != nil {
-		return err
-	}
+		// 初始化 DB
+		err = db.Init(config.Path(),
+			&history.ProjectSelectLog{},
+			&history.ProjectOpenLog{},
+		)
+		checkError(err, "init db failed")
 
-	// 记录启动日志
-	slog.Debug("command start", "debug", debug, "cfgPath", config.Path(), "args", args)
+		// 记录启动日志
+		slog.Debug("command start", "debug", debug, "cfgPath", config.Path(), "args", os.Args)
+	})
 
-	return nil
+	// 执行命令
+	err := rootCmd.Execute()
+	checkError(err, "execute failed")
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
-func Execute() {
-	err := rootPreExecute()
+func checkError(err error, msg string) {
 	if err != nil {
-		slog.Error("pre execute failed", "err", err)
-		os.Exit(1)
-	}
-
-	err = rootCmd.Execute()
-	if err != nil {
-		slog.Error("execute failed", "err", err)
+		slog.Error(msg, "err", err)
 		os.Exit(1)
 	}
 }
