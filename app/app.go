@@ -15,18 +15,7 @@ type App struct {
 	historyService *history.Service
 }
 
-func (app *App) Server() *web.Server {
-	return app.server
-}
-
-func (app *App) ProjectService() *project.Service {
-	return app.projectService
-}
-
-func (app *App) OpenerService() *opener.Service {
-	return app.openerService
-}
-
-func (app *App) HistoryService() *history.Service {
-	return app.historyService
-}
+func (app *App) Server() *web.Server              { return app.server }
+func (app *App) ProjectService() *project.Service { return app.projectService }
+func (app *App) OpenerService() *opener.Service   { return app.openerService }
+func (app *App) HistoryService() *history.Service { return app.historyService }

@@ -71,7 +71,7 @@ func Load(dir string) (*Cache, error) {
 
 	// 确保目录存在
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return c, fmt.Errorf("create cache dir failed: %w", err)
+		return c, fmt.Errorf("创建 cache 目录失败: %w", err)
 	}
 
 	// 文件不存在：空缓存
@@ -126,16 +126,16 @@ func (c *Cache) Save() error {
 
 	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {
-		return fmt.Errorf("marshal cache failed: %w", err)
+		return fmt.Errorf("序列化 cache 失败: %w", err)
 	}
 
 	path := c.path()
 	tmpPath := path + ".tmp"
 	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("write cache tmp failed: %w", err)
+		return fmt.Errorf("写入 cache 临时文件失败: %w", err)
 	}
 	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("rename cache tmp failed: %w", err)
+		return fmt.Errorf("重命名 cache 临时文件失败: %w", err)
 	}
 	return nil
 }

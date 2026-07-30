@@ -21,7 +21,7 @@ func Init(cfgPath string) error {
 	// 若 cfgPath 不存在则创建
 	if _, err := os.Stat(cfgPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(cfgPath, 0755); err != nil {
-			return fmt.Errorf("create config dir failed: %w", err)
+			return fmt.Errorf("创建 config 目录失败: %w", err)
 		}
 	}
 
@@ -58,12 +58,12 @@ func initDefaultConf(cfgPath string) error {
 func parseConfigFile(cfgFile string, cfg *Config) error {
 	data, err := os.ReadFile(cfgFile)
 	if err != nil {
-		return fmt.Errorf("read config file failed: %w", err)
+		return fmt.Errorf("读取 config 文件失败: %w", err)
 	}
 
 	err = json.Unmarshal(data, cfg)
 	if err != nil {
-		return fmt.Errorf("unmarshal config data failed: %w", err)
+		return fmt.Errorf("解析 config 数据失败: %w", err)
 	}
 
 	return nil

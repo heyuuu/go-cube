@@ -75,7 +75,7 @@ func (s *Server) Start(addr string) error {
 
 	select {
 	case err := <-errCh:
-		return fmt.Errorf("server start failed: %w", err)
+		return fmt.Errorf("server 启动失败: %w", err)
 	case sig := <-sigCh:
 		slog.Info("server shutting down", "signal", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)

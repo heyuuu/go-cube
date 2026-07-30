@@ -15,16 +15,16 @@ import (
 // 在非 TTY 下不尝试用 accessible 模式自动作答，而是直接返回 ErrNotTTY，
 // 由调用方决定降级策略（退到命令行 flag、用默认值、或直接退出）。
 // 这避免了 CI/脚本里「无人输入却静默选了第一项」的隐患。
-var ErrNotTTY = errors.New("tui: stdin is not a tty (interactive functions require a real terminal)")
+var ErrNotTTY = errors.New("tui: stdin 不是 tty（交互式函数需要真实终端）")
 
 // ErrUserAborted 表示用户取消了交互（按 Ctrl+C）。
 //
 // 由 Select / MultiSelect / Confirm / Input / PasswordInput 在用户中断时返回，
 // 调用方可据此区分「取消」与「真实错误」。
-var ErrUserAborted = errors.New("tui: user aborted")
+var ErrUserAborted = errors.New("tui: 用户已取消")
 
 // ErrEmptyOptions 在选项列表为空时由 Select / MultiSelect 返回。
-var ErrEmptyOptions = errors.New("tui: options must not be empty")
+var ErrEmptyOptions = errors.New("tui: 选项列表不能为空")
 
 // normalizeError 把 huh 返回的底层错误归一化为本包的对外错误。
 //

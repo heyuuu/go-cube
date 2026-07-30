@@ -109,14 +109,14 @@ func TryAsyncRefresh(cacheDir string, ttl time.Duration) {
 func RefreshSync(cacheDir string, paths []string) error {
 	// 确保目录存在（父进程的 TryAsyncRefresh 不一定先建目录）
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
-		return fmt.Errorf("create cache dir: %w", err)
+		return fmt.Errorf("创建 cache 目录失败: %w", err)
 	}
 
 	// 1. flock 非阻塞抢锁
 	lockPath := filepath.Join(cacheDir, lockFileName)
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
-		return fmt.Errorf("open lock file: %w", err)
+		return fmt.Errorf("打开 lock 文件失败: %w", err)
 	}
 	defer f.Close()
 
@@ -134,10 +134,10 @@ func RefreshSync(cacheDir string, paths []string) error {
 	// 3. 采集
 	cache, err := Load(cacheDir)
 	if err != nil {
-		return fmt.Errorf("load cache: %w", err)
+		return fmt.Errorf("加载 cache 失败: %w", err)
 	}
 	if err := cache.Refresh(paths); err != nil {
-		return fmt.Errorf("refresh cache: %w", err)
+		return fmt.Errorf("刷新 cache 失败: %w", err)
 	}
 
 	slog.Debug("git cache: refresh done", "projects", len(paths))
