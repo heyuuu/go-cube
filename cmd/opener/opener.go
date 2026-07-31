@@ -27,7 +27,7 @@ var openerListCmd = &easycobra.Command{
 		}
 
 		service := app.Default().OpenerService()
-		apps := service.Search(query)
+		apps := service.SearchAll(query)
 		showOpeners(apps)
 		return nil
 	},
@@ -37,12 +37,14 @@ func showOpeners(apps []*opener.Opener) {
 	tui.PrintTable(
 		[]string{
 			fmt.Sprintf("Opener(%d)", len(apps)),
-			"Bin",
+			"Cmd",
+			"Roles",
 		},
 		slicekit.Map(apps, func(app *opener.Opener) []string {
 			return []string{
 				app.Name(),
-				app.Bin(),
+				app.CmdString(),
+				app.RolesString(),
 			}
 		}),
 	)

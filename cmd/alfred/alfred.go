@@ -10,7 +10,6 @@ import (
 
 	"github.com/heyuuu/cube/app"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
-	"github.com/heyuuu/cube/cmd/util/runner"
 	"github.com/heyuuu/cube/opener"
 	"github.com/heyuuu/cube/project"
 	"github.com/heyuuu/cube/util/slicekit"
@@ -90,7 +89,7 @@ var openerSearchCmd = &easycobra.Command{
 
 			// 获取匹配的命令列表
 			service := app.Default().OpenerService()
-			openers := service.Search(strings.Join(query, " "))
+			openers := service.SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
 			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
 			if len(projectName) > 0 {
@@ -103,7 +102,7 @@ var openerSearchCmd = &easycobra.Command{
 			return PrintResult(openers, func(item *opener.Opener) Item {
 				return Item{
 					Title:    item.Name(),
-					SubTitle: item.Bin(),
+					SubTitle: item.CmdString(),
 					Arg:      item.Name(),
 				}
 			})
@@ -174,7 +173,7 @@ var projectOpenCmd = &easycobra.Command{
 			}
 
 			// 打开项目
-			err := runner.Run(opener.Bin(), proj.Path())
+			err := opener.Open(proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}

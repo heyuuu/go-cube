@@ -10,8 +10,9 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name string `json:"name"`
-	Bin  string `json:"bin"`
+	Name  string   `json:"name"`
+	Cmd   []string `json:"cmd"`
+	Roles []string `json:"roles"`
 }
 
 func toOpenerDTO(entity *opener.Opener) *OpenerDTO {
@@ -21,7 +22,10 @@ func toOpenerDTO(entity *opener.Opener) *OpenerDTO {
 
 	return &OpenerDTO{
 		Name: entity.Name(),
-		Bin:  entity.Bin(),
+		Cmd:  entity.Cmd(),
+		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
+			return string(r)
+		}),
 	}
 }
 
@@ -43,7 +47,7 @@ func (h *OpenerHandler) Register(api huma.API) {
 }
 
 func (h *OpenerHandler) openerList(_ struct{}) (ListResult[*OpenerDTO], error) {
-	apps := h.service.Openers()
+	apps := h.service.AllOpeners()
 	list := slicekit.Map(apps, toOpenerDTO)
 	return listResult(list), nil
 }

@@ -8,7 +8,6 @@ import (
 
 	"github.com/heyuuu/cube/app"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
-	"github.com/heyuuu/cube/cmd/util/runner"
 	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/config"
 	"github.com/heyuuu/cube/opener"
@@ -52,19 +51,19 @@ var configEditCmd = &easycobra.Command{
 
 		// 选择 opener 打开 config 文件
 		openerService := app.Default().OpenerService()
-		openers := openerService.Openers()
+		openers := openerService.RoleOpeners(opener.RoleOpenFile)
 		if len(openers) == 0 {
-			return fmt.Errorf("未配置任何 opener，请在 config.json 中配置 openers 后重试")
+			return fmt.Errorf("未配置任何可打开文件的 opener，请在 config.json 中为 opener 声明 roles:[\"open-file\"] 后重试")
 		}
 
-		openApp, err := tui.SelectItem("选择 opener 打开 config", openers, func(o *opener.Opener) string {
+		opener, err := tui.SelectItem("选择 opener 打开 config", openers, func(o *opener.Opener) string {
 			return o.Name()
 		})
 		if err != nil {
 			return err
 		}
 
-		if err = runner.Run(openApp.Bin(), cfgFile); err != nil {
+		if err = opener.Open(cfgFile); err != nil {
 			return fmt.Errorf("打开 config 失败: %w", err)
 		}
 		return nil

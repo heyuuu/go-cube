@@ -30,6 +30,7 @@ type CloneRuleConfig struct {
 }
 
 type OpenerConfig struct {
-	Name string `json:"name"`
-	Bin  string `json:"bin"`
+	Name  string   `json:"name"`
+	Cmd   []string `json:"cmd"`   // 启动命令，cmd[0]=可执行文件，其余为参数；用 $0/$1... 占位路径槽位
+	Roles []string `json:"roles"` // 该 opener 的业务用途枚举，如 ["open-dir"]、["diff-dir","diff-file"]；缺省视为 ["open-dir"]
 }
