@@ -25,17 +25,17 @@ const (
 
 // 参数类型常量（内部用，role 签名的元素）。
 const (
-	TypeDir  = "dir"
-	TypeFile = "file"
+	typeDir  = "dir"
+	typeFile = "file"
 )
 
 // roleSlots 是 role → 每槽参数类型签名 的映射。
 // 类型仅区分 dir/file（内部细节，不暴露给配置与筛选层）。
 var roleSlots = map[Role][]string{
-	RoleOpenDir:  {TypeDir},
-	RoleOpenFile: {TypeFile},
-	RoleDiffDir:  {TypeDir, TypeDir},
-	RoleDiffFile: {TypeFile, TypeFile},
+	RoleOpenDir:  {typeDir},
+	RoleOpenFile: {typeFile},
+	RoleDiffDir:  {typeDir, typeDir},
+	RoleDiffFile: {typeFile, typeFile},
 }
 
 // roleSlotCount 返回 role 对应的参数槽个数。

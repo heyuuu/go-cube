@@ -1,6 +1,7 @@
 package pathkit
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,16 @@ func RealPath(path string) string {
 		}
 	}
 	return filepath.Clean(path)
+}
+
+// ResolvePath 把用户输入的路径展开为绝对路径：先用 RealPath 展开 ~/，
+// 再用 filepath.Abs 把相对路径基于当前工作目录转为绝对路径。
+func ResolvePath(p string) (string, error) {
+	abs, err := filepath.Abs(RealPath(p))
+	if err != nil {
+		return "", fmt.Errorf("解析路径失败: %w", err)
+	}
+	return abs, nil
 }
 
 func PrettyPath(path string) string {

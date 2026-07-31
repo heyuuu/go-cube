@@ -42,6 +42,55 @@ func TestRealPath(t *testing.T) {
 	}
 }
 
+// ---------- ResolvePath ----------
+
+func TestResolvePath(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("os.UserHomeDir() 失败: %v", err)
+	}
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("os.Getwd() 失败: %v", err)
+	}
+
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		// 已是绝对路径：原样返回（Clean 规范化冗余段）
+		{"绝对路径原样返回", "/usr/local/bin", "/usr/local/bin"},
+		{"绝对路径脏输入双斜杠", "/usr//local/bin", "/usr/local/bin"},
+		{"绝对路径脏输入点段", "/usr/./local/bin", "/usr/local/bin"},
+		{"绝对路径脏输入双点回退", "/usr/local/../bin", "/usr/bin"},
+
+		// ~/ 前缀：先展开成 home 绝对路径（不再相对 cwd）
+		{"tilde 展开为绝对", "~/code", filepath.Join(home, "code")},
+		{"tilde 展开含脏输入", "~/code//app", filepath.Join(home, "code", "app")},
+		// 仅波浪号本身不展开（非 ~/ 前缀），按相对路径处理 → 相对 cwd
+		{"仅波浪号走相对路径", "~user/x", filepath.Join(wd, "~user", "x")},
+
+		// 相对路径：基于 cwd 转 abs
+		{"相对路径转绝对", "foo/bar", filepath.Join(wd, "foo", "bar")},
+		{"相对路径脏输入双斜杠", "foo//bar", filepath.Join(wd, "foo", "bar")},
+		{"相对路径点段", "foo/./bar", filepath.Join(wd, "foo", "bar")},
+		{"相对路径双点回退", "a/b/../../c", filepath.Join(wd, "c")},
+		{"相对单点", "./app", filepath.Join(wd, "app")},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := ResolvePath(c.in)
+			if err != nil {
+				t.Fatalf("ResolvePath(%q) 出错: %v", c.in, err)
+			}
+			if got != c.want {
+				t.Fatalf("ResolvePath(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 // ---------- PrettyPath ----------
 
 func TestPrettyPath(t *testing.T) {

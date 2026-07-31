@@ -11,9 +11,12 @@ import (
 )
 
 var RootCmd = &easycobra.Command{
-	Use: "opener",
+	Use:     "opener",
+	Aliases: []string{"o", "open"},
 	Children: []*easycobra.Command{
 		openerListCmd,
+		openerOpenCmd,
+		openerDiffCmd,
 	},
 }
 
