@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cube</title>
   <link rel="stylesheet" href="/ui/app.css">
-  <!-- Alpine.js：defer 必加，等 DOM 解析完再初始化 -->
-  <script defer src="/ui/vendor/alpine.min.js"></script>
+  <!-- 顺序：app.js 必须在 alpine 之前加载，确保 Alpine 初始化 x-data="cubeApp()" 时 window.cubeApp 已定义 -->
   <script defer src="/ui/app.js"></script>
+  <script defer src="/ui/vendor/alpine.min.js"></script>
 </head>
 <body>
 <div class="layout" x-data="cubeApp()">
@@ -148,7 +148,7 @@
 
     <!-- ============ 详情抽屉（点行滑出） ============ -->
     <div class="drawer-mask" x-show="drawer" x-transition.opacity @click="drawer = null"></div>
-    <aside class="drawer" x-show="drawer" x-transition.origin.right x-data="{ get p() { return this.drawer } }">
+    <aside class="drawer" x-show="drawer" x-transition.origin.right>
       <template x-if="drawer">
         <div class="drawer-body">
           <div class="drawer-head">
