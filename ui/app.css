@@ -428,7 +428,7 @@ html, body {
 
 .config-list { display: flex; flex-direction: column; gap: 4px; }
 .config-item {
-  display: flex; align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 12px;
   padding: 8px 12px;
   border-radius: 6px;
   background: var(--bg);
@@ -436,22 +436,25 @@ html, body {
 }
 .config-item:hover { background: var(--bg-elev); }
 .config-item-opener { flex-wrap: wrap; }
+/* 固定列宽，保证每行同列字段左对齐 */
 .config-idx {
   color: var(--text-mute); font-family: var(--mono);
-  font-size: 0.78rem; min-width: 1.5em;
+  font-size: 0.78rem; width: 2em; flex-shrink: 0; text-align: right;
 }
-.config-path { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; }
-.config-host { font-family: var(--mono); color: var(--accent); font-size: 0.82rem; }
-.config-prefix { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; }
-.config-arrow { color: var(--text-mute); }
-.config-depth { color: var(--text-mute); font-size: 0.78rem; margin-left: auto; }
+.config-item > .badge { width: 5.5em; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+.config-host { font-family: var(--mono); color: var(--accent); font-size: 0.82rem; width: 8em; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+.config-prefix { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; width: 7em; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; }
+.config-arrow { color: var(--text-mute); flex-shrink: 0; }
+.config-path { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.config-depth { color: var(--text-mute); font-size: 0.78rem; width: 5em; flex-shrink: 0; text-align: right; }
 .config-cmd {
   font-family: var(--mono); font-size: 0.82rem;
   color: var(--text-dim); background: var(--bg-elev);
   padding: 1px 6px; border-radius: 3px;
+  flex: 1; min-width: 0;
 }
-.config-roles { display: flex; gap: 4px; flex-wrap: wrap; }
-.config-del { margin-left: auto; }
+.config-roles { display: flex; gap: 4px; flex-wrap: wrap; width: 12em; flex-shrink: 0; }
+.config-del { margin-left: auto; flex-shrink: 0; }
 .config-empty {
   padding: 24px; text-align: center;
   color: var(--text-mute); font-size: 0.85rem;

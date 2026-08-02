@@ -292,7 +292,7 @@
               <div class="config-item">
                 <span class="config-idx" x-text="i + 1"></span>
                 <span class="config-host" x-text="r.repoHost"></span>
-                <span class="config-prefix" x-show="r.repoPrefix" x-text="r.repoPrefix"></span>
+                <span class="config-prefix" x-text="r.repoPrefix || '—'"></span>
                 <span class="config-arrow">→</span>
                 <span class="config-path" x-text="r.localPath"></span>
                 <button class="btn btn-link config-del" @click="delClone(r)">删除</button>
