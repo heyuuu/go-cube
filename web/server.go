@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -28,6 +29,15 @@ type Server struct {
 	api huma.API
 }
 
+// uiAssets 前端静态资源，由 main 通过 SetUIAssets 注入。
+// 为 nil 时表示未注入（web 包不阻断构造，但 / 与 /ui/ 路由不挂载）。
+var uiAssets embed.FS
+
+// SetUIAssets 由装配层（main）调用，把 //go:embed ui 得到的 FS 注入 web 包。
+// 必须在 NewServer / Start 之前调用。采用注入而非 web 包自 embed 的原因：
+// //go:embed 不允许引用上级目录，而仓库根属 main 包，embed 声明只能放在 main。
+func SetUIAssets(fs embed.FS) { uiAssets = fs }
+
 func NewServer(handlers ...Handler) *Server {
 	mux := http.NewServeMux()
 
@@ -39,6 +49,9 @@ func NewServer(handlers ...Handler) *Server {
 	for _, handler := range handlers {
 		handler.Register(api)
 	}
+
+	// 静态前端资源路由（/ 与 /ui/*），仅当 main 注入了资源时挂载
+	registerStaticRoutes(mux)
 
 	return &Server{mux: mux, api: api}
 }

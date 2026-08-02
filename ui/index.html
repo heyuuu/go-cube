@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>cube</title>
+  <link rel="stylesheet" href="/ui/app.css">
+  <!-- Alpine.js：defer 必加，等 DOM 解析完再初始化 -->
+  <script defer src="/ui/vendor/alpine.min.js"></script>
+  <script defer src="/ui/app.js"></script>
+</head>
+<body>
+<div class="layout" x-data="cubeApp()">
+
+  <!-- ============ 左侧栏 ============ -->
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">▣</span> cube
+    </div>
+
+    <!-- domain switcher（当前仅 project） -->
+    <div class="switcher">
+      <span class="switcher-current">project</span>
+      <span class="switcher-arrow">▾</span>
+    </div>
+
+    <!-- project 域导航 -->
+    <nav class="nav">
+      <a class="nav-item active">Projects</a>
+      <!-- 后端批量 API 就绪后加：Groups -->
+    </nav>
+
+    <div class="sidebar-foot">
+      <a href="/docs" target="_blank" class="foot-link">API Docs ↗</a>
+    </div>
+  </aside>
+
+  <!-- ============ 右侧正文 ============ -->
+  <main class="content">
+
+    <!-- 页内标题区 -->
+    <header class="page-head">
+      <div class="page-title">Projects</div>
+      <div class="page-actions">
+        <button class="btn btn-ghost" @click="refresh()" :disabled="loading">
+          <span x-show="!loading">刷新</span>
+          <span x-show="loading">刷新中…</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 工具条：搜索 + 筛选 -->
+    <div class="toolbar">
+      <input class="input" type="text" x-model="keyword" placeholder="🔍 搜索项目名 / 路径">
+      <select class="select" x-model="groupFilter">
+        <option value="all">全部 group</option>
+        <template x-for="g in groups" :key="g">
+          <option :value="g" x-text="g"></option>
+        </template>
+      </select>
+      <select class="select" x-model="gitFilter">
+        <option value="all">全部 git 状态</option>
+        <option value="clean">clean</option>
+        <option value="dirty">dirty</option>
+        <option value="ahead">ahead</option>
+        <option value="behind">behind</option>
+        <option value="none">未采集</option>
+      </select>
+      <span class="count">共 <strong x-text="filtered.length"></strong> 个</span>
+    </div>
+
+    <!-- 批量动作条（占位，待后端批量 API） -->
+    <div class="batch-bar" x-show="selected.size > 0" x-transition>
+      已选 <strong x-text="selected.size"></strong> 个 ——
+      <button class="btn btn-ghost" disabled title="待后端 pull API">Pull</button>
+      <button class="btn btn-ghost" disabled title="待后端 open API">Open ▾</button>
+      <button class="btn btn-link" @click="selected.clear()">取消</button>
+    </div>
+
+    <!-- 错误提示 -->
+    <div class="error-banner" x-show="error" x-transition x-text="error"></div>
+
+    <!-- 表格 -->
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th class="col-check"></th>
+            <th class="col-name">name</th>
+            <th class="col-group">group</th>
+            <th class="col-git">git</th>
+            <th class="col-tags">tags</th>
+            <th class="col-action"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="p in filtered" :key="p.path">
+            <tr @click="openDrawer(p)" :class="{ 'row-selected': selected.has(p.path) }">
+              <td class="col-check" @click.stop>
+                <input type="checkbox"
+                       :checked="selected.has(p.path)"
+                       @change="toggleSelect(p.path)">
+              </td>
+              <td class="col-name">
+                <div class="name-main" x-text="p.name"></div>
+                <div class="name-path" x-text="p.path"></div>
+              </td>
+              <td class="col-group"><span class="badge badge-blue" x-text="p.group"></span></td>
+              <td class="col-git">
+                <template x-if="p.gitInfo === null">
+                  <span class="badge badge-mute">未采集</span>
+                </template>
+                <template x-if="p.gitInfo">
+                  <div class="git-cell">
+                    <span class="git-branch" x-text="'⎇ ' + (p.gitInfo.currentBranch || p.gitInfo.defaultBranch || '-')"></span>
+                    <span class="badge badge-red" x-show="p.gitInfo.dirty">dirty</span>
+                    <span class="badge badge-yellow" x-show="p.gitInfo.ahead > 0" x-text="'↑' + p.gitInfo.ahead"></span>
+                    <span class="badge badge-mute" x-show="p.gitInfo.behind > 0" x-text="'↓' + p.gitInfo.behind"></span>
+                    <span class="badge badge-green" x-show="!p.gitInfo.dirty && p.gitInfo.ahead === 0 && p.gitInfo.behind === 0">clean</span>
+                  </div>
+                </template>
+              </td>
+              <td class="col-tags">
+                <template x-for="t in p.tags" :key="t">
+                  <span class="tag" x-text="t"></span>
+                </template>
+              </td>
+              <td class="col-action" @click.stop>
+                <button class="row-more" title="待后端 open/pull API">⋯</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+
+      <!-- 空状态 -->
+      <div class="empty" x-show="!loading && filtered.length === 0 && !error">
+        <div class="empty-title">无匹配项目</div>
+        <div class="empty-sub" x-show="projects.length === 0">尚未扫描到任何项目，检查 scan 配置。</div>
+        <div class="empty-sub" x-show="projects.length > 0">试试调整搜索或筛选条件。</div>
+      </div>
+
+      <!-- 加载态 -->
+      <div class="empty" x-show="loading && projects.length === 0">
+        <div class="empty-title">加载中…</div>
+      </div>
+    </div>
+
+    <!-- ============ 详情抽屉（点行滑出） ============ -->
+    <div class="drawer-mask" x-show="drawer" x-transition.opacity @click="drawer = null"></div>
+    <aside class="drawer" x-show="drawer" x-transition.origin.right x-data="{ get p() { return this.drawer } }">
+      <template x-if="drawer">
+        <div class="drawer-body">
+          <div class="drawer-head">
+            <div>
+              <div class="drawer-title" x-text="drawer.name"></div>
+              <div class="drawer-sub" x-text="drawer.path"></div>
+            </div>
+            <button class="btn btn-link" @click="drawer = null">✕</button>
+          </div>
+
+          <section class="drawer-section">
+            <div class="drawer-label">基本信息</div>
+            <dl class="kv">
+              <dt>group</dt><dd x-text="drawer.group"></dd>
+              <dt>repo</dt><dd x-text="drawer.repoUrl || '-'"></dd>
+              <dt>tags</dt>
+              <dd>
+                <template x-for="t in drawer.tags" :key="t">
+                  <span class="tag" x-text="t"></span>
+                </template>
+                <span x-show="drawer.tags.length === 0">-</span>
+              </dd>
+            </dl>
+          </section>
+
+          <section class="drawer-section" x-show="drawer.gitInfo">
+            <div class="drawer-label">git 状态</div>
+            <dl class="kv">
+              <dt>branch</dt><dd x-text="drawer.gitInfo?.currentBranch || '-'"></dd>
+              <dt>default</dt><dd x-text="drawer.gitInfo?.defaultBranch || '-'"></dd>
+              <dt>ahead/behind</dt>
+              <dd>
+                <span x-text="'↑' + (drawer.gitInfo?.ahead || 0)"></span> /
+                <span x-text="'↓' + (drawer.gitInfo?.behind || 0)"></span>
+              </dd>
+              <dt>dirty</dt>
+              <dd>
+                <span class="badge badge-red" x-show="drawer.gitInfo?.dirty">dirty</span>
+                <span class="badge badge-green" x-show="!drawer.gitInfo?.dirty">clean</span>
+              </dd>
+              <dt>采集时间</dt><dd x-text="formatTime(drawer.gitInfo?.collectedAt)"></dd>
+            </dl>
+          </section>
+
+          <section class="drawer-section">
+            <div class="drawer-label">动作</div>
+            <div class="drawer-actions">
+              <button class="btn btn-ghost" disabled title="待后端 open API">Open ▾</button>
+              <button class="btn btn-ghost" disabled title="待后端 pull API">Pull</button>
+              <button class="btn btn-ghost" @click="copyPath(drawer.path)">复制路径</button>
+            </div>
+          </section>
+
+          <section class="drawer-section drawer-placeholder">
+            <div class="drawer-label">worktree</div>
+            <div class="placeholder-text">后端 worktree 能力未实现</div>
+          </section>
+        </div>
+      </template>
+    </aside>
+
+  </main>
+</div>
+</body>
+</html>

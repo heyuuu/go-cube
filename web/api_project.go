@@ -4,16 +4,19 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"github.com/heyuuu/cube/project"
+	"github.com/heyuuu/cube/project/gitcache"
 	"github.com/heyuuu/cube/util/slicekit"
 )
 
 // --- dto ---
 
 type ProjectDTO struct {
-	Name    string   `json:"name"`
-	Path    string   `json:"path"`
-	RepoUrl string   `json:"repoUrl"`
-	Tags    []string `json:"tags"`
+	Name    string          `json:"name"`
+	Group   string          `json:"group"`
+	Path    string          `json:"path"`
+	RepoUrl string          `json:"repoUrl"`
+	Tags    []string        `json:"tags"`
+	GitInfo *gitcache.Entry `json:"gitInfo"` // git 状态快照，可能为 nil（未采集）
 }
 
 func toProjectDTO(entity *project.Project) *ProjectDTO {
@@ -23,9 +26,11 @@ func toProjectDTO(entity *project.Project) *ProjectDTO {
 
 	return &ProjectDTO{
 		Name:    entity.Name(),
+		Group:   entity.Group(),
 		Path:    entity.Path(),
 		RepoUrl: entity.RepoUrl(),
 		Tags:    entity.Tags(),
+		GitInfo: entity.GitInfo(),
 	}
 }
 

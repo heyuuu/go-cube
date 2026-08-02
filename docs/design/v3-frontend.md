@@ -1,6 +1,78 @@
 # Cube · v3 前端设计
 
+> ⚠️ **本文档的 React+Vite+TS 重型方案已废弃（2026-08-02）**。下方「方案切换说明」是当前事实源，正文（第一节起）保留为重型方案的历史设计记录，仅供参考。
+>
 > `cube server` 的 Web 前端设计。配套总体设计见 [v3-design.md](./v3-design.md)。
+
+---
+
+## 方案切换说明（当前事实源 · 2026-08-02）
+
+### 决策
+
+放弃下方第一节的 React + Vite + TypeScript + shadcn/ui + OpenAPI codegen 重型方案，改为**无构建链的轻量方案**：
+
+| 维度 | 新方案（当前） | 旧方案（已废弃，见正文第一节） |
+|------|---------------|------------------------------|
+| 框架 | **Alpine.js**（声明式 HTML 属性，gzip ~15KB） | React 18 + react-router v6 |
+| 构建 | **无构建**（纯 HTML + JS + CSS） | Vite → `web/dist/` |
+| 语言 | **纯 JavaScript**（无 TS） | TypeScript strict |
+| 调用层 | **原生 fetch + 手写 envelope unwrap** | OpenAPI codegen 出 typed SDK |
+| UI | **手写 CSS**（`ui/app.css`，类 Tailwind 命名） | shadcn/ui + Tailwind |
+| 嵌入 | `//go:embed ui`（main 包声明，注入 web） | `//go:embed web/dist` |
+| 状态管理 | Alpine `x-data` 对象 + getter | TanStack Query + Context |
+
+### 为什么切
+
+- **cube 是本地工具、个人单用户、几十个项目量级**，重型方案的构建链/类型系统/codegen 收益远小于维护成本。
+- Alpine 的 `x-data`/`x-for`/`:class` 在表格、抽屉、git 徽章这类场景代码量最少，与 HTML 完美贴合。调研详见 `docs/tech-notes/alpine-intro.html`（可交互演示）。
+- 复用 deck 已验证的模式：手写 CSS + embed 静态文件 + 无构建。
+- 排除项：petite-vue（官方已停维护）、htmx（与"纯前端 fetch JSON"模式根本冲突，需叠扩展吃 JSON）、Preact+htm（hooks 心智对轻量场景过重）。
+
+### 目录结构（已落地）
+
+```
+cube/
+├── main.go                # 装配层：web.SetUIAssets(UIFS) 注入
+├── embed.go               # package main，//go:embed ui → var UIFS embed.FS
+├── ui/                    # 前端资源（仓库根，纯静态）
+│   ├── index.html         # 入口：B 端布局（sidebar + 正文），Alpine x-data="cubeApp()"
+│   ├── app.css            # 手写样式（暗色，class 命名贴近 Tailwind）
+│   ├── app.js             # cubeApp()：fetch list + getter 过滤 + 30s 轮询 + 抽屉
+│   └── vendor/
+│       ├── alpine.min.js  # 入 git，钉版本 v3.14.1（gzip ~15KB）
+│       └── fetch.sh       # 下载脚本（升级版本时跑，记录 RESOURCES 数组）
+└── web/
+    ├── server.go          # NewServer 内调 registerStaticRoutes；SetUIAssets 包级 setter
+    └── static.go          # registerStaticRoutes：/ui/* 文件服务器 + / 首页
+```
+
+### embed 接入为何是「main 包声明 + 注入 web」（方案 B）
+
+`//go:embed` 三条硬规则：路径相对 `.go` 文件目录、不允许 `..`、一个目录只能一个包名。cube 要求 `ui/` 在仓库根，而仓库根是 `package main`，所以 embed 声明只能放 main 包（`embed.go`），由 `main()` 调 `web.SetUIAssets(UIFS)` 注入。详见 [embed 调研](.)（Stack Overflow 业界共识：资源目录在上层时，要么把 `.go` 放进资源目录（方案 D，但要避开 embed 自己），要么从 main 注入）。cube 选 B 是为了 embed 直接 `//go:embed ui` 整个目录一锅端，不必穷举文件名。
+
+### 实时性（与正文第六节一致，机制不变）
+
+后端 gitcache 异步采集 + 前端 30s 轮询拉快照。前端**不自己采集 git、不用 SSE**。`app.js` 的 `init()` 里 `setInterval(() => this.load(), 30000)`。
+
+### 落地范围（对齐正文 F1，但用 Alpine 实现）
+
+已落地：工程骨架 + embed 接线 + 布局 + Projects 列表页（搜索/group 筛选/git 筛选/git 徽章）+ 详情抽屉（点行滑出，只读）。
+
+占位（待后端 API）：勾选批量条、行操作 Open/Pull、worktree 块——前端做 disabled 占位。
+
+### 加新 domain 的前端步骤（对应正文第八节）
+
+1. 后端加 `web/xxx_api.go` Handler → `/api/xxx/*` 自动就绪。
+2. `ui/index.html` 的 sidebar domain switcher 加一项。
+3. 正文区加一个 `x-show="domain==='xxx'"` 的内容块。
+4. `app.js` 加对应的数据加载逻辑。
+
+现有 project 代码零改动。
+
+### 未来若要升级回重型方案
+
+Alpine 的 `x-data` 函数与 Vue 的 `setup()` 数据模型几乎一一对应，迁移成本低（主要是 HTML 属性 → 模板语法）。届时恢复正文第一节的 React/Vite 方案即可，本节作废。
 >
 > **现状对齐**：本文基于 `develop` 分支真实代码。后端 huma 已落地（`web/server.go`，`/docs` Scalar、`OpenAPIJSON()` 可导 spec）、git 信息走 `project/gitcache` 异步缓存。**前端工程尚未创建**（`frontend/`、`web/dist/`、`go:embed` 均未接入，属本文档定义的目标）。当前后端 API 偏少（project 仅 `list/info/scan-rules/clone-rules`，全只读），**git 操作 / open / 批量等 API 尚未实现**——前端设计标注了这些 gap，按"前端能做的前做、缺的后端 API 留接口位"推进。
 >

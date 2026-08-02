@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alpine.js 速览 · 与 React/Vue 对比</title>
+
+<!-- Alpine.js 本体（页面自身的交互演示用） -->
+<script defer src="https://unpkg.com/alpinejs@3.14.1/dist/cdn.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0d1117;
+    --bg-soft: #161b22;
+    --bg-elev: #1c2128;
+    --border: #30363d;
+    --border-soft: #21262d;
+    --text: #e6edf3;
+    --text-dim: #9198a1;
+    --text-mute: #6e7681;
+    --accent: #58a6ff;
+    --accent-soft: rgba(88, 166, 255, 0.12);
+    --green: #3fb950;
+    --green-soft: rgba(63, 185, 80, 0.12);
+    --yellow: #d29922;
+    --yellow-soft: rgba(210, 153, 34, 0.12);
+    --red: #f85149;
+    --purple: #bc8cff;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ---------- 布局 ---------- */
+  .layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: 100vh;
+  }
+
+  /* 侧边栏 */
+  .sidebar {
+    background: var(--bg-soft);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+  }
+  .brand {
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    padding: 0 8px 4px;
+  }
+  .brand .tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    background: var(--green-soft);
+    padding: 2px 7px;
+    border-radius: 4px;
+    margin-left: 6px;
+    vertical-align: middle;
+    font-family: var(--mono);
+  }
+  .brand-sub {
+    font-size: 12px;
+    color: var(--text-mute);
+    padding: 0 8px 20px;
+  }
+  .nav-section {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-mute);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 14px 8px 6px;
+  }
+  .nav-item {
+    display: block;
+    padding: 6px 10px;
+    border-radius: 6px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 14px;
+    transition: all 0.12s;
+  }
+  .nav-item:hover { color: var(--text); background: var(--bg-elev); }
+  .nav-item.active { color: var(--accent); background: var(--accent-soft); }
+
+  /* 正文 */
+  .content {
+    max-width: 880px;
+    padding: 48px 56px 120px;
+  }
+  section { margin-bottom: 72px; scroll-margin-top: 24px; }
+  h1 {
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px;
+  }
+  h2 {
+    font-size: 22px;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0 0 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  h2 .num {
+    color: var(--text-mute);
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    margin-right: 10px;
+  }
+  h3 {
+    font-size: 16px;
+    font-weight: 650;
+    margin: 28px 0 10px;
+    color: var(--text);
+  }
+  p { margin: 0 0 14px; }
+  p.lead {
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+  code:not(pre code) {
+    font-family: var(--mono);
+    font-size: 13px;
+    background: var(--bg-elev);
+    color: var(--purple);
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border-soft);
+  }
+  strong { color: var(--text); font-weight: 650; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  ul, ol { padding-left: 22px; margin: 10px 0 16px; }
+  li { margin-bottom: 6px; }
+  li::marker { color: var(--text-mute); }
+
+  /* ---------- 代码块 ---------- */
+  pre {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+    overflow-x: auto;
+    margin: 12px 0 18px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  pre code {
+    font-family: var(--mono);
+    color: var(--text);
+    background: none;
+    border: none;
+    padding: 0;
+  }
+  /* 语法高亮（手写） */
+  .tok-tag { color: #7ee787; }       /* 标签名 / 属性名 */
+  .tok-attr { color: #79c0ff; }      /* 属性值 */
+  .tok-str { color: #a5d6ff; }       /* 字符串 */
+  .tok-kw { color: #ff7b72; }        /* 关键字 */
+  .tok-fn { color: #d2a8ff; }        /* 函数 */
+  .tok-com { color: var(--text-mute); font-style: italic; } /* 注释 */
+  .tok-num { color: #79c0ff; }
+  .tok-dim { color: var(--text-dim); }
+
+  /* ---------- 演示框 ---------- */
+  .demo {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    margin: 14px 0 18px;
+  }
+  .demo-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--green);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .demo-label::before {
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* ---------- 三栏对比 ---------- */
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+    margin: 14px 0 18px;
+  }
+  .compare-col {
+    background: var(--bg-soft);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .compare-head {
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 650;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .compare-head .size {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-mute);
+  }
+  .compare-col.recommended .compare-head {
+    background: var(--green-soft);
+    color: var(--green);
+  }
+  .compare-col pre {
+    margin: 0;
+    border: none;
+    border-radius: 0;
+    background: transparent;
+    flex: 1;
+  }
+
+  /* ---------- 元件 ---------- */
+  .btn {
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    font-family: var(--sans);
+    transition: opacity 0.12s;
+  }
+  .btn:hover { opacity: 0.88; }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { background: var(--bg-elev); }
+
+  input[type="text"], input.demo-input, select.demo-select {
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px;
+    font-size: 14px;
+    font-family: var(--sans);
+    outline: none;
+    transition: border-color 0.12s;
+  }
+  input[type="text"]:focus, input.demo-input:focus, select.demo-select:focus {
+    border-color: var(--accent);
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--mono);
+  }
+  .badge-green { background: var(--green-soft); color: var(--green); }
+  .badge-yellow { background: var(--yellow-soft); color: var(--yellow); }
+  .badge-red { background: rgba(248,81,73,0.12); color: var(--red); }
+  .badge-blue { background: var(--accent-soft); color: var(--accent); }
+
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 13px;
+  }
+  table.data th, table.data td {
+    text-align: left;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border-soft);
+  }
+  table.data th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-mute);
+    font-weight: 600;
+  }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 12px 16px;
+    border-radius: 0 6px 6px 0;
+    margin: 14px 0 18px;
+    font-size: 14px;
+  }
+  .callout.green { border-color: var(--green); background: var(--green-soft); }
+  .callout.yellow { border-color: var(--yellow); background: var(--yellow-soft); }
+
+  .spacer-8 { height: 8px; }
+  .spacer-4 { height: 4px; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+  <!-- ============ 侧边栏 ============ -->
+  <aside class="sidebar">
+    <div class="brand">Alpine.js <span class="tag">15KB</span></div>
+    <div class="brand-sub">与 React / Vue 对比速览</div>
+
+    <div class="nav-section">入门</div>
+    <a class="nav-item" href="#what">它是什么</a>
+    <a class="nav-item" href="#why">为什么用它</a>
+
+    <div class="nav-section">核心概念</div>
+    <a class="nav-item" href="#data">响应式数据</a>
+    <a class="nav-item" href="#bind">双向绑定</a>
+    <a class="nav-item" href="#events">事件处理</a>
+    <a class="nav-item" href="#list">列表渲染</a>
+    <a class="nav-item" href="#show">显隐与切换</a>
+
+    <div class="nav-section">实战对比</div>
+    <a class="nav-item" href="#todo">Todo 输入框</a>
+    <a class="nav-item" href="#table">项目列表表格</a>
+    <a class="nav-item" href="#drawer">详情抽屉</a>
+
+    <div class="nav-section">选型</div>
+    <a class="nav-item" href="#summary">三者取舍</a>
+    <a class="nav-item" href="#cube">为何适合 cube</a>
+  </aside>
+
+  <!-- ============ 正文 ============ -->
+  <main class="content">
+
+    <p class="lead">cube 前端选型调研笔记。这是一份可交互的速览，右侧所有演示都真实运行（页面已加载 Alpine.js）。</p>
+    <h1>Alpine.js · 一个为"无构建链"而生的轻量框架</h1>
+
+    <!-- ============================================================ -->
+    <section id="what">
+      <h2><span class="num">01</span>它是什么</h2>
+      <p>Alpine.js 是一个<strong>通过 HTML 属性驱动交互</strong>的极简 JS 库。它的定位很明确：给你 Vue 那样的声明式数据绑定能力，但<strong>不需要任何构建步骤</strong>——一行 <code>&lt;script&gt;</code> 引进来就能用。</p>
+
+      <p>下面这个计数器，<strong>整页就是一个真实的 Alpine 组件</strong>。点一下试试：</p>
+
+      <div class="demo" x-data="{ count: 0 }">
+        <div class="demo-label">实时演示 · 计数器</div>
+        <p style="margin:0 0 14px;">当前计数：<strong x-text="count" style="font-size:20px;color:var(--accent);"></strong></p>
+        <button class="btn" @click="count++">+1</button>
+        <button class="btn btn-ghost" @click="count = 0" style="margin-left:8px;">重置</button>
+      </div>
+
+      <p>它的全部代码就这么几行：</p>
+      <pre><code><span class="tok-dim">&lt;!-- 引入：一行，defer 必加 --&gt;</span>
+&lt;script defer src=<span class="tok-str">"alpine.min.js"</span>&gt;&lt;/script&gt;
+
+<span class="tok-dim">&lt;!-- 用法：HTML 属性驱动 --&gt;</span>
+&lt;div <span class="tok-tag">x-data</span>=<span class="tok-attr">"{ count: 0 }"</span>&gt;
+  当前计数：&lt;span <span class="tok-tag">x-text</span>=<span class="tok-attr">"count"</span>&gt;&lt;/span&gt;
+  &lt;button <span class="tok-tag">@click</span>=<span class="tok-attr">"count++"</span>&gt;+1&lt;/button&gt;
+&lt;/div&gt;</code></pre>
+
+      <p>就这些。没有 <code>createApp</code>，没有 <code>setup()</code>，没有 <code>useState</code>，没有 <code>import</code>，没有 <code>npm install</code>。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="why">
+      <h2><span class="num">02</span>为什么用它（而不是 React / Vue）</h2>
+      <p>三者都能做到上面那个计数器，差别在<strong>心智成本</strong>和<strong>体积</strong>。同样一个计数器，三者并排：</p>
+
+      <div class="compare">
+        <div class="compare-col recommended">
+          <div class="compare-head">Alpine.js <span class="size">15KB</span></div>
+<pre><code>&lt;div <span class="tok-tag">x-data</span>=<span class="tok-attr">"{n:0}"</span>&gt;
+  &lt;span <span class="tok-tag">x-text</span>=<span class="tok-attr">"n"</span>&gt;&lt;/span&gt;
+  &lt;button <span class="tok-tag">@click</span>=<span class="tok-attr">"n++"</span>&gt;+&lt;/button&gt;
+&lt;/div&gt;
+
+<span class="tok-com">// 一行 script 引入</span>
+<span class="tok-com">// 无 import、无构建</span></code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">Vue 3 <span class="size">45KB</span></div>
+<pre><code>&lt;div id=<span class="tok-str">"app"</span>&gt;
+  &lt;span&gt;{{ n }}&lt;/span&gt;
+  &lt;button @click=<span class="tok-str">"n++"</span>&gt;+&lt;/button&gt;
+&lt;/div&gt;
+
+&lt;script&gt;
+<span class="tok-kw">const</span> { createApp, ref } = Vue;
+createApp({
+  setup() {
+    <span class="tok-kw">const</span> n = ref(<span class="tok-num">0</span>);
+    <span class="tok-kw">return</span> { n };
+  }
+}).mount(<span class="tok-str">'#app'</span>);
+&lt;/script&gt;</code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">React <span class="size">~45KB</span></div>
+<pre><code><span class="tok-com">// 需构建链 或 import map</span>
+<span class="tok-kw">import</span> {useState} <span class="tok-kw">from</span> <span class="tok-str">'react'</span>;
+
+<span class="tok-kw">function</span> <span class="tok-fn">App</span>() {
+  <span class="tok-kw">const</span> [n, setN] = <span class="tok-fn">useState</span>(<span class="tok-num">0</span>);
+  <span class="tok-kw">return</span> (
+    &lt;&gt;
+      &lt;span&gt;{n}&lt;/span&gt;
+      &lt;button onClick={() =&gt; <span class="tok-fn">setN</span>(n+1)}&gt;+&lt;/button&gt;
+    &lt;/&gt;
+  );
+}</code></pre>
+        </div>
+      </div>
+
+      <p>三个观察：</p>
+      <ul>
+        <li><strong>Alpine</strong>：数据直接写在 HTML 的 <code>x-data</code> 属性里，逻辑（<code>n++</code>）也在 HTML 里。一个文件搞定。</li>
+        <li><strong>Vue</strong>：HTML 写模板，但数据逻辑必须挪到 <code>&lt;script&gt;</code> 的 <code>setup()</code> 里，还要 <code>ref()</code> 包一层。多了一层"模板和 JS 分离"的样板。</li>
+        <li><strong>React</strong>：连 JSX 都要编译（或用 import map + htm 字符串），<code>useState</code> + 闭包那套心智最重。</li>
+      </ul>
+
+      <div class="callout">
+        <strong>关键差异</strong>：Alpine 是"HTML 优先"——逻辑天然内联在标签上，适合页面片段；Vue/React 是"JS 优先"——组件是 JS 函数，HTML 是被 JS 渲染出来的，适合大型 SPA。
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="data">
+      <h2><span class="num">03</span>响应式数据（x-data）</h2>
+      <p><code>x-data</code> 定义一个组件的作用域数据。Alpine 自动追踪依赖，数据变了 DOM 自动更新。</p>
+
+      <div class="demo" x-data="{ name: 'cube', items: ['a','b','c'] }">
+        <div class="demo-label">实时演示</div>
+        <p style="margin:0 0 10px;">项目名：<strong x-text="name"></strong>，子项数：<strong x-text="items.length"></strong></p>
+        <input class="demo-input" type="text" x-model="name" placeholder="改名字试试">
+        <button class="btn btn-ghost" @click="items.push('x')" style="margin-left:8px;">加一个子项</button>
+      </div>
+
+      <p>注意 <code>x-text="items.length"</code>——Alpine 会自动重新计算表达式。这是响应式的核心：<strong>你只管改数据，DOM 自己刷新</strong>。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="bind">
+      <h2><span class="num">04</span>双向绑定（x-model）</h2>
+      <p><code>x-model</code> 把表单输入和数据双向绑定。输入框打字 → 数据变；数据变 → 输入框也变。</p>
+
+      <div class="demo" x-data="{ keyword: '', projects: ['cube','deck','gogit','easycobra','fuzzy'] }">
+        <div class="demo-label">实时演示 · 搜索过滤</div>
+        <input class="demo-input" type="text" x-model="keyword" placeholder="搜索项目名..." style="width:280px;">
+        <div class="spacer-8"></div>
+        <div style="font-size:13px;color:var(--text-dim);margin-bottom:6px;">匹配结果：</div>
+        <template x-for="p in projects.filter(x => x.includes(keyword))" :key="p">
+          <span class="badge badge-blue" style="margin-right:6px;" x-text="p"></span>
+        </template>
+        <template x-if="projects.filter(x => x.includes(keyword)).length === 0">
+          <span style="color:var(--text-mute);font-size:13px;">无匹配</span>
+        </template>
+      </div>
+
+      <p>整个搜索过滤<strong>没有任何手动 DOM 操作</strong>。<code>x-model</code> 绑输入，<code>x-for</code> 循环渲染，<code>.filter()</code> 在模板里直接算。React/Vue 也能做，但 Alpine 这版最短。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="events">
+      <h2><span class="num">05</span>事件处理（@click / x-on）</h2>
+      <p><code>@click</code> 是 <code>x-on:click</code> 的简写。可以写任何 JS 表达式，也能调方法。</p>
+
+      <div class="demo" x-data="{ open: false, count: 0, log: [] }">
+        <div class="demo-label">实时演示 · 多种事件</div>
+        <button class="btn" @click="count++; log.push('+1 → ' + count)">count++</button>
+        <button class="btn btn-ghost" @click="open = !open" style="margin-left:8px;">切换面板</button>
+        <button class="btn btn-ghost" @click="log = []; count = 0" style="margin-left:8px;">清空</button>
+        <div class="spacer-8"></div>
+        <div x-show="open" x-transition style="padding:10px;background:var(--bg-elev);border-radius:6px;">
+          面板内容（count = <strong x-text="count"></strong>）
+        </div>
+        <div x-show="log.length > 0" style="margin-top:10px;font-family:var(--mono);font-size:12px;color:var(--text-mute);">
+          <template x-for="(line, i) in log" :key="i">
+            <div x-text="line"></div>
+          </template>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="list">
+      <h2><span class="num">06</span>列表渲染（x-for）</h2>
+      <p><code>x-for</code> 必须放在 <code>&lt;template&gt;</code> 标签上，且要给 <code>:key</code>。这点和 Vue 完全一样。</p>
+
+      <div class="demo" x-data="{
+        projects: [
+          { name: 'cube', group: 'github', ahead: 2, dirty: false },
+          { name: 'deck', group: 'github', ahead: 0, dirty: true },
+          { name: 'private-tool', group: 'pers', ahead: 5, dirty: true }
+        ]
+      }">
+        <div class="demo-label">实时演示 · 模拟 git 状态表格</div>
+        <table class="data">
+          <thead>
+            <tr><th>name</th><th>group</th><th>git 状态</th></tr>
+          </thead>
+          <tbody>
+            <template x-for="p in projects" :key="p.name">
+              <tr>
+                <td x-text="p.name"></td>
+                <td><span class="badge badge-blue" x-text="p.group"></span></td>
+                <td>
+                  <template x-if="p.dirty">
+                    <span class="badge badge-red">dirty</span>
+                  </template>
+                  <template x-if="!p.dirty && p.ahead === 0">
+                    <span class="badge badge-green">clean</span>
+                  </template>
+                  <template x-if="!p.dirty && p.ahead > 0">
+                    <span class="badge badge-yellow" x-text="'ahead ' + p.ahead"></span>
+                  </template>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <p style="font-size:13px;color:var(--text-mute);margin:8px 0 0;">这就是 cube 列表页 git 徽章的雏形。</p>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="show">
+      <h2><span class="num">07</span>显隐与切换（x-show / x-if）</h2>
+      <p>两者的区别：</p>
+      <ul>
+        <li><strong><code>x-show</code></strong>：通过 <code>display:none</code> 切换，元素始终在 DOM 里。适合频繁切换（抽屉、下拉）。</li>
+        <li><strong><code>x-if</code></strong>：真正增删 DOM 节点。适合条件渲染（列表里的"无数据"提示）。必须放在 <code>&lt;template&gt;</code> 上。</li>
+      </ul>
+
+      <div class="demo" x-data="{ tab: 'list', drawer: false }">
+        <div class="demo-label">实时演示 · Tab 切换 + 抽屉</div>
+        <div style="margin-bottom:10px;">
+          <button class="btn-ghost btn" @click="tab='list'" style="font-size:13px;">列表</button>
+          <button class="btn-ghost btn" @click="tab='config'" style="font-size:13px;margin-left:6px;">配置</button>
+        </div>
+        <div x-show="tab==='list'" style="padding:14px;background:var(--bg-elev);border-radius:6px;">这是列表页内容</div>
+        <div x-show="tab==='config'" x-transition style="padding:14px;background:var(--bg-elev);border-radius:6px;">这是配置页内容</div>
+        <div class="spacer-8"></div>
+        <button class="btn" @click="drawer = !drawer">打开详情抽屉</button>
+        <div x-show="drawer" x-transition.origin.top.right
+             style="margin-top:10px;padding:16px;background:var(--accent-soft);border:1px solid var(--accent);border-radius:6px;">
+          抽屉内容（点行滑出的那种）<br>
+          <span style="font-size:13px;color:var(--text-dim);">x-show + x-transition 实现，零额外代码</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="todo">
+      <h2><span class="num">08</span>实战对比 · 一个"添加输入框"</h2>
+      <p>需求：输入框 + 按钮，点按钮把输入内容加到列表。三者完整对比：</p>
+
+      <div class="compare">
+        <div class="compare-col recommended">
+          <div class="compare-head">Alpine <span class="size">15KB</span></div>
+<pre><code>&lt;div <span class="tok-tag">x-data</span>=<span class="tok-attr">"{text:'', items:[]}"</span>&gt;
+  &lt;input <span class="tok-tag">x-model</span>=<span class="tok-attr">"text"</span>&gt;
+  &lt;button <span class="tok-tag">@click</span>=<span class="tok-attr">"items.push(text); text=''"</span>&gt;
+    添加
+  &lt;/button&gt;
+  &lt;template <span class="tok-tag">x-for</span>=<span class="tok-attr">"i in items"</span>&gt;
+    &lt;div <span class="tok-tag">x-text</span>=<span class="tok-attr">"i"</span>&gt;&lt;/div&gt;
+  &lt;/template&gt;
+&lt;/div&gt;</code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">Vue 3 <span class="size">45KB</span></div>
+<pre><code>&lt;div id=<span class="tok-str">"app"</span>&gt;
+  &lt;input v-model=<span class="tok-str">"text"</span>&gt;
+  &lt;button @click=<span class="tok-str">"add"</span>&gt;添加&lt;/button&gt;
+  &lt;div v-for=<span class="tok-str">"i in items"</span>&gt;{{ i }}&lt;/div&gt;
+&lt;/div&gt;
+&lt;script&gt;
+<span class="tok-kw">const</span> { createApp, ref } = Vue;
+createApp({
+  setup() {
+    <span class="tok-kw">const</span> text = ref(<span class="tok-str">''</span>);
+    <span class="tok-kw">const</span> items = ref([]);
+    <span class="tok-kw">const</span> <span class="tok-fn">add</span> = () =&gt; {
+      items.value.<span class="tok-fn">push</span>(text.value);
+      text.value = <span class="tok-str">''</span>;
+    };
+    <span class="tok-kw">return</span> { text, items, add };
+  }
+}).mount(<span class="tok-str">'#app'</span>);
+&lt;/script&gt;</code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">React <span class="size">~45KB</span></div>
+<pre><code><span class="tok-kw">function</span> <span class="tok-fn">App</span>() {
+  <span class="tok-kw">const</span> [text, setText] = <span class="tok-fn">useState</span>(<span class="tok-str">''</span>);
+  <span class="tok-kw">const</span> [items, setItems] = <span class="tok-fn">useState</span>([]);
+  <span class="tok-kw">const</span> <span class="tok-fn">add</span> = () =&gt; {
+    <span class="tok-fn">setItems</span>([...items, text]);
+    <span class="tok-fn">setText</span>(<span class="tok-str">''</span>);
+  };
+  <span class="tok-kw">return</span> (
+    &lt;&gt;
+      &lt;input value={text}
+        onChange={e =&gt; <span class="tok-fn">setText</span>(e.target.value)} /&gt;
+      &lt;button onClick={add}&gt;添加&lt;/button&gt;
+      {items.<span class="tok-fn">map</span>(i =&gt; &lt;div&gt;{i}&lt;/div&gt;)}
+    &lt;/&gt;
+  );
+}</code></pre>
+        </div>
+      </div>
+
+      <p>注意几个细节：</p>
+      <ul>
+        <li><strong>Alpine</strong> 直接操作数组 <code>items.push()</code>，响应式自动生效。<strong>Vue</strong> 在 <code>setup</code> 里要写 <code>items.value.push()</code>（多一层 <code>.value</code>）。<strong>React</strong> 必须用 <code>setItems([...items, text])</code>（不能直接 push，状态不可变）。</li>
+        <li><strong>Alpine</strong> 的 <code>text=''</code> 清空直接写在 <code>@click</code> 表达式里。<strong>React</strong> 要单独调 <code>setText('')</code>。</li>
+        <li>代码行数：Alpine ~6 行模板、Vue 14 行、React 13 行（且要编译）。</li>
+      </ul>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="table">
+      <h2><span class="num">09</span>实战对比 · 项目列表 + 搜索（cube 的核心页）</h2>
+      <p>这是 cube 列表页要做的：fetch 数据 + 搜索框 + 表格。下面是 Alpine 的完整实现，<strong>真实可运行</strong>（数据写死模拟，实际换成 fetch 即可）：</p>
+
+      <div class="demo" x-data="{
+        keyword: '',
+        group: 'all',
+        rawProjects: [
+          {name:'cube', group:'github', git:'ahead 2'},
+          {name:'deck', group:'github', git:'dirty'},
+          {name:'gogit', group:'github', git:'clean'},
+          {name:'pers-tool', group:'pers', git:'ahead 5'},
+          {name:'secret', group:'pers', git:'dirty'}
+        ],
+        get filtered() {
+          return this.rawProjects.filter(p =>
+            p.name.includes(this.keyword) &&
+            (this.group === 'all' || p.group === this.group)
+          );
+        }
+      }">
+        <div class="demo-label">实时演示 · cube 列表页原型</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+          <input class="demo-input" type="text" x-model="keyword" placeholder="🔍 搜索项目名" style="width:200px;">
+          <select class="demo-select" x-model="group">
+            <option value="all">全部 group</option>
+            <option value="github">github</option>
+            <option value="pers">pers</option>
+          </select>
+          <span style="font-size:13px;color:var(--text-mute);align-self:center;margin-left:4px;">
+            共 <strong x-text="filtered.length" style="color:var(--accent);"></strong> 个
+          </span>
+        </div>
+        <table class="data">
+          <thead><tr><th>name</th><th>group</th><th>git</th></tr></thead>
+          <tbody>
+            <template x-for="p in filtered" :key="p.name">
+              <tr>
+                <td x-text="p.name"></td>
+                <td><span class="badge badge-blue" x-text="p.group"></span></td>
+                <td>
+                  <span class="badge"
+                        :class="{'badge-green': p.git==='clean', 'badge-yellow': p.git.startsWith('ahead'), 'badge-red': p.git==='dirty'}"
+                        x-text="p.git"></span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <template x-if="filtered.length === 0">
+          <p style="color:var(--text-mute);text-align:center;padding:20px;">无匹配项目</p>
+        </template>
+      </div>
+
+      <p>换成真实数据只需把 <code>rawProjects</code> 换成 <code>init()</code> 里 fetch：</p>
+      <pre><code><span class="tok-kw">async</span> <span class="tok-fn">init</span>() {
+  <span class="tok-kw">const</span> res = <span class="tok-kw">await</span> <span class="tok-fn">fetch</span>(<span class="tok-str">'/api/project/list'</span>);
+  <span class="tok-kw">const</span> json = <span class="tok-kw">await</span> res.<span class="tok-fn">json</span>();
+  <span class="tok-com">// cube 后端统一 envelope: {ok, message, data:{list:[...]}}</span>
+  <span class="tok-kw">this</span>.rawProjects = json.data.list;
+}</code></pre>
+
+      <p><strong>注意 <code>get filtered()</code></strong>——Alpine 支持 getter，搜索/筛选逻辑写成一个计算属性，依赖的 <code>keyword</code>/<code>group</code> 一变就自动重算。这等价于 Vue 的 <code>computed</code>。</p>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="drawer">
+      <h2><span class="num">10</span>实战对比 · 详情抽屉（点行滑出）</h2>
+      <p>cube 列表页点一行，右侧滑出详情。Alpine 实现：</p>
+
+      <div class="demo" x-data="{
+        projects: [
+          {name:'cube', path:'/Users/heyu/cube', branch:'develop'},
+          {name:'deck', path:'/Users/heyu/deck', branch:'main'}
+        ],
+        selected: null,
+        select(p) { this.selected = p; }
+      }">
+        <div class="demo-label">实时演示 · 点行打开抽屉</div>
+        <table class="data">
+          <thead><tr><th>name</th><th></th></tr></thead>
+          <tbody>
+            <template x-for="p in projects" :key="p.name">
+              <tr @click="select(p)" style="cursor:pointer;">
+                <td x-text="p.name"></td>
+                <td style="color:var(--text-mute);">点击 →</td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- 抽屉 -->
+        <div x-show="selected !== null"
+             x-transition.opacity
+             @click="selected = null"
+             style="position:relative;margin-top:12px;">
+          <div x-show="selected !== null"
+               x-transition.origin.right
+               style="background:var(--bg-elev);border:1px solid var(--accent);border-radius:8px;padding:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+              <strong x-text="selected?.name"></strong>
+              <button class="btn-ghost btn" @click="selected = null" style="font-size:12px;padding:3px 10px;">✕</button>
+            </div>
+            <div style="font-size:13px;color:var(--text-dim);">
+              <div>path: <code x-text="selected?.path"></code></div>
+              <div>branch: <span class="badge badge-green" x-text="selected?.branch"></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="summary">
+      <h2><span class="num">11</span>三者取舍（一句话版）</h2>
+
+      <div class="compare">
+        <div class="compare-col recommended">
+          <div class="compare-head">Alpine.js ✓</div>
+<pre style="padding:14px;"><code><span class="tok-com">适合：</span>
+- 无构建链、纯 HTML
+- 页面片段、表格、抽屉
+- 个人工具、后台型
+- 渐进增强已有页面
+
+<span class="tok-com">不适合：</span>
+- 大型 SPA（多路由、深嵌套）
+- 需要强类型 TS + 组件树</code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">Vue 3</div>
+<pre style="padding:14px;"><code><span class="tok-com">适合：</span>
+- 中等复杂度应用
+- 想留升级 Vite+SFC 后路
+- 喜欢 setup() 显式响应式
+
+<span class="tok-com">不适合：</span>
+- 极轻量场景（45KB 偏大）
+- 完全不想写 JS 样板</code></pre>
+        </div>
+        <div class="compare-col">
+          <div class="compare-head">React</div>
+<pre style="padding:14px;"><code><span class="tok-com">适合：</span>
+- 大型 SPA、团队协作
+- 复杂状态、生态依赖
+- 已有 React 肌肉记忆
+
+<span class="tok-com">不适合：</span>
+- 无构建链（JSX 要编译）
+- 轻量交互（hooks 心智重）</code></pre>
+        </div>
+      </div>
+
+      <div class="callout green">
+        <strong>cube 的判断</strong>：本地工具、几十个项目、表格+抽屉+git 徽章、不要构建链——这是 Alpine 的教科书场景。Vue 可作次选（功能全但偏重），React 不匹配（要构建、心智重）。
+      </div>
+    </section>
+
+    <!-- ============================================================ -->
+    <section id="cube">
+      <h2><span class="num">12</span>为何 Alpine 适合 cube（对应到具体页面）</h2>
+
+      <p>把 cube 的前端需求逐条对应到 Alpine 特性：</p>
+
+      <ul>
+        <li><strong>项目列表表格</strong> → <code>x-for</code> 循环 + <code>:key</code>。见第 06、09 节。</li>
+        <li><strong>git 状态徽章（clean/dirty/ahead）</strong> → <code>:class</code> 动态绑 class。见第 09 节。</li>
+        <li><strong>搜索框</strong> → <code>x-model</code> 双向绑定 + getter 算过滤。见第 04、09 节。</li>
+        <li><strong>group 筛选下拉</strong> → <code>x-model</code> + getter。见第 09 节。</li>
+        <li><strong>点行滑出详情抽屉</strong> → <code>x-show</code> + <code>x-transition</code>。见第 07、10 节。</li>
+        <li><strong>Tab 切换（project / config 域）</strong> → <code>x-show</code>。见第 07 节。</li>
+        <li><strong>fetch 后端 JSON</strong> → <code>init()</code> 钩子里调 <code>fetch</code>，见第 09 节。</li>
+        <li><strong>30s 自动刷新（拉 gitcache 快照）</strong> → <code>init()</code> 里 <code>setInterval(this.load, 30000)</code>。</li>
+      </ul>
+
+      <h3>Alpine 的几个"坑"提前知道</h3>
+      <ul>
+        <li><strong><code>x-data</code> 的 <code>{}</code> 是对象字面量</strong>，不能直接写复杂逻辑。复杂组件用 <code>x-data="myComponent()"</code>，把函数定义放到 <code>&lt;script&gt;</code> 里（cube 会大量用这种，见第 09 节的 getter 写法）。</li>
+        <li><strong><code>x-for</code> 和 <code>x-if</code> 必须挂在 <code>&lt;template&gt;</code> 上</strong>，不能直接挂普通元素（和 Vue 一样）。</li>
+        <li><strong><code>defer</code> 必加</strong>：Alpine 必须在 DOM 解析完后初始化，所以 <code>&lt;script defer&gt;</code>。</li>
+        <li><strong>没有虚拟 DOM</strong>：更新是直接操作真实 DOM。性能上几十到几百个元素完全够用，但上千行表格就该上虚拟化了（cube 量级远不到）。</li>
+      </ul>
+
+      <div class="callout yellow">
+        <strong>什么时候该换 Vue/React</strong>：如果 cube 前端膨胀到「多路由 SPA + 组件嵌套深 + 需要强类型 TS + 团队多人协作」，就该升级到 Vue+Vite 或 React+Vite。Alpine 的 <code>x-data</code> 函数可以无痛迁移成 Vue 的 <code>setup()</code>——数据模型几乎一一对应，迁移成本主要在把 HTML 属性改成模板语法。
+      </div>
+
+      <p style="margin-top:36px;color:var(--text-mute);font-size:13px;border-top:1px solid var(--border-soft);padding-top:16px;">
+        本页本身就是用 Alpine.js 写的单文件 HTML（无构建）。查看源码即可学习。<br>
+        参考：<a href="https://alpinejs.dev/" target="_blank">alpinejs.dev 官方文档</a> ·
+        <a href="https://alpinejs.dev/essentials/installation" target="_blank">安装指南</a>
+      </p>
+    </section>
+
+  </main>
+</div>
+
+</body>
+</html>
