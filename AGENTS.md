@@ -95,6 +95,10 @@ go test ./opener/...     # 聚焦某个包
    - **多个 getter（或多个 setter）连写在一起，不加空行**；顺序与对应属性在 struct 内的声明顺序一致。参考 `project.Project` 的 `Group/Name/Path/Tags/GitInfo`。
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
+10. **优先复用 `util/` 下的辅助函数**，能力收敛在各 util 子包内，不在调用方就地重造：
+    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读走 `util/gogit`（分支 / remote / tag / ahead-behind / dirty），git 写走 `util/git`（push / clone / commit / `FindGitRoot`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
+    - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录）；其它 util 包（`git` / `gogit` / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
+    - 警惕功能重叠：例如「向上探测 `.git` 根」已有 `git.FindGitRoot(dir)`，调用方就不该再写一遍 `os.Stat(filepath.Join(..., ".git"))` 的循环。
 
 ## 文档
 
