@@ -106,6 +106,21 @@ func (s *Service) GitCacheUpdatedAt() time.Time {
 	return s.gitCache.UpdatedAt()
 }
 
+// ReloadGitCacheIfStale 检测磁盘 git.json 是否比内存新，若是则重新加载。
+// 供长驻 web server 感知后台 fork 子进程的刷新结果：web 进程内存里的 cache
+// 是启动时的快照，子进程写盘后父进程不会自动感知，需主动 Reload。
+// Reload 后同时清空 scanCache，让下次 Projects() 重新用新 gitInfo 构造项目。
+func (s *Service) ReloadGitCacheIfStale() {
+	if s.gitCache == nil {
+		return
+	}
+	if !s.gitCache.IsStale() {
+		return
+	}
+	s.gitCache.Reload()
+	s.scanCache.Clear() // gitInfo 变了，项目数据需重建
+}
+
 // TriggerAsyncRefresh 触发一次异步刷新：TTL 内直接返回，否则 fork 子进程后台采集。
 // 非阻塞，立即返回。供读命令（list/info）在返回前调用。
 func (s *Service) TriggerAsyncRefresh() {

@@ -68,6 +68,12 @@ func (h *ProjectHandler) Register(api huma.API) {
 }
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
+	// web server 是长驻进程：内存里的 git 缓存是启动时的快照，后台 fork 子进程
+	// 刷新的是磁盘文件，父进程不会自动感知。返回前先检测磁盘是否更新，若是则 Reload。
+	h.service.ReloadGitCacheIfStale()
+	// 读快照返回前触发一次异步刷新（TTL 1min 内不重复 fork），与 CLI list 对齐
+	h.service.TriggerAsyncRefresh()
+
 	projects := h.service.Projects()
 	list := slicekit.Map(projects, toProjectDTO)
 	return ProjectListResult{

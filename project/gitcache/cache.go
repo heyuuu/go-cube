@@ -69,6 +69,19 @@ func (c *Cache) UpdatedAt() time.Time {
 	return c.updatedAt
 }
 
+// IsStale 判断磁盘缓存文件是否比内存新（即后台子进程已刷新落盘，需 Reload）。
+// 用磁盘文件的 mod-time 对比内存记录的 UpdatedAt；磁盘更新则视为 stale。
+func (c *Cache) IsStale() bool {
+	info, err := os.Stat(c.path())
+	if err != nil {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	// 磁盘 mtime 比内存 updatedAt 晚至少 1 秒才判 stale（避免同秒内抖动）
+	return info.ModTime().After(c.updatedAt.Add(time.Second))
+}
+
 // Load 从 dir 加载缓存。
 // 行为约定（降级优先，绝不因缓存问题阻塞 CLI）：
 //   - dir 不存在：创建并返回空缓存。
@@ -92,19 +105,37 @@ func Load(dir string) (*Cache, error) {
 		return c, nil // 其他读错误也降级
 	}
 
-	// 解析
+	c.loadFromBytes(path, data)
+	return c, nil
+}
+
+// loadFromBytes 解析缓存文件字节并写回内存（entries + updatedAt）。供 Load / Reload 复用。
+func (c *Cache) loadFromBytes(path string, data []byte) {
 	var file cacheFile
 	if err := json.Unmarshal(data, &file); err != nil {
 		slog.Warn("git cache file corrupted, backing up and starting fresh",
 			"path", path, "err", err)
 		backupCorrupt(path, data)
-		return c, nil
+		return
 	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if file.Entries != nil {
 		c.entries = file.Entries
 	}
 	c.updatedAt = file.UpdatedAt
-	return c, nil
+}
+
+// Reload 重新从磁盘读取缓存文件，刷新内存里的 entries + updatedAt。
+// 供长驻进程（web server）感知后台子进程的刷新结果：子进程 fork 采集落盘后，
+// 父进程调 Reload 即可拿到最新数据，无需重启。
+func (c *Cache) Reload() {
+	path := c.path()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return // 文件不存在/读失败：保持旧内存数据（降级）
+	}
+	c.loadFromBytes(path, data)
 }
 
 // path 返回缓存文件完整路径（包内自用，对外只暴露 Dir）。
