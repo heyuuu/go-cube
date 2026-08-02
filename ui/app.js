@@ -9,7 +9,7 @@ function cubeApp() {
     keyword: '',
     groupFilter: [],   // group 多选：空数组 = 全部
     gitFilter: 'all',  // git 单选：'all' = 全部，否则为具体状态（clean/dirty/ahead/behind/none）
-    tagFilter: 'all',  // tag 单选：'all' = 全部，否则为具体 tag（git/git-worktree/godot...）
+    tagFilter: 'all',  // tag 单选：'all' = 全部，否则为具体 tag（worktree/godot...）
     gitStatuses: [
       { value: 'clean', label: 'clean' },
       { value: 'dirty', label: 'dirty' },
@@ -155,7 +155,7 @@ function cubeApp() {
       return [...set].sort();
     },
 
-    // 聚合所有项目出现过的 tag（git / git-worktree / godot ...）
+    // 聚合所有项目出现过的 tag（worktree / godot ...）
     get tags() {
       const set = new Set();
       this.projects.forEach(p => (p.tags || []).forEach(t => set.add(t)));

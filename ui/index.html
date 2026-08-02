@@ -152,7 +152,7 @@
               </td>
               <td class="col-tags">
                 <template x-for="t in p.tags" :key="t">
-                  <span class="tag" :class="{ 'tag-worktree': t === 'git-worktree' }" x-text="t"></span>
+                  <span class="tag" :class="{ 'tag-worktree': t === 'worktree' }" x-text="t"></span>
                 </template>
               </td>
               <td class="col-action" @click.stop>

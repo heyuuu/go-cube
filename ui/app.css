@@ -228,7 +228,7 @@ html, body {
   background: var(--bg-elev); color: var(--text-dim);
   border: 1px solid var(--border-soft);
 }
-/* git-worktree 标签用黄色强调，区别于普通 git */
+/* worktree 标签用黄色强调 */
 .tag-worktree { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-soft); }
 
 .row-more {

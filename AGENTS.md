@@ -25,6 +25,7 @@
 
 ## 关键机制（改动前先理解）
 
+- **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
 - **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。读路径**不得阻塞**采集——只能读快照。详见 `docs/design/v3-design.md` 第四节。
 - **opener 参数槽 (slots)**：`Opener` 的能力由 `slots []Slot` 声明（`dir` / `file` / `path` + 可选 shell glob），`Arity() = len(slots)`；`cmd` 中用 `$0/$1...` 占位符引用路径。改 `opener` 时务必同步看 `opener/slot.go` 和 `command_test.go`。
 - **easycobra**：`cmd/util/easycobra` 是 cobra 的封装，分组命令（无 `Run` 的纯分组）+ 叶子命令（`Run` 或 `InitRun`）两种。分组命令不会触发 `PersistentPreRunE`，所以全局初始化放在 `cobra.OnInitialize`（见 `cmd/root.go`）。

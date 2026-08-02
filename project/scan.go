@@ -14,11 +14,15 @@ type ScanRule struct {
 	MaxDepth int    `json:"maxDepth"` // 扫描的最大深度
 }
 
-// 项目标签。scanner 命中特征时打标；用于区分 git/godot 等项目类型。
+// 项目标签。scanner 命中特征时打标。
+//
+// 前提假设：所有项目都是 git 项目（.git 存在是项目判定的必要条件），
+// 因此不再打通用的 "git" tag——它是冗余信息。标签只标记额外特征：
+//   - worktree：.git 是文件而非目录（git worktree，主仓库在别处）
+//   - godot：含 .godot 文件（godot 引擎项目，同时仍是 git 项目）
 const (
-	TagGit         = "git"
-	TagGitWorktree = "git-worktree" // git worktree：.git 是文件而非目录
-	TagGodot       = "godot"
+	TagWorktree = "worktree"
+	TagGodot    = "godot"
 )
 
 func scanProjects(r ScanRule, yield func(path string, tags []string)) error {
@@ -61,25 +65,28 @@ func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 		return false, nil, fs.SkipDir
 	}
 
-	// 获取子文件/子目录用于判断是否是项目及对应tag
+	// 获取子文件/子目录用于判断是否是项目及对应 tag
 	dirEntries, err := os.ReadDir(path)
 	if err != nil {
 		return false, nil, err
 	}
+	hasGit := false
 	for _, entry := range dirEntries {
 		if entry.Name() == ".git" {
-			// .git 存在即认为是 git 项目：
+			// .git 存在即认为是 git 项目（前提：所有项目都是 git 项目）：
 			//   - .git 是目录 → 常规仓库
 			//   - .git 是文件 → git worktree（内容形如 "gitdir: <主仓库>/.git/worktrees/<名>"）
-			tags = append(tags, TagGit)
+			hasGit = true
 			if !entry.IsDir() {
-				tags = append(tags, TagGitWorktree)
+				tags = append(tags, TagWorktree)
 			}
-		} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
+		} else if hasGit && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
+			// godot 标签：在已是 git 项目的前提下，额外标记 godot 引擎项目
 			tags = append(tags, TagGodot)
 		}
 	}
-	if len(tags) > 0 {
+	// 项目判定：必须含 .git（前提：所有项目都是 git 项目）
+	if hasGit {
 		return true, tags, nil
 	}
 	return false, nil, nil

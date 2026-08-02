@@ -13,9 +13,11 @@
 
 ## 二、数据模型：project 与扫描规则
 
+> **前提假设：所有项目都是 git 项目**。`.git` 存在是项目判定的必要条件——cube 只管理 git 仓库（含 worktree）。非 git 目录不会被识别为项目。因此 `tags` 不再打冗余的 `git` 标签（所有项目都有等于没有），只标记额外特征：`worktree`（.git 是文件而非目录）、`godot`（godot 引擎项目，同时仍是 git 项目）等。
+
 **两个核心概念**：
 
-- **Project**：一等实体。主键 `path`（绝对路径，全局唯一），展示名 `name = group:subpath`。持有 `gitInfo`（来自 gitcache 快照）、`tags`（git / godot ...）。
+- **Project**：一等实体。主键 `path`（绝对路径，全局唯一），展示名 `name = group:subpath`。持有 `gitInfo`（来自 gitcache 快照）、`tags`（worktree / godot ...）。
 - **ScanRule `{Group, Path, MaxDepth}`**：扫描规则。一条规则扫一个根目录，命中的项目归属该 `group`。`group` 是字符串字段（如 `github`、`personal`），承担"物理目录约定 + 分组聚合 + 批量作用域"三重价值。
 
 > 历史注记：v2 曾有 `Workspace` 一等实体，v3 已简化为 `ScanRule` + `group` 字段——`group` 保留了 workspace 的全部实用价值（分组、批量作用域），但不再需要独立实体和 service。
