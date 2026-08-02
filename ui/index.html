@@ -63,7 +63,7 @@
 
     <!-- group 筛选（inline chips，一行展示，直接点击切换） -->
     <div class="chip-row">
-      <span class="chip-label">group</span>
+      <span class="chip-label">group <span class="chip-mode">多选</span></span>
       <button class="chip" :class="{ 'chip-active': groupFilter.length === 0 }"
               @click="groupFilter = []">全部</button>
       <template x-for="g in groups" :key="g">
@@ -74,7 +74,7 @@
 
     <!-- git 状态筛选（inline chips） -->
     <div class="chip-row">
-      <span class="chip-label">git</span>
+      <span class="chip-label">git <span class="chip-mode">单选</span></span>
       <button class="chip" :class="{ 'chip-active': gitFilter === 'all' }"
               @click="gitFilter = 'all'">全部</button>
       <template x-for="s in gitStatuses" :key="s.value">

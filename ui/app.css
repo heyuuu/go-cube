@@ -120,9 +120,18 @@ html, body {
   gap: 6px; margin-bottom: 10px;
 }
 .chip-label {
+  display: inline-flex; align-items: baseline; gap: 4px;
   font-size: 0.75rem; color: var(--text-mute);
   text-transform: uppercase; letter-spacing: 0.06em;
-  margin-right: 4px; min-width: 3em;
+  margin-right: 8px;
+  width: 5em;            /* 固定宽度，让两行 label 列等宽，首 chip 对齐 */
+  flex-shrink: 0;
+}
+/* 类型标识：单选/多选，极小字 + 括号，暗示交互语义 */
+.chip-mode {
+  font-size: 0.65rem; color: var(--text-mute);
+  text-transform: none; letter-spacing: 0;
+  opacity: 0.7;
 }
 .chip {
   background: var(--bg-soft); color: var(--text-dim);
