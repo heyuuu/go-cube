@@ -6,8 +6,17 @@ function cubeApp() {
     // --- 状态 ---
     projects: [],
     keyword: '',
-    groupFilter: 'all',
-    gitFilter: 'all',
+    groupFilter: [],   // 多选：空数组 = 全部
+    gitFilter: [],     // 多选：空数组 = 全部
+    gitStatuses: [
+      { value: 'clean', label: 'clean' },
+      { value: 'dirty', label: 'dirty' },
+      { value: 'ahead', label: 'ahead' },
+      { value: 'behind', label: 'behind' },
+      { value: 'none', label: '未采集' },
+    ],
+    groupOpen: false,
+    gitOpen: false,
     selected: new Set(),
     drawer: null,
     loading: false,
@@ -52,14 +61,26 @@ function cubeApp() {
         if (kw && !(p.name.toLowerCase().includes(kw) || (p.path || '').toLowerCase().includes(kw))) {
           return false;
         }
-        if (this.groupFilter !== 'all' && p.group !== this.groupFilter) {
+        // group 多选：空数组 = 全部；否则需命中
+        if (this.groupFilter.length > 0 && !this.groupFilter.includes(p.group)) {
           return false;
         }
-        if (this.gitFilter !== 'all') {
-          if (this.gitFilter !== this.gitStatusOf(p)) return false;
+        // git 多选：空数组 = 全部；否则需命中
+        if (this.gitFilter.length > 0 && !this.gitFilter.includes(this.gitStatusOf(p))) {
+          return false;
         }
         return true;
       });
+    },
+
+    // toggleAll：点击「全部」时，清空已选数组（空 = 全部）；已选非空时勾选「全部」则清空
+    toggleAll(key, allOptions) {
+      if (this[key].length === 0) {
+        // 当前是「全部」（空），点了「全部」无意义，保持空
+        return;
+      }
+      // 当前选了若干，点「全部」→ 清空
+      this[key] = [];
     },
 
     // 把 gitInfo 归类成单一状态枚举，供筛选
