@@ -5,8 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>cube</title>
   <link rel="stylesheet" href="/ui/app.css">
-  <!-- 顺序：app.js 必须在 alpine 之前加载，确保 Alpine 初始化 x-data="cubeApp()" 时 window.cubeApp 已定义 -->
+  <!-- 加载顺序（defer 按文档顺序执行）：
+       app.js 定义 cubeApp 骨架 + extras 机制 → views/*.js 注册各视图扩展 → alpine 初始化 -->
   <script defer src="/ui/app.js"></script>
+  <script defer src="/ui/views/projects.js"></script>
+  <script defer src="/ui/views/tree.js"></script>
+  <script defer src="/ui/views/config.js"></script>
   <script defer src="/ui/vendor/alpine.min.js"></script>
 </head>
 <body>
@@ -30,6 +34,8 @@
          @click="view = 'projects'">Projects</a>
       <a class="nav-item" :class="{ 'active': view === 'tree' }"
          @click="switchView('tree')">Tree</a>
+      <a class="nav-item" :class="{ 'active': view === 'config' }"
+         @click="switchView('config')">Config</a>
     </nav>
 
     <div class="sidebar-foot">
@@ -226,6 +232,107 @@
         </template>
       </div>
     </div><!-- /Tree 视图 -->
+
+    <!-- ============ Config 视图 ============ -->
+    <div x-show="view === 'config'" x-transition>
+      <header class="page-head">
+        <div>
+          <div class="page-title">Config</div>
+          <div class="page-meta">配置管理（增删 scan / clone / opener 规则，写回 config.json）</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-ghost" @click="loadConfig()" :disabled="configLoading">
+            <span x-show="!configLoading">刷新</span>
+            <span x-show="configLoading">加载中…</span>
+          </button>
+        </div>
+      </header>
+      <div class="error-banner" x-show="configError" x-transition x-text="configError"></div>
+
+      <div x-show="config" x-transition>
+        <!-- tab 切换 -->
+        <div class="config-tabs">
+          <button class="config-tab" :class="{ 'active': configTab === 'scan' }" @click="configTab = 'scan'">Scan 规则</button>
+          <button class="config-tab" :class="{ 'active': configTab === 'clone' }" @click="configTab = 'clone'">Clone 规则</button>
+          <button class="config-tab" :class="{ 'active': configTab === 'opener' }" @click="configTab = 'opener'">Opener</button>
+        </div>
+
+        <!-- scan 规则 -->
+        <div x-show="configTab === 'scan'" class="config-section">
+          <div class="config-add-form">
+            <input class="input" type="text" x-model="newScan.group" placeholder="group（如 github）">
+            <input class="input config-input-path" type="text" x-model="newScan.path" placeholder="扫描根目录（如 ~/Code）">
+            <input class="input config-input-num" type="number" x-model.number="newScan.maxDepth" placeholder="深度" min="0">
+            <button class="btn" @click="addScan()">+ 添加</button>
+          </div>
+          <div class="config-list">
+            <template x-for="(r, i) in scanRules" :key="r.group + r.path">
+              <div class="config-item">
+                <span class="config-idx" x-text="i + 1"></span>
+                <span class="badge badge-blue" x-text="r.group"></span>
+                <span class="config-path" x-text="r.path"></span>
+                <span class="config-depth">depth: <span x-text="r.maxDepth"></span></span>
+                <button class="btn btn-link config-del" @click="delScan(r)">删除</button>
+              </div>
+            </template>
+            <div class="config-empty" x-show="scanRules.length === 0">暂无 scan 规则</div>
+          </div>
+        </div>
+
+        <!-- clone 规则 -->
+        <div x-show="configTab === 'clone'" class="config-section">
+          <div class="config-add-form">
+            <input class="input" type="text" x-model="newClone.repoHost" placeholder="repoHost（如 github.com）">
+            <input class="input" type="text" x-model="newClone.repoPrefix" placeholder="repoPrefix（可选，如 owner/）">
+            <input class="input config-input-path" type="text" x-model="newClone.localPath" placeholder="本地落地路径（如 ~/Code/github）">
+            <button class="btn" @click="addClone()">+ 添加</button>
+          </div>
+          <div class="config-list">
+            <template x-for="(r, i) in cloneRules" :key="r.repoHost + r.repoPrefix + r.localPath">
+              <div class="config-item">
+                <span class="config-idx" x-text="i + 1"></span>
+                <span class="config-host" x-text="r.repoHost"></span>
+                <span class="config-prefix" x-show="r.repoPrefix" x-text="r.repoPrefix"></span>
+                <span class="config-arrow">→</span>
+                <span class="config-path" x-text="r.localPath"></span>
+                <button class="btn btn-link config-del" @click="delClone(r)">删除</button>
+              </div>
+            </template>
+            <div class="config-empty" x-show="cloneRules.length === 0">暂无 clone 规则</div>
+          </div>
+        </div>
+
+        <!-- opener -->
+        <div x-show="configTab === 'opener'" class="config-section">
+          <div class="config-add-form config-add-form-col">
+            <div class="config-form-row">
+              <input class="input" type="text" x-model="newOpener.name" placeholder="name（如 vscode）">
+              <input class="input config-input-path" type="text" x-model="newOpener.cmd" placeholder="cmd（空格分词，$0 占位路径，如 code $0）">
+            </div>
+            <div class="config-form-row">
+              <input class="input" type="text" x-model="newOpener.roles" placeholder="roles（逗号/空格分隔，如 open-dir,open-file）">
+              <button class="btn" @click="addOpener()">+ 添加</button>
+            </div>
+          </div>
+          <div class="config-list">
+            <template x-for="(o, i) in openerRules" :key="o.name">
+              <div class="config-item config-item-opener">
+                <span class="config-idx" x-text="i + 1"></span>
+                <span class="badge badge-green" x-text="o.name"></span>
+                <code class="config-cmd" x-text="(o.cmd || []).join(' ')"></code>
+                <span class="config-roles">
+                  <template x-for="role in (o.roles || [])" :key="role">
+                    <span class="tag" x-text="role"></span>
+                  </template>
+                </span>
+                <button class="btn btn-link config-del" @click="delOpener(o.name)">删除</button>
+              </div>
+            </template>
+            <div class="config-empty" x-show="openerRules.length === 0">暂无 opener</div>
+          </div>
+        </div>
+      </div>
+    </div><!-- /Config 视图 -->
 
     <!-- ============ 详情抽屉（点行滑出） ============ -->
     <div class="drawer-mask" x-show="drawer" x-transition.opacity @click="drawer = null"></div>

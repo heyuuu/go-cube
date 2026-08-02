@@ -46,6 +46,35 @@ func Default() Config {
 	return defaultConf
 }
 
+// DefaultPtr 返回 defaultConf 的指针，供需要修改配置的场景（如 web 写接口）使用。
+// 注意：调用方修改后需调 Save() 才能持久化到 config.json。
+func DefaultPtr() *Config {
+	return &defaultConf
+}
+
+// ConfigFile 返回 config.json 的完整路径。
+func ConfigFile() string {
+	return filepath.Join(configPath, "config.json")
+}
+
+// Save 把当前 defaultConf 序列化写回 config.json（格式化 2 空格缩进，便于人工查看）。
+func Save() error {
+	data, err := json.MarshalIndent(defaultConf, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化 config 失败: %w", err)
+	}
+	data = append(data, '\n')
+	cfgFile := ConfigFile()
+	tmp := cfgFile + ".tmp"
+	if err := os.WriteFile(tmp, data, 0644); err != nil {
+		return fmt.Errorf("写入 config 临时文件失败: %w", err)
+	}
+	if err := os.Rename(tmp, cfgFile); err != nil {
+		return fmt.Errorf("重命名 config 临时文件失败: %w", err)
+	}
+	return nil
+}
+
 func initDefaultConf(cfgPath string) error {
 	cfgFile := filepath.Join(cfgPath, "config.json")
 	// 若配置文件不存在则跳过

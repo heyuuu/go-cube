@@ -394,3 +394,65 @@ html, body {
   cursor: pointer;
 }
 .tree-open-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ---------- Config 视图 ---------- */
+.config-tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.config-tab {
+  background: none; border: none; color: var(--text-dim);
+  padding: 8px 16px; font-size: 0.9rem; font-family: var(--sans);
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.12s;
+}
+.config-tab:hover { color: var(--text); }
+.config-tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+.config-section {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+}
+.config-add-form {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 14px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.config-add-form-col { flex-direction: column; align-items: stretch; }
+.config-form-row { display: flex; gap: 8px; align-items: center; width: 100%; }
+.config-input-path { flex: 1; min-width: 200px; }
+.config-input-num { width: 80px; }
+
+.config-list { display: flex; flex-direction: column; gap: 4px; }
+.config-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 0.88rem;
+}
+.config-item:hover { background: var(--bg-elev); }
+.config-item-opener { flex-wrap: wrap; }
+.config-idx {
+  color: var(--text-mute); font-family: var(--mono);
+  font-size: 0.78rem; min-width: 1.5em;
+}
+.config-path { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; }
+.config-host { font-family: var(--mono); color: var(--accent); font-size: 0.82rem; }
+.config-prefix { font-family: var(--mono); color: var(--text-dim); font-size: 0.82rem; }
+.config-arrow { color: var(--text-mute); }
+.config-depth { color: var(--text-mute); font-size: 0.78rem; margin-left: auto; }
+.config-cmd {
+  font-family: var(--mono); font-size: 0.82rem;
+  color: var(--text-dim); background: var(--bg-elev);
+  padding: 1px 6px; border-radius: 3px;
+}
+.config-roles { display: flex; gap: 4px; flex-wrap: wrap; }
+.config-del { margin-left: auto; }
+.config-empty {
+  padding: 24px; text-align: center;
+  color: var(--text-mute); font-size: 0.85rem;
+}

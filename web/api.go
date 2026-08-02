@@ -121,3 +121,23 @@ func apiPost[I, O any](api huma.API, path string, summary string, handler func(I
 		Summary: summary,
 	}, jsonHandler(handler))
 }
+
+func apiDelete[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
+	apiRegister[I, ApiOutput[O]](api, huma.Operation{
+		Method:  http.MethodDelete,
+		Path:    path,
+		Summary: summary,
+	}, jsonHandler(handler))
+}
+
+// apiRegisterOp 支持显式指定 operationId。
+// 用于同 path 不同 method 的场景（如 POST/DELETE 同一路径），
+// 避免 parseInfoFromPath 按 path 推导出重复 operationId 导致 huma panic。
+func apiRegisterOp[I, O any](api huma.API, method, path, summary, operationID string, handler func(I) (O, error)) {
+	apiRegister[I, ApiOutput[O]](api, huma.Operation{
+		Method:      method,
+		Path:        path,
+		Summary:     summary,
+		OperationID: operationID,
+	}, jsonHandler(handler))
+}

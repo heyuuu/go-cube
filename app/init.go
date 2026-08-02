@@ -28,7 +28,8 @@ func InitApp() *App {
 	conf := config.Default()
 	defaultDB := db.Default()
 
-	configHandler := web.NewConfigHandler(conf)
+	// ConfigHandler 用 config 包的指针：web 写接口能直接修改 defaultConf 并 Save 持久化
+	configHandler := web.NewConfigHandlerPtr(config.DefaultPtr())
 
 	projectService := project.NewService(conf.Project, filepath.Join(config.Path(), "cache"))
 
