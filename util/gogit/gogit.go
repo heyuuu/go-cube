@@ -19,6 +19,7 @@ package gogit
 //   - 真实读取错误（损坏的 .git、IO 异常等）：返回零值 + error，由调用方决定是否记录。
 
 import (
+	"sort"
 	"strings"
 
 	gogit "github.com/go-git/go-git/v5"
@@ -51,12 +52,53 @@ func RemoteUrl(path string) (string, error) {
 	return urls[0], nil
 }
 
-// Branches 返回 path 处仓库的全部分支列表（本地 + 远程）以及当前分支名。
+// Remote 描述一个 remote：名字 + 抓取/推送地址（取各自的第一条）。
+type Remote struct {
+	Name  string
+	Fetch string
+	Push  string
+}
+
+// Remotes 返回 path 处仓库的全部 remote（按名字排序）。
+// 每个 remote 的 Fetch / Push 取其配置 URLs 的第一条（多数 remote 只有 push==fetch 一条）。
+// 非仓库目录或无任何 remote 时返回 (nil, nil)，不视为错误。
+func Remotes(path string) ([]Remote, error) {
+	repo, err := openRepo(path)
+	if err != nil {
+		return nil, nil
+	}
+
+	remotes, err := repo.Remotes()
+	if err != nil {
+		return nil, nil
+	}
+
+	var result []Remote
+	for _, r := range remotes {
+		cfg := r.Config()
+		// go-git 的 RemoteConfig 不区分 fetch/push URL 列表，统一放在 URLs；
+		// 多数 remote 只有一条（既抓又推），这里第二条（若有）当作 push 专用地址展示。
+		var fetch, push string
+		if len(cfg.URLs) >= 2 {
+			fetch, push = cfg.URLs[0], cfg.URLs[1]
+		} else if len(cfg.URLs) >= 1 {
+			fetch, push = cfg.URLs[0], cfg.URLs[0]
+		}
+		result = append(result, Remote{Name: cfg.Name, Fetch: fetch, Push: push})
+	}
+	// 按名字排序，保证输出稳定
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
+	return result, nil
+}
+
+// Branches 返回 path 处仓库的全部本地分支列表以及当前分支名。
 //
-// 输出格式与原系统 git 实现保持一致，便于上层无感替换：
-//   - 本地分支短名：     "master" / "develop"
-//   - 远程分支短名：     "origin/master"（带 remote 名前缀）
+// 输出格式：
+//   - 本地分支短名：     "master" / "develop"（仅 refs/heads/*，不含远程分支）
 //   - 当前分支：         同上短名形式；HEAD detached 时返回空串
+//
+// 注意：go-git 的 repo.Branches() 只遍历 refs/heads/*，远程分支（refs/remotes/*）
+// 需用 RemoteBranches 获取。
 func Branches(path string) (branches []string, current string, err error) {
 	repo, err := openRepo(path)
 	if err != nil {
@@ -68,7 +110,7 @@ func Branches(path string) (branches []string, current string, err error) {
 		current = refShortName(head.Name())
 	}
 
-	// 全部分支：遍历 branches iterator
+	// 全部本地分支：遍历 branches iterator（仅 refs/heads/*）
 	iter, err := repo.Branches()
 	if err != nil {
 		return nil, current, nil
@@ -78,6 +120,63 @@ func Branches(path string) (branches []string, current string, err error) {
 		return nil
 	})
 	return branches, current, nil
+}
+
+// RemoteBranch 描述一个远程分支：所属 remote 名 + 分支名（不含 remote 前缀）。
+// 例 origin/master → {Remote:"origin", Branch:"master"}。
+type RemoteBranch struct {
+	Remote string
+	Branch string
+}
+
+// RemoteBranches 返回 path 处仓库的全部远程分支（所有 remote 的 refs/remotes/*）。
+//
+// 自动跳过各 remote 的 HEAD（refs/remotes/{remote}/HEAD，它是 symbolic ref 而非真实分支）。
+// 非仓库目录或无任何远程分支时返回 (nil, nil)，不视为错误。
+func RemoteBranches(path string) ([]RemoteBranch, error) {
+	repo, err := openRepo(path)
+	if err != nil {
+		return nil, nil
+	}
+	iter, err := repo.References()
+	if err != nil {
+		return nil, nil
+	}
+	var result []RemoteBranch
+	_ = iter.ForEach(func(ref *plumbing.Reference) error {
+		name := ref.Name()
+		if !name.IsRemote() {
+			return nil
+		}
+		remote, branch, ok := splitRemoteRef(name)
+		if !ok {
+			return nil
+		}
+		result = append(result, RemoteBranch{Remote: remote, Branch: branch})
+		return nil
+	})
+	return result, nil
+}
+
+// Tags 返回 path 处仓库的全部 tag 名（按名字升序，含轻量 tag 与 annotated tag）。
+// 非仓库目录或无 tag 时返回 (nil, nil)，不视为错误。
+func Tags(path string) ([]string, error) {
+	repo, err := openRepo(path)
+	if err != nil {
+		return nil, nil
+	}
+	iter, err := repo.Tags()
+	if err != nil {
+		return nil, nil
+	}
+	var tags []string
+	_ = iter.ForEach(func(ref *plumbing.Reference) error {
+		// refs/tags/<name> → <name>；Short() 已等价处理但显式裁前缀更直观
+		tags = append(tags, strings.TrimPrefix(ref.Name().String(), "refs/tags/"))
+		return nil
+	})
+	sort.Strings(tags)
+	return tags, nil
 }
 
 // refShortName 把 plumbing.ReferenceName 折算成短名，区分本地与远程：
@@ -90,14 +189,23 @@ func refShortName(name plumbing.ReferenceName) string {
 	}
 	if name.IsRemote() {
 		// refs/remotes/{remote}/{branch...} → {remote}/{branch...}
-		// plumbing.ReferenceName 没有 Fields()，自己 split。
-		parts := strings.SplitN(name.String(), "/", 4)
-		// parts: ["refs", "remotes", remote, branch(可能含 /)]
-		if len(parts) == 4 {
-			return parts[2] + "/" + parts[3]
+		remote, branch, ok := splitRemoteRef(name)
+		if ok {
+			return remote + "/" + branch
 		}
 	}
 	return name.Short()
+}
+
+// splitRemoteRef 把 refs/remotes/{remote}/{branch...} 拆成 (remote, branch)。
+// 入参必须是远程引用（IsRemote()==true）；HEAD 这种 symbolic ref 会返回 ok=false。
+func splitRemoteRef(name plumbing.ReferenceName) (remote, branch string, ok bool) {
+	// parts: ["refs", "remotes", remote, branch(可能含 /)]
+	parts := strings.SplitN(name.String(), "/", 4)
+	if len(parts) != 4 || parts[3] == "HEAD" {
+		return "", "", false
+	}
+	return parts[2], parts[3], true
 }
 
 // DefaultBranch 返回 path 处仓库的默认分支短名（"master" / "main" 等）。
@@ -189,12 +297,64 @@ func AheadBehind(path string, local, remote string) (ahead, behind int, err erro
 	return ahead, behind, nil
 }
 
+// AheadBehindRemote 计算本地分支 localBranch 相对指定 remote 的 remoteBranch 的领先 / 落后数。
+// 与 AheadBehind 的区别：显式接受 remote 名，便于比较非 origin 的远程分支。
+// 任一 ref 缺失（如该 remote 没有这个分支）返回 (0, 0, nil)，不视为错误。
+//
+// 与 AheadBehind 一样基于本地已有 commit 比对，不会 fetch。
+func AheadBehindRemote(path string, localBranch, remoteName, remoteBranch string) (ahead, behind int, err error) {
+	repo, err := openRepo(path)
+	if err != nil {
+		return 0, 0, nil
+	}
+
+	localHash, ok := resolveBranchHash(repo, localBranch, false)
+	if !ok {
+		return 0, 0, nil
+	}
+	remoteRefName := plumbing.NewRemoteReferenceName(remoteName, remoteBranch)
+	remoteRef, err := repo.Reference(remoteRefName, true)
+	if err != nil {
+		return 0, 0, nil
+	}
+	remoteHash := remoteRef.Hash()
+	if localHash == remoteHash {
+		return 0, 0, nil
+	}
+
+	localSet, err := reachableCommits(repo, localHash)
+	if err != nil {
+		return 0, 0, nil
+	}
+	remoteSet, err := reachableCommits(repo, remoteHash)
+	if err != nil {
+		return 0, 0, nil
+	}
+	for h := range localSet {
+		if !remoteSet[h] {
+			ahead++
+		}
+	}
+	for h := range remoteSet {
+		if !localSet[h] {
+			behind++
+		}
+	}
+	return ahead, behind, nil
+}
+
 // resolveBranchHash 在 repo 内按短名解析分支的 commit hash。
-// isRemote=true 时按远程分支解析（"origin/master" → refs/remotes/origin/master）。
+//   - isRemote=false：按本地分支解析（"master" → refs/heads/master）
+//   - isRemote=true：按远程分支解析（"origin/master" → refs/remotes/origin/master），
+//     remote 名取自 shortName 的前缀（stripRemotePrefix 反向操作）
 func resolveBranchHash(repo *gogit.Repository, shortName string, isRemote bool) (plumbing.Hash, bool) {
 	var refName plumbing.ReferenceName
 	if isRemote {
-		refName = plumbing.NewRemoteReferenceName(gogit.DefaultRemoteName, stripRemotePrefix(shortName))
+		remote, branch, ok := splitRemoteBranchShortName(shortName)
+		if !ok {
+			return plumbing.ZeroHash, false
+		}
+		refName = plumbing.NewRemoteReferenceName(remote, branch)
 	} else {
 		refName = plumbing.NewBranchReferenceName(shortName)
 	}
@@ -203,6 +363,17 @@ func resolveBranchHash(repo *gogit.Repository, shortName string, isRemote bool) 
 		return plumbing.ZeroHash, false
 	}
 	return ref.Hash(), true
+}
+
+// splitRemoteBranchShortName 把 "origin/master" 这种远程分支短名拆成 (origin, master)。
+// 支持分支名含 /（如 "origin/feature/x" → ("origin", "feature/x")）。
+// 无 remote 前缀时返回 ok=false。
+func splitRemoteBranchShortName(shortName string) (remote, branch string, ok bool) {
+	idx := strings.Index(shortName, "/")
+	if idx <= 0 {
+		return "", "", false
+	}
+	return shortName[:idx], shortName[idx+1:], true
 }
 
 // stripRemotePrefix 去掉远程分支短名里的 remote 前缀（"origin/master" → "master"）。

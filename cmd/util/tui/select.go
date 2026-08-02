@@ -64,11 +64,33 @@ func SelectItem[T any](title string, items []T, labelGetter func(T) string) (T, 
 // 用户一个都没选时返回长度为 0 的切片（非错误）。
 // huh 的 MultiSelect 默认支持按 / 进入过滤模式。
 func MultiSelect[T any](title string, options []Option[T]) ([]T, error) {
+	return MultiSelectWithDefaults(title, options, nil)
+}
+
+// MultiSelectWithDefaults 与 MultiSelect 一致，但可指定进入时默认勾选的值集合。
+//
+// selected 是「期望默认勾选」的值切片；函数会在 huh.Options 中预先勾选 label 匹配
+// （按 Value 相等判断）的选项。selected 中的值若不在 options 内则忽略。
+// 用户取消（Ctrl+C）时返回 ErrUserAborted；一个都没选时返回长度为 0 的切片。
+func MultiSelectWithDefaults[T any](title string, options []Option[T], selected []T) ([]T, error) {
 	if err := mustTTY(); err != nil {
 		return nil, err
 	}
 	if len(options) == 0 {
 		return nil, ErrEmptyOptions
+	}
+
+	// 计算默认勾选的 index 集合（huh.MultiSelect 的 Value 指针就是「已选集合」）
+	// 把选中的值映射成 option index 列表，作为初始 Value 传入 huh。
+	selectedSet := make(map[any]bool, len(selected))
+	for _, v := range selected {
+		selectedSet[v] = true
+	}
+	defaultIndices := make([]int, 0)
+	for i, o := range options {
+		if selectedSet[o.Value] {
+			defaultIndices = append(defaultIndices, i)
+		}
 	}
 
 	// init huh.Options
@@ -77,8 +99,8 @@ func MultiSelect[T any](title string, options []Option[T]) ([]T, error) {
 		huhOptions[i] = huh.NewOption(o.Label, i)
 	}
 
-	// 启动 Select，返回选择 indices
-	var indices []int
+	// 启动 Select，返回 indices（用默认勾选初始化）
+	indices := defaultIndices
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewMultiSelect[int]().Title(title).Options(huhOptions...).Value(&indices),
@@ -103,7 +125,20 @@ func MultiSelect[T any](title string, options []Option[T]) ([]T, error) {
 // MultiSelectItem 是 MultiSelect 的便利方法：把任意结构体切片映射成选项，返回
 // 所有被选中的原始项（用索引中转，与 SelectItem 同理）。
 func MultiSelectItem[T any](title string, items []T, labelGetter func(T) string) ([]T, error) {
-	return MultiSelect(title, slicekit.Map(items, func(item T) Option[T] {
+	return MultiSelectItemWithDefaults(title, items, labelGetter, nil)
+}
+
+// MultiSelectItemWithDefaults 是 MultiSelectItem 的带默认勾选版本：
+// 传入默认勾选的 items 子集（需与 items 元素可比较），列表初始即勾选这些项。
+//
+// 适用于「默认全选 remotes」「默认勾选当前分支」等场景。
+func MultiSelectItemWithDefaults[T any](
+	title string,
+	items []T,
+	labelGetter func(T) string,
+	defaults []T,
+) ([]T, error) {
+	return MultiSelectWithDefaults(title, slicekit.Map(items, func(item T) Option[T] {
 		return Option[T]{Label: labelGetter(item), Value: item}
-	}))
+	}), defaults)
 }

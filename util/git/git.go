@@ -74,6 +74,24 @@ func Commit(dir string, message string) error {
 	return Run(dir, "commit", "-m", message)
 }
 
+// Push 把指定 ref 推送到 remote，stdout/stderr 透传给当前终端。
+// 参数：
+//   - dir:    仓库工作目录（空串表示当前进程工作目录）
+//   - remote: 目标 remote 名（如 "origin"）
+//   - ref:    待推送的 ref（分支名 "master" 或 tag "v1.0"）；空串表示推送当前分支
+//   - force:  是否强制推送（--force-with-lease，比 --force 更安全）
+func Push(dir string, remote string, ref string, force bool) error {
+	args := []string{"push"}
+	if force {
+		args = append(args, "--force-with-lease")
+	}
+	args = append(args, remote)
+	if ref != "" {
+		args = append(args, ref)
+	}
+	return Run(dir, args...)
+}
+
 // FindGitRoot 从 dir 开始向上查找，返回最先出现 .git(文件或目录均可) 的目录。
 //
 // 与 git 自身的向上查找语义一致：能识别普通仓库的 .git 目录，也能识别 worktree /

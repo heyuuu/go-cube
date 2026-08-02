@@ -9,6 +9,7 @@ import (
 	"github.com/heyuuu/cube/cmd/alfred"
 	cmdConfig "github.com/heyuuu/cube/cmd/config"
 	cmdDebug "github.com/heyuuu/cube/cmd/debug"
+	"github.com/heyuuu/cube/cmd/gitx"
 	"github.com/heyuuu/cube/cmd/opener"
 	"github.com/heyuuu/cube/cmd/project"
 	"github.com/heyuuu/cube/cmd/server"
@@ -34,6 +35,7 @@ var rootCmd = &easycobra.Command{
 		cmdConfig.RootCmd,
 		ugly.RootCmd,
 		cmdDebug.RootCmd,
+		gitx.RootCmd,
 		// simple commands
 		versionCmd,
 	},
