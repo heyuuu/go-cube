@@ -16,8 +16,9 @@ type ScanRule struct {
 
 // 项目标签。scanner 命中特征时打标；用于区分 git/godot 等项目类型。
 const (
-	TagGit   = "git"
-	TagGodot = "godot"
+	TagGit         = "git"
+	TagGitWorktree = "git-worktree" // git worktree：.git 是文件而非目录
+	TagGodot       = "godot"
 )
 
 func scanProjects(r ScanRule, yield func(path string, tags []string)) error {
@@ -66,8 +67,14 @@ func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 		return false, nil, err
 	}
 	for _, entry := range dirEntries {
-		if entry.Name() == ".git" { // 若 .git 存在则认为是一个 project (常规仓库为 .git 目录，worktree 仓库为 .git 文件)
+		if entry.Name() == ".git" {
+			// .git 存在即认为是 git 项目：
+			//   - .git 是目录 → 常规仓库
+			//   - .git 是文件 → git worktree（内容形如 "gitdir: <主仓库>/.git/worktrees/<名>"）
 			tags = append(tags, TagGit)
+			if !entry.IsDir() {
+				tags = append(tags, TagGitWorktree)
+			}
 		} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
 			tags = append(tags, TagGodot)
 		}

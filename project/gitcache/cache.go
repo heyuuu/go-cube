@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -38,6 +39,7 @@ type Entry struct {
 	Ahead         int       `json:"ahead"`         // 默认分支相对 origin 的领先 commit 数
 	Behind        int       `json:"behind"`        // 落后的 commit 数
 	Dirty         bool      `json:"dirty"`         // 工作区是否有改动
+	WorktreeMain  string    `json:"worktreeMain"`  // git worktree 的主仓库目录（仅 worktree 项目非空）
 	CollectedAt   time.Time `json:"collectedAt"`   // 本次采集时间
 }
 
@@ -254,6 +256,7 @@ func collectEntry(path string) *Entry {
 		ahead, behind, _ = gogit.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
 	}
 	dirty, _ := gogit.IsDirty(path)
+	worktreeMain := detectWorktreeMain(path)
 	return &Entry{
 		RepoUrl:       repoUrl,
 		CurrentBranch: currBranch,
@@ -262,8 +265,41 @@ func collectEntry(path string) *Entry {
 		Ahead:         ahead,
 		Behind:        behind,
 		Dirty:         dirty,
+		WorktreeMain:  worktreeMain,
 		CollectedAt:   time.Now(),
 	}
+}
+
+// detectWorktreeMain 检测 path 是否是 git worktree，若是返回主仓库目录。
+//
+// worktree 的 .git 是文件（非目录），内容形如：
+//
+//	gitdir: /主仓库/.git/worktrees/<worktree名>
+//
+// 从中解析出主仓库目录（去掉 /.git/worktrees/<名> 后缀）。
+// 非 worktree（.git 是目录或不存在）返回空字符串。
+func detectWorktreeMain(path string) string {
+	gitPath := filepath.Join(path, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return "" // .git 不存在或是目录 → 非 worktree
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return ""
+	}
+	line := strings.TrimSpace(string(data))
+	const prefix = "gitdir:"
+	if !strings.HasPrefix(line, prefix) {
+		return ""
+	}
+	gitdir := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+	// gitdir 形如 /主仓库/.git/worktrees/<名>；找到 /.git/worktrees/ 截断
+	const marker = "/.git/worktrees/"
+	if idx := strings.Index(gitdir, marker); idx >= 0 {
+		return gitdir[:idx]
+	}
+	return ""
 }
 
 // backupCorrupt 把损坏文件备份到 git.json.corrupt-{timestamp}，便于事后排查。
