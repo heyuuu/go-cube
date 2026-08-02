@@ -19,9 +19,13 @@ type TableOption func(*table.Table)
 //
 // 这组样式与 console 包 huh 后端的 PrintTable 视觉一致，调用方零配置即得彩色表格。
 // 后续的 TableOption 在此基础上增量覆盖（如 WithBorder(BorderNone) 可关掉边框）。
+//
+// 注意：表头与单元格必须使用相同的 Padding，否则表头文字会和下方单元格
+// 在垂直方向上错位（lipgloss table 不自动对齐 padding）。这里两者都用 Padding(0,1)。
 func applyDefaultStyle(t *table.Table) {
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("51"))
-	cellStyle := lipgloss.NewStyle().Padding(0, 1)
+	padding := lipgloss.NewStyle().Padding(0, 1)
+	headerStyle := padding.Bold(true).Foreground(lipgloss.Color("51"))
+	cellStyle := padding
 
 	t.Border(lipgloss.RoundedBorder()).
 		BorderStyle(lipgloss.NewStyle().Foreground(lipgloss.Color("99"))).
