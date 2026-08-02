@@ -14,6 +14,7 @@ import (
 	"github.com/heyuuu/cube/cmd/project"
 	"github.com/heyuuu/cube/cmd/server"
 	"github.com/heyuuu/cube/cmd/ugly"
+	"github.com/heyuuu/cube/cmd/ui"
 	"github.com/heyuuu/cube/cmd/util/easycobra"
 	"github.com/heyuuu/cube/config"
 	"github.com/heyuuu/cube/db"
@@ -30,6 +31,7 @@ var rootCmd = &easycobra.Command{
 		// group commands
 		alfred.RootCmd,
 		server.RootCmd,
+		ui.RootCmd,
 		project.RootCmd,
 		opener.RootCmd,
 		cmdConfig.RootCmd,
