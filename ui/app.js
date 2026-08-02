@@ -15,8 +15,6 @@ function cubeApp() {
       { value: 'behind', label: 'behind' },
       { value: 'none', label: '未采集' },
     ],
-    groupOpen: false,
-    gitOpen: false,
     selected: new Set(),
     drawer: null,
     loading: false,
@@ -103,9 +101,16 @@ function cubeApp() {
       return Math.floor(hr / 24) + ' 天前';
     },
 
-    // toggleAll：点击「全部」时清空已选数组
-    toggleAll(key) {
-      this[key] = [];
+    // toggleChip：点击单个 chip 切换选中状态（点击「全部」则直接清空数组）
+    toggleChip(key, value) {
+      const arr = this[key];
+      const idx = arr.indexOf(value);
+      if (idx >= 0) {
+        arr.splice(idx, 1);  // 已选 → 取消
+      } else {
+        arr.push(value);     // 未选 → 加入
+      }
+      this[key] = [...arr];  // 触发 Alpine 响应式
     },
 
     gitStatusOf(p) {

@@ -101,7 +101,7 @@ html, body {
 /* ---------- 工具条 ---------- */
 .toolbar {
   display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 .input, .select {
   background: var(--bg-soft); color: var(--text);
@@ -113,6 +113,31 @@ html, body {
 .input:focus, .select:focus { border-color: var(--accent); }
 .count { color: var(--text-mute); font-size: 0.85rem; margin-left: auto; }
 .count strong { color: var(--accent); font-family: var(--mono); }
+
+/* ---------- 筛选 chip 组（inline，一行展示，直接点击切换） ---------- */
+.chip-row {
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 6px; margin-bottom: 10px;
+}
+.chip-label {
+  font-size: 0.75rem; color: var(--text-mute);
+  text-transform: uppercase; letter-spacing: 0.06em;
+  margin-right: 4px; min-width: 3em;
+}
+.chip {
+  background: var(--bg-soft); color: var(--text-dim);
+  border: 1px solid var(--border); border-radius: 4px;
+  padding: 3px 10px; font-size: 0.82rem; font-family: var(--sans);
+  cursor: pointer; transition: all 0.12s; white-space: nowrap;
+}
+.chip:hover { border-color: var(--text-mute); color: var(--text); }
+/* 选中态：用对应的语义色高亮 */
+.chip-active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.chip-clean.chip-active { color: var(--green); border-color: var(--green); background: var(--green-soft); }
+.chip-dirty.chip-active { color: var(--red); border-color: var(--red); background: var(--red-soft); }
+.chip-ahead.chip-active { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-soft); }
+.chip-behind.chip-active { color: var(--text); border-color: var(--text-mute); background: var(--bg-elev); }
+.chip-none.chip-active { color: var(--text-mute); border-color: var(--text-mute); background: var(--bg-elev); }
 
 /* ---------- 批量条 ---------- */
 .batch-bar {
@@ -263,20 +288,7 @@ html, body {
 }
 .btn-link:hover { color: var(--accent); }
 
-/* ---------- 多选下拉 ---------- */
-.multiselect { position: relative; }
-.ms-trigger {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: var(--bg-soft); color: var(--text);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 7px 12px; font-size: 0.9rem; font-family: var(--sans);
-  cursor: pointer; transition: border-color 0.12s;
-}
-.ms-trigger:hover { border-color: var(--text-mute); }
-.ms-label { color: var(--text-mute); font-size: 0.85rem; }
-.ms-value { color: var(--text); }
-.ms-arrow { color: var(--text-mute); font-size: 0.75rem; margin-left: 2px; }
-
+/* ---------- 「打开方式」下拉面板（行内 + 抽屉共用） ---------- */
 .ms-panel {
   position: absolute; top: calc(100% + 4px); left: 0;
   min-width: 100%; width: max-content; max-width: 240px;
@@ -292,8 +304,6 @@ html, body {
   font-size: 0.9rem; cursor: pointer; color: var(--text);
 }
 .ms-option:hover { background: var(--bg-elev); }
-.ms-option input { accent-color: var(--accent); cursor: pointer; }
-.ms-all { color: var(--text-mute); font-style: italic; }
 
 /* ---------- 「打开方式」下拉（行内 + 抽屉共用） ---------- */
 .open-menu { position: relative; display: inline-block; }

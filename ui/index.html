@@ -58,54 +58,36 @@
     <!-- 工具条：搜索 + 筛选 -->
     <div class="toolbar">
       <input class="input" type="text" x-model="keyword" placeholder="🔍 搜索项目名 / 路径">
-
-      <!-- group 多选下拉 -->
-      <div class="multiselect" @click.away="groupOpen = false">
-        <button class="ms-trigger" @click="groupOpen = !groupOpen">
-          <span class="ms-label">group</span>
-          <span class="ms-value" x-show="groupFilter.length === 0">全部</span>
-          <span class="ms-value" x-show="groupFilter.length > 0" x-text="groupFilter.length + ' 项'"></span>
-          <span class="ms-arrow" x-text="groupOpen ? '▴' : '▾'"></span>
-        </button>
-        <div class="ms-panel" x-show="groupOpen" x-transition.origin.top.left>
-          <label class="ms-option">
-            <input type="checkbox" @change="toggleAll('groupFilter', groups)"
-                   :checked="groupFilter.length === 0">
-            <span class="ms-all">全部</span>
-          </label>
-          <template x-for="g in groups" :key="g">
-            <label class="ms-option">
-              <input type="checkbox" :value="g" x-model="groupFilter">
-              <span x-text="g"></span>
-            </label>
-          </template>
-        </div>
-      </div>
-
-      <!-- git 状态多选下拉 -->
-      <div class="multiselect" @click.away="gitOpen = false">
-        <button class="ms-trigger" @click="gitOpen = !gitOpen">
-          <span class="ms-label">git</span>
-          <span class="ms-value" x-show="gitFilter.length === 0">全部</span>
-          <span class="ms-value" x-show="gitFilter.length > 0" x-text="gitFilter.length + ' 项'"></span>
-          <span class="ms-arrow" x-text="gitOpen ? '▴' : '▾'"></span>
-        </button>
-        <div class="ms-panel" x-show="gitOpen" x-transition.origin.top.left>
-          <label class="ms-option">
-            <input type="checkbox" @change="toggleAll('gitFilter', gitStatuses)"
-                   :checked="gitFilter.length === 0">
-            <span class="ms-all">全部</span>
-          </label>
-          <template x-for="s in gitStatuses" :key="s.value">
-            <label class="ms-option">
-              <input type="checkbox" :value="s.value" x-model="gitFilter">
-              <span x-text="s.label"></span>
-            </label>
-          </template>
-        </div>
-      </div>
-
       <span class="count">共 <strong x-text="filtered.length"></strong> 个</span>
+    </div>
+
+    <!-- group 筛选（inline chips，一行展示，直接点击切换） -->
+    <div class="chip-row">
+      <span class="chip-label">group</span>
+      <button class="chip" :class="{ 'chip-active': groupFilter.length === 0 }"
+              @click="groupFilter = []">全部</button>
+      <template x-for="g in groups" :key="g">
+        <button class="chip" :class="{ 'chip-active': groupFilter.includes(g) }"
+                @click="toggleChip('groupFilter', g)" x-text="g"></button>
+      </template>
+    </div>
+
+    <!-- git 状态筛选（inline chips） -->
+    <div class="chip-row">
+      <span class="chip-label">git</span>
+      <button class="chip" :class="{ 'chip-active': gitFilter.length === 0 }"
+              @click="gitFilter = []">全部</button>
+      <template x-for="s in gitStatuses" :key="s.value">
+        <button class="chip" :class="{
+                'chip-active': gitFilter.includes(s.value),
+                'chip-clean': s.value === 'clean',
+                'chip-dirty': s.value === 'dirty',
+                'chip-ahead': s.value === 'ahead',
+                'chip-behind': s.value === 'behind',
+                'chip-none': s.value === 'none'
+              }"
+                @click="toggleChip('gitFilter', s.value)" x-text="s.label"></button>
+      </template>
     </div>
 
     <!-- 批量动作条（占位，待后端批量 API） -->
