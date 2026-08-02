@@ -6,8 +6,8 @@ function cubeApp() {
     // --- 状态 ---
     projects: [],
     keyword: '',
-    groupFilter: [],   // 多选：空数组 = 全部
-    gitFilter: [],     // 多选：空数组 = 全部
+    groupFilter: [],   // group 多选：空数组 = 全部
+    gitFilter: 'all',  // git 单选：'all' = 全部，否则为具体状态（clean/dirty/ahead/behind/none）
     gitStatuses: [
       { value: 'clean', label: 'clean' },
       { value: 'dirty', label: 'dirty' },
@@ -81,7 +81,8 @@ function cubeApp() {
         if (this.groupFilter.length > 0 && !this.groupFilter.includes(p.group)) {
           return false;
         }
-        if (this.gitFilter.length > 0 && !this.gitFilter.includes(this.gitStatusOf(p))) {
+        // git 单选：'all' = 全部，否则需精确匹配
+        if (this.gitFilter !== 'all' && this.gitFilter !== this.gitStatusOf(p)) {
           return false;
         }
         return true;

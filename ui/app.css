@@ -131,13 +131,9 @@ html, body {
   cursor: pointer; transition: all 0.12s; white-space: nowrap;
 }
 .chip:hover { border-color: var(--text-mute); color: var(--text); }
-/* 选中态：用对应的语义色高亮 */
-.chip-active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
-.chip-clean.chip-active { color: var(--green); border-color: var(--green); background: var(--green-soft); }
-.chip-dirty.chip-active { color: var(--red); border-color: var(--red); background: var(--red-soft); }
-.chip-ahead.chip-active { color: var(--yellow); border-color: var(--yellow); background: var(--yellow-soft); }
-.chip-behind.chip-active { color: var(--text); border-color: var(--text-mute); background: var(--bg-elev); }
-.chip-none.chip-active { color: var(--text-mute); border-color: var(--text-mute); background: var(--bg-elev); }
+/* 选中态：统一用蓝色（accent）边框 + 背景，与 group 一致；
+   behind/未采集 用语义色在小屏上不易区分是否选中，故统一蓝色 */
+.chip-active { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); font-weight: 600; }
 
 /* ---------- 批量条 ---------- */
 .batch-bar {
@@ -182,7 +178,7 @@ html, body {
 .col-check { width: 32px; }
 .col-name { min-width: 200px; }
 .col-group { width: 110px; }
-.col-git { width: 240px; }
+.col-git { width: 300px; min-width: 260px; }
 .col-tags { width: 160px; }
 .col-action { width: 40px; text-align: center; }
 
@@ -193,10 +189,12 @@ html, body {
 }
 
 /* ---------- git 单元 ---------- */
-.git-cell { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+/* git 单元格：nowrap 让内容在一行，浏览器会尊重 col-git 的列宽建议而不压缩 */
+.git-cell { display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; }
 .git-branch {
   font-family: var(--mono); font-size: 0.85rem;
   color: var(--text-dim); margin-right: 4px;
+  overflow: hidden; text-overflow: ellipsis; min-width: 0;
 }
 
 /* ---------- 徽章 ---------- */
@@ -257,7 +255,9 @@ html, body {
   font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--text-mute); margin-bottom: 10px;
 }
-.kv { margin: 0; display: grid; grid-template-columns: 90px 1fr; gap: 8px 12px; font-size: 0.9rem; }
+/* 标签列用 auto 自适应内容宽度，避免外接大屏字号放大后「ahead/behind」「采集时间」等长标签溢出与右侧值重叠 */
+.kv { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 16px; font-size: 0.9rem; }
+.kv dt { white-space: nowrap; }
 .kv dt { color: var(--text-mute); }
 .kv dd { margin: 0; color: var(--text); word-break: break-all; }
 
@@ -292,12 +292,17 @@ html, body {
 .ms-panel {
   position: absolute; top: calc(100% + 4px); left: 0;
   min-width: 100%; width: max-content; max-width: 240px;
-  max-height: 320px; overflow-y: auto;
+  max-height: 60vh; overflow-y: auto;
   background: var(--bg-soft);
   border: 1px solid var(--border); border-radius: 6px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   padding: 4px; z-index: 30;
 }
+/* 自定义滚动条：匹配暗色主题，避免原生滚动条突兀 */
+.ms-panel::-webkit-scrollbar { width: 8px; }
+.ms-panel::-webkit-scrollbar-track { background: transparent; }
+.ms-panel::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+.ms-panel::-webkit-scrollbar-thumb:hover { background: var(--text-mute); }
 .ms-option {
   display: flex; align-items: center; gap: 8px;
   padding: 6px 10px; border-radius: 4px;

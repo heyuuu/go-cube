@@ -75,18 +75,11 @@
     <!-- git 状态筛选（inline chips） -->
     <div class="chip-row">
       <span class="chip-label">git</span>
-      <button class="chip" :class="{ 'chip-active': gitFilter.length === 0 }"
-              @click="gitFilter = []">全部</button>
+      <button class="chip" :class="{ 'chip-active': gitFilter === 'all' }"
+              @click="gitFilter = 'all'">全部</button>
       <template x-for="s in gitStatuses" :key="s.value">
-        <button class="chip" :class="{
-                'chip-active': gitFilter.includes(s.value),
-                'chip-clean': s.value === 'clean',
-                'chip-dirty': s.value === 'dirty',
-                'chip-ahead': s.value === 'ahead',
-                'chip-behind': s.value === 'behind',
-                'chip-none': s.value === 'none'
-              }"
-                @click="toggleChip('gitFilter', s.value)" x-text="s.label"></button>
+        <button class="chip" :class="{ 'chip-active': gitFilter === s.value }"
+                @click="gitFilter = s.value" x-text="s.label"></button>
       </template>
     </div>
 
