@@ -57,6 +57,39 @@ go test ./...
 go test ./opener/...     # 聚焦某个包
 ```
 
+### 测试辅助包 `internal/testfixture`
+
+cube 的 IO 测试（git 操作、文件扫描、缓存读写）通过 `internal/testfixture` 包提供统一 fixture builder：
+
+- **临时目录落 `runtime/test/`**（已 gitignore），**不用系统 `/tmp`**——失败时方便翻看现场排查。每个测试拿到独立子目录（`runtime/test/<时间戳>-<test名>/`），不自动清理。
+- **`Workspace`**：测试工作区。`ws := testfixture.NewWorkspace(t)` → `ws.Dir` 是该测试专属目录；`ws.Mkdir/WriteFile/Join` 在其下操作。
+- **`BuildGitRepo(t, dir, GitRepoSpec)` / `ws.MakeGitRepo(name)`**：建真实 git 仓库（用系统 git + 注入 user 配置，不依赖全局 git config）。`GitRepoSpec` 声明预期状态（分支/commit 数/tag/remote/ahead/dirty）。
+- **`ws.MakeProjectDir(relPath, opts...)`**：建「会被 cube 扫描识别为 project」的目录（默认含 git 仓库）。opts：`WithGodot()`/`WithWorktree()`/`WithDirty()`/`WithoutGit()`。
+
+```go
+ws := testfixture.NewWorkspace(t)
+repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+    Branch: "develop", RemoteUrl: "/tmp/remote.git", MakeDirty: true,
+})
+// 或工程目录
+ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
+```
+
+**为什么 testfixture 不 import `project` 包**：底层包（`gogit`/`gitcache`）的测试要用 testfixture，而 `project → gitcache → gogit` 是依赖链。若 testfixture 反向依赖 project 会形成循环。所以「构造 project.Service」这种依赖 `project` 包的逻辑写在调用方测试里（见 `project/scan_test.go` 的 `newServiceAt`），不沉淀进 testfixture。
+
+### 测试策略（什么测、什么不测）
+
+- **纯函数**（解析、计算、字符串处理）：普通表驱动测试。`fuzzy`/`pathkit`/`git/url`/`gogit 纯函数`/`slicekit`/`easycache`/`opener 解析`。
+- **依赖外部进程/库的 IO**（go-git 读仓库、git 二进制）：**用 testfixture 建真实临时仓库测**，不 mock。`gogit` 的 `Branches/Remotes/Tags/IsDirty`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
+- **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
+- **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
+- **不写单测的（靠手动/集成验证）**：
+  - `git.Run`/`git.Clone`/`git.Push`（透传 stdio 到 `os.Stdout`，无法捕获输出；且本质是组装 git 参数）
+  - `gitcache.TryAsyncRefresh`（fork 自身可执行文件跑子命令，进程编排非逻辑）
+  - `opener.Open`（实际启动编辑器/IDE，副作用）
+  - `config`/`db`（全局单例无 setter，测试无法隔离）
+  - `cmd/*`（cobra 命令编排）、`web`（huma 路由 + envelope，集成测比单测值）
+
 ## 必须遵守的编码规则
 
 1. **Go 代码修改后必须先格式化与校验再提交/收工**——这是强制规则：
