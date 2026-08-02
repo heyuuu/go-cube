@@ -31,10 +31,11 @@ func InitApp() *App {
 	configHandler := web.NewConfigHandler(conf)
 
 	projectService := project.NewService(conf.Project, filepath.Join(config.Path(), "cache"))
-	projectHandler := web.NewProjectHandler(projectService)
 
 	openerService := opener.NewService(conf)
 	openerHandler := web.NewOpenerHandler(openerService)
+
+	projectHandler := web.NewProjectHandler(projectService, openerService)
 
 	server := web.NewServer(
 		configHandler,

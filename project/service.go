@@ -97,6 +97,15 @@ func (s *Service) GitInfo(path string) (*gitcache.Entry, bool) {
 	return s.gitCache.Get(path)
 }
 
+// GitCacheUpdatedAt 返回 git 缓存整体最近一次落盘时间；无缓存返回零值。
+// 区别于单项目的 CollectedAt：这是整个 cache 文件的刷新时间。
+func (s *Service) GitCacheUpdatedAt() time.Time {
+	if s.gitCache == nil {
+		return time.Time{}
+	}
+	return s.gitCache.UpdatedAt()
+}
+
 // TriggerAsyncRefresh 触发一次异步刷新：TTL 内直接返回，否则 fork 子进程后台采集。
 // 非阻塞，立即返回。供读命令（list/info）在返回前调用。
 func (s *Service) TriggerAsyncRefresh() {

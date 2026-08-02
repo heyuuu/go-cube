@@ -40,7 +40,13 @@
 
     <!-- 页内标题区 -->
     <header class="page-head">
-      <div class="page-title">Projects</div>
+      <div>
+        <div class="page-title">Projects</div>
+        <div class="page-meta">
+          git 缓存更新：<span class="meta-time" x-text="gitCacheUpdatedText"></span>
+          <span class="meta-tip" x-show="gitCacheUpdated" :title="formatTime(gitCacheUpdated)">ⓘ</span>
+        </div>
+      </div>
       <div class="page-actions">
         <button class="btn btn-ghost" @click="refresh()" :disabled="loading">
           <span x-show="!loading">刷新</span>
@@ -159,7 +165,20 @@
                 </template>
               </td>
               <td class="col-action" @click.stop>
-                <button class="row-more" title="待后端 open/pull API">⋯</button>
+                <div class="open-menu" @click.away="openMenuPath = null">
+                  <button class="row-more" @click="toggleOpenMenu(p.path)" title="用 app 打开">▾</button>
+                  <div class="ms-panel open-panel" x-show="openMenuPath === p.path" x-transition.origin.top.right>
+                    <div class="ms-panel-title">打开方式</div>
+                    <template x-for="op in openers" :key="op.name">
+                      <button class="ms-option ms-option-btn"
+                              @click="openProject(p.path, op.name)"
+                              :disabled="opening[p.path + op.name]">
+                        <span x-text="op.name"></span>
+                      </button>
+                    </template>
+                    <div class="ms-panel-empty" x-show="openers.length === 0">未配置 opener</div>
+                  </div>
+                </div>
               </td>
             </tr>
           </template>
@@ -229,7 +248,21 @@
           <section class="drawer-section">
             <div class="drawer-label">动作</div>
             <div class="drawer-actions">
-              <button class="btn btn-ghost" disabled title="待后端 open API">Open ▾</button>
+              <div class="open-menu drawer-open-menu" @click.away="drawerOpenMenu = false">
+                <button class="btn" @click="drawerOpenMenu = !drawerOpenMenu">
+                  打开方式 ▾
+                </button>
+                <div class="ms-panel open-panel drawer-open-panel" x-show="drawerOpenMenu" x-transition.origin.top.left>
+                  <template x-for="op in openers" :key="op.name">
+                    <button class="ms-option ms-option-btn"
+                            @click="openProject(drawer.path, op.name); drawerOpenMenu = false"
+                            :disabled="opening[drawer.path + op.name]">
+                      <span x-text="op.name"></span>
+                    </button>
+                  </template>
+                  <div class="ms-panel-empty" x-show="openers.length === 0">未配置 opener</div>
+                </div>
+              </div>
               <button class="btn btn-ghost" disabled title="待后端 pull API">Pull</button>
               <button class="btn btn-ghost" @click="copyPath(drawer.path)">复制路径</button>
             </div>

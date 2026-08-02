@@ -56,9 +56,17 @@ type cacheFile struct {
 //   - 跨进程：由 refresh.go 的 flock 保证同一时刻只有一个采集进程在写文件；
 //     读进程加载快照到内存后只读不改，不存在真并发修改。
 type Cache struct {
-	dir     string // 缓存目录（~/.config/cube/cache/）
-	mu      sync.RWMutex
-	entries map[string]*Entry // key = 项目绝对路径
+	dir       string // 缓存目录（~/.config/cube/cache/）
+	mu        sync.RWMutex
+	entries   map[string]*Entry // key = 项目绝对路径
+	updatedAt time.Time         // 最近一次采集落盘时间（缓存整体刷新时间）
+}
+
+// UpdatedAt 返回缓存最近一次落盘时间（整体刷新时间，区别于单项目的 CollectedAt）。
+func (c *Cache) UpdatedAt() time.Time {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.updatedAt
 }
 
 // Load 从 dir 加载缓存。
@@ -95,6 +103,7 @@ func Load(dir string) (*Cache, error) {
 	if file.Entries != nil {
 		c.entries = file.Entries
 	}
+	c.updatedAt = file.UpdatedAt
 	return c, nil
 }
 
@@ -116,13 +125,15 @@ func (c *Cache) Get(path string) (*Entry, bool) {
 // 流程：序列化 → 写 git.json.tmp → rename 覆盖 git.json。
 // rename 保证原子性（同文件系统下）；tmp 与目标同目录以满足这一前提。
 func (c *Cache) Save() error {
-	c.mu.RLock()
+	c.mu.Lock()
+	now := time.Now()
+	c.updatedAt = now
 	file := cacheFile{
 		Version:   cacheVersion,
-		UpdatedAt: time.Now(),
+		UpdatedAt: now,
 		Entries:   c.entries,
 	}
-	c.mu.RUnlock()
+	c.mu.Unlock()
 
 	data, err := json.MarshalIndent(file, "", "  ")
 	if err != nil {

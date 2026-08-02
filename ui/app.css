@@ -91,6 +91,12 @@ html, body {
 }
 .page-title { font-size: 1.3rem; font-weight: 650; letter-spacing: -0.01em; }
 .page-actions { display: flex; gap: 8px; }
+.page-meta {
+  font-size: 0.8rem; color: var(--text-mute);
+  margin-top: 3px; display: flex; align-items: center; gap: 5px;
+}
+.meta-time { color: var(--text-dim); font-family: var(--mono); }
+.meta-tip { cursor: help; font-size: 0.75rem; }
 
 /* ---------- 工具条 ---------- */
 .toolbar {
@@ -288,3 +294,22 @@ html, body {
 .ms-option:hover { background: var(--bg-elev); }
 .ms-option input { accent-color: var(--accent); cursor: pointer; }
 .ms-all { color: var(--text-mute); font-style: italic; }
+
+/* ---------- 「打开方式」下拉（行内 + 抽屉共用） ---------- */
+.open-menu { position: relative; display: inline-block; }
+.open-panel { right: 0; left: auto; min-width: 140px; }
+.ms-panel-title {
+  font-size: 0.75rem; color: var(--text-mute);
+  padding: 4px 10px; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.ms-option-btn {
+  display: block; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text);
+  padding: 6px 10px; border-radius: 4px;
+  font-size: 0.9rem; font-family: var(--sans); cursor: pointer;
+}
+.ms-option-btn:hover:not(:disabled) { background: var(--bg-elev); }
+.ms-option-btn:disabled { opacity: 0.5; cursor: wait; }
+.ms-panel-empty { padding: 8px 10px; font-size: 0.8rem; color: var(--text-mute); }
+.drawer-open-menu { flex: 0 0 auto; }
+.drawer-open-panel { left: 0; right: auto; }

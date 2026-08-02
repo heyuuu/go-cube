@@ -1,5 +1,5 @@
 // cubeApp —— Alpine.js 根组件。
-// 数据：fetch /api/project/list → ApiOutput{ok,message,data:{list:[...]}} → 取 data.list
+// 数据：fetch /api/project/list → ApiOutput{ok,message,data:{list, gitCacheUpdated}}
 // 实时性：复用后端 gitcache，前端 30s 轮询拉快照（后端 fork 子进程异步刷新）
 function cubeApp() {
   return {
@@ -22,9 +22,17 @@ function cubeApp() {
     loading: false,
     error: '',
 
+    // opener 列表 + 缓存更新时间（来自后端）
+    openers: [],
+    gitCacheUpdated: null,
+    openMenuPath: null,   // 当前展开「打开」下拉的行 path（同时只展开一个）
+    drawerOpenMenu: false, // 抽屉内的「打开方式」下拉
+    opening: {},          // 正在打开中的 path → bool，禁用按钮防重复
+
     // --- 生命周期 ---
     init() {
       this.load();
+      this.loadOpeners();
       // 30s 轮询：拉被后端 gitcache 子进程刷新的快照（对齐后端 TTL ~1min）
       setInterval(() => this.load(), 30000);
     },
@@ -40,11 +48,22 @@ function cubeApp() {
           throw new Error(json.message || '请求失败');
         }
         this.projects = json.data?.list || [];
+        this.gitCacheUpdated = json.data?.gitCacheUpdated || null;
       } catch (e) {
         this.error = '加载失败：' + (e.message || e);
       } finally {
         this.loading = false;
       }
+    },
+
+    async loadOpeners() {
+      try {
+        const res = await fetch('/api/opener/list');
+        const json = await res.json();
+        if (json.ok) {
+          this.openers = json.data?.list || [];
+        }
+      } catch (e) {}
     },
 
     refresh() { return this.load(); },
@@ -61,11 +80,9 @@ function cubeApp() {
         if (kw && !(p.name.toLowerCase().includes(kw) || (p.path || '').toLowerCase().includes(kw))) {
           return false;
         }
-        // group 多选：空数组 = 全部；否则需命中
         if (this.groupFilter.length > 0 && !this.groupFilter.includes(p.group)) {
           return false;
         }
-        // git 多选：空数组 = 全部；否则需命中
         if (this.gitFilter.length > 0 && !this.gitFilter.includes(this.gitStatusOf(p))) {
           return false;
         }
@@ -73,17 +90,24 @@ function cubeApp() {
       });
     },
 
-    // toggleAll：点击「全部」时，清空已选数组（空 = 全部）；已选非空时勾选「全部」则清空
-    toggleAll(key, allOptions) {
-      if (this[key].length === 0) {
-        // 当前是「全部」（空），点了「全部」无意义，保持空
-        return;
-      }
-      // 当前选了若干，点「全部」→ 清空
+    // 缓存更新时间的相对描述（如「3 分钟前」），无缓存返回 '-'
+    get gitCacheUpdatedText() {
+      if (!this.gitCacheUpdated) return '-';
+      const diff = Date.now() - new Date(this.gitCacheUpdated).getTime();
+      if (isNaN(diff)) return '-';
+      const min = Math.floor(diff / 60000);
+      if (min < 1) return '刚刚';
+      if (min < 60) return min + ' 分钟前';
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return hr + ' 小时前';
+      return Math.floor(hr / 24) + ' 天前';
+    },
+
+    // toggleAll：点击「全部」时清空已选数组
+    toggleAll(key) {
       this[key] = [];
     },
 
-    // 把 gitInfo 归类成单一状态枚举，供筛选
     gitStatusOf(p) {
       const g = p.gitInfo;
       if (!g) return 'none';
@@ -93,11 +117,34 @@ function cubeApp() {
       return 'clean';
     },
 
+    // --- 打开项目 ---
+    toggleOpenMenu(path) {
+      this.openMenuPath = this.openMenuPath === path ? null : path;
+    },
+
+    async openProject(path, app) {
+      if (this.opening[path + app]) return;
+      this.opening[path + app] = true;
+      this.openMenuPath = null;
+      try {
+        const res = await fetch('/api/project/open', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path, app }),
+        });
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.message || '打开失败');
+      } catch (e) {
+        this.error = '打开失败：' + (e.message || e);
+      } finally {
+        this.opening[path + app] = false;
+      }
+    },
+
     // --- 交互 ---
     toggleSelect(path) {
       if (this.selected.has(path)) this.selected.delete(path);
       else this.selected.add(path);
-      // Set 的响应式触发：重新赋值（Alpine 对 Set 增删不自动追踪）
       this.selected = new Set(this.selected);
     },
 
@@ -116,5 +163,4 @@ function cubeApp() {
   };
 }
 
-// 暴露到全局供 HTML x-data="cubeApp()" 引用
 window.cubeApp = cubeApp;
