@@ -4,6 +4,7 @@
 function cubeApp() {
   return {
     // --- 状态 ---
+    view: 'projects',  // 当前视图：projects / tree
     projects: [],
     keyword: '',
     groupFilter: [],   // group 多选：空数组 = 全部
@@ -27,12 +28,93 @@ function cubeApp() {
     drawerOpenMenu: false, // 抽屉内的「打开方式」下拉
     opening: {},          // 正在打开中的 path → bool，禁用按钮防重复
 
+    // Tree 视图状态
+    treeRoot: null,       // 后端返回的原始树
+    treeExpanded: {},     // path → bool，节点展开状态
+    treeLoading: false,
+    treeError: '',
+
     // --- 生命周期 ---
     init() {
       this.load();
       this.loadOpeners();
       // 30s 轮询：拉被后端 gitcache 子进程刷新的快照（对齐后端 TTL ~1min）
       setInterval(() => this.load(), 30000);
+    },
+
+    // 视图切换：切到 tree 时按需加载（目录树变化不频繁，无需轮询）
+    switchView(v) {
+      this.view = v;
+      if (v === 'tree' && !this.treeRoot && !this.treeLoading) {
+        this.loadTree();
+      }
+    },
+
+    // --- Tree 视图 ---
+    async loadTree() {
+      this.treeLoading = true;
+      this.treeError = '';
+      try {
+        const res = await fetch('/api/project/tree');
+        const json = await res.json();
+        if (!json.ok) throw new Error(json.message || '请求失败');
+        this.treeRoot = json.data;
+        // 默认展开根节点 + 第一层
+        this.treeExpanded = { [this.treeRoot.path]: true };
+      } catch (e) {
+        this.treeError = '加载目录树失败：' + (e.message || e);
+      } finally {
+        this.treeLoading = false;
+      }
+    },
+
+    get flatTree() {
+      if (!this.treeRoot) return [];
+      const rows = [];
+      const walk = (node, depth, isRoot) => {
+        const hasChildren = node.children && node.children.length > 0;
+        const expanded = isRoot ? true : !!this.treeExpanded[node.path];
+        if (!isRoot || hasChildren || true) {  // 根节点也显示
+          rows.push({
+            name: node.name,
+            path: node.path,
+            kind: isRoot ? 'dir' : node.kind,  // 根节点当 dir 样式
+            depth,
+            hasChildren,
+            expanded,
+            isRoot,
+          });
+        }
+        // 根节点总是展开；其余仅展开时下钻
+        if (node.children && (isRoot || this.treeExpanded[node.path])) {
+          for (const c of node.children) walk(c, depth + 1, false);
+        }
+      };
+      walk(this.treeRoot, 0, true);
+      return rows;
+    },
+
+    toggleTreeNode(row) {
+      if (!row.hasChildren) return;
+      this.treeExpanded[row.path] = !this.treeExpanded[row.path];
+      // 触发 Alpine 响应式（对象属性新增）
+      this.treeExpanded = { ...this.treeExpanded };
+    },
+
+    expandAllTree() {
+      const all = {};
+      const walk = (n) => {
+        if (n.children && n.children.length > 0) {
+          all[n.path] = true;
+          n.children.forEach(walk);
+        }
+      };
+      walk(this.treeRoot);
+      this.treeExpanded = all;
+    },
+
+    collapseAllTree() {
+      this.treeExpanded = { [this.treeRoot?.path]: true };  // 仅保留根展开
     },
 
     // --- 数据加载 ---

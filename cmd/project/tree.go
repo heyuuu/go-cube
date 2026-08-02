@@ -1,11 +1,8 @@
 package project
 
 import (
+	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -13,8 +10,6 @@ import (
 	"github.com/heyuuu/cube/cmd/util/easycobra"
 	"github.com/heyuuu/cube/cmd/util/tui"
 	"github.com/heyuuu/cube/project"
-	"github.com/heyuuu/cube/util/pathkit"
-	"github.com/heyuuu/cube/util/slicekit"
 )
 
 var projectTreeCmd = &easycobra.Command{
@@ -26,140 +21,38 @@ var projectTreeCmd = &easycobra.Command{
 		cmd.Flags().StringVar(&root, "root", "", "支持根目录")
 
 		return func(args []string) error {
-			// 项目列表
 			service := app.Default().ProjectService()
-			projects := service.Projects()
-			if len(projects) == 0 {
-				fmt.Println("未找到任何项目，请确认配置是否正确")
-				return nil
-			}
 
-			// root 未指定时，默认取所有项目的最长公共前缀目录作为树根：
-			// 多项目 → 共同祖先目录；单项目 → 项目自身。
-			if root == "" {
-				paths := make([]string, 0, len(projects))
-				for _, p := range projects {
-					paths = append(paths, filepath.Clean(p.Path()))
+			// 树构建逻辑下沉在 project.Service.BuildTree（与 web 共用）
+			treeRoot, err := service.BuildTree(root)
+			if err != nil {
+				if errors.Is(err, project.ErrNoProjects) {
+					fmt.Println("未找到任何项目，请确认配置是否正确")
+					return nil
 				}
-				root = pathkit.CommonPrefix(paths)
-			} else {
-				// 指定的 root 规范化为绝对路径：
-				// 先展开 ~，再 filepath.Abs（含 Clean，并支持相对路径如 .）
-				root = pathkit.RealPath(root)
-				if abs, err := filepath.Abs(root); err == nil {
-					root = abs
-				}
+				return err
 			}
 
-			// 仅保留位于 root 子树下的项目
-			projects = slicekit.Filter(projects, func(p *project.Project) bool {
-				return pathkit.HasPrefix(p.Path(), root)
-			})
-
-			if len(projects) == 0 {
-				fmt.Printf("没有任何符合条件的项目: root=%s", pathkit.PrettyPath(root))
-				return nil
-			}
-
-			// 渲染项目目录树
-			treeRoot := buildProjectTree(projects, root)
-			tui.PrintTree(treeRoot)
-
+			// 渲染：project.TreeNode → tui.TreeNode（领域模型 → 渲染模型）
+			tui.PrintTree(toTuiNode(treeRoot))
 			return nil
 		}
 	},
 }
 
-// buildProjectTree 从一组项目构造以 root 为根的目录树。
-//
-// 规则：
-//   - 根节点 = 调用方指定的 root，标签用 pathkit.PrettyPath 展示绝对路径；
-//   - 仅展开「项目目录」或「包含项目目录的目录」；其余目录作为叶子节点显示但不再展开；
-//   - 真实子目录通过 os.ReadDir 读取（忠实于磁盘）；
-//   - 项目目录标记为 Blue（加粗青色），含项目但非项目的目录标记为 Green（加粗绿色）；
-//   - 同级节点按名称字典序排序。
-func buildProjectTree(projects []*project.Project, root string) tui.TreeNode {
-	// Project.Path() 已是绝对路径，这里仅做 Clean 保证后续前缀比较与磁盘读取一致。
-	paths := slicekit.Map(projects, (*project.Project).Path)
-	projectSet := slicekit.ToSet(paths)     // 项目目录集合（精确到项目路径本身）
-	skeleton := buildProjectSkeleton(paths) // 含项目的目录集合（项目路径 + 所有祖先）
-
-	// 根节点标签：PrettyPath 会把 home 目录下的绝对路径渲染成 ~ 形式
-	rootLabel := pathkit.PrettyPath(root)
-
-	return tui.TreeNode{
-		Name:     rootLabel,
-		Children: buildDirChildren(root, projectSet, skeleton),
+// toTuiNode 把领域层的 project.TreeNode 转成 tui.TreeNode（cmd 渲染专用）。
+// 样式映射：Project → Green（加粗绿）；Dir → Blue（加粗青）；None → None。
+func toTuiNode(n project.TreeNode) tui.TreeNode {
+	var style tui.TreeNodeStyle
+	switch n.Style {
+	case project.TreeNodeStyleProject:
+		style = tui.TreeNodeStyleGreen
+	case project.TreeNodeStyleDir:
+		style = tui.TreeNodeStyleBlue
 	}
-}
-
-// buildProjectSkeleton 构造「含项目的目录集合」：
-// 每条项目路径自身及其所有祖先目录都加入集合。
-// 集合中的目录在树里要么是项目目录、要么是中转目录——都会被展开。
-func buildProjectSkeleton(paths []string) map[string]bool {
-	set := make(map[string]bool)
-	for _, p := range paths {
-		p = filepath.Clean(p)
-		set[p] = true
-		for dir := filepath.Dir(p); dir != p && dir != "" && dir != "."; dir = filepath.Dir(dir) {
-			set[dir] = true
-			if dir == string(filepath.Separator) {
-				break
-			}
-		}
+	children := make([]tui.TreeNode, 0, len(n.Children))
+	for _, c := range n.Children {
+		children = append(children, toTuiNode(c))
 	}
-	return set
-}
-
-// buildDirChildren 读取 dir 的真实子目录，构造下一层节点。
-// 仅当 dir 在 skeleton 中（即含项目）时才下钻；否则返回 nil（成为叶子）。
-func buildDirChildren(dir string, projectSet, skeleton map[string]bool) []tui.TreeNode {
-	if !skeleton[dir] {
-		return nil // 当前目录不含项目：作为叶子停止展开
-	}
-
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return nil // 不可读目录按叶子处理
-	}
-
-	// 收集子目录节点，按是否项目目录标记样式：
-	//   - 项目目录 → Blue；含项目但非项目目录 → Green；其余 → None。
-	nodes := make([]tui.TreeNode, 0, len(entries))
-	for _, e := range entries {
-		if !e.IsDir() {
-			continue
-		}
-		// 跳过隐藏目录（与常见 tree 工具一致，也避免 .git 等噪声）
-		if strings.HasPrefix(e.Name(), ".") {
-			continue
-		}
-		absPath := filepath.Join(dir, e.Name())
-		var node tui.TreeNode
-		switch {
-		case projectSet[absPath]: // 项目节点
-			node = tui.TreeNode{
-				Name:  e.Name(),
-				Style: tui.TreeNodeStyleGreen,
-			}
-		case skeleton[absPath]: // 含项目的目录
-			children := buildDirChildren(filepath.Join(dir, e.Name()), projectSet, skeleton)
-			node = tui.TreeNode{
-				Name:     e.Name(),
-				Style:    tui.TreeNodeStyleBlue,
-				Children: children,
-			}
-		default: // 其他目录
-			node = tui.TreeNode{
-				Name:  e.Name(),
-				Style: tui.TreeNodeStyleNone,
-			}
-		}
-		nodes = append(nodes, node)
-	}
-
-	// 同级排序：按名称字典序（本树只渲染目录节点，不存在目录/文件混排）
-	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Name < nodes[j].Name })
-
-	return nodes
+	return tui.TreeNode{Name: n.Name, Style: style, Children: children}
 }
