@@ -16,7 +16,8 @@ function cubeApp() {
   // 公共状态（所有视图共享）
   const base = {
     // 视图切换
-    view: 'projects',  // 当前视图：projects / tree / config
+    view: 'projects',  // 当前视图：projects / config
+    displayMode: 'table',  // projects 视图内的显示模式：table / tree
 
     // 公共数据
     projects: [],
@@ -43,14 +44,16 @@ function cubeApp() {
     },
 
     // --- hash 路由 ---
-    // 设计：#/projects | #/tree | #/config （视图）；#/p/<encoded-path> （详情抽屉）
+    // 设计：#/projects[/{table|tree}] | #/config （视图）；#/p/<encoded-path> （详情抽屉）
     // hash 模式而非 history：cube server 无 SPA fallback 路由，hash 刷新只请求 / 拿 index.html，零后端改动。
     //
-    // 状态 → URL（switchView/openDrawer/closeDrawer 调用）
+    // 状态 → URL（switchView/switchDisplay/openDrawer/closeDrawer 调用）
     updateHash() {
       let hash;
       if (this.drawer) {
         hash = '#/p/' + encodeURIComponent(this.drawer.path);
+      } else if (this.view === 'projects') {
+        hash = '#/projects' + (this.displayMode === 'tree' ? '/tree' : '');
       } else {
         hash = '#/' + (this.view || 'projects');
       }
@@ -64,6 +67,10 @@ function cubeApp() {
       // 视图切换
       if (route.view && route.view !== this.view) {
         this.switchView(route.view, { skipHash: true });
+      }
+      // projects 视图内的显示模式
+      if (route.view === 'projects' && route.mode && route.mode !== this.displayMode) {
+        this.switchDisplay(route.mode, { skipHash: true });
       }
       // 抽屉
       if (route.drawerPath) {
@@ -85,20 +92,34 @@ function cubeApp() {
       if (parts[0] === 'p' && parts[1]) {
         return { drawerPath: decodeURIComponent(parts[1]) };
       }
-      if (['projects', 'tree', 'config'].includes(parts[0])) {
-        return { view: parts[0] };
+      if (parts[0] === 'projects') {
+        return { view: 'projects', mode: parts[1] === 'tree' ? 'tree' : 'table' };
+      }
+      if (parts[0] === 'config') {
+        return { view: 'config' };
       }
       return { view: 'projects' };
     },
 
-    // 视图切换：切到 tree/config 时按需加载
+    // 视图切换：切到 config 时按需加载
     switchView(v, opts = {}) {
       this.view = v;
-      if (v === 'tree' && !this.treeRoot && !this.treeLoading) this.loadTree();
       if (v === 'config' && !this.config && !this.configLoading) this.loadConfig();
       if (!opts.skipHash) {
         // 切视图时关抽屉（避免抽屉跨视图残留）
         this.drawer = null;
+        this.updateHash();
+      }
+    },
+
+    // projects 视图内的显示模式切换（table / tree）
+    switchDisplay(mode, opts = {}) {
+      this.displayMode = mode;
+      // 切到 tree 时重置展开状态（树基于 filtered 重建）
+      if (mode === 'tree') {
+        this.treeExpanded = {};
+      }
+      if (!opts.skipHash) {
         this.updateHash();
       }
     },

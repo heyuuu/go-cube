@@ -32,8 +32,6 @@
     <nav class="nav">
       <a class="nav-item" :class="{ 'active': view === 'projects' }"
          @click="switchView('projects')">Projects</a>
-      <a class="nav-item" :class="{ 'active': view === 'tree' }"
-         @click="switchView('tree')">Tree</a>
       <a class="nav-item" :class="{ 'active': view === 'config' }"
          @click="switchView('config')">Config</a>
     </nav>
@@ -59,6 +57,13 @@
         </div>
       </div>
       <div class="page-actions">
+        <!-- 显示模式切换：表格 / 树（树复用当前筛选结果） -->
+        <div class="seg-control">
+          <button class="seg-btn" :class="{ 'seg-active': displayMode === 'table' }"
+                  @click="switchDisplay('table')" title="表格视图">☰ 表格</button>
+          <button class="seg-btn" :class="{ 'seg-active': displayMode === 'tree' }"
+                  @click="switchDisplay('tree')" title="目录树视图">⇲ 树</button>
+        </div>
         <button class="btn btn-ghost" @click="refresh()" :disabled="loading">
           <span x-show="!loading">刷新</span>
           <span x-show="loading">刷新中…</span>
@@ -116,8 +121,8 @@
     <!-- 错误提示 -->
     <div class="error-banner" x-show="error" x-transition x-text="error"></div>
 
-    <!-- 表格 -->
-    <div class="table-wrap">
+    <!-- 表格（仅 table 模式显示） -->
+    <div class="table-wrap" x-show="displayMode === 'table'">
       <table class="data-table">
         <thead>
           <tr>
@@ -195,43 +200,36 @@
       </div>
     </div>
 
+    <!-- 树视图（仅 tree 模式显示，复用上方筛选结果） -->
+    <div class="tree-view" x-show="displayMode === 'tree'" x-transition>
+      <!-- 树工具条：全展开/全折叠 -->
+      <div class="tree-toolbar">
+        <span class="tree-tip">基于当前筛选结果（<strong x-text="filtered.length"></strong> 个）的目录树</span>
+        <button class="btn btn-ghost" @click="expandAllTree()">全展开</button>
+        <button class="btn btn-ghost" @click="collapseAllTree()">全折叠</button>
+      </div>
+      <template x-for="row in flatFilteredTree" :key="row.path">
+        <div class="tree-row"
+             :style="'padding-left: ' + (row.depth * 20 + 12) + 'px'"
+             @click="toggleTreeNode(row)">
+          <span class="tree-arrow" x-show="row.hasChildren" x-text="row.expanded ? '▾' : '▸'"></span>
+          <span class="tree-arrow tree-arrow-leaf" x-show="!row.hasChildren">·</span>
+          <span class="tree-label" :class="'tree-label-' + row.kind" x-text="row.name"></span>
+          <!-- 项目节点：点击打开详情抽屉 -->
+          <span class="tree-actions" x-show="row.kind === 'project'" @click.stop>
+            <button class="tree-open-btn" @click="openDrawer(row.project)" title="查看详情">详情</button>
+          </span>
+        </div>
+      </template>
+      <!-- 空状态 -->
+      <div class="empty" x-show="filtered.length === 0 && !loading">
+        <div class="empty-title">无项目可展示</div>
+        <div class="empty-sub">调整筛选条件或检查 scan 配置。</div>
+      </div>
+    </div>
+
     </div><!-- /Projects 视图 -->
 
-    <!-- ============ Tree 视图 ============ -->
-    <div x-show="view === 'tree'" x-transition>
-      <header class="page-head">
-        <div>
-          <div class="page-title">Tree</div>
-          <div class="page-meta">项目目录树（点击节点展开/折叠）</div>
-        </div>
-        <div class="page-actions">
-          <button class="btn btn-ghost" @click="loadTree()" :disabled="treeLoading">
-            <span x-show="!treeLoading">刷新</span>
-            <span x-show="treeLoading">加载中…</span>
-          </button>
-          <button class="btn btn-ghost" @click="expandAllTree()">全展开</button>
-          <button class="btn btn-ghost" @click="collapseAllTree()">全折叠</button>
-        </div>
-      </header>
-      <div class="error-banner" x-show="treeError" x-transition x-text="treeError"></div>
-      <div class="tree-view" x-show="treeRoot && !treeError">
-        <!-- 扁平化渲染：树拍平成行，每行带 depth + expanded，点击展开/折叠 -->
-        <template x-for="row in flatTree" :key="row.path">
-          <div class="tree-row"
-               :style="'padding-left: ' + (row.depth * 20 + 12) + 'px'"
-               @click="toggleTreeNode(row)">
-            <!-- 展开/折叠箭头：含子节点显示 ▾/▸，叶子显示空心圆 -->
-            <span class="tree-arrow" x-show="row.hasChildren" x-text="row.expanded ? '▾' : '▸'"></span>
-            <span class="tree-arrow tree-arrow-leaf" x-show="!row.hasChildren">·</span>
-            <span class="tree-label" :class="'tree-label-' + row.kind" x-text="row.name"></span>
-            <!-- 项目节点：可打开 -->
-            <span class="tree-actions" x-show="row.kind === 'project'" @click.stop>
-              <button class="tree-open-btn" @click="openProject(row.path, 'finder')">Finder</button>
-            </span>
-          </div>
-        </template>
-      </div>
-    </div><!-- /Tree 视图 -->
 
     <!-- ============ Config 视图 ============ -->
     <div x-show="view === 'config'" x-transition>
