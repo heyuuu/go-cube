@@ -33,16 +33,74 @@ function cubeApp() {
 
     // --- 生命周期 ---
     init() {
+      // 从 URL hash 恢复视图状态（支持 F5 刷新停在当前页、分享链接直达）
+      this.applyHash();
+      window.addEventListener('hashchange', () => this.applyHash());
+
       this.load();
       this.loadOpeners();
       setInterval(() => this.load(), 30000);
     },
 
+    // --- hash 路由 ---
+    // 设计：#/projects | #/tree | #/config （视图）；#/p/<encoded-path> （详情抽屉）
+    // hash 模式而非 history：cube server 无 SPA fallback 路由，hash 刷新只请求 / 拿 index.html，零后端改动。
+    //
+    // 状态 → URL（switchView/openDrawer/closeDrawer 调用）
+    updateHash() {
+      let hash;
+      if (this.drawer) {
+        hash = '#/p/' + encodeURIComponent(this.drawer.path);
+      } else {
+        hash = '#/' + (this.view || 'projects');
+      }
+      if (location.hash !== hash) {
+        location.hash = hash;
+      }
+    },
+    // URL → 状态（init 恢复 + hashchange 监听前进/后退）
+    applyHash() {
+      const route = this.parseHash();
+      // 视图切换
+      if (route.view && route.view !== this.view) {
+        this.switchView(route.view, { skipHash: true });
+      }
+      // 抽屉
+      if (route.drawerPath) {
+        const p = this.projects.find(x => x.path === route.drawerPath);
+        if (p) {
+          this.drawer = p;
+          return;
+        }
+      }
+      // 无抽屉路由则关闭（处理浏览器后退关抽屉）
+      if (!route.drawerPath && this.drawer) {
+        this.drawer = null;
+      }
+    },
+    parseHash() {
+      const h = location.hash.replace(/^#\/?/, ''); // 去掉 # 和开头 /
+      if (!h) return { view: 'projects' };
+      const parts = h.split('/');
+      if (parts[0] === 'p' && parts[1]) {
+        return { drawerPath: decodeURIComponent(parts[1]) };
+      }
+      if (['projects', 'tree', 'config'].includes(parts[0])) {
+        return { view: parts[0] };
+      }
+      return { view: 'projects' };
+    },
+
     // 视图切换：切到 tree/config 时按需加载
-    switchView(v) {
+    switchView(v, opts = {}) {
       this.view = v;
       if (v === 'tree' && !this.treeRoot && !this.treeLoading) this.loadTree();
       if (v === 'config' && !this.config && !this.configLoading) this.loadConfig();
+      if (!opts.skipHash) {
+        // 切视图时关抽屉（避免抽屉跨视图残留）
+        this.drawer = null;
+        this.updateHash();
+      }
     },
 
     // --- 公共数据加载 ---
@@ -55,6 +113,11 @@ function cubeApp() {
         if (!json.ok) throw new Error(json.message || '请求失败');
         this.projects = json.data?.list || [];
         this.gitCacheUpdated = json.data?.gitCacheUpdated || null;
+        // 首次加载完成后，若 URL 指向某个 project 详情，补开抽屉（init 时 projects 还空）
+        if (!this._drawerResolved) {
+          this._drawerResolved = true;
+          this.applyHash();
+        }
       } catch (e) {
         this.error = '加载失败：' + (e.message || e);
       } finally {
@@ -73,7 +136,14 @@ function cubeApp() {
     refresh() { return this.load(); },
 
     // --- 公共交互 ---
-    openDrawer(p) { this.drawer = p; },
+    openDrawer(p) {
+      this.drawer = p;
+      this.updateHash();
+    },
+    closeDrawer() {
+      this.drawer = null;
+      this.updateHash();
+    },
 
     formatTime(s) {
       if (!s) return '-';

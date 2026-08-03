@@ -31,7 +31,7 @@
     <!-- project 域导航 -->
     <nav class="nav">
       <a class="nav-item" :class="{ 'active': view === 'projects' }"
-         @click="view = 'projects'">Projects</a>
+         @click="switchView('projects')">Projects</a>
       <a class="nav-item" :class="{ 'active': view === 'tree' }"
          @click="switchView('tree')">Tree</a>
       <a class="nav-item" :class="{ 'active': view === 'config' }"
@@ -335,7 +335,7 @@
     </div><!-- /Config 视图 -->
 
     <!-- ============ 详情抽屉（点行滑出） ============ -->
-    <div class="drawer-mask" x-show="drawer" x-transition.opacity @click="drawer = null"></div>
+    <div class="drawer-mask" x-show="drawer" x-transition.opacity @click="closeDrawer()"></div>
     <aside class="drawer" x-show="drawer" x-transition.origin.right>
       <template x-if="drawer">
         <div class="drawer-body">
@@ -344,7 +344,7 @@
               <div class="drawer-title" x-text="drawer.name"></div>
               <div class="drawer-sub" x-text="drawer.path"></div>
             </div>
-            <button class="btn btn-link" @click="drawer = null">✕</button>
+            <button class="btn btn-link" @click="closeDrawer()">✕</button>
           </div>
 
           <section class="drawer-section">
