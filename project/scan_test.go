@@ -1,6 +1,7 @@
 package project
 
 import (
+	"os"
 	"path"
 	"testing"
 
@@ -184,5 +185,124 @@ func TestScanRules_Getter(t *testing.T) {
 	rules := s.ScanRules()
 	if len(rules) != 1 || rules[0].Group != "g" {
 		t.Fatalf("ScanRules 异常: %v", rules)
+	}
+}
+
+// TestScan_HomePathExpansion 验证 scan 规则路径里的 ~/ 被展开为绝对路径。
+// 这是用户配置常见场景（写 ~/Code 而非 /Users/xxx/Code）。
+func TestScan_HomePathExpansion(t *testing.T) {
+	// 用一个临时 HOME，在其中建项目目录
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	// 在 home 下建 Code/proj 真实 git 仓库
+	repoDir := home + "/Code/proj"
+	os.MkdirAll(repoDir, 0755)
+	// 用 testfixture 的 BuildGitRepo 在该目录建仓库（不依赖 Workspace 的 runtime/test 根）
+	ws := testfixture.NewWorkspace(t) // 仅借用它的 BuildGitRepo 能力
+	testfixture.BuildGitRepo(ws.TB, repoDir, testfixture.GitRepoSpec{})
+
+	// 配置里写 ~/Code（相对 home 展开）
+	conf := config.ProjectConfig{
+		Scan: []config.ScanRuleConfig{{Group: "g", Path: "~/Code", MaxDepth: 3}},
+	}
+	cacheDir := ws.Mkdir("cache")
+	s := NewService(conf, cacheDir)
+
+	// 规则路径应被展开为绝对路径
+	rules := s.ScanRules()
+	if len(rules) != 1 {
+		t.Fatalf("应保留 1 条规则，实际 %d（可能 ~/ 未展开导致校验失败被跳过）", len(rules))
+	}
+	if rules[0].Path != home+"/Code" {
+		t.Fatalf("规则路径未展开 ~/，实际 %q，期望 %q", rules[0].Path, home+"/Code")
+	}
+
+	// 扫描应能命中 ~/Code/proj
+	projs := s.Projects()
+	if len(projs) != 1 || projs[0].Path() != repoDir {
+		t.Fatalf("扫描结果异常： %+v，期望命中 %s", projs, repoDir)
+	}
+}
+
+// TestScan_InvalidPathSkipped 不存在的 scan 路径被降级跳过（不阻断其它规则）。
+func TestScan_InvalidPathSkipped(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	goodRoot := ws.Mkdir("real-root")
+	ws.MakeProjectDir(path.Join("real-root", "proj"))
+
+	conf := config.ProjectConfig{
+		Scan: []config.ScanRuleConfig{
+			{Group: "bad", Path: "/this/does/not/exist/xyz", MaxDepth: 3},
+			{Group: "good", Path: goodRoot, MaxDepth: 3},
+		},
+	}
+	s := NewService(conf, ws.Mkdir("cache"))
+
+	rules := s.ScanRules()
+	if len(rules) != 1 {
+		t.Fatalf("无效路径应被跳过，保留 1 条规则，实际 %d", len(rules))
+	}
+	if rules[0].Group != "good" {
+		t.Fatalf("应保留 good 规则，实际 %v", rules)
+	}
+	// 扫描仍能命中有效规则下的项目
+	if len(s.Projects()) != 1 {
+		t.Fatalf("应扫到 1 个项目，实际 %d", len(s.Projects()))
+	}
+}
+
+// TestCloneRule_LocalPathExpansion 验证 clone 规则的 LocalPath 展开 ~/。
+func TestCloneRule_LocalPathExpansion(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	ws := testfixture.NewWorkspace(t)
+	conf := config.ProjectConfig{
+		Clone: []config.CloneRuleConfig{
+			{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "~/src"},
+		},
+	}
+	s := NewService(conf, ws.Mkdir("cache"))
+
+	rules := s.CloneRules()
+	if len(rules) != 1 {
+		t.Fatalf("应保留 1 条 clone 规则，实际 %d", len(rules))
+	}
+	if rules[0].LocalPath != home+"/src" {
+		t.Fatalf("clone LocalPath 未展开 ~/，实际 %q，期望 %q", rules[0].LocalPath, home+"/src")
+	}
+}
+
+// TestService_Reload 验证 Reload 后新配置生效（旧的 scanCache 失效重建）。
+func TestService_Reload(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	root1 := ws.Mkdir("root1")
+	ws.MakeProjectDir(path.Join("root1", "p1"))
+
+	// 初始：只 root1 一条规则
+	s := newServiceAt(t, root1, "g1", 5)
+	if len(s.Projects()) != 1 {
+		t.Fatalf("初始应扫到 1 个项目，实际 %d", len(s.Projects()))
+	}
+
+	// Reload：换成 root2（新建，含 2 个项目）
+	root2 := ws.Mkdir("root2")
+	ws.MakeProjectDir(path.Join("root2", "a"))
+	ws.MakeProjectDir(path.Join("root2", "b"))
+
+	newConf := config.ProjectConfig{
+		Scan: []config.ScanRuleConfig{{Group: "g2", Path: root2, MaxDepth: 5}},
+	}
+	s.Reload(newConf)
+
+	// 规则更新
+	rules := s.ScanRules()
+	if len(rules) != 1 || rules[0].Path != root2 {
+		t.Fatalf("Reload 后规则异常：%v", rules)
+	}
+	// scanCache 失效，重新扫描得到 root2 的 2 个项目
+	projs := s.Projects()
+	if len(projs) != 2 {
+		t.Fatalf("Reload 后应扫到 2 个项目，实际 %d：%v", len(projs), projs)
 	}
 }

@@ -2,8 +2,10 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -23,8 +25,14 @@ var RootCmd = &easycobra.Command{
 		cmd.Flags().IntVarP(&port, "port", "p", 8080, "server port")
 
 		return func(args []string) error {
-			server := app.Default().Server()
-			return server.Start(fmt.Sprintf(":%d", port))
+			a := app.Default()
+			// 后台监听配置文件变更，热 reload 到各 service（无需重启 server）
+			go func() {
+				if err := a.WatchConfig(context.Background()); err != nil {
+					slog.Warn("config watcher exited", "err", err)
+				}
+			}()
+			return a.Server().Start(fmt.Sprintf(":%d", port))
 		}
 	},
 	Children: []*easycobra.Command{
