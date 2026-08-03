@@ -60,6 +60,8 @@ cube 是 CLI 模式执行，每次 `project list --status` 要为每个 git 项�
 - huma 自动生成 OpenAPI 3.1 spec（`OpenAPIJSON()` / `/openapi.json`），`/docs` 用 Scalar 渲染器。前端用 spec codegen 出 typed SDK。
 
 **当前 API（动词式，全 GET 只读）**：
+
+> ⚠️ **本节已过时**（2026-08-03）。实际 API 已非"全 GET 只读"：`POST /api/project/open` 已实现，config 域有 6 个写接口（POST/DELETE scan/clone/opener）。完整路由以代码 `web/api_project.go` / `web/api_config.go` / `web/api_opener.go` 为准（共 15 个路由）。下表的"待补"里 `POST /api/project/open` 已落地。本文档保留原表作历史参考；当前契约快照见 [spec.md](../spec.md)。
 ```
 GET /api/project/list          # 项目列表（含 gitInfo 快照）
 GET /api/project/info?name=    # 项目详情
@@ -127,7 +129,7 @@ cube config / version
 - **✅ git 信息缓存**：gitcache 异步采集机制
 - **⏳ M2 — git 操作 + 批量**：`util/gogit` 完整操作；project 暴露 pull/fetch；group 维度批量
 - **⏳ M3 — worktree**：创建/列出/删除
-- **⏳ M4 — Web 端**：前端工程（[v3-frontend.md](./v3-frontend.md)）。F1 骨架当前可开工
+- **🟡 M4 — Web 端**：前端 F1 骨架已落地（Alpine.js 无构建方案，[v3-frontend.md](./v3-frontend.md) 顶部"方案切换说明"是当前事实源）；待 F2/F3（批量/diff，依赖后端 API）
 - **⏳ M5 — MCP 出口**：官方 go-sdk，按 domain 分 toolset
 - **⏳ M6+ — 新 domain**：sqlite 管理（`cube db`）、本地端口查看等
 
