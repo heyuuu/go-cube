@@ -14,7 +14,7 @@ import (
 )
 
 // RootCmd 是 `cube diff` 命令入口。
-var openerDiffCmd = &easycobra.Command{
+var diffCmd = &easycobra.Command{
 	Use:   "diff <path1> <path2> [:-o|--opener= 对比工具名]",
 	Short: "用对比工具(opener)对比两个路径（同为 dir 或同为 file）",
 	Args:  cobra.ExactArgs(2),

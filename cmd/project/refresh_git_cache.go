@@ -24,7 +24,7 @@ import (
 //   - Load 缓存 → Refresh 采集 → 落盘
 //
 // 错误只 slog 记录，绝不 panic —— 即便作为后台子进程也不应影响父进程。
-var projectRefreshGitCacheCmd = &easycobra.Command{
+var refreshGitCacheCmd = &easycobra.Command{
 	Use:   "refresh-git-cache",
 	Short: "刷新 git 信息缓存",
 	Args:  cobra.NoArgs,

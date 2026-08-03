@@ -28,7 +28,7 @@ tmp/
 `
 
 // cmd `project init`
-var projectInitCmd = &easycobra.Command{
+var initCmd = &easycobra.Command{
 	Use:   "init",
 	Short: "在指定目录初始化一个项目(本质是初始化 git 仓库)",
 	InitRun: func(cmd *cobra.Command) easycobra.Run {

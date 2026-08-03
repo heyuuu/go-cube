@@ -19,7 +19,7 @@ const (
 var allCheckItems = []string{checkItemCloneRules, checkItemGitDirty}
 
 // cmd `project list`
-var projectCheckCmd = &easycobra.Command{
+var checkCmd = &easycobra.Command{
 	Use:   "check <options>...",
 	Short: "检查项目(目前 options 有: clone-rules)，不传会检查所有项目",
 	Run: func(options []string) error {

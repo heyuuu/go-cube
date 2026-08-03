@@ -14,7 +14,7 @@ import (
 	"github.com/heyuuu/cube/util/pathkit"
 )
 
-// gitxPushCmd 是 `cube gitx push` 命令入口。
+// pushCmd 是 `cube gitx push` 命令入口。
 //
 // 行为：在指定仓库（默认从当前工作目录向上探测）里，把多个分支 / tag
 // 批量推送到多个 remote。remotes 与 refs 都通过 TUI 多选交互确认；
@@ -22,7 +22,7 @@ import (
 //
 // 非 TTY 环境（脚本）下可改用 flag 显式指定：--remote（可多次）/ --ref（可多次），
 // 此时跳过对应交互；--force 启用 --force-with-lease。
-var gitxPushCmd = &easycobra.Command{
+var pushCmd = &easycobra.Command{
 	Use:   "push [仓库路径]",
 	Short: "把选中的分支/tag 批量推送到多个 remote",
 	InitRun: func(cmd *cobra.Command) easycobra.Run {

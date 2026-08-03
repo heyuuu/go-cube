@@ -12,12 +12,12 @@ import (
 	"github.com/heyuuu/cube/util/pathkit"
 )
 
-// gitxRemoteStatusCmd 是 `cube gitx remote-status` 命令入口。
+// remoteStatusCmd 是 `cube gitx remote-status` 命令入口。
 //
 // 列出「本地分支 ∩ 各 remote 同名分支的并集」中，每个分支相对每个 remote 上
 // 对应分支的 ahead / behind commit 数。宽表：每 remote 占一列，内容形如 "+3/-1"。
 // 当前分支用 "*" 标记；某 remote 没有该分支则该格显示 "-"。
-var gitxRemoteStatusCmd = &easycobra.Command{
+var remoteStatusCmd = &easycobra.Command{
 	Use:   "remote-status [仓库路径]",
 	Short: "列出本地分支与各 remote 对应分支的 commit 差距（ahead/behind）",
 	Run: func(args []string) error {

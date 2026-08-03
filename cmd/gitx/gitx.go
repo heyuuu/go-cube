@@ -16,7 +16,7 @@ var RootCmd = &easycobra.Command{
 	Aliases: []string{"gx"},
 	Short:   "git 增强：多 remote 批量 push 等跨仓库常用动作",
 	Children: []*easycobra.Command{
-		gitxPushCmd,
-		gitxRemoteStatusCmd,
+		pushCmd,
+		remoteStatusCmd,
 	},
 }

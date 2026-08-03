@@ -12,7 +12,7 @@ import (
 	"github.com/heyuuu/cube/project"
 )
 
-var projectTreeCmd = &easycobra.Command{
+var treeCmd = &easycobra.Command{
 	Use:   "tree",
 	Short: "查看项目目录树",
 	InitRun: func(cmd *cobra.Command) easycobra.Run {

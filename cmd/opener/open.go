@@ -14,7 +14,7 @@ import (
 )
 
 // RootCmd 是 `cube open` 命令入口。
-var openerOpenCmd = &easycobra.Command{
+var openCmd = &easycobra.Command{
 	Use:   "open <path> [-o|--opener=打开工具名]",
 	Short: "用 opener 打开路径（按 dir/file 自动匹配 role）",
 	Args:  cobra.ExactArgs(1),
