@@ -144,7 +144,7 @@
               </td>
               <td class="col-name">
                 <div class="name-main" x-text="p.name"></div>
-                <div class="name-path" x-text="p.path"></div>
+                <div class="name-path" x-text="prettyPath(p.path)" :title="p.path"></div>
               </td>
               <td class="col-group"><span class="badge badge-blue" x-text="p.group"></span></td>
               <td class="col-git">
@@ -268,7 +268,7 @@
               <div class="config-item">
                 <span class="config-idx" x-text="i + 1"></span>
                 <span class="badge badge-blue" x-text="r.group"></span>
-                <span class="config-path" x-text="r.path"></span>
+                <span class="config-path" x-text="prettyPath(r.path)" :title="r.path"></span>
                 <span class="config-depth">depth: <span x-text="r.maxDepth"></span></span>
                 <button class="btn btn-link config-del" @click="delScan(r)">删除</button>
               </div>
@@ -292,7 +292,7 @@
                 <span class="config-host" x-text="r.repoHost"></span>
                 <span class="config-prefix" x-text="r.repoPrefix || '—'"></span>
                 <span class="config-arrow">→</span>
-                <span class="config-path" x-text="r.localPath"></span>
+                <span class="config-path" x-text="prettyPath(r.localPath)" :title="r.localPath"></span>
                 <button class="btn btn-link config-del" @click="delClone(r)">删除</button>
               </div>
             </template>
@@ -340,7 +340,7 @@
           <div class="drawer-head">
             <div>
               <div class="drawer-title" x-text="drawer.name"></div>
-              <div class="drawer-sub" x-text="drawer.path"></div>
+              <div class="drawer-sub" x-text="prettyPath(drawer.path)" :title="drawer.path"></div>
             </div>
             <button class="btn btn-link" @click="closeDrawer()">✕</button>
           </div>

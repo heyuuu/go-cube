@@ -177,6 +177,28 @@ function cubeApp() {
       try { await navigator.clipboard.writeText(path); } catch (e) {}
     },
 
+    // prettyPath 把绝对路径里的 HOME 前缀替换为 ~，缩短显示（对应后端 pathkit.PrettyPath）。
+    // 浏览器无法直接读 HOME，用启发式：取所有已知项目路径的最长公共「/Users/<user>」前缀作为 HOME 近似。
+    // 推断失败（路径形态非标准）则原样返回。
+    prettyPath(p) {
+      if (!p) return '';
+      const home = this.guessHome();
+      if (home && p === home) return '~';
+      if (home && p.startsWith(home + '/')) return '~' + p.slice(home.length);
+      return p;
+    },
+    // guessHome 从已加载项目的路径推断 HOME（缓存）。MAC/Linux 路径形如 /Users/<user>/... 或 /home/<user>/...。
+    guessHome() {
+      if (this._homeCache !== undefined) return this._homeCache;
+      let home = '';
+      for (const p of (this.projects || []).map(x => x.path)) {
+        const m = p.match(/^(\/(?:Users|home)\/[^/]+)\//);
+        if (m) { home = m[1]; break; }
+      }
+      this._homeCache = home; // 空串也缓存（避免重复尝试）
+      return home;
+    },
+
     // 缓存更新时间相对描述
     get gitCacheUpdatedText() {
       if (!this.gitCacheUpdated) return '-';
