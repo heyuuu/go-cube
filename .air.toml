@@ -12,7 +12,7 @@ tmp_dir = "tmp"
   post_cmd = []
   # 启动
   bin = "./tmp/main"
-  args_bin = ["-d", "server"]
+  args_bin = ["-d", "server", "-p", "6001"]
 #  args_bin = ["-d", "-c", "./tmp/config", "server"]
   # 防抖(毫秒)
   delay = 1000
