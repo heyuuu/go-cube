@@ -1,16 +1,8 @@
-.DEFAULT_GOAL := dev
-.PHONY: dev build-ui build install tag
+.DEFAULT_GOAL := build
+.PHONY: build-ui build install tag
 
 # 输入参数
-ARGS ?= version
 OUTPUT ?= tmp/cube
-
-dev: build-ui
-	cd server && go build -o ../$(OUTPUT)
-	@echo "==> cube $(ARGS)"
-	@$(OUTPUT) $(ARGS)
-
-# ========== 正式命令 ==========
 
 # 从 git 收集构建期信息（与 version/version.go 配合，通过 ldflags 注入）
 VERSION    := $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
