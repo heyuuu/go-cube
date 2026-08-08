@@ -17,8 +17,6 @@ import (
 	"cube/cmd/ugly"
 	"cube/cmd/ui"
 	"cube/config"
-	"cube/db"
-	"cube/history"
 	"cube/logger"
 	"cube/version"
 )
@@ -65,15 +63,11 @@ func Execute() {
 	// 尽量在其他行为前初始化 Logger
 	logger.Init()
 
-	// 初始化 DB
-	err = db.Init(config.Path(),
-		&history.ProjectSelectLog{},
-		&history.ProjectOpenLog{},
-	)
-	checkError(err, "init db failed")
-
 	// 初始化 App
-	a := app.New(cfg)
+	a, err := app.New(cfg)
+	checkError(err, "App 初始化失败")
+
+	// 构建 cmd
 	cmd := newRootCmd(a)
 
 	// 执行命令

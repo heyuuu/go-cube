@@ -3,6 +3,8 @@ package app
 import (
 	"path/filepath"
 
+	"gorm.io/gorm"
+
 	"cube/config"
 	"cube/db"
 	"cube/history"
@@ -12,7 +14,10 @@ import (
 )
 
 type App struct {
-	cfg    *config.Config
+	cfg   *config.Config
+	db    *gorm.DB
+	paths *Paths
+
 	server *web.Server
 
 	projectService *project.Service
@@ -20,8 +25,17 @@ type App struct {
 	historyService *history.Service
 }
 
-func New(cfg *config.Config) *App {
-	defaultDB := db.Default()
+func New(cfg *config.Config) (*App, error) {
+	paths := NewPaths(cfg.DataDir)
+
+	// 初始数数据库
+	dataDb, err := db.Init(paths.DataDbFile(),
+		&history.ProjectSelectLog{},
+		&history.ProjectOpenLog{},
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// ConfigHandler 用 config 包的指针：web 写接口能直接修改 defaultConf 并 Save 持久化
 	configHandler := web.NewConfigHandlerPtr(config.DefaultPtr())
@@ -39,18 +53,21 @@ func New(cfg *config.Config) *App {
 		openerHandler,
 	)
 
-	historyService := history.NewService(defaultDB)
+	historyService := history.NewService(dataDb)
 
 	return &App{
-		server:         server,
+		cfg:    cfg,
+		server: server,
+
 		projectService: projectService,
 		openerService:  openerService,
 		historyService: historyService,
-	}
+	}, nil
 }
 
-func (app *App) Config() *config.Config           { return app.cfg }
-func (app *App) Server() *web.Server              { return app.server }
-func (app *App) ProjectService() *project.Service { return app.projectService }
-func (app *App) OpenerService() *opener.Service   { return app.openerService }
-func (app *App) HistoryService() *history.Service { return app.historyService }
+func (a *App) Config() *config.Config           { return a.cfg }
+func (a *App) Db() *gorm.DB                     { return a.db }
+func (a *App) Server() *web.Server              { return a.server }
+func (a *App) ProjectService() *project.Service { return a.projectService }
+func (a *App) OpenerService() *opener.Service   { return a.openerService }
+func (a *App) HistoryService() *history.Service { return a.historyService }

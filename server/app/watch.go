@@ -18,7 +18,7 @@ import (
 // 当前 reload 的范围：project.Service（scan/clone 规则）+ opener.Service（openers 列表）。
 // web.Server 的端口/路由不动（路由定义稳定，无需重建）。
 // db/history 不 reload（数据层与配置无关）。
-func (app *App) Reload() {
+func (a *App) Reload() {
 	// 重新解析磁盘 config.json 覆盖 config 包的 defaultConf
 	cfgFile := config.ConfigFile()
 	if err := config.Init(config.Path()); err != nil {
@@ -28,8 +28,8 @@ func (app *App) Reload() {
 	conf := config.Default()
 
 	// 应用到各 service（各 service 内部有自己的锁）
-	app.projectService.Reload(conf.Project)
-	app.openerService.Reload(conf)
+	a.projectService.Reload(conf.Project)
+	a.openerService.Reload(conf)
 	slog.Info("config reloaded", "file", cfgFile)
 }
 
@@ -38,7 +38,7 @@ func (app *App) Reload() {
 //
 // 监听配置目录而非文件本身：编辑器（尤其 vim）保存常用「写临时文件 + rename」原子替换，
 // 直接 watch 文件会丢失 rename 后的事件，watch 目录则能捕获。
-func (app *App) WatchConfig(ctx context.Context) error {
+func (a *App) WatchConfig(ctx context.Context) error {
 	cfgFile := config.ConfigFile()
 	cfgDir := filepath.Dir(cfgFile)
 
@@ -72,7 +72,7 @@ func (app *App) WatchConfig(ctx context.Context) error {
 			pending = false
 			mu.Unlock()
 			if isPending {
-				app.Reload()
+				a.Reload()
 			}
 		})
 	}
