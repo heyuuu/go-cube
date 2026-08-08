@@ -1,7 +1,6 @@
-/tmp
-/runtime
-cube
-openapi.json
+tmp
+runtime
+server/web/ui
 
 #
 .claude/plans

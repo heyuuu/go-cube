@@ -1,34 +1,47 @@
-.DEFAULT_GOAL := build
+.DEFAULT_GOAL := dev
+.PHONY: dev build-ui build install tag
+
+# 输入参数
+ARGS ?= version
+OUTPUT ?= tmp/cube
+
+dev: build-ui
+	cd server && go build -o ../$(OUTPUT)
+	@echo "==> cube $(ARGS)"
+	@$(OUTPUT) $(ARGS)
+
+# ========== 正式命令 ==========
 
 # 从 git 收集构建期信息（与 version/version.go 配合，通过 ldflags 注入）
 VERSION    := $(shell git describe --tags --abbrev=0 2>/dev/null || git rev-parse --short HEAD)
 COMMIT     := $(shell git rev-parse --short HEAD)
 BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
-VERSION_PKG := github.com/heyuuu/cube/version
+VERSION_PKG := cube/version
 LDFLAGS := \
   -X $(VERSION_PKG).Version=$(VERSION) \
   -X $(VERSION_PKG).Commit=$(COMMIT) \
   -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
 
-OUTPUT ?= tmp/cube
+ZSH_COMPLETION_FILE := ~/.config/cube/zsh.sh
 
-.PHONY: build install
+build-ui:
+	rm -rf ./server/web/ui
+	cp -r ./ui ./server/web/ui
 
-build: ## 构建到 OUTPUT（默认 tmp/cube）
+build: build-ui
 	@echo "==> go build ($(VERSION) @ $(COMMIT))"
-	go build -ldflags "$(LDFLAGS)" -o $(OUTPUT)
+	cd server && go build -ldflags "$(LDFLAGS)" -o ../$(OUTPUT)
 	@echo "==> built $(OUTPUT) ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
+	@$(OUTPUT) version
 
-install: ## go install 到 GOBIN（默认 ~/go/bin）
+install:
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
-	go install -ldflags "$(LDFLAGS)"
+	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
-
-install-zsh-completion:
-	cube completion zsh > ~/.config/cube/zsh.sh
-
-.PHONY: tag
+	cube version
+	# install zsh completion
+	cube completion zsh > $(ZSH_COMPLETION_FILE)
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
 	@set -e; \
