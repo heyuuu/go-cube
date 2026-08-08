@@ -1,8 +1,6 @@
 package app
 
 import (
-	"path/filepath"
-
 	"gorm.io/gorm"
 
 	"cube/config"
@@ -38,9 +36,9 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// ConfigHandler 用 config 包的指针：web 写接口能直接修改 defaultConf 并 Save 持久化
-	configHandler := web.NewConfigHandlerPtr(config.DefaultPtr())
+	configHandler := web.NewConfigHandler(cfg)
 
-	projectService := project.NewService(cfg.Project, filepath.Join(config.Path(), "cache"))
+	projectService := project.NewService(cfg.Project, paths.CacheDir())
 
 	openerService := opener.NewService(cfg)
 	openerHandler := web.NewOpenerHandler(openerService)
@@ -57,6 +55,8 @@ func New(cfg *config.Config) (*App, error) {
 
 	return &App{
 		cfg:    cfg,
+		db:     dataDb,
+		paths:  paths,
 		server: server,
 
 		projectService: projectService,
@@ -67,6 +67,7 @@ func New(cfg *config.Config) (*App, error) {
 
 func (a *App) Config() *config.Config           { return a.cfg }
 func (a *App) Db() *gorm.DB                     { return a.db }
+func (a *App) Paths() *Paths                    { return a.paths }
 func (a *App) Server() *web.Server              { return a.server }
 func (a *App) ProjectService() *project.Service { return a.projectService }
 func (a *App) OpenerService() *opener.Service   { return a.openerService }

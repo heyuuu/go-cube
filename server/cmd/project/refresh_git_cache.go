@@ -2,12 +2,10 @@ package project
 
 import (
 	"log/slog"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/config"
 	"cube/project/gitcache"
 )
 
@@ -30,7 +28,7 @@ func newRefreshGitCacheCmd(a *app.App) *cobra.Command {
 		Short: "刷新 git 信息缓存",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cacheDir := filepath.Join(config.Path(), "cache")
+			cacheDir := a.Paths().CacheDir()
 			projects := a.ProjectService().Projects()
 			paths := make([]string, 0, len(projects))
 			for _, p := range projects {

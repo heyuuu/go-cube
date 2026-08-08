@@ -25,9 +25,23 @@ const (
 	TagGodot    = "godot"
 )
 
-func scanProjects(r ScanRule, yield func(path string, tags []string)) error {
+func scan(rules []ScanRule) ([]*Project, error) {
+	var all []*Project
+	for _, rule := range rules {
+		got, err := scanOne(rule)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, got...)
+	}
+	return all, nil
+}
+
+func scanOne(r ScanRule) ([]*Project, error) {
 	root, maxDepth := r.Path, r.MaxDepth
-	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+
+	var projects []*Project
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -40,8 +54,9 @@ func scanProjects(r ScanRule, yield func(path string, tags []string)) error {
 		isProject, tags, checkErr := checkProjectPath(path)
 		if checkErr != nil {
 			return checkErr
-		} else if isProject {
-			yield(path, tags)
+		}
+		if isProject {
+			projects = append(projects, newProject(r, path, tags))
 			return fs.SkipDir
 		}
 
@@ -56,6 +71,10 @@ func scanProjects(r ScanRule, yield func(path string, tags []string)) error {
 
 		return nil
 	})
+	if err != nil {
+		return nil, err
+	}
+	return projects, nil
 }
 
 func checkProjectPath(path string) (isProject bool, tags []string, err error) {
@@ -80,7 +99,7 @@ func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 			if !entry.IsDir() {
 				tags = append(tags, TagWorktree)
 			}
-		} else if hasGit && !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
+		} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
 			// godot 标签：在已是 git 项目的前提下，额外标记 godot 引擎项目
 			tags = append(tags, TagGodot)
 		}

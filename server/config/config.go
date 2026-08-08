@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 )
@@ -72,7 +73,30 @@ func applyDefaults(cfg *Config, path string) *Config {
 		cfg.Log.Level = "info"
 	}
 	if cfg.Log.Path == "" {
-		cfg.Log.Path = filepath.Join(cfg.DataDir, "log.json")
+		cfg.Log.Path = cfg.DataDir
 	}
 	return cfg
+}
+
+// Save 把 cfg 原子写入 path：先写临时文件（同目录，随机后缀），再 os.Rename 替换。
+func Save(path string, cfg *Config) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return fmt.Errorf("创建配置父目录失败: dir=%s err=%w", filepath.Dir(path), err)
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("序列化 config 失败: %w", err)
+	}
+	data = append(data, '\n')
+
+	tmp := fmt.Sprintf("%s.tmp.%d", path, rand.Int31())
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return fmt.Errorf("写临时配置文件失败: tmp=%s err=%w", tmp, err)
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp) // 清理临时文件（best-effort）
+		return fmt.Errorf("替换配置文件失败: path=%s err=%w", path, err)
+	}
+	return nil
 }

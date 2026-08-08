@@ -273,8 +273,8 @@ func TestCloneRule_LocalPathExpansion(t *testing.T) {
 	}
 }
 
-// TestService_Reload 验证 Reload 后新配置生效（旧的 scanCache 失效重建）。
-func TestService_Reload(t *testing.T) {
+// TestService_NewWithDifferentConfig 验证用新配置构造 Service 后，新规则生效且扫描结果正确。
+func TestService_NewWithDifferentConfig(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	root1 := ws.Mkdir("root1")
 	ws.MakeProjectDir(path.Join("root1", "p1"))
@@ -285,7 +285,7 @@ func TestService_Reload(t *testing.T) {
 		t.Fatalf("初始应扫到 1 个项目，实际 %d", len(s.Projects()))
 	}
 
-	// Reload：换成 root2（新建，含 2 个项目）
+	// 用新配置构造新的 Service（模拟 config 变更后重建）
 	root2 := ws.Mkdir("root2")
 	ws.MakeProjectDir(path.Join("root2", "a"))
 	ws.MakeProjectDir(path.Join("root2", "b"))
@@ -293,16 +293,16 @@ func TestService_Reload(t *testing.T) {
 	newConf := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{{Group: "g2", Path: root2, MaxDepth: 5}},
 	}
-	s.Reload(newConf)
+	s2 := NewService(newConf, ws.Mkdir("cache"))
 
 	// 规则更新
-	rules := s.ScanRules()
+	rules := s2.ScanRules()
 	if len(rules) != 1 || rules[0].Path != root2 {
-		t.Fatalf("Reload 后规则异常：%v", rules)
+		t.Fatalf("新 Service 规则异常：%v", rules)
 	}
-	// scanCache 失效，重新扫描得到 root2 的 2 个项目
-	projs := s.Projects()
+	// 扫描结果为 root2 的 2 个项目
+	projs := s2.Projects()
 	if len(projs) != 2 {
-		t.Fatalf("Reload 后应扫到 2 个项目，实际 %d：%v", len(projs), projs)
+		t.Fatalf("新 Service 应扫到 2 个项目，实际 %d：%v", len(projs), projs)
 	}
 }

@@ -28,7 +28,6 @@ func newRootCmd(a *app.App) *cobra.Command {
 	}
 
 	cmd.AddCommand(newVersionCmd(a))
-	cmd.AddCommand(newConfigCmd(a))
 	cmd.AddCommand(alfred.NewCmd(a))
 	cmd.AddCommand(server.NewCommand(a))
 	cmd.AddCommand(ui.NewCommand(a))
@@ -61,7 +60,7 @@ func Execute() {
 	checkError(err, "加载配置文件失败")
 
 	// 尽量在其他行为前初始化 Logger
-	logger.Init()
+	logger.Init(cfg.Log)
 
 	// 初始化 App
 	a, err := app.New(cfg)

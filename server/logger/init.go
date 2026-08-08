@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -20,19 +21,9 @@ var logStdioColors = map[slog.Level]string{
 	slog.LevelError: colorRed,
 }
 
-var initialize bool
-
-func Init() {
-	// check initialize
-	if initialize {
-		slog.Warn("logger already initialized")
-		return
-	}
-	initialize = true
-
-	// init
-	logger := slog.New(initHandler())
-	slog.SetDefault(logger)
+func Init(cfg config.LogConfig) {
+	handler := initHandler(cfg)
+	slog.SetDefault(slog.New(handler))
 
 	// 延迟日志
 	applyLazyLogs()
@@ -53,11 +44,11 @@ func applyLazyLogs() {
 		f()
 	}
 }
-func initHandler() slog.Handler {
+func initHandler(cfg config.LogConfig) slog.Handler {
 	var fileHandler, stdioHandler slog.Handler
 
 	// 初始化日志文件
-	fileHandler = initFileHandler()
+	fileHandler = initFileHandler(cfg)
 
 	// 在 Debug 模式下或日志文件不生效时，初始化标准 io handler
 	if config.IsDebug() || fileHandler == nil {
@@ -69,30 +60,29 @@ func initHandler() slog.Handler {
 }
 
 // 初始化日志文件 handler
-func initFileHandler() slog.Handler {
-	conf := config.Default()
-
+func initFileHandler(cfg config.LogConfig) slog.Handler {
 	// path
-	path := conf.Log.Path
-	if path == "" {
-		path = config.Path()
+	logPath := cfg.Path
+	if logPath == "" {
+		fmt.Printf("log path 配置为空，不记录日志文件")
+		return nil
 	}
+	logFile := filepath.Join(logPath, logFileName)
 
 	// init log file
-	filePath := filepath.Join(path, logFileName)
-	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
+	file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
 		lazyLog(func() {
-			slog.Error("open log file failed", "logFile", filePath, "err", err)
+			slog.Error("open log file failed", "logFile", logFile, "err", err)
 		})
 		return nil
 	}
 
 	// level
-	level := parseLogLevel(conf.Log.Level)
+	level := parseLogLevel(cfg.Level)
 
 	// format
-	format := conf.Log.Format
+	format := cfg.Format
 	if format == "" {
 		format = logFileFormat
 	}
@@ -102,7 +92,7 @@ func initFileHandler() slog.Handler {
 
 	// 记录 handler 信息
 	lazyLog(func() {
-		slog.Debug("init log file handler succeed", "level", level.String(), "logFile", filePath)
+		slog.Debug("init log file handler succeed", "level", level.String(), "logFile", logFile)
 	})
 
 	return h
