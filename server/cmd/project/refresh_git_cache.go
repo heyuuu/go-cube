@@ -7,7 +7,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
 	"cube/config"
 	"cube/project/gitcache"
 )
@@ -24,23 +23,27 @@ import (
 //   - Load 缓存 → Refresh 采集 → 落盘
 //
 // 错误只 slog 记录，绝不 panic —— 即便作为后台子进程也不应影响父进程。
-var refreshGitCacheCmd = &easycobra.Command{
-	Use:   "refresh-git-cache",
-	Short: "刷新 git 信息缓存",
-	Args:  cobra.NoArgs,
-	Run: func(args []string) error {
-		cacheDir := filepath.Join(config.Path(), "cache")
-		projects := app.Default().ProjectService().Projects()
-		paths := make([]string, 0, len(projects))
-		for _, p := range projects {
-			paths = append(paths, p.Path())
-		}
 
-		if err := gitcache.RefreshSync(cacheDir, paths); err != nil {
-			slog.Warn("refresh-git-cache failed", "err", err, "projects", len(paths))
-			return err
-		}
-		slog.Debug("refresh-git-cache done", "projects", len(paths))
-		return nil
-	},
+func newRefreshGitCacheCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "refresh-git-cache",
+		Short: "刷新 git 信息缓存",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cacheDir := filepath.Join(config.Path(), "cache")
+			projects := a.ProjectService().Projects()
+			paths := make([]string, 0, len(projects))
+			for _, p := range projects {
+				paths = append(paths, p.Path())
+			}
+
+			if err := gitcache.RefreshSync(cacheDir, paths); err != nil {
+				slog.Warn("refresh-git-cache failed", "err", err, "projects", len(paths))
+				return err
+			}
+			slog.Debug("refresh-git-cache done", "projects", len(paths))
+			return nil
+		},
+	}
+	return cmd
 }

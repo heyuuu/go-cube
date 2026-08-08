@@ -6,24 +6,18 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
 	"cube/util/git"
 )
 
 // cmd `project clone`
-var cloneCmd = &easycobra.Command{
-	Use:   "clone {repoUrl} {--depth= : 克隆深度，默认为不限制} {--b|branch=}",
-	Short: "使用 RepoUrl 初始化项目",
-	Args:  cobra.ExactArgs(1),
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		// init flags
-		var depth int
-		var branch string
-		cmd.Flags().IntVar(&depth, "depth", -1, "克隆深度，默认为不限制")
-		cmd.Flags().StringVarP(&branch, "branch", "b", "", "分支名，默认为master")
-
-		// run
-		return func(args []string) error {
+func newCloneCmd(a *app.App) *cobra.Command {
+	var depth int
+	var branch string
+	cmd := &cobra.Command{
+		Use:   "clone {repoUrl} {--depth= : 克隆深度，默认为不限制} {--b|branch=}",
+		Short: "使用 RepoUrl 初始化项目",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			rawRepoUrl := args[0]
 			if branch != "" && depth == 0 {
 				depth = 1 // // 指定分支情况下，默认深度为1
@@ -36,7 +30,7 @@ var cloneCmd = &easycobra.Command{
 			}
 
 			// 匹配 CloneRule，获取对应本地路径
-			service := app.Default().ProjectService()
+			service := a.ProjectService()
 			_, localPath, ok := service.MatchCloneRule(rawRepoUrl)
 			if !ok {
 				return fmt.Errorf("repoUrl 没有对应 clone 规则: url=%s", rawRepoUrl)
@@ -49,6 +43,9 @@ var cloneCmd = &easycobra.Command{
 			}
 
 			return nil
-		}
-	},
+		},
+	}
+	cmd.Flags().IntVar(&depth, "depth", -1, "克隆深度，默认为不限制")
+	cmd.Flags().StringVarP(&branch, "branch", "b", "", "分支名，默认为master")
+	return cmd
 }

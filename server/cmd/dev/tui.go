@@ -1,12 +1,14 @@
-package debug
+package dev
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
+	"github.com/spf13/cobra"
+
+	"cube/app"
+	"cube/util/tui"
 )
 
 // cmd `cube debug tui [component]`
@@ -14,10 +16,15 @@ import (
 // 逐个演示 tui 包的组件，便于开发期调整样式 / 新增封装时快速看效果。
 //   - 不带参数：交互式选择「全部」或某个具体组件；
 //   - 带参数：直接演示匹配名称的组件（匹配不上则报错）。
-var tuiCmd = &easycobra.Command{
-	Use:   "tui [component]",
-	Short: "演示 tui 包各组件（交互 / 渲染 / 错误语义）",
-	Run:   runTuiDemo,
+func newTuiCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "tui [component]",
+		Short: "演示 tui 包各组件（交互 / 渲染 / 错误语义）",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runTuiDemo(args)
+		},
+	}
+	return cmd
 }
 
 // demo 描述一个可单独演示的组件：名字 + 执行函数。

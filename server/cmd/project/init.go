@@ -7,10 +7,10 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
+	"cube/app"
 	"cube/util/git"
 	"cube/util/pathkit"
+	"cube/util/tui"
 )
 
 // defaultGitignore 是新建 .gitignore 时使用的最小模板
@@ -28,14 +28,12 @@ tmp/
 `
 
 // cmd `project init`
-var initCmd = &easycobra.Command{
-	Use:   "init",
-	Short: "在指定目录初始化一个项目(本质是初始化 git 仓库)",
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		var projectPath string
-		cmd.Flags().StringVarP(&projectPath, "path", "p", ".", "待初始化的项目目录")
-
-		return func(args []string) error {
+func newInitCmd(a *app.App) *cobra.Command {
+	var projectPath string
+	cmd := &cobra.Command{
+		Use:   "init",
+		Short: "在指定目录初始化一个项目(本质是初始化 git 仓库)",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// 解析为绝对路径
 			absPath, err := filepath.Abs(pathkit.RealPath(projectPath))
 			if err != nil {
@@ -105,8 +103,10 @@ var initCmd = &easycobra.Command{
 
 			fmt.Printf("\n> 项目初始化完成: %s\n", pathkit.PrettyPath(absPath))
 			return nil
-		}
-	},
+		},
+	}
+	cmd.Flags().StringVarP(&projectPath, "path", "p", ".", "待初始化的项目目录")
+	return cmd
 }
 
 // findGitRoot / runGit 等 git 操作已合并入 util/git 包

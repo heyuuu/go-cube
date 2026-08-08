@@ -3,28 +3,32 @@ package opener
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"cube/app"
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
 	"cube/opener"
 	"cube/util/slicekit"
+	"cube/util/tui"
 )
 
 // cmd `opener list`
-var listCmd = &easycobra.Command{
-	Use:   "list [query]",
-	Short: "列出可用 Opener 列表(支持模糊搜索)",
-	Run: func(args []string) error {
-		var query string
-		if len(args) > 0 {
-			query = args[0]
-		}
+func newListCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list [query]",
+		Short: "列出可用 Opener 列表(支持模糊搜索)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var query string
+			if len(args) > 0 {
+				query = args[0]
+			}
 
-		service := app.Default().OpenerService()
-		apps := service.SearchAll(query)
-		showOpeners(apps)
-		return nil
-	},
+			service := a.OpenerService()
+			apps := service.SearchAll(query)
+			showOpeners(apps)
+			return nil
+		},
+	}
+	return cmd
 }
 
 func showOpeners(apps []*opener.Opener) {

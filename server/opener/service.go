@@ -13,9 +13,9 @@ type Service struct {
 	openers []*Opener
 }
 
-func NewService(conf config.Config) *Service {
+func NewService(conf *config.Config) *Service {
 	s := &Service{}
-	s.applyConf(conf)
+	s.applyConf(*conf)
 	return s
 }
 

@@ -8,25 +8,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
 	"cube/project"
 	"cube/util/pathkit"
+	"cube/util/tui"
 )
 
 // cmd `project list`
-var listCmd = &easycobra.Command{
-	Use:   "list [query]",
-	Short: "项目列表(支持模糊搜索)",
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		// init flags
-		var verbose int
-		var group string
-		cmd.Flags().CountVarP(&verbose, "verbose", "v", "verbose level (-v, -vv, -vvv)")
-		cmd.Flags().StringVarP(&group, "group", "g", "", "限定分组 group")
-
-		// run
-		return func(args []string) error {
+func newListCmd(a *app.App) *cobra.Command {
+	var verbose int
+	var group string
+	cmd := &cobra.Command{
+		Use:   "list [query]",
+		Short: "项目列表(支持模糊搜索)",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// 获取输入参数
 			var query string
 			if len(args) > 0 {
@@ -34,7 +28,7 @@ var listCmd = &easycobra.Command{
 			}
 
 			// 项目列表
-			service := app.Default().ProjectService()
+			service := a.ProjectService()
 			projects := service.Search(query)
 
 			// 按 group 过滤
@@ -48,8 +42,11 @@ var listCmd = &easycobra.Command{
 			showProjects(projects, verbose)
 
 			return nil
-		}
-	},
+		},
+	}
+	cmd.Flags().CountVarP(&verbose, "verbose", "v", "verbose level (-v, -vv, -vvv)")
+	cmd.Flags().StringVarP(&group, "group", "g", "", "限定分组 group")
+	return cmd
 }
 
 func showProjects(projects []*project.Project, verbose int) {

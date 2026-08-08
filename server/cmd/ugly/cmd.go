@@ -10,14 +10,19 @@
 // 不在此处重复造轮子，也不污染通用包。
 package ugly
 
-import "cube/cmd/util/easycobra"
+import (
+	"github.com/spf13/cobra"
 
-// RootCmd 是 `cube ugly`（别名 `cube ug`）命令组入口，纯分发。
-//
-// 在此追加定制子命令；每条都应有计划被通用化或移除。
-var RootCmd = &easycobra.Command{
-	Use:      "ugly",
-	Aliases:  []string{"ug"},
-	Short:    "ugly hacks: 临时定制命令，应尽早通用化",
-	Children: []*easycobra.Command{},
+	"cube/app"
+)
+
+// `cube ugly`（别名 `cube ug`）命令组入口，纯分发。
+
+func NewCommand(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "ugly",
+		Aliases: []string{"ug"},
+		Short:   "ugly hacks: 临时定制命令，应尽早通用化",
+	}
+	return cmd
 }

@@ -8,15 +8,21 @@
 // 交互复用 cmd/util/tui，不在此处重复造轮子。
 package gitx
 
-import "cube/cmd/util/easycobra"
+import (
+	"github.com/spf13/cobra"
+
+	"cube/app"
+)
 
 // RootCmd 是 `cube gitx`（别名 `gx`）命令组入口，纯分发。
-var RootCmd = &easycobra.Command{
-	Use:     "gitx",
-	Aliases: []string{"gx"},
-	Short:   "git 增强：多 remote 批量 push 等跨仓库常用动作",
-	Children: []*easycobra.Command{
-		pushCmd,
-		remoteStatusCmd,
-	},
+
+func NewCommand(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:     "gitx",
+		Aliases: []string{"gx"},
+		Short:   "git 增强：多 remote 批量 push 等跨仓库常用动作",
+	}
+	cmd.AddCommand(newPushCmd(a))
+	cmd.AddCommand(newRemoteStatusCmd(a))
+	return cmd
 }

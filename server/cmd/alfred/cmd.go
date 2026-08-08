@@ -5,14 +5,21 @@
 // 本文件只放命令组入口 RootCmd；通用的 Alfred JSON 输出 helper 在 helpers.go。
 package alfred
 
-import "cube/cmd/util/easycobra"
+import (
+	"github.com/spf13/cobra"
+
+	"cube/app"
+)
 
 // RootCmd 是 `cube alfred` 命令组入口，纯分发。
-var RootCmd = &easycobra.Command{
-	Use: "alfred",
-	Children: []*easycobra.Command{
-		projectSearchCmd,
-		projectOpenCmd,
-		openerSearchCmd,
-	},
+func NewCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use: "alfred",
+	}
+
+	cmd.AddCommand(newProjectSearchCmd(a))
+	cmd.AddCommand(newProjectOpenCmd(a))
+	cmd.AddCommand(newOpenerSearchCmd(a))
+
+	return cmd
 }

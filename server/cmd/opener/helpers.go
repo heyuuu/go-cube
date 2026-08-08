@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"cube/cmd/util/tui"
 	"cube/opener"
+	"cube/util/tui"
 )
 
 // PathType 区分路径类型（目录 / 文件），用于按 role 选择 opener。

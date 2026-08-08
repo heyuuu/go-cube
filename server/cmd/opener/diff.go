@@ -7,22 +7,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
 	"cube/opener"
 	"cube/util/pathkit"
+	"cube/util/tui"
 )
 
 // RootCmd 是 `cube diff` 命令入口。
-var diffCmd = &easycobra.Command{
-	Use:   "diff <path1> <path2> [:-o|--opener= 对比工具名]",
-	Short: "用对比工具(opener)对比两个路径（同为 dir 或同为 file）",
-	Args:  cobra.ExactArgs(2),
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		var openerName string
-		cmd.Flags().StringVarP(&openerName, "opener", "o", "", "对比工具(opener)名")
-
-		return func(args []string) error {
+func newDiffCmd(a *app.App) *cobra.Command {
+	var openerName string
+	cmd := &cobra.Command{
+		Use:   "diff <path1> <path2> [:-o|--opener= 对比工具名]",
+		Short: "用对比工具(opener)对比两个路径（同为 dir 或同为 file）",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// 1. 绝对化两个路径
 			abs1, err := pathkit.ResolvePath(args[0])
 			if err != nil {
@@ -48,7 +45,7 @@ var diffCmd = &easycobra.Command{
 			// 4. 按 type 选 diff role
 			role := pickDiffRole(pt1)
 			// 5. 选 opener
-			service := app.Default().OpenerService()
+			service := a.OpenerService()
 			pick, err := pickOpener(service, role, openerName)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
@@ -61,8 +58,10 @@ var diffCmd = &easycobra.Command{
 				return fmt.Errorf("对比失败: %w", err)
 			}
 			return nil
-		}
-	},
+		},
+	}
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "对比工具(opener)名")
+	return cmd
 }
 
 // pickDiffRole 由路径类型推导 diff role：dir→RoleDiffDir，file→RoleDiffFile。

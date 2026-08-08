@@ -7,36 +7,31 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
 	"cube/opener"
 	"cube/util/slicekit"
 )
 
 // cmd `alfred opener-search`
-var openerSearchCmd = &easycobra.Command{
-	Use:   "opener-search [query]",
-	Short: "搜索可用命令列表",
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		// init flags
-		var projectName string
-		cmd.Flags().StringVar(&projectName, "project", "", "项目名")
-
-		// run
-		return func(args []string) error {
+func newOpenerSearchCmd(a *app.App) *cobra.Command {
+	var projectName string
+	cmd := &cobra.Command{
+		Use:   "opener-search [query]",
+		Short: "搜索可用命令列表",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			query := args
 
 			// sticky: alfred 选择项目后会以空参数调用此命令
 			if len(query) == 0 && len(projectName) > 0 {
-				app.Default().HistoryService().AddProjectSelectLog(projectName, true)
+				a.HistoryService().AddProjectSelectLog(projectName, true)
 			}
 
 			// 获取匹配的命令列表
-			service := app.Default().OpenerService()
+			service := a.OpenerService()
 			openers := service.SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
 			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
 			if len(projectName) > 0 {
-				historyService := app.Default().HistoryService()
+				historyService := a.HistoryService()
 				history := historyService.LeastProjectOpenApps(projectName, 3, true)
 				openers = sortOpeners(openers, history)
 			}
@@ -49,8 +44,11 @@ var openerSearchCmd = &easycobra.Command{
 					Arg:      item.Name(),
 				}
 			})
-		}
-	},
+		},
+	}
+
+	cmd.Flags().StringVar(&projectName, "project", "", "项目名")
+	return cmd
 }
 
 func sortOpeners(openers []*opener.Opener, history []string) []*opener.Opener {

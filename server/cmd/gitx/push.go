@@ -7,11 +7,11 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
+	"cube/app"
 	"cube/util/git"
 	"cube/util/gogit"
 	"cube/util/pathkit"
+	"cube/util/tui"
 )
 
 // pushCmd 是 `cube gitx push` 命令入口。
@@ -22,22 +22,17 @@ import (
 //
 // 非 TTY 环境（脚本）下可改用 flag 显式指定：--remote（可多次）/ --ref（可多次），
 // 此时跳过对应交互；--force 启用 --force-with-lease。
-var pushCmd = &easycobra.Command{
-	Use:   "push [仓库路径]",
-	Short: "把选中的分支/tag 批量推送到多个 remote",
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		var (
-			remotes []string
-			refs    []string
-			force   bool
-			yes     bool
-		)
-		cmd.Flags().StringArrayVarP(&remotes, "remote", "r", nil, "目标 remote（可多次指定，默认交互多选）")
-		cmd.Flags().StringArrayVarP(&refs, "ref", "b", nil, "待推送的 ref：分支名/tag 名（可多次指定，默认交互多选）")
-		cmd.Flags().BoolVarP(&force, "force", "f", false, "强制推送（使用 --force-with-lease）")
-		cmd.Flags().BoolVarP(&yes, "yes", "y", false, "跳过最终确认，直接推送")
-
-		return func(args []string) error {
+func newPushCmd(a *app.App) *cobra.Command {
+	var (
+		remotes []string
+		refs    []string
+		force   bool
+		yes     bool
+	)
+	cmd := &cobra.Command{
+		Use:   "push [仓库路径]",
+		Short: "把选中的分支/tag 批量推送到多个 remote",
+		RunE: func(cmd *cobra.Command, args []string) error {
 			// 1. 解析仓库根：参数路径（可空）展开为绝对路径，再向上探测 .git
 			var pathHint string
 			if len(args) > 0 {
@@ -111,8 +106,13 @@ var pushCmd = &easycobra.Command{
 
 			// 6. 执行：remote 外层、ref 内层，逐条 push 并汇总结果
 			return runPush(repoPath, chosenRemotes, chosenRefs, force)
-		}
-	},
+		},
+	}
+	cmd.Flags().StringArrayVarP(&remotes, "remote", "r", nil, "目标 remote（可多次指定，默认交互多选）")
+	cmd.Flags().StringArrayVarP(&refs, "ref", "b", nil, "待推送的 ref：分支名/tag 名（可多次指定，默认交互多选）")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "强制推送（使用 --force-with-lease）")
+	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "跳过最终确认，直接推送")
+	return cmd
 }
 
 // filterLocalBranches 从 gogit.Branches 的输出里筛出本地分支（去掉 origin/* 这种远程分支）。

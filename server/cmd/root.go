@@ -1,21 +1,21 @@
 package cmd
 
 import (
+	"flag"
 	"log/slog"
 	"os"
 
 	"github.com/spf13/cobra"
 
+	"cube/app"
 	"cube/cmd/alfred"
-	cmdConfig "cube/cmd/config"
-	cmdDebug "cube/cmd/debug"
+	"cube/cmd/dev"
 	"cube/cmd/gitx"
 	"cube/cmd/opener"
 	"cube/cmd/project"
 	"cube/cmd/server"
 	"cube/cmd/ugly"
 	"cube/cmd/ui"
-	"cube/cmd/util/easycobra"
 	"cube/config"
 	"cube/db"
 	"cube/history"
@@ -23,65 +23,61 @@ import (
 	"cube/version"
 )
 
-// rootCmd represents the base command when called without any subcommands
-var rootCmd = &easycobra.Command{
-	Use:   "cube",
-	Short: "cube " + version.Version,
-	Children: []*easycobra.Command{
-		// group commands
-		alfred.RootCmd,
-		server.RootCmd,
-		ui.RootCmd,
-		project.RootCmd,
-		opener.RootCmd,
-		cmdConfig.RootCmd,
-		ugly.RootCmd,
-		cmdDebug.RootCmd,
-		gitx.RootCmd,
-		// simple commands
-		versionCmd,
-	},
+func newRootCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "cube",
+		Short: "cube " + version.Version,
+	}
+
+	cmd.AddCommand(newVersionCmd(a))
+	cmd.AddCommand(newConfigCmd(a))
+	cmd.AddCommand(alfred.NewCmd(a))
+	cmd.AddCommand(server.NewCommand(a))
+	cmd.AddCommand(ui.NewCommand(a))
+	cmd.AddCommand(project.NewCommand(a))
+	cmd.AddCommand(opener.NewCommand(a))
+	cmd.AddCommand(ugly.NewCommand(a))
+	cmd.AddCommand(dev.NewCommand(a))
+	cmd.AddCommand(gitx.NewCommand(a))
+
+	return cmd
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+const defaultConfigPath = "~/.config/cube/config.json"
+
 func Execute() {
-	cmd := rootCmd.CobraCommand()
-
-	// persistent flags
-	var cfgPath string
+	// 在 cobra 初始化之前，使用 Go 原生 flag 包预解析全局 flag（--config, --debug）
+	var cfgFile string
 	var debug bool
-	cmd.PersistentFlags().StringVarP(&cfgPath, "config", "c", "", "config folder path (default is ~/.config/cube/)")
-	cmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "open debug mode")
 
-	// 初始化：在 cobra 解析完 flag 后、命令执行前触发。
-	// 用 OnInitialize 而非 PersistentPreRunE：后者只在最终命中的 runnable 命令上触发，
-	// 而本项目 cube/project 等是纯分组命令（无 Run），不会触发 PersistentPreRunE；
-	// OnInitialize 在任意命令执行前都会可靠触发。
-	cobra.OnInitialize(func() {
-		// 设置 debug 环境
-		config.SetDebug(debug)
+	fs := flag.NewFlagSet("global", flag.ContinueOnError)
+	fs.Usage = func() {} // 抑制未知 flag 的 usage 输出
+	fs.StringVar(&cfgFile, "config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
+	fs.BoolVar(&debug, "debug", false, "enable debug mode")
 
-		// 初始化配置
-		err := config.Init(cfgPath)
-		checkError(err, "init config failed")
+	// 设置 debug 环境
+	config.SetDebug(debug)
 
-		// 初始化 Logger
-		logger.Init()
+	// 初始化配置
+	cfg, err := config.Load(cfgFile)
+	checkError(err, "加载配置文件失败")
 
-		// 初始化 DB
-		err = db.Init(config.Path(),
-			&history.ProjectSelectLog{},
-			&history.ProjectOpenLog{},
-		)
-		checkError(err, "init db failed")
+	// 尽量在其他行为前初始化 Logger
+	logger.Init()
 
-		// 记录启动日志
-		slog.Debug("command start", "debug", debug, "cfgPath", config.Path(), "args", os.Args)
-	})
+	// 初始化 DB
+	err = db.Init(config.Path(),
+		&history.ProjectSelectLog{},
+		&history.ProjectOpenLog{},
+	)
+	checkError(err, "init db failed")
+
+	// 初始化 App
+	a := app.New(cfg)
+	cmd := newRootCmd(a)
 
 	// 执行命令
-	err := rootCmd.Execute()
+	err = cmd.Execute()
 	checkError(err, "execute failed")
 }
 

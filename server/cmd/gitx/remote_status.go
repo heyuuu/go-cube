@@ -5,11 +5,13 @@ import (
 	"sort"
 	"strings"
 
-	"cube/cmd/util/easycobra"
-	"cube/cmd/util/tui"
+	"github.com/spf13/cobra"
+
+	"cube/app"
 	"cube/util/git"
 	"cube/util/gogit"
 	"cube/util/pathkit"
+	"cube/util/tui"
 )
 
 // remoteStatusCmd 是 `cube gitx remote-status` 命令入口。
@@ -17,56 +19,59 @@ import (
 // 列出「本地分支 ∩ 各 remote 同名分支的并集」中，每个分支相对每个 remote 上
 // 对应分支的 ahead / behind commit 数。宽表：每 remote 占一列，内容形如 "+3/-1"。
 // 当前分支用 "*" 标记；某 remote 没有该分支则该格显示 "-"。
-var remoteStatusCmd = &easycobra.Command{
-	Use:   "remote-status [仓库路径]",
-	Short: "列出本地分支与各 remote 对应分支的 commit 差距（ahead/behind）",
-	Run: func(args []string) error {
-		// 1. 解析仓库根
-		var pathHint string
-		if len(args) > 0 {
-			pathHint = args[0]
-		}
-		start, err := pathkit.ResolvePath(pathHint)
-		if err != nil {
-			return err
-		}
-		repoPath, ok := git.FindGitRoot(start)
-		if !ok {
-			return fmt.Errorf("未找到 git 仓库（向上探测 .git 失败）: %s", start)
-		}
+func newRemoteStatusCmd(a *app.App) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "remote-status [仓库路径]",
+		Short: "列出本地分支与各 remote 对应分支的 commit 差距（ahead/behind）",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// 1. 解析仓库根
+			var pathHint string
+			if len(args) > 0 {
+				pathHint = args[0]
+			}
+			start, err := pathkit.ResolvePath(pathHint)
+			if err != nil {
+				return err
+			}
+			repoPath, ok := git.FindGitRoot(start)
+			if !ok {
+				return fmt.Errorf("未找到 git 仓库（向上探测 .git 失败）: %s", start)
+			}
 
-		// 2. 收集数据：本地分支 / 当前分支 / remote 列表 / 远程分支
-		localBranches, currentBranch, err := gogit.Branches(repoPath)
-		if err != nil {
-			return fmt.Errorf("读取本地分支失败: %w", err)
-		}
-		remotes, err := gogit.Remotes(repoPath)
-		if err != nil {
-			return fmt.Errorf("读取 remote 列表失败: %w", err)
-		}
-		if len(remotes) == 0 {
-			return fmt.Errorf("仓库未配置任何 remote: %s", repoPath)
-		}
-		remoteBranches, err := gogit.RemoteBranches(repoPath)
-		if err != nil {
-			return fmt.Errorf("读取远程分支失败: %w", err)
-		}
+			// 2. 收集数据：本地分支 / 当前分支 / remote 列表 / 远程分支
+			localBranches, currentBranch, err := gogit.Branches(repoPath)
+			if err != nil {
+				return fmt.Errorf("读取本地分支失败: %w", err)
+			}
+			remotes, err := gogit.Remotes(repoPath)
+			if err != nil {
+				return fmt.Errorf("读取 remote 列表失败: %w", err)
+			}
+			if len(remotes) == 0 {
+				return fmt.Errorf("仓库未配置任何 remote: %s", repoPath)
+			}
+			remoteBranches, err := gogit.RemoteBranches(repoPath)
+			if err != nil {
+				return fmt.Errorf("读取远程分支失败: %w", err)
+			}
 
-		// 3. 算分支集合：本地分支 ∩ {任一 remote 上有同名分支}
-		//    remoteHasBranch[branch][remote] = 该 remote 是否有此分支
-		remoteHasBranch := buildRemoteBranchMap(remoteBranches)
-		branches := pickSharedBranches(localBranches, remoteHasBranch)
-		if len(branches) == 0 {
-			fmt.Println("没有本地与任一 remote 同名的分支，无可对比项。")
+			// 3. 算分支集合：本地分支 ∩ {任一 remote 上有同名分支}
+			//    remoteHasBranch[branch][remote] = 该 remote 是否有此分支
+			remoteHasBranch := buildRemoteBranchMap(remoteBranches)
+			branches := pickSharedBranches(localBranches, remoteHasBranch)
+			if len(branches) == 0 {
+				fmt.Println("没有本地与任一 remote 同名的分支，无可对比项。")
+				return nil
+			}
+
+			// 4. 计算每格的 ahead/behind，打印宽表
+			rows := buildStatusRows(repoPath, branches, remotes, remoteHasBranch, currentBranch)
+			headers := buildStatusHeaders(remotes)
+			tui.PrintTable(headers, rows)
 			return nil
-		}
-
-		// 4. 计算每格的 ahead/behind，打印宽表
-		rows := buildStatusRows(repoPath, branches, remotes, remoteHasBranch, currentBranch)
-		headers := buildStatusHeaders(remotes)
-		tui.PrintTable(headers, rows)
-		return nil
-	},
+		},
+	}
+	return cmd
 }
 
 // buildRemoteBranchMap 把远程分支列表组织成 map[branch]set[remote]，便于 O(1) 查询

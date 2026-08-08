@@ -11,22 +11,19 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/util/easycobra"
 )
 
 // cmd `ui` —— 启动 server 并用默认浏览器打开页面。
 // 等价于 `cube server` + 自动 open http://localhost:port/。
-var RootCmd = &easycobra.Command{
-	Use:   "ui",
-	Short: `启动 server 并打开浏览器`,
-	Args:  cobra.NoArgs,
-	InitRun: func(cmd *cobra.Command) easycobra.Run {
-		var port int
-		var noOpen bool
-		cmd.Flags().IntVarP(&port, "port", "p", 8080, "server port")
-		cmd.Flags().BoolVar(&noOpen, "no-open", false, "不自动打开浏览器")
 
-		return func(args []string) error {
+func NewCommand(a *app.App) *cobra.Command {
+	var port int
+	var noOpen bool
+	cmd := &cobra.Command{
+		Use:   "ui",
+		Short: `启动 server 并打开浏览器`,
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
 			url := fmt.Sprintf("http://localhost:%d/", port)
 
 			// 异步：等 server 监听后开浏览器（避免浏览器先打开连不上）
@@ -34,11 +31,15 @@ var RootCmd = &easycobra.Command{
 				go openBrowserWhenReady(url, port)
 			}
 
-			server := app.Default().Server()
+			server := a.Server()
 			slog.Info("cube ui", "url", url)
 			return server.Start(fmt.Sprintf(":%d", port))
-		}
-	},
+		},
+	}
+	cmd.Flags().IntVarP(&port, "port", "p", 8080, "server port")
+	cmd.Flags().BoolVar(&noOpen, "no-open", false, "不自动打开浏览器")
+
+	return cmd
 }
 
 // openBrowserWhenReady 轮询端口直到 server 监听，然后用默认浏览器打开 url。
