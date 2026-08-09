@@ -2,7 +2,6 @@ package web
 
 import (
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -17,11 +16,6 @@ import (
 
 	"cube/version"
 )
-
-// uiAssets 前端静态资源，由 main 通过 SetUIAssets 注入。
-//
-//go:embed ui
-var uiAssets embed.FS
 
 // Handler 接口
 type Handler interface {
@@ -46,7 +40,7 @@ func NewServer(handlers ...Handler) *Server {
 		handler.Register(api)
 	}
 
-	// 静态前端资源路由（/ 与 /ui/*），仅当 main 注入了资源时挂载
+	// 静态前端资源路由（/ 与 /ui/*）
 	registerStaticRoutes(mux)
 
 	return &Server{mux: mux, api: api}

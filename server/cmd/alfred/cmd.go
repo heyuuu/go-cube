@@ -14,7 +14,8 @@ import (
 // RootCmd 是 `cube alfred` 命令组入口，纯分发。
 func NewCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use: "alfred",
+		Use:    "alfred",
+		Hidden: true,
 	}
 
 	cmd.AddCommand(newProjectSearchCmd(a))

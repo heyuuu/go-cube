@@ -1,4 +1,4 @@
-package gitx
+package cmd
 
 import (
 	"fmt"

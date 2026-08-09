@@ -1,4 +1,4 @@
-package project
+package cmd
 
 import (
 	"log/slog"

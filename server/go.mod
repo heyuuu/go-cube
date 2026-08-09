@@ -1,13 +1,12 @@
 module cube
 
-go 1.25.8
+go 1.26.5
 
 require (
 	charm.land/huh/v2 v2.0.3
 	charm.land/lipgloss/v2 v2.0.1
 	github.com/charmbracelet/colorprofile v0.4.2
 	github.com/danielgtaylor/huma/v2 v2.39.0
-	github.com/fsnotify/fsnotify v1.10.1
 	github.com/go-git/go-git/v5 v5.19.1
 	github.com/spf13/cobra v1.10.2
 	golang.org/x/term v0.43.0

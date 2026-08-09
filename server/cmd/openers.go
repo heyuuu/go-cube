@@ -1,4 +1,4 @@
-package opener
+package cmd
 
 import (
 	"fmt"
@@ -11,10 +11,9 @@ import (
 	"cube/util/tui"
 )
 
-// cmd `opener list`
-func newListCmd(a *app.App) *cobra.Command {
+func newOpenersCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list [query]",
+		Use:   "openers [query]",
 		Short: "列出可用 Opener 列表(支持模糊搜索)",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var query string

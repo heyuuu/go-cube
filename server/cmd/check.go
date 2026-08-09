@@ -1,4 +1,4 @@
-package project
+package cmd
 
 import (
 	"fmt"
@@ -112,5 +112,5 @@ func checkGitDirty(service *project.Service) {
 	})
 
 	fmt.Printf("> github dirty 的项目 %d 个:\n", len(targets))
-	showProjects(targets, 1)
+	showProjects(targets)
 }

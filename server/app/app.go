@@ -35,23 +35,20 @@ func New(cfg *config.Config) (*App, error) {
 		return nil, err
 	}
 
-	// ConfigHandler 用 config 包的指针：web 写接口能直接修改 defaultConf 并 Save 持久化
-	configHandler := web.NewConfigHandler(cfg)
-
+	// 组装 services
 	projectService := project.NewService(cfg.Project, paths.CacheDir())
-
 	openerService := opener.NewService(cfg)
-	openerHandler := web.NewOpenerHandler(openerService)
+	historyService := history.NewService(dataDb)
 
+	// 组装 web server
+	configHandler := web.NewConfigHandler(cfg)
 	projectHandler := web.NewProjectHandler(projectService, openerService)
-
+	openerHandler := web.NewOpenerHandler(openerService)
 	server := web.NewServer(
 		configHandler,
 		projectHandler,
 		openerHandler,
 	)
-
-	historyService := history.NewService(dataDb)
 
 	return &App{
 		cfg:    cfg,

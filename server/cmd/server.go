@@ -1,45 +1,47 @@
-package ui
+package cmd
 
 import (
 	"fmt"
 	"log/slog"
 	"net"
 	"os/exec"
-	"runtime"
 	"time"
 
 	"github.com/spf13/cobra"
 
 	"cube/app"
+	"cube/web"
 )
 
-// cmd `ui` —— 启动 server 并用默认浏览器打开页面。
-// 等价于 `cube server` + 自动 open http://localhost:port/。
-
-func NewCommand(a *app.App) *cobra.Command {
+// cmd `server` —— 启动 server
+func newServerCmd(a *app.App) *cobra.Command {
 	var port int
-	var noOpen bool
+	var open bool
 	cmd := &cobra.Command{
-		Use:   "ui",
-		Short: `启动 server 并打开浏览器`,
+		Use:   "server",
+		Short: `启动 server`,
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			url := fmt.Sprintf("http://localhost:%d/", port)
-
-			// 异步：等 server 监听后开浏览器（避免浏览器先打开连不上）
-			if !noOpen {
-				go openBrowserWhenReady(url, port)
-			}
-
-			server := a.Server()
-			slog.Info("cube ui", "url", url)
-			return server.Start(fmt.Sprintf(":%d", port))
+			return startServer(a.Server(), port, open)
 		},
 	}
+
 	cmd.Flags().IntVarP(&port, "port", "p", 8080, "server port")
-	cmd.Flags().BoolVar(&noOpen, "no-open", false, "不自动打开浏览器")
+	cmd.Flags().BoolVarP(&open, "open", "O", false, "open browser")
 
 	return cmd
+}
+
+func startServer(server *web.Server, port int, open bool) error {
+	url := fmt.Sprintf("http://localhost:%d/", port)
+	slog.Info("Server starting", "url", url)
+
+	if open {
+		// 异步：等 server 监听后开浏览器（避免浏览器先打开连不上）
+		go openBrowserWhenReady(url, port)
+	}
+
+	return server.Start(fmt.Sprintf(":%d", port))
 }
 
 // openBrowserWhenReady 轮询端口直到 server 监听，然后用默认浏览器打开 url。
@@ -73,14 +75,6 @@ func openBrowser(url string) error {
 
 // openCmd 按平台返回「打开 URL」的命令。主平台 macOS 用 open，其余平台尽力覆盖。
 func openCmd(url string) (string, []string) {
-	switch runtime.GOOS {
-	case "darwin":
-		return "open", []string{url}
-	case "linux":
-		return "xdg-open", []string{url}
-	case "windows":
-		return "rundll32", []string{"url.dll,FileProtocolHandler", url}
-	}
 	// 兜底：macOS 风格
 	return "open", []string{url}
 }

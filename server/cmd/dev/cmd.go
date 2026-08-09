@@ -20,5 +20,6 @@ func NewCommand(a *app.App) *cobra.Command {
 		Short:  "内部调试命令（开发期测试用）",
 	}
 	cmd.AddCommand(newTuiCmd(a))
+	cmd.AddCommand(newCommandsCmd(a))
 	return cmd
 }

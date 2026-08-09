@@ -89,7 +89,7 @@ func Save(path string, cfg *Config) error {
 		return fmt.Errorf("序列化 config 失败: %w", err)
 	}
 	data = append(data, '\n')
-
+	// 临时文件同目录（保证 rename 同文件系统原子），带随机后缀避免并发写互相覆盖。
 	tmp := fmt.Sprintf("%s.tmp.%d", path, rand.Int31())
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return fmt.Errorf("写临时配置文件失败: tmp=%s err=%w", tmp, err)

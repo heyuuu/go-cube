@@ -1,4 +1,4 @@
-package opener
+package cmd
 
 import (
 	"errors"
@@ -12,11 +12,10 @@ import (
 	"cube/util/tui"
 )
 
-// RootCmd 是 `cube open` 命令入口。
-func newOpenCmd(a *app.App) *cobra.Command {
+func newOpenPathCmd(a *app.App) *cobra.Command {
 	var openerName string
 	cmd := &cobra.Command{
-		Use:   "open <path> [-o|--opener=打开工具名]",
+		Use:   "open-path <path> [-o|--opener=打开工具名]",
 		Short: "用 opener 打开路径（按 dir/file 自动匹配 role）",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {

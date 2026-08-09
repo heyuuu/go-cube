@@ -1,4 +1,4 @@
-package opener
+package cmd
 
 import (
 	"errors"
@@ -6,8 +6,51 @@ import (
 	"os"
 
 	"cube/opener"
+	"cube/project"
+	"cube/util/pathkit"
 	"cube/util/tui"
 )
+
+func getArg(args []string, index int) string {
+	if len(args) > index {
+		return args[index]
+	}
+	return ""
+}
+
+// selectProject 按查询词匹配项目：0 个提示、1 个直接返回、多个交互选择。
+// 供 list/info/open 等需要"定位单个项目"的命令复用。
+func selectProject(service *project.Service, query string) *project.Project {
+	projects := service.Search(query)
+	switch len(projects) {
+	case 0:
+		fmt.Println("没有匹配的项目")
+		return nil
+	case 1:
+		return projects[0]
+	default:
+		proj, err := tui.SelectItem("选择项目", projects, (*project.Project).Name)
+		if err != nil {
+			fmt.Printf("选择项目失败: %v\n", err)
+			return nil
+		}
+		return proj
+	}
+}
+
+func showProjects(projects []*project.Project) {
+	var headers []string
+	rows := make([][]string, len(projects))
+
+	// verbose: 0
+	headers = append(headers, fmt.Sprintf("项目(%d)", len(projects)), "Path", "RepoUrl")
+	for i, p := range projects {
+		rows[i] = append(rows[i], p.Name(), pathkit.PrettyPath(p.Path()), p.RepoUrl())
+	}
+
+	// 输出表格
+	tui.PrintTable(headers, rows)
+}
 
 // PathType 区分路径类型（目录 / 文件），用于按 role 选择 opener。
 type PathType string

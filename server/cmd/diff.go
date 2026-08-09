@@ -1,4 +1,4 @@
-package opener
+package cmd
 
 import (
 	"errors"
