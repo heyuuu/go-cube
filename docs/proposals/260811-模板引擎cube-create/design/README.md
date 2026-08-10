@@ -6,7 +6,7 @@
 > - `discussion.md`：**讨论详情**，给 AI 理解上下文，记录「为什么这么定、排除了什么」。
 > - `glob-rules.md`：**glob 规则细节**，明确协议采用的通配符语义。
 >
-> 与 [`docs/project-template-spec.md`](../project-template-spec.md) 的区别：那份是**模板内容**（某一套技术栈的目录结构、分层规范）；本目录是**引擎协议**（引擎和模板之间的契约），是更上层的元规则。两者互补。
+> 与 [`docs/project-template-spec.md`](../../../misc/project-template-spec.md) 的区别：那份是**模板内容**（某一套技术栈的目录结构、分层规范）；本目录是**引擎协议**（引擎和模板之间的契约），是更上层的元规则。两者互补。
 
 ---
 

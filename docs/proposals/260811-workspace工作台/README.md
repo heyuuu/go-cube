@@ -1,7 +1,7 @@
 # workspace 工作台 + diff / 伪终端
 
 > **状态**：📋 待办（需求刚澄清，形态未定，讨论处于极早期）
-> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../tech-notes/cube-next-absorption.md) 第 13.2 条）
+> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../../tech-notes/cube-next-absorption.md) 第 13.2 条）
 
 ## 需求本质
 

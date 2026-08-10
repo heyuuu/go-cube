@@ -2,11 +2,11 @@
 
 面向未来 ZCode agent 的项目工作规则。先读此文件，再动手改 cube。
 
-> 项目采用 SDD（Spec-Driven Development）管理演进，**当前契约快照见 [`docs/spec.md`](./docs/spec.md)**（Requirements / Design / Tasks 三段）。改动功能或架构前，先读 spec.md 对应段落，确认改动是"实现已记录的需求"还是"需要新增需求/Tasks"。设计推理与历史见 `docs/design/`。
+> 项目采用 SDD（Spec-Driven Development）管理演进，**当前现状见 [`docs/spec/现状.md`](./docs/spec/现状.md)**（定位/架构/命令/API/数据/配置）。改动功能或架构前，先读 现状.md 对应段落。未来需求提案在 [`docs/proposals/`](./docs/proposals/)，设计历史与讨论记录在 [`docs/tech-notes/`](./docs/tech-notes/)。
 
 ## 项目简介
 
-**cube** —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。Go 1.25 编写，module path `github.com/heyuuu/cube`。
+**cube** —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。Go 1.26 编写，module path `cube`。
 
 - 历史有三代：v1 (php)、v2 (go)、**v3 (当前，按领域重构)**。
 - 出口：CLI（人用 / alfred）、本地 Web HTTP server（`cube server`，huma + 标准 ServeMux）。MCP 出口为后续规划。
@@ -28,7 +28,7 @@
 ## 关键机制（改动前先理解）
 
 - **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
-- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。读路径**不得阻塞**采集——只能读快照。详见 `docs/design/v3-design.md` 第四节。
+- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。读路径**不得阻塞**采集——只能读快照。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
 - **opener role + slotCount**：`Opener` 的能力由 `roles []Role` 声明（`open-dir`/`open-file`/`diff-dir`/`diff-file`，见 `opener/role.go`），`slotCount` 由 role 推导（1 或 2，同 opener 所有 role 必须一致）；`cmd` 中用 `$0/$1...` 占位符引用路径槽位，无占位符时路径追加末尾。改 `opener` 时务必同步看 `opener/role.go` 和 `opener/opener.go`。
 - **easycobra**：`cmd/util/easycobra` 是 cobra 的封装，分组命令（无 `Run` 的纯分组）+ 叶子命令（`Run` 或 `InitRun`）两种。分组命令不会触发 `PersistentPreRunE`，所以全局初始化放在 `cobra.OnInitialize`（见 `cmd/root.go`）。
 - **App 懒初始化**：`app.Default()` 首次调用才构造各 service。`cmd/*` 通过 `app.Default().ProjectService()` 等访问。不要在包级 `init()` 里反向依赖未就绪的服务。
@@ -140,9 +140,11 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 
 改动敏感区域前先读：
 
-- `docs/design/v3-design.md` —— v3 架构、分层、gitcache、Web API、里程碑、扩展模型。改架构边界或加 domain 前必读。
-- `docs/design/v3-frontend.md` —— Web 前端规划（当前 server 只暴露 API + `/docs`，前端 embed 为 M4）。
-- `README.md` —— v3 主要变更总览。
+- [`docs/spec/现状.md`](./docs/spec/现状.md) —— 项目现状（定位/架构/命令/API/数据/配置）。改架构边界或加 domain 前必读。
+- [`docs/proposals/`](./docs/proposals/) —— 待办需求提案。
+- [`docs/tech-notes/`](./docs/tech-notes/) —— 设计历史与讨论记录（含 cube-next 吸收记录、v3 设计历史）。
+- [`docs/references/`](./docs/references/) —— 竞品分析（mani / gitbatch，做批量操作前必读 gitbatch 避坑点）。
+- `README.md` —— 项目主要变更总览。
 
 ## 已知 gotcha
 
