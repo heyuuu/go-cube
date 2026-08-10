@@ -10,10 +10,11 @@ type Service struct {
 	openers []*Opener
 }
 
-func NewService(cfg []config.OpenerConfig) *Service {
+// NewService 从配置构造 Service。executor 可选，缺省装 NewDefaultExecutor()；测试传 fake。
+func NewService(cfg []config.OpenerConfig, executor ...Executor) *Service {
 	var openers []*Opener
 	for _, oc := range cfg {
-		o, err := InitOpener(oc)
+		o, err := InitOpener(oc, executor...)
 		if err != nil {
 			// 解析失败的 opener 跳过（配置错误不阻断启动，list 等命令仍可用）
 			continue

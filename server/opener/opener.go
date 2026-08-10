@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"cube/config"
-	"cube/util/runner"
 )
 
 type Opener struct {
@@ -15,13 +14,15 @@ type Opener struct {
 	cmd       []string // 启动命令模板：cmd[0]=可执行文件，其余为参数，含 $0/$1 占位符
 	roles     []Role   // 该 opener 的业务用途集合；slotCount 由 roles 推导
 	slotCount int      // 参数槽个数（由 roles 推导，供 BuildArgs 校验占位符）
+	executor  Executor // 启动子进程的执行器（测试可注入 fake）
 }
 
 // InitOpener 从配置构造 Opener。
 //   - cmd 必填，cmd[0] 是可执行文件；
 //   - roles 解析为用途枚举并推导 slotCount；缺省为 ["open-dir"]；
-//   - cmd 中出现的占位符索引不得 >= slotCount（越界报错）。
-func InitOpener(cfg config.OpenerConfig) (*Opener, error) {
+//   - cmd 中出现的占位符索引不得 >= slotCount（越界报错）；
+//   - executor 可选，缺省装 NewDefaultExecutor()（走 os/exec）；测试传 fake 断言命令。
+func InitOpener(cfg config.OpenerConfig, executor ...Executor) (*Opener, error) {
 	if len(cfg.Cmd) == 0 {
 		return nil, fmt.Errorf("opener %q 缺少必填字段 cmd", cfg.Name)
 	}
@@ -38,11 +39,16 @@ func InitOpener(cfg config.OpenerConfig) (*Opener, error) {
 		}
 	}
 
+	exec := NewDefaultExecutor()
+	if len(executor) > 0 {
+		exec = executor[0]
+	}
 	return &Opener{
 		name:      cfg.Name,
 		cmd:       slices.Clone(cfg.Cmd),
 		roles:     roles,
 		slotCount: slotCount,
+		executor:  exec,
 	}, nil
 }
 
@@ -75,8 +81,8 @@ func (o *Opener) CmdString() string {
 //   - cmd 中的 $0/$1... 占位符被对应路径替换；无占位符的参数原样保留；
 //   - 缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 ["code"] + path 形态。
 //
-// 返回 (bin, args) 供调用方自行启动子进程（runner.Run 或其它方式）。
-// Open() 是它的便捷封装（BuildArgs + runner.Run）。
+// 返回 (bin, args) 供调用方自行启动子进程。
+// Open() 是它的便捷封装（BuildArgs + executor.Run）。
 func (o *Opener) BuildArgs(slotArgs ...string) (bin string, args []string, err error) {
 	if len(slotArgs) != o.slotCount {
 		return "", nil, fmt.Errorf("opener %s 需要 %d 个路径参数，实际传入 %d", o.name, o.slotCount, len(slotArgs))
@@ -94,14 +100,14 @@ func (o *Opener) BuildArgs(slotArgs ...string) (bin string, args []string, err e
 	return bin, args, nil
 }
 
-// Open 用该 opener 打开一个或多个路径：构造 args 后委托 runner.Run 启动子进程。
+// Open 用该 opener 打开一个或多个路径：构造 args 后委托 executor 启动子进程。
 // 需要更灵活的启动方式（自定义 stdio、异步、非阻塞等）时，改用 BuildArgs 自行启动。
 func (o *Opener) Open(slotArgs ...string) error {
 	bin, args, err := o.BuildArgs(slotArgs...)
 	if err != nil {
 		return err
 	}
-	return runner.Run(bin, args...)
+	return o.executor.Run(bin, args...)
 }
 
 // renderArgs 渲染 args 中的占位符 $0/$1... 为 paths 对应项。

@@ -7,6 +7,20 @@ import (
 	"cube/config"
 )
 
+// fakeExecutor 记录 Run 调用的 bin+args，不真正启动子进程。供 Open 全链路测试用。
+type fakeExecutor struct {
+	calls []fakeCall
+}
+type fakeCall struct {
+	bin  string
+	args []string
+}
+
+func (f *fakeExecutor) Run(bin string, args ...string) error {
+	f.calls = append(f.calls, fakeCall{bin: bin, args: append([]string(nil), args...)})
+	return nil
+}
+
 // ---------- placeholderIndex ----------
 
 func TestPlaceholderIndex(t *testing.T) {
@@ -105,7 +119,7 @@ func TestBuildArgs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: c.cmd, Roles: c.roles})
+			o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: c.cmd, Roles: c.roles}, &fakeExecutor{})
 			if err != nil {
 				t.Fatalf("InitOpener 失败: %v", err)
 			}
@@ -141,7 +155,7 @@ func TestInitOpenerCmdValidation(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			oc := config.OpenerConfig{Name: "test", Cmd: c.cmd, Roles: c.roles}
-			o, err := InitOpener(oc)
+			o, err := InitOpener(oc, &fakeExecutor{})
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("期望报错，实际 o=%+v err=nil", o)
@@ -158,5 +172,78 @@ func TestInitOpenerCmdValidation(t *testing.T) {
 // ---------- CanOpenAt glob 匹配 ----------
 //
 // 注：旧的 CanOpenAt(idx, typ, name) 已重构为 SupportTypeAt(idx, typ)（只看声明类型）
-// 与 SupportPathAt(idx, path)（按真实路径 Lstat + glob 匹配）。glob 命中/不命中的覆盖
+// 与 SupportPathAt(idx, path)（按真实路径 LStat + glob 匹配）。glob 命中/不命中的覆盖
 // 已迁移到 filter_test.go 的 TestForPathValue（用真实临时文件验证），此处不再重复。
+
+// ---------- Open 全链路（注入 fakeExecutor）----------
+
+func TestOpenInvokesExecutor(t *testing.T) {
+	cases := []struct {
+		name     string
+		cmd      []string
+		roles    []string
+		paths    []string
+		wantBin  string
+		wantArgs []string
+	}{
+		{
+			name:     "单槽占位符",
+			cmd:      []string{"code", "$0"},
+			roles:    []string{"open-dir"},
+			paths:    []string{"/proj"},
+			wantBin:  "code",
+			wantArgs: []string{"/proj"},
+		},
+		{
+			name:     "无占位符路径追加末尾",
+			cmd:      []string{"code"},
+			roles:    []string{"open-dir"},
+			paths:    []string{"/proj"},
+			wantBin:  "code",
+			wantArgs: []string{"/proj"},
+		},
+		{
+			name:     "双槽 diff 工具",
+			cmd:      []string{"bcompare", "$0", "$1"},
+			roles:    []string{"diff-dir"},
+			paths:    []string{"/a", "/b"},
+			wantBin:  "bcompare",
+			wantArgs: []string{"/a", "/b"},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fake := &fakeExecutor{}
+			o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: c.cmd, Roles: c.roles}, fake)
+			if err != nil {
+				t.Fatalf("InitOpener 失败: %v", err)
+			}
+			if err := o.Open(c.paths...); err != nil {
+				t.Fatalf("Open 失败: %v", err)
+			}
+			if len(fake.calls) != 1 {
+				t.Fatalf("期望 executor 被调用 1 次，实际 %d 次", len(fake.calls))
+			}
+			call := fake.calls[0]
+			if call.bin != c.wantBin || !reflect.DeepEqual(call.args, c.wantArgs) {
+				t.Fatalf("Open(%v) 执行 (%q,%v), 期望 (%q,%v)", c.paths, call.bin, call.args, c.wantBin, c.wantArgs)
+			}
+		})
+	}
+}
+
+func TestOpenSlotCountMismatch(t *testing.T) {
+	fake := &fakeExecutor{}
+	o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: []string{"code", "$0"}, Roles: []string{"open-dir"}}, fake)
+	if err != nil {
+		t.Fatalf("InitOpener 失败: %v", err)
+	}
+	// slotCount=1 但传 2 个路径，应在 BuildArgs 阶段报错，executor 不被调用
+	err = o.Open("/a", "/b")
+	if err == nil {
+		t.Fatalf("期望 slotCount 不匹配报错，实际 nil")
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("期望 executor 未被调用，实际调用 %d 次", len(fake.calls))
+	}
+}
