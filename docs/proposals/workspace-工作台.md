@@ -1,0 +1,30 @@
+# workspace 工作台 + diff / 伪终端
+
+> **状态**：📋 待办（需求刚澄清，形态未定，讨论处于极早期）
+> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../tech-notes/cube-next-absorption.md) 第 13.2 条）
+
+## 需求本质
+
+**多窗口是困境，不是目标。**
+
+痛点：同时开发时桌面散落多个窗口（IDE / SourceTree / 终端 / 浏览器 / Finder），切换累、心智负担重。
+
+目标：在 cube 的一个 Web 界面里聚合更多日常信息，以减少窗口数量，只在需要深度操作时才切出去开专门工具。
+
+## 三个聚合方向
+
+| 方向 | 说明 | 架构影响 |
+|---|---|---|
+| 代码阅读 | 文件树 + 代码查看（只读或轻编辑） | 浅档无依赖；深档需嵌 Monaco Editor |
+| Git 操作（类 SourceTree） | 历史/diff/分支/操作可视化 | 复用 cube 已有 gitcache + gogit 能力 |
+| 命令行 | Web 里跑命令（预设命令 or 真 PTY 终端） | 真 PTY 需 WebSocket 长连接，是架构临界点 |
+
+## 启动讨论时的起点（关键）
+
+详细分析见 cube-next `docs/deferred-features.md`（`/Users/heyu/Code/heyuuu/cube-next/docs/deferred-features.md`）。
+
+**启动讨论时必须先定深度档位再动手**：
+
+- 每个方向都有浅/中/深三档。
+- 深度选择不只影响「做多少功能」，还直接影响 Web 出口层架构。
+- **架构临界点**：真 PTY 终端引入 WebSocket 长连接后不可逆；代码编辑深度档要嵌 Monaco Editor；Git 深度档要嵌 go-git 完整能力（冲突解决/rebase）。
