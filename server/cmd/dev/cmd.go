@@ -21,5 +21,6 @@ func NewCommand(a *app.App) *cobra.Command {
 	}
 	cmd.AddCommand(newTuiCmd(a))
 	cmd.AddCommand(newCommandsCmd(a))
+	cmd.AddCommand(newLoggerCmd(a))
 	return cmd
 }
