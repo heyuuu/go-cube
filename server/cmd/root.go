@@ -65,15 +65,12 @@ func Execute() {
 	fs.StringVar(&cfgFile, "config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
 	fs.BoolVar(&debug, "debug", false, "enable debug mode")
 
-	// 设置 debug 环境
-	config.SetDebug(debug)
-
 	// 初始化配置
 	cfg, err := config.Load(cfgFile)
 	checkError(err, "加载配置文件失败")
 
 	// 尽量在其他行为前初始化 Logger
-	logger.Init(cfg.Log)
+	logger.Init(cfg.Log, debug)
 
 	// 初始化 App
 	a, err := app.New(cfg)

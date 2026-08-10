@@ -3,23 +3,20 @@ package db
 import (
 	"fmt"
 	"log/slog"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-
-	"cube/config"
 )
 
 func Init(dsn string, models ...any) (*gorm.DB, error) {
 	// 连接到 SQLite 数据库
 	slog.Info("init db", "dsn", dsn)
 
-	gormConfig := &gorm.Config{}
-	if config.IsDebug() {
-		gormConfig.Logger = logger.Default.LogMode(logger.Info)
-	}
-	db, err := gorm.Open(sqlite.Open(dsn), gormConfig)
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+		Logger: newGormLogger(),
+	})
 	if err != nil {
 		return nil, fmt.Errorf("无法连接到数据库: %w", err)
 	}
@@ -33,4 +30,13 @@ func Init(dsn string, models ...any) (*gorm.DB, error) {
 	}
 
 	return db, nil
+}
+
+func newGormLogger() logger.Interface {
+	return logger.NewSlogLogger(slog.Default(), logger.Config{
+		LogLevel:                  logger.Info, // 设置最高级别，透传所有日志。具体日志级别处理由 slog 具体 handler 过滤。
+		SlowThreshold:             200 * time.Millisecond,
+		IgnoreRecordNotFoundError: true,
+		ParameterizedQueries:      false,
+	})
 }

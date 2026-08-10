@@ -21,8 +21,8 @@ var logStdioColors = map[slog.Level]string{
 	slog.LevelError: colorRed,
 }
 
-func Init(cfg config.LogConfig) {
-	handler := initHandler(cfg)
+func Init(cfg config.LogConfig, debug bool) {
+	handler := initHandler(cfg, debug)
 	slog.SetDefault(slog.New(handler))
 
 	// 延迟日志
@@ -44,14 +44,14 @@ func applyLazyLogs() {
 		f()
 	}
 }
-func initHandler(cfg config.LogConfig) slog.Handler {
+func initHandler(cfg config.LogConfig, debug bool) slog.Handler {
 	var fileHandler, stdioHandler slog.Handler
 
 	// 初始化日志文件
 	fileHandler = initFileHandler(cfg)
 
 	// 在 Debug 模式下或日志文件不生效时，初始化标准 io handler
-	if config.IsDebug() || fileHandler == nil {
+	if debug || fileHandler == nil {
 		stdioHandler = initStdioHandler()
 	}
 
