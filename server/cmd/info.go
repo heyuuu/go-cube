@@ -8,19 +8,18 @@ import (
 	"cube/app"
 )
 
-// cmd `project info`
 func newInfoCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "info [query]",
+		Use:   "info <query>",
 		Short: "打开项目(支持模糊搜索)",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := args[0]
 
 			// 匹配项目
-			proj := selectProject(a.ProjectService(), query)
-			if proj == nil {
-				return nil
+			proj, err := pickProject(a.ProjectService(), query)
+			if err != nil {
+				return err
 			}
 
 			fmt.Printf("project: %s\n", proj.Name())

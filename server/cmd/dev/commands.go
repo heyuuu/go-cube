@@ -1,6 +1,8 @@
 package dev
 
 import (
+	"iter"
+	"slices"
 	"sort"
 	"strings"
 
@@ -13,16 +15,14 @@ import (
 
 // cmd `cube dev commands`
 //
-// 从当前命令向上找到 root，递归收集所有可用命令，
-// 按字典序排列后以表格形式输出。
+// 收集所有可用命令，按字典序排列后以表格形式输出。
 func newCommandsCmd(a *app.App) *cobra.Command {
 	return &cobra.Command{
 		Use:   "commands",
-		Short: "列出所有命令（字典序，表格形式）",
+		Short: "列出所有命令",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := findRoot(cmd)
-			var all []cmdEntry
-			collectCommands(root, "", &all)
+			all := slices.Collect(iterCommands(root, ""))
 			sort.Slice(all, func(i, j int) bool {
 				return all[i].path < all[j].path
 			})
@@ -54,32 +54,39 @@ func findRoot(cmd *cobra.Command) *cobra.Command {
 	return cmd
 }
 
-// collectCommands 递归收集命令树中所有可用命令的信息。
-func collectCommands(cmd *cobra.Command, prefix string, out *[]cmdEntry) {
-	for _, c := range cmd.Commands() {
-		if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
-			continue
+// collectCommands 遍历命令树中所有可用命令的信息。
+func iterCommands(cmd *cobra.Command, prefix string) iter.Seq[cmdEntry] {
+	return func(yield func(cmdEntry) bool) {
+		for _, c := range cmd.Commands() {
+			if !c.IsAvailableCommand() || c.IsAdditionalHelpTopicCommand() {
+				continue
+			}
+			// 跳过 cobra 自动生成的内置命令（completion、help 等）
+			if isBuiltinCommand(c) {
+				continue
+			}
+			name := c.Name()
+			if prefix != "" {
+				name = prefix + " " + name
+			}
+
+			// 只收集有执行函数的命令，不收集纯分组命令
+			if c.Run != nil || c.RunE != nil {
+				yield(cmdEntry{
+					path:    name,
+					aliases: joinAliases(c.Aliases),
+					short:   c.Short,
+					flags:   collectFlags(c),
+				})
+			}
+
+			// 递归收集其子命令
+			for child := range iterCommands(c, name) {
+				if !yield(child) {
+					return
+				}
+			}
 		}
-		// 跳过 cobra 自动生成的内置命令（completion、help 等）
-		if isBuiltinCommand(c) {
-			continue
-		}
-		name := c.Name()
-		if prefix != "" {
-			name = prefix + " " + name
-		}
-		// 纯分组命令不输出，但仍递归收集其子命令
-		if c.Run == nil && c.RunE == nil {
-			collectCommands(c, name, out)
-			continue
-		}
-		*out = append(*out, cmdEntry{
-			path:    name,
-			aliases: joinAliases(c.Aliases),
-			short:   c.Short,
-			flags:   collectFlags(c),
-		})
-		collectCommands(c, name, out)
 	}
 }
 

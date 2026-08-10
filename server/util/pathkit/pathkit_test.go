@@ -24,6 +24,7 @@ func TestRealPath(t *testing.T) {
 		{"相对路径原样返回", "foo/bar", "foo/bar"},
 		{"仅波浪号本身不展开(非 ~/ 前缀)", "~user/x", "~user/x"},
 		{"空串原样返回", "", ""},
+		{"单个 ~ 指代 home 目录", "~", home},
 
 		// 脏输入：冗余分隔符 / . / .. 按 filepath.Clean 规范化
 		{"绝对路径双斜杠折叠", "/usr//local/bin", "/usr/local/bin"},

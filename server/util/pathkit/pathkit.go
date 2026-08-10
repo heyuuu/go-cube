@@ -12,9 +12,13 @@ func RealPath(path string) string {
 		return ""
 	}
 	// 支持 ~ 前缀
-	if strings.HasPrefix(path, "~/") {
+	if path == "~" || strings.HasPrefix(path, "~/") {
 		if home, err := os.UserHomeDir(); err == nil && home != "" {
-			path = filepath.Join(home, path[2:])
+			if path == "~" {
+				return home
+			} else {
+				return filepath.Join(home, path[2:])
+			}
 		}
 	}
 	return filepath.Clean(path)

@@ -24,10 +24,10 @@ type Service struct {
 	cloneRules []CloneRule // 项目 clone 规则
 }
 
-func NewService(conf config.ProjectConfig, cacheDir string) *Service {
+func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 	// scan 规则：展开 ~/ 为绝对路径，校验目录存在（不存在的规则降级跳过，不阻断）
 	var scanRules []ScanRule
-	for _, r := range conf.Scan {
+	for _, r := range cfg.Scan {
 		absPath := pathkit.RealPath(r.Path)
 		if absPath == "" {
 			slog.Warn("scan 规则路径为空，跳过", "group", r.Group, "path", r.Path)
@@ -45,7 +45,7 @@ func NewService(conf config.ProjectConfig, cacheDir string) *Service {
 	}
 
 	// clone 规则：LocalPath 展开 ~/ 为绝对路径（不校验存在——clone 时会自动创建）
-	cloneRules := slicekit.Map(conf.Clone, func(r config.CloneRuleConfig) CloneRule {
+	cloneRules := slicekit.Map(cfg.Clone, func(r config.CloneRuleConfig) CloneRule {
 		return CloneRule{
 			RepoHost:   r.RepoHost,
 			RepoPrefix: r.RepoPrefix,
@@ -89,15 +89,6 @@ func (s *Service) Projects() []*Project {
 	return s.scanCache.Get()
 }
 
-func (s *Service) FindByPath(path string) *Project {
-	for _, proj := range s.Projects() {
-		if proj.Path() == path {
-			return proj
-		}
-	}
-	return nil
-}
-
 func (s *Service) FindByName(name string) *Project {
 	for _, proj := range s.Projects() {
 		if proj.Name() == name {
@@ -107,8 +98,47 @@ func (s *Service) FindByName(name string) *Project {
 	return nil
 }
 
-func (s *Service) Search(query string) []*Project {
+func (s *Service) FindByPath(path string) *Project {
+	realPath := pathkit.RealPath(path)
+	if realPath == "" {
+		return nil
+	}
+
+	for _, proj := range s.Projects() {
+		if proj.Path() == realPath {
+			return proj
+		}
+	}
+	return nil
+}
+
+func (s *Service) SearchByName(query string) []*Project {
 	return fuzzy.MatchBy(query, s.Projects(), (*Project).Name, nil)
+}
+
+// SearchByPath 通过路径搜索项目列表
+// up 表示是否向上搜索。用于通过项目子目录标定当前目录时使用。
+// 因为项目子目录不可能是另一个项目的目录或父目录，所以当向上匹配成功时不会出现其他项目
+func (s *Service) SearchByPath(path string, up bool) []*Project {
+	realPath := pathkit.RealPath(path)
+	if realPath == "" {
+		return nil
+	}
+
+	var result []*Project
+	for _, proj := range s.Projects() {
+		// 判断 proj 是否在 realpath 目录及子目录中
+		if pathkit.HasPrefix(proj.Path(), realPath) {
+			result = append(result, proj)
+			continue
+		}
+		// 若向上查找， 判断 proj.Path() 是否在 realpath 父目录
+		if up && pathkit.HasPrefix(realPath, proj.Path()) {
+			result = append(result, proj)
+			continue
+		}
+	}
+	return result
 }
 
 // --- git 缓存相关 ---

@@ -27,13 +27,13 @@ func newOpenCmd(a *app.App) *cobra.Command {
 			}
 
 			// 匹配项目
-			proj := selectProject(a.ProjectService(), query)
-			if proj == nil {
-				return nil
+			proj, err := pickProject(a.ProjectService(), query)
+			if err != nil {
+				return err
 			}
 
 			// 打开项目
-			err := openApp.Open(proj.Path())
+			err = openApp.Open(proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}

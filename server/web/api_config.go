@@ -7,12 +7,12 @@ import (
 )
 
 type ConfigHandler struct {
-	conf *config.Config
+	cfg *config.Config
 }
 
 // NewConfigHandler 接收 *Config 指针，供需要写回配置的场景使用。
-func NewConfigHandler(conf *config.Config) *ConfigHandler {
-	return &ConfigHandler{conf: conf}
+func NewConfigHandler(cfg *config.Config) *ConfigHandler {
+	return &ConfigHandler{cfg: cfg}
 }
 
 func (h *ConfigHandler) Register(api huma.API) {
@@ -20,5 +20,5 @@ func (h *ConfigHandler) Register(api huma.API) {
 }
 
 func (h *ConfigHandler) getConfig(_ struct{}) (config.Config, error) {
-	return *h.conf, nil
+	return *h.cfg, nil
 }

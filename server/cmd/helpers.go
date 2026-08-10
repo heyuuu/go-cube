@@ -11,6 +11,7 @@ import (
 	"cube/util/tui"
 )
 
+// getArg 从 args 切片中安全取第 index 个元素，越界返回空字符串。
 func getArg(args []string, index int) string {
 	if len(args) > index {
 		return args[index]
@@ -18,106 +19,88 @@ func getArg(args []string, index int) string {
 	return ""
 }
 
-// selectProject 按查询词匹配项目：0 个提示、1 个直接返回、多个交互选择。
-// 供 list/info/open 等需要"定位单个项目"的命令复用。
-func selectProject(service *project.Service, query string) *project.Project {
-	projects := service.Search(query)
-	switch len(projects) {
-	case 0:
-		fmt.Println("没有匹配的项目")
-		return nil
-	case 1:
-		return projects[0]
-	default:
-		proj, err := tui.SelectItem("选择项目", projects, (*project.Project).Name)
-		if err != nil {
-			fmt.Printf("选择项目失败: %v\n", err)
-			return nil
+// isPathQuery 判断 query 是否为路径(以`.`/`~`/`/` 开头时，当做路径)
+func isPathQuery(query string) bool {
+	return len(query) > 0 && (query[0] == '.' || query[0] == '~' || query[0] == '/')
+}
+
+// searchProjects 搜索项目列表
+//
+// query 为搜索关键词，默认为搜索项目名；当以`.`/`~`/`/` 开头时，当做路径
+// upper 表示是否向上搜索。仅 query 为路径时生效，用于在项目子目录标定当前目录时使用。
+func searchProjects(service *project.Service, query string, up bool) []*project.Project {
+	if isPathQuery(query) {
+		return service.SearchByPath(query, up)
+	} else {
+		return service.SearchByName(query)
+	}
+}
+
+// pickProject 根据关键词匹配项目：精确匹配直接返回，多项匹配则交互选择。
+//
+// 非交互环境不支持多项选择，会报错提示使用精确名称或路径。
+func pickProject(service *project.Service, query string) (*project.Project, error) {
+	projects := searchProjects(service, query, true)
+	if len(projects) == 0 {
+		return nil, fmt.Errorf("未找到匹配的 project: query=`%s`", query)
+	} else if len(projects) == 1 {
+		return projects[0], nil
+	}
+
+	// 匹配多个 project 时，触发用户选择
+	pick, err := tui.SelectItem("选择 project", projects, (*project.Project).Name)
+	if err != nil {
+		if errors.Is(err, tui.ErrNotTTY) {
+			return nil, fmt.Errorf("非 TTY 环境请使用精确项目名或项目路径，避免匹配多项。: query=`%s`", query)
 		}
-		return proj
+		if errors.Is(err, tui.ErrUserAborted) {
+			return nil, fmt.Errorf("用户取消了 project 选择: %w", err)
+		}
+		return nil, err
 	}
+	return pick, nil
 }
 
-func showProjects(projects []*project.Project) {
-	var headers []string
-	rows := make([][]string, len(projects))
-
-	// verbose: 0
-	headers = append(headers, fmt.Sprintf("项目(%d)", len(projects)), "Path", "RepoUrl")
-	for i, p := range projects {
-		rows[i] = append(rows[i], p.Name(), pathkit.PrettyPath(p.Path()), p.RepoUrl())
+// checkOpenPath 解析并校验路径：返回绝对路径及其是否为目录。
+func checkOpenPath(path string) (absPath string, isDir bool, err error) {
+	// 获取绝对路径
+	absPath, err = pathkit.ResolvePath(path)
+	if err != nil {
+		return "", false, err
 	}
-
-	// 输出表格
-	tui.PrintTable(headers, rows)
-}
-
-// PathType 区分路径类型（目录 / 文件），用于按 role 选择 opener。
-type PathType string
-
-const (
-	TypeDir  PathType = "dir"
-	TypeFile PathType = "file"
-)
-
-// detectPathType 用 os.Stat 判断路径类型。路径不存在时返回中文错误。
-// 存在且为目录返回 TypeDir，否则返回 TypeFile。
-func detectPathType(p string) (PathType, error) {
-	info, err := os.Stat(p)
+	// 获取文件信息
+	info, err := os.Stat(absPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", fmt.Errorf("路径不存在: %s", p)
+			return "", false, fmt.Errorf("路径不存在: %s", path)
 		}
-		return "", fmt.Errorf("读取路径失败: %w", err)
+		return "", false, fmt.Errorf("读取路径失败: %w", err)
 	}
-	if info.IsDir() {
-		return TypeDir, nil
-	}
-	return TypeFile, nil
+
+	return absPath, info.IsDir(), nil
 }
 
-// pickOpener 按 TTY 与否分派到对应实现：
-//   - TTY：交互环境，可模糊匹配 / 列表选择 opener。
-//   - 非 TTY：必须显式指定 --opener，按精确名查找并校验 role。
+// pickOpener 根据 role 和关键词匹配 opener：精确匹配直接返回，多项匹配则交互选择。
 //
-// 用户取消选择（ErrUserAborted）时返回该错误，由调用方决定是否静默。
+// 非交互环境不支持多项选择，会报错提示使用精确 opener 名。
 func pickOpener(service *opener.Service, role opener.Role, name string) (*opener.Opener, error) {
-	if tui.IsTTY() {
-		return pickOpenerTTY(service, role, name)
-	}
-	return pickOpenerNonTTY(service, role, name)
-}
-
-// pickOpenerTTY 处理交互环境（终端）下的 opener 选择。
-//   - name != ""：SearchFor 模糊匹配；命中多个则交互选择，命中零个报错。
-//   - name == ""：从 RoleOpeners(role) 中交互选择。
-func pickOpenerTTY(service *opener.Service, role opener.Role, name string) (*opener.Opener, error) {
 	openers := service.SearchFor(role, name)
 	if len(openers) == 0 {
 		return nil, fmt.Errorf("未找到匹配的 opener: role=%s, name=`%s`", role, name)
 	} else if len(openers) == 1 {
 		return openers[0], nil
-	} else { // 匹配多个 opener 时，触发用户选择
-		pick, err := tui.SelectItem("选择 opener", openers, (*opener.Opener).Name)
-		if err != nil {
-			return nil, err
-		}
-		return pick, nil
 	}
-}
 
-// pickOpenerNonTTY 处理非交互环境（脚本 / alfred 等）下的 opener 选择：
-// 必须显式指定 --opener，按精确名查找，命中后还会校验是否支持给定 role。
-func pickOpenerNonTTY(service *opener.Service, role opener.Role, name string) (*opener.Opener, error) {
-	if name == "" {
-		return nil, errors.New("非交互环境(tty)下必须通过 --opener 指定 opener 名")
-	}
-	pick := service.FindByName(name)
-	if pick == nil {
-		return nil, fmt.Errorf("未找到指定 opener: %s", name)
-	}
-	if !pick.HasRole(role) {
-		return nil, fmt.Errorf("opener %s 不支持该用途(需声明 roles:[%q])，当前 roles=%s", name, role, pick.RolesString())
+	// 匹配多个 opener 时，触发用户选择
+	pick, err := tui.SelectItem("选择 opener", openers, (*opener.Opener).Name)
+	if err != nil {
+		if errors.Is(err, tui.ErrNotTTY) {
+			return nil, fmt.Errorf("非 TTY 环境请使用精确 opener 名，避免匹配多项: name=`%s`", name)
+		}
+		if errors.Is(err, tui.ErrUserAborted) {
+			return nil, fmt.Errorf("用户取消了 opener 选择: %w", err)
+		}
+		return nil, err
 	}
 	return pick, nil
 }

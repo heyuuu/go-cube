@@ -6,6 +6,8 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+
+	"cube/util/pathkit"
 )
 
 type Config struct {
@@ -46,6 +48,11 @@ type OpenerConfig struct {
 
 // Load 从 path 读取 JSON 配置。
 func Load(path string) (*Config, error) {
+	path = pathkit.RealPath(path)
+	if path == "" {
+		return nil, fmt.Errorf("配置目录不可为空")
+	}
+
 	cfg := &Config{}
 
 	raw, err := os.ReadFile(path)

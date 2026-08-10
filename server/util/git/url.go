@@ -1,3 +1,4 @@
+// Package git 提供 git 相关的通用工具（URL 解析等）。
 package git
 
 import (
@@ -5,12 +6,18 @@ import (
 	"strings"
 )
 
+// RepoUrl 是解析后的远程仓库地址。
 type RepoUrl struct {
-	Scheme string
-	Host   string
-	Path   string
+	Scheme string // git（SSH 形态）/ https / http
+	Host   string // 域名，无协议，如 github.com
+	Path   string // 路径，含前导 /，如 /heyuuu/cube.git
 }
 
+// ParseRepoUrl 解析远程仓库地址，支持两种形态：
+//   - git@host:path （SSH）：scheme="git"，path 补前导 / 规范化（与 https 一致，避免下游匹配歧义）。
+//   - https://host/path：用 net/url 解析。
+//
+// 非法输入返回中文错误。
 func ParseRepoUrl(rawURL string) (*RepoUrl, error) {
 	rawURL = strings.TrimSpace(rawURL)
 

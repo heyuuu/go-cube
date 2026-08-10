@@ -21,26 +21,26 @@ type Opener struct {
 //   - cmd 必填，cmd[0] 是可执行文件；
 //   - roles 解析为用途枚举并推导 slotCount；缺省为 ["open-dir"]；
 //   - cmd 中出现的占位符索引不得 >= slotCount（越界报错）。
-func InitOpener(conf config.OpenerConfig) (*Opener, error) {
-	if len(conf.Cmd) == 0 {
-		return nil, fmt.Errorf("opener %q 缺少必填字段 cmd", conf.Name)
+func InitOpener(cfg config.OpenerConfig) (*Opener, error) {
+	if len(cfg.Cmd) == 0 {
+		return nil, fmt.Errorf("opener %q 缺少必填字段 cmd", cfg.Name)
 	}
 
-	roles, slotCount, err := ParseRoles(conf.Roles)
+	roles, slotCount, err := ParseRoles(cfg.Roles)
 	if err != nil {
-		return nil, fmt.Errorf("opener %q roles 解析失败: %w", conf.Name, err)
+		return nil, fmt.Errorf("opener %q roles 解析失败: %w", cfg.Name, err)
 	}
 
 	// 校验 cmd 中的占位符索引不越界（slotCount 由 roles 推导）
-	for _, arg := range conf.Cmd {
+	for _, arg := range cfg.Cmd {
 		if n, ok := placeholderIndex(arg); ok && n >= slotCount {
-			return nil, fmt.Errorf("opener %q cmd 占位符 $%d 越界（slotCount=%d，合法索引 0..%d）", conf.Name, n, slotCount, slotCount-1)
+			return nil, fmt.Errorf("opener %q cmd 占位符 $%d 越界（slotCount=%d，合法索引 0..%d）", cfg.Name, n, slotCount, slotCount-1)
 		}
 	}
 
 	return &Opener{
-		name:      conf.Name,
-		cmd:       slices.Clone(conf.Cmd),
+		name:      cfg.Name,
+		cmd:       slices.Clone(cfg.Cmd),
 		roles:     roles,
 		slotCount: slotCount,
 	}, nil
@@ -77,17 +77,17 @@ func (o *Opener) CmdString() string {
 //
 // 返回 (bin, args) 供调用方自行启动子进程（runner.Run 或其它方式）。
 // Open() 是它的便捷封装（BuildArgs + runner.Run）。
-func (o *Opener) BuildArgs(paths ...string) (bin string, args []string, err error) {
-	if len(paths) != o.slotCount {
-		return "", nil, fmt.Errorf("opener %s 需要 %d 个路径参数，实际传入 %d", o.name, o.slotCount, len(paths))
+func (o *Opener) BuildArgs(slotArgs ...string) (bin string, args []string, err error) {
+	if len(slotArgs) != o.slotCount {
+		return "", nil, fmt.Errorf("opener %s 需要 %d 个路径参数，实际传入 %d", o.name, o.slotCount, len(slotArgs))
 	}
 
 	// 先对整条 cmd 渲染占位符（cmd[0] 也可能是占位符，如用路径本身作可执行文件），
 	// 再取 [0] 为 bin、[1:] 为 args。
-	rendered, used := renderArgs(o.cmd, paths)
+	rendered, used := renderArgs(o.cmd, slotArgs)
 	// cmd 参数里没有任何占位符时，把路径按顺序追加到末尾（兼容纯 ["code"] 配置）
 	if used == 0 {
-		rendered = append(rendered, paths...)
+		rendered = append(rendered, slotArgs...)
 	}
 	bin = rendered[0]
 	args = rendered[1:]
@@ -96,8 +96,8 @@ func (o *Opener) BuildArgs(paths ...string) (bin string, args []string, err erro
 
 // Open 用该 opener 打开一个或多个路径：构造 args 后委托 runner.Run 启动子进程。
 // 需要更灵活的启动方式（自定义 stdio、异步、非阻塞等）时，改用 BuildArgs 自行启动。
-func (o *Opener) Open(paths ...string) error {
-	bin, args, err := o.BuildArgs(paths...)
+func (o *Opener) Open(slotArgs ...string) error {
+	bin, args, err := o.BuildArgs(slotArgs...)
 	if err != nil {
 		return err
 	}

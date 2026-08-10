@@ -21,7 +21,7 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 
 			// 项目列表
 			service := a.ProjectService()
-			projects := service.Search(query)
+			projects := service.SearchByName(query)
 
 			// 最近打开日志
 			historyService := a.HistoryService()

@@ -14,12 +14,12 @@ import (
 func newServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *Service {
 	t.Helper()
 	ws := testfixture.NewWorkspace(t)
-	conf := config.ProjectConfig{
+	cfg := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{
 			{Group: group, Path: scanRoot, MaxDepth: maxDepth},
 		},
 	}
-	return NewService(conf, ws.Mkdir("cache"))
+	return NewService(cfg, ws.Mkdir("cache"))
 }
 
 // TestScan_SingleProject 单个 git 项目被识别。
@@ -178,10 +178,10 @@ func TestFindByPathAndName(t *testing.T) {
 // TestScanRules_Getter ScanRules() 返回构造时传入的规则。
 func TestScanRules_Getter(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	conf := config.ProjectConfig{
+	cfg := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{{Group: "g", Path: ws.Mkdir("root"), MaxDepth: 3}},
 	}
-	s := NewService(conf, ws.Mkdir("cache"))
+	s := NewService(cfg, ws.Mkdir("cache"))
 	rules := s.ScanRules()
 	if len(rules) != 1 || rules[0].Group != "g" {
 		t.Fatalf("ScanRules 异常: %v", rules)
@@ -202,11 +202,11 @@ func TestScan_HomePathExpansion(t *testing.T) {
 	testfixture.BuildGitRepo(ws.TB, repoDir, testfixture.GitRepoSpec{})
 
 	// 配置里写 ~/Code（相对 home 展开）
-	conf := config.ProjectConfig{
+	cfg := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{{Group: "g", Path: "~/Code", MaxDepth: 3}},
 	}
 	cacheDir := ws.Mkdir("cache")
-	s := NewService(conf, cacheDir)
+	s := NewService(cfg, cacheDir)
 
 	// 规则路径应被展开为绝对路径
 	rules := s.ScanRules()
@@ -230,13 +230,13 @@ func TestScan_InvalidPathSkipped(t *testing.T) {
 	goodRoot := ws.Mkdir("real-root")
 	ws.MakeProjectDir(path.Join("real-root", "proj"))
 
-	conf := config.ProjectConfig{
+	cfg := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{
 			{Group: "bad", Path: "/this/does/not/exist/xyz", MaxDepth: 3},
 			{Group: "good", Path: goodRoot, MaxDepth: 3},
 		},
 	}
-	s := NewService(conf, ws.Mkdir("cache"))
+	s := NewService(cfg, ws.Mkdir("cache"))
 
 	rules := s.ScanRules()
 	if len(rules) != 1 {
@@ -257,12 +257,12 @@ func TestCloneRule_LocalPathExpansion(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	ws := testfixture.NewWorkspace(t)
-	conf := config.ProjectConfig{
+	cfg := config.ProjectConfig{
 		Clone: []config.CloneRuleConfig{
 			{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "~/src"},
 		},
 	}
-	s := NewService(conf, ws.Mkdir("cache"))
+	s := NewService(cfg, ws.Mkdir("cache"))
 
 	rules := s.CloneRules()
 	if len(rules) != 1 {
@@ -290,10 +290,10 @@ func TestService_NewWithDifferentConfig(t *testing.T) {
 	ws.MakeProjectDir(path.Join("root2", "a"))
 	ws.MakeProjectDir(path.Join("root2", "b"))
 
-	newConf := config.ProjectConfig{
+	newCfg := config.ProjectConfig{
 		Scan: []config.ScanRuleConfig{{Group: "g2", Path: root2, MaxDepth: 5}},
 	}
-	s2 := NewService(newConf, ws.Mkdir("cache"))
+	s2 := NewService(newCfg, ws.Mkdir("cache"))
 
 	// 规则更新
 	rules := s2.ScanRules()

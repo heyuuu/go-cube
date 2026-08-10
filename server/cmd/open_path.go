@@ -1,15 +1,12 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"cube/app"
 	"cube/opener"
-	"cube/util/pathkit"
-	"cube/util/tui"
 )
 
 func newOpenPathCmd(a *app.App) *cobra.Command {
@@ -19,29 +16,28 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 		Short: "用 opener 打开路径（按 dir/file 自动匹配 role）",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 绝对化路径
-			abs, err := pathkit.ResolvePath(args[0])
+			// 检查路径
+			path, isDir, err := checkOpenPath(args[0])
 			if err != nil {
 				return err
 			}
-			// 2. 判断类型（不存在则报错）
-			pt, err := detectPathType(abs)
+
+			// 判断 role 类型
+			var role opener.Role
+			if isDir {
+				role = opener.RoleOpenDir
+			} else {
+				role = opener.RoleOpenFile
+			}
+
+			// 选 opener
+			pick, err := pickOpener(a.OpenerService(), role, openerName)
 			if err != nil {
 				return err
 			}
-			// 3. 按 type 选 role
-			role := pickOpenRole(pt)
-			// 4. 选 opener（TTY 模糊/交互，非 TTY 精确）
-			service := a.OpenerService()
-			pick, err := pickOpener(service, role, openerName)
-			if err != nil {
-				if errors.Is(err, tui.ErrUserAborted) {
-					return nil
-				}
-				return err
-			}
-			// 5. 打开
-			if err := pick.Open(abs); err != nil {
+
+			// 打开
+			if err := pick.Open(path); err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}
 			return nil
@@ -49,12 +45,4 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名")
 	return cmd
-}
-
-// pickOpenRole 由路径类型推导 open role：dir→RoleOpenDir，file→RoleOpenFile。
-func pickOpenRole(pt PathType) opener.Role {
-	if pt == TypeDir {
-		return opener.RoleOpenDir
-	}
-	return opener.RoleOpenFile
 }

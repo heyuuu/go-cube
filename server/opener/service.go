@@ -10,16 +10,9 @@ type Service struct {
 	openers []*Opener
 }
 
-func NewService(conf *config.Config) *Service {
-	s := &Service{}
-	s.applyConf(*conf)
-	return s
-}
-
-// applyConf 按配置重置 openers 列表。
-func (s *Service) applyConf(conf config.Config) {
-	openers := make([]*Opener, 0, len(conf.Openers))
-	for _, oc := range conf.Openers {
+func NewService(cfg []config.OpenerConfig) *Service {
+	var openers []*Opener
+	for _, oc := range cfg {
 		o, err := InitOpener(oc)
 		if err != nil {
 			// 解析失败的 opener 跳过（配置错误不阻断启动，list 等命令仍可用）
@@ -27,7 +20,8 @@ func (s *Service) applyConf(conf config.Config) {
 		}
 		openers = append(openers, o)
 	}
-	s.openers = openers
+
+	return &Service{openers: openers}
 }
 
 func (s *Service) AllOpeners() []*Opener { return s.openers }
@@ -47,9 +41,9 @@ func (s *Service) SearchFor(role Role, query string) []*Opener {
 }
 
 func (s *Service) FindByName(name string) *Opener {
-	for _, app := range s.openers {
-		if app.Name() == name {
-			return app
+	for _, o := range s.openers {
+		if o.Name() == name {
+			return o
 		}
 	}
 	return nil

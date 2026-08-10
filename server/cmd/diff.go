@@ -8,7 +8,6 @@ import (
 
 	"cube/app"
 	"cube/opener"
-	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
@@ -20,54 +19,43 @@ func newDiffCmd(a *app.App) *cobra.Command {
 		Short: "用对比工具(opener)对比两个路径（同为 dir 或同为 file）",
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 绝对化两个路径
-			abs1, err := pathkit.ResolvePath(args[0])
+			// 检查两个路径
+			path1, isDir1, err := checkOpenPath(args[0])
 			if err != nil {
 				return err
 			}
-			abs2, err := pathkit.ResolvePath(args[1])
+			path2, isDir2, err := checkOpenPath(args[1])
 			if err != nil {
 				return err
 			}
-			// 2. 判断类型（不存在则报错）
-			pt1, err := detectPathType(abs1)
-			if err != nil {
-				return err
+
+			// 判断 role 类型
+			if isDir1 != isDir2 {
+				return fmt.Errorf("两个路径类型不一致：%s 的 isDir=%v，%s 的 isDir=%v", args[0], isDir1, args[1], isDir2)
 			}
-			pt2, err := detectPathType(abs2)
-			if err != nil {
-				return err
+			var role opener.Role
+			if isDir1 {
+				role = opener.RoleDiffDir
+			} else {
+				role = opener.RoleDiffFile
 			}
-			// 3. 校验类型一致
-			if pt1 != pt2 {
-				return fmt.Errorf("两个路径类型不一致：%s 是 %s，%s 是 %s", args[0], pt1, args[1], pt2)
-			}
-			// 4. 按 type 选 diff role
-			role := pickDiffRole(pt1)
-			// 5. 选 opener
-			service := a.OpenerService()
-			pick, err := pickOpener(service, role, openerName)
+
+			// 选 opener
+			pick, err := pickOpener(a.OpenerService(), role, openerName)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
 					return nil
 				}
 				return err
 			}
-			// 6. 对比
-			if err := pick.Open(abs1, abs2); err != nil {
-				return fmt.Errorf("对比失败: %w", err)
+
+			// 打开
+			if err := pick.Open(path1, path2); err != nil {
+				return fmt.Errorf("打开对比软件失败: %w", err)
 			}
 			return nil
 		},
 	}
 	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "对比工具(opener)名")
 	return cmd
-}
-
-// pickDiffRole 由路径类型推导 diff role：dir→RoleDiffDir，file→RoleDiffFile。
-func pickDiffRole(pt PathType) opener.Role {
-	if pt == TypeDir {
-		return opener.RoleDiffDir
-	}
-	return opener.RoleDiffFile
 }
