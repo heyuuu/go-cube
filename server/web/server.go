@@ -33,6 +33,9 @@ func NewServer(handlers ...Handler) *Server {
 
 	cfg := huma.DefaultConfig("Cube API", version.Version)
 	cfg.DocsRenderer = huma.DocsRendererScalar // 切换 /docs 页面风格为 Scalar 渲染器
+	cfg.Formats = map[string]huma.Format{
+		"application/json": nilSliceJSONFormat, // nil 切片/map → []/{}，避免前端拿到 null 崩溃
+	}
 	api := humago.New(mux, cfg)
 
 	// 各 domain 注册自己的路由

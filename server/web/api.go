@@ -26,9 +26,6 @@ type ListResult[T any] struct {
 }
 
 func listResult[T any](list []T) ListResult[T] {
-	if list == nil {
-		list = make([]T, 0) // fix: 修复 nil 数据 json 化以后为 null 的问题
-	}
 	return ListResult[T]{List: list}
 }
 
