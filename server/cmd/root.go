@@ -1,9 +1,9 @@
 package cmd
 
 import (
-	"flag"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 
@@ -57,13 +57,7 @@ const defaultConfigPath = "~/.config/cube/config.json"
 
 func Execute() {
 	// 在 cobra 初始化之前，使用 Go 原生 flag 包预解析全局 flag（--config, --debug）
-	var cfgFile string
-	var debug bool
-
-	fs := flag.NewFlagSet("global", flag.ContinueOnError)
-	fs.Usage = func() {} // 抑制未知 flag 的 usage 输出
-	fs.StringVar(&cfgFile, "config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
-	fs.BoolVar(&debug, "debug", false, "enable debug mode")
+	cfgFile, debug, remaining := extractGlobalFlags(os.Args[1:], defaultConfigPath)
 
 	// 初始化配置
 	cfg, err := config.Load(cfgFile)
@@ -71,6 +65,7 @@ func Execute() {
 
 	// 尽量在其他行为前初始化 Logger
 	logger.Init(cfg.Log, debug)
+	slog.Info("init logger", "debug", debug)
 
 	// 初始化 App
 	a, err := app.New(cfg)
@@ -78,6 +73,11 @@ func Execute() {
 
 	// 构建 cmd
 	cmd := newRootCmd(a)
+	cmd.SetArgs(remaining)
+
+	// cmd 上绑定全局 flag，仅用于生成 help 提示(此时 --config 及 --debug 早解析完了)
+	cmd.PersistentFlags().String("config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
+	cmd.PersistentFlags().BoolP("debug", "D", false, "enable debug mode")
 
 	// 执行命令
 	err = cmd.Execute()
@@ -89,4 +89,27 @@ func checkError(err error, msg string) {
 		slog.Error(msg, "err", err)
 		os.Exit(1)
 	}
+}
+
+// extractGlobalFlags 从 args 任意位置摘出 --debug / --config，返回 (cfgFile, debug, 剩余 args)。
+// 不识别的 token（含子命令、子命令自己的 flag、位置参数）原样留在 remaining 里。
+func extractGlobalFlags(args []string, defaultCfg string) (cfgFile string, debug bool, remaining []string) {
+	cfgFile = defaultCfg
+	for i := 0; i < len(args); i++ {
+		arg := args[i]
+		switch {
+		case arg == "--debug" || arg == "-D":
+			debug = true
+		case arg == "--config":
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				cfgFile = args[i+1]
+				i++
+			}
+		case strings.HasPrefix(arg, "--config="):
+			cfgFile = strings.TrimPrefix(arg, "--config=")
+		default:
+			remaining = append(remaining, arg)
+		}
+	}
+	return
 }
