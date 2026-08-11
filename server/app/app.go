@@ -37,7 +37,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// 组装 services
 	projectService := project.NewService(cfg.Project, paths.CacheDir())
-	openerService := opener.NewService(cfg.Openers)
+	openerService := opener.NewService(cfg.Openers, nil)
 	historyService := history.NewService(dataDb)
 
 	// 组装 web server

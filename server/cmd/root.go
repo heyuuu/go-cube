@@ -81,12 +81,14 @@ func Execute() {
 
 	// 执行命令
 	err = cmd.Execute()
-	checkError(err, "execute failed")
+	checkError(err, "命令执行失败")
 }
 
 func checkError(err error, msg string) {
 	if err != nil {
 		slog.Error(msg, "err", err)
+		// exit 前的错误信息，直接输出方便排查问题
+		fmt.Printf("%s: %v", msg, err)
 		os.Exit(1)
 	}
 }

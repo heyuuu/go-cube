@@ -22,7 +22,7 @@ type Opener struct {
 //   - roles 解析为用途枚举并推导 slotCount；缺省为 ["open-dir"]；
 //   - cmd 中出现的占位符索引不得 >= slotCount（越界报错）；
 //   - executor 可选，缺省装 NewDefaultExecutor()（走 os/exec）；测试传 fake 断言命令。
-func InitOpener(cfg config.OpenerConfig, executor ...Executor) (*Opener, error) {
+func InitOpener(cfg config.OpenerConfig, executor Executor) (*Opener, error) {
 	if len(cfg.Cmd) == 0 {
 		return nil, fmt.Errorf("opener %q 缺少必填字段 cmd", cfg.Name)
 	}
@@ -39,16 +39,16 @@ func InitOpener(cfg config.OpenerConfig, executor ...Executor) (*Opener, error) 
 		}
 	}
 
-	exec := NewDefaultExecutor()
-	if len(executor) > 0 {
-		exec = executor[0]
+	// executor 默认值
+	if executor == nil {
+		executor = NewDefaultExecutor()
 	}
 	return &Opener{
 		name:      cfg.Name,
 		cmd:       slices.Clone(cfg.Cmd),
 		roles:     roles,
 		slotCount: slotCount,
-		executor:  exec,
+		executor:  executor,
 	}, nil
 }
 
