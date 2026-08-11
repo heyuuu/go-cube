@@ -2,66 +2,67 @@
 
 面向未来 ZCode agent 的项目工作规则。先读此文件，再动手改 cube。
 
-> 项目采用 SDD（Spec-Driven Development）管理演进，**当前现状见 [`docs/spec/现状.md`](./docs/spec/现状.md)**（定位/架构/命令/API/数据/配置）。改动功能或架构前，先读 现状.md 对应段落。未来需求提案在 [`docs/proposals/`](./docs/proposals/)，设计历史与讨论记录在 [`docs/tech-notes/`](./docs/tech-notes/)。
+> 项目采用 SDD（Spec-Driven Development）管理演进，**当前现状见 [`docs/spec/现状.md`](./docs/spec/现状.md)**（定位/架构/命令/API/数据/配置）。改动功能或架构前，先读 现状.md 对应段落。本文件与 现状.md 冲突时，**现状.md 是事实基准**（它描述代码「是什么」），本文件侧重「怎么改」。未来需求提案在 [`docs/proposals/`](./docs/proposals/)，设计历史与讨论记录在 [`docs/tech-notes/`](./docs/tech-notes/)。
 
 ## 项目简介
 
-**cube** —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。Go 1.26 编写，module path `cube`。
+**cube** —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。Go 1.26 编写，module path `cube`（go.mod 第一行）。
 
 - 历史有三代：v1 (php)、v2 (go)、**v3 (当前，按领域重构)**。
 - 出口：CLI（人用 / alfred）、本地 Web HTTP server（`cube server`，huma + 标准 ServeMux）。MCP 出口为后续规划。
 - 定位原则：不做云服务、不绑 AI（cube 可被 AI 编排，但自身不集成 AI）。
+- Go 源码根在 `server/`（不是仓库根）；`make build` / `make install` 都 `cd server` 再执行。
 
 ## 分层架构（改代码必须遵守的依赖纪律）
 
 ```
-基础设施  config / db / logger / version                                  所有层共享
-能力      opener / util(git / gogit / fuzzy / easycache / pathkit / slicekit)  通用动作, 不含业务实体
-领域      project (含 gitcache / scan / clone)                            业务 domain, 含实体和规则
-出口      cmd / web                                                       把领域包成 CLI/Web
-装配      app / main                                                      接线
+基础设施  config / db / logger / version / runtime               所有层共享
+能力      opener / util(git / gogit / fuzzy / easycache / pathkit / slicekit / tui)  通用动作, 不含业务实体
+领域      project (含 gitcache / scan / clone) / history          业务 domain, 含实体和规则
+出口      cmd / web                                               把领域包成 CLI/Web
+装配      app / main                                              接线
 ```
 
-- 基础设施不依赖上层；能力层只依赖基础设施；领域层依赖能力+基础设施；**cmd 与 web 不互调**；`app` 是唯一接线点（`app.Default()` 用 `sync.Once` 懒初始化整个 App）。
-- 加一个新 domain = ①领域包 ②`cmd/<x>` 子命令组 ③`web.NewXxxHandler` ④config 加节 ⑤`app/init.go` 装配清单加构造。**五处都是加法，不碰现有 domain**。
+- 基础设施不依赖上层；能力层只依赖基础设施；领域层依赖能力+基础设施；**cmd 与 web 不互调**；`app` 是唯一接线点。
+- **App 装配是显式构造，不是懒初始化**：`app.New(cfg)` 一次性开 db + AutoMigrate + 构造各 service + 组装 web server（`server/app/app.go`）。`cmd.Execute()`（`server/cmd/root.go`）在 main 里调用，把 `*app.App` 显式传给所有命令工厂（`newXxxCmd(a *app.App)`）。**无全局单例、无 `app.Default()`、无包级 `init()` 反向依赖**。
+- 加一个新 domain = ①领域包 ②`cmd/<x>` 子命令组 ③`web.NewXxxHandler` ④config 加节 ⑤`app/app.go` 装配清单加构造。**五处都是加法，不碰现有 domain**。
 
 ## 关键机制（改动前先理解）
 
 - **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
-- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。读路径**不得阻塞**采集——只能读快照。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
-- **opener role + slotCount**：`Opener` 的能力由 `roles []Role` 声明（`open-dir`/`open-file`/`diff-dir`/`diff-file`，见 `opener/role.go`），`slotCount` 由 role 推导（1 或 2，同 opener 所有 role 必须一致）；`cmd` 中用 `$0/$1...` 占位符引用路径槽位，无占位符时路径追加末尾。改 `opener` 时务必同步看 `opener/role.go` 和 `opener/opener.go`。
-- **easycobra**：`cmd/util/easycobra` 是 cobra 的封装，分组命令（无 `Run` 的纯分组）+ 叶子命令（`Run` 或 `InitRun`）两种。分组命令不会触发 `PersistentPreRunE`，所以全局初始化放在 `cobra.OnInitialize`（见 `cmd/root.go`）。
-- **App 懒初始化**：`app.Default()` 首次调用才构造各 service。`cmd/*` 通过 `app.Default().ProjectService()` 等访问。不要在包级 `init()` 里反向依赖未就绪的服务。
-- **Web 装配**：`web.NewServer(handlers ...Handler)`，每个 domain 实现 `Handler.Register(api huma.API)`；统一 `ApiOutput{ok,message,data}` envelope；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。
-- **配置**：默认目录 `~/.config/cube/`，`config.json` 按 domain 分节（`log` / `project{scan,clone}` / `openers`）。`-c` 覆盖目录，`-d` 开 debug。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。
+- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
+- **opener role + slotCount + Executor**：`Opener` 的能力由 `roles []Role` 声明（`open-dir`/`open-file`/`diff-dir`/`diff-file`，见 `opener/role.go`），`slotCount` 由 role 推导（1 或 2，同 opener 所有 role 必须一致）；`cmd` 中用 `$0/$1...` 占位符引用路径槽位，无占位符时路径追加末尾。`Open()` 通过 `Executor` 接口执行（`opener/executor.go`），默认实现走 `os/exec`，测试可注入 fake——**改 opener 时务必同步看 `opener/role.go`、`opener/opener.go`、`opener/executor.go` 三处**。
+- **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
+- **Web 装配**：`web.NewServer(handlers ...Handler)`，每个 domain 实现 `Handler.Register(api huma.API)`；统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
+- **配置**：默认目录 `~/.config/cube/`，`config.json` 按 domain 分节。`-c` 覆盖目录，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、`cube.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。
 
 ## 常用命令
 
-构建 / 安装（Makefile 已注入 version ldflags）：
+构建 / 安装（Makefile 在**仓库根**，已注入 version ldflags；go 源码在 `server/`）：
 
 ```bash
-make build        # 构建到 tmp/cube
-make install      # go install 到 GOBIN
-make tag          # 当前位置打递增版本 tag
+make build        # 先 cp -r ui server/web/ui (go:embed)，再 cd server && go build 到 tmp/cube
+make install      # cd server && go install + 安装 zsh completion
+make tag          # 当前位置打递增版本 tag（末位 +1）
 ```
 
-Web 开发热重载（`.air.toml`，已内置 `goimports -w .` + `go vet ./...` 预检）：
+Web 开发热重载（`server/.air.toml`，已内置 `goimports -w .` + `go vet ./...` 预检）：
 
 ```bash
-air               # 需安装 air；args_bin = ["-d", "server"]
-./run.sh [args]   # 手动：goimports -> go build -> 运行
+cd server && air               # 需安装 air；args_bin = ["-d", "server", "-p", "6001"]
+./run.sh [args]                # 手动：goimports -> go vet -> go build -> 运行（在 server/ 下）
 ```
 
-测试（标准 go test，无额外 harness）：
+测试（标准 go test，在 `server/` 下执行；无额外 harness）：
 
 ```bash
-go test ./...
-go test ./opener/...     # 聚焦某个包
+cd server && go test ./...
+cd server && go test ./opener/...     # 聚焦某个包
 ```
 
 ### 测试辅助包 `internal/testfixture`
 
-cube 的 IO 测试（git 操作、文件扫描、缓存读写）通过 `internal/testfixture` 包提供统一 fixture builder：
+cube 的 IO 测试（git 操作、文件扫描、缓存读写）通过 `server/internal/testfixture` 包提供统一 fixture builder：
 
 - **临时目录落 `runtime/test/`**（已 gitignore），**不用系统 `/tmp`**——失败时方便翻看现场排查。每个测试拿到独立子目录（`runtime/test/<时间戳>-<test名>/`），不自动清理。
 - **`Workspace`**：测试工作区。`ws := testfixture.NewWorkspace(t)` → `ws.Dir` 是该测试专属目录；`ws.Mkdir/WriteFile/Join` 在其下操作。
@@ -85,10 +86,11 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **依赖外部进程/库的 IO**（go-git 读仓库、git 二进制）：**用 testfixture 建真实临时仓库测**，不 mock。`gogit` 的 `Branches/Remotes/Tags/IsDirty`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
 - **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
 - **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
+- **opener 执行类**：通过 `Executor` 接口注入 fake，不真的启动编辑器。见 `opener/opener_test.go`。
 - **不写单测的（靠手动/集成验证）**：
   - `git.Run`/`git.Clone`/`git.Push`（透传 stdio 到 `os.Stdout`，无法捕获输出；且本质是组装 git 参数）
   - `gitcache.TryAsyncRefresh`（fork 自身可执行文件跑子命令，进程编排非逻辑）
-  - `opener.Open`（实际启动编辑器/IDE，副作用）
+  - `opener.Open` 的真实进程启动（已用 Executor 隔离，但默认实现的真启动仍靠手动验证）
   - `config`/`db`（全局单例无 setter，测试无法隔离）
   - `cmd/*`（cobra 命令编排）、`web`（huma 路由 + envelope，集成测比单测值）
 
@@ -99,11 +101,11 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    goimports -w .     # 格式化 + 整理 import（本地已安装：~/go/bin/goimports）
    go vet ./...       # 静态校验
    ```
-   每次改完 `.go` 文件都要跑，不要跳过。`air` 与 `run.sh` 也已内置这两步，保持一致。
+   每次改完 `.go` 文件都要跑，不要跳过。`air` 与 `run.sh` 也已内置这两步，保持一致。**命令在 `server/` 目录下执行**（go.mod 在那里）。
 2. 遵循 v3 分层依赖纪律（见上），不要让 `cmd` 直接调 `web`、不要让基础设施包 import 领域包。
 3. **加新 domain 走"五处加法"流程**，不修改既有 domain 的接线。
 4. 日志统一用 `log/slog`（`slog.Debug` / `slog.Info` / ...），不要用 `fmt.Println` 做日志（`fmt` 仅用于面向用户的 CLI 输出）。debug 日志受 `-d` 控制。
-5. 错误处理遵循现有风格：可恢复的降级用 `log.Printf`/`slog` 记录后继续；致命错误用 `fmt.Errorf("...: %w", err)` 包装并返回。
+5. 错误处理遵循现有风格：可恢复的降级用 `slog` 记录后继续；致命错误用 `fmt.Errorf("...: %w", err)` 包装并返回。`cmd.Execute()` 的 `checkError` 会在退出前把错误打到 `slog` + stdout。
 6. **所有 Error 消息一律用中文**（`errors.New` / `fmt.Errorf` 的字符串）。变量名、标识符、以及约定俗成的英文专业名词/技术术语保留英文原词——例如 `repoUrl`、`OpenAPI`、`worktree`、`opener`、`config`、`slot`、`tty` 等。参考既有代码，如 `fmt.Errorf("repoUrl 不是合法地址: url=%s", rawRepoUrl)`、`errors.New("未找到指定app: " + appName)`。
 7. **构造函数命名约定**（按返回值形态选前缀）：
    - `NewXxx()` → 返回 `*Xxx`（指针，单返回值）。例：`NewService` / `NewOpenerHandler` / `NewItem`。
@@ -115,7 +117,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    func (o *Opener) Name() string { return o.name }
    func (s *Service) ScanRules() []ScanRule { return s.scanRules }
    ```
-   仅当逻辑较复杂、单行会牺牲可读性时才折行展开。
+   仅当逻辑较复杂、单行会牺牲可读性时才折行展开。`server/app/app.go` 的 `App` 一组 getter 是参考样板。
 
    **准确定义**：本规则所说的 getter/setter 仅指——
    - 是 **struct 的方法**（带 receiver），不是包级函数；
@@ -140,14 +142,17 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 
 改动敏感区域前先读：
 
-- [`docs/spec/现状.md`](./docs/spec/现状.md) —— 项目现状（定位/架构/命令/API/数据/配置）。改架构边界或加 domain 前必读。
-- [`docs/proposals/`](./docs/proposals/) —— 待办需求提案。
+- [`docs/spec/现状.md`](./docs/spec/现状.md) —— 项目现状（定位/架构/命令/API/数据/配置）。改架构边界或加 domain 前必读。**与代码冲突时以代码为准**。
+- [`docs/proposals/`](./docs/proposals/) —— 待办需求提案（按 `日期-主题/` 目录组织，每个提案含 README.md，部分含 alternatives.md / design/）。
 - [`docs/tech-notes/`](./docs/tech-notes/) —— 设计历史与讨论记录（含 cube-next 吸收记录、v3 设计历史）。
 - [`docs/references/`](./docs/references/) —— 竞品分析（mani / gitbatch，做批量操作前必读 gitbatch 避坑点）。
 - `README.md` —— 项目主要变更总览。
 
 ## 已知 gotcha
 
+- **go 源码根在 `server/`**，不是仓库根。`go build` / `go test` / `goimports` / `go vet` 都要在 `server/` 下跑（Makefile 和 run.sh 已处理 `cd`，手动执行时别忘）。
+- **module path 是 `cube`**（不是 `github.com/heyuuu/cube`——README 里写的旧值，以 go.mod 为准）。import 路径写 `cube/...`。
 - `logger` 包用 `runtime.Callers` 在 `init()` 里推算项目绝对路径（`relativeProjPath = "../../"`），移动/重命名 logger 源文件位置会让日志里的 `file` 相对路径错位。
-- `tmp/`、`cube`（构建产物）、`openapi.json` 在 `.gitignore` 内，不要提交。`.zcode/plans` 也已忽略。
-- 默认配置目录是 `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、日志）都落在那里。
+- `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `ui/` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
+- 默认配置目录是 `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）都落在那里。
+- **前端资源在 `ui/`（仓库根）**，`make build` 时 `cp -r ui server/web/ui` 后用 go:embed 嵌入。改前端改 `ui/`，不要直接改 `server/web/ui/`（会被覆盖）。
