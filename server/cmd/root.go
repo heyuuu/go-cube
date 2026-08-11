@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
