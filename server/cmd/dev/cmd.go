@@ -13,7 +13,7 @@ import (
 
 // `cube dev`
 
-func NewCommand(a *app.App) *cobra.Command {
+func NewCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:    "dev",
 		Hidden: true,

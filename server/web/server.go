@@ -43,6 +43,9 @@ func NewServer(handlers ...Handler) *Server {
 		handler.Register(api)
 	}
 
+	// system 端点（whoami / shutdown）
+	newSystemHandler().Register(api, mux)
+
 	// 静态前端资源路由（/ 与 /ui/*）
 	registerStaticRoutes(mux)
 
@@ -56,7 +59,7 @@ func (s *Server) OpenAPIJSON() ([]byte, error) {
 	return s.api.OpenAPI().MarshalJSON()
 }
 
-// Start 启动 server, 收到 SIGINT/SIGTERM 优雅关闭。
+// Start 启动 server，收到 SIGINT/SIGTERM 时优雅关闭。
 func (s *Server) Start(addr string) error {
 	server := &http.Server{
 		Addr:              addr,

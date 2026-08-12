@@ -11,6 +11,7 @@ import (
 	"cube/app"
 	"cube/cmd/alfred"
 	"cube/cmd/dev"
+	"cube/cmd/server"
 	"cube/config"
 	"cube/logger"
 	"cube/version"
@@ -24,7 +25,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 	cmd.AddCommand(newVersionCmd(a))
 	// web server 相关
-	cmd.AddCommand(newServerCmd(a))
+	cmd.AddCommand(server.NewCmd(a))
 	cmd.AddCommand(newOpenapiCmd(a))
 	// project 相关
 	cmd.AddCommand(newProjectsCmd(a)) // 项目列表
@@ -45,7 +46,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 	// 内部命令
 	cmd.AddCommand(alfred.NewCmd(a))
-	cmd.AddCommand(dev.NewCommand(a))
+	cmd.AddCommand(dev.NewCmd(a))
 
 	// 待整理命令
 	cmd.AddCommand(newCheckCmd(a))
