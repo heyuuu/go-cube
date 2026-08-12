@@ -21,6 +21,12 @@
 - [`260811-history清理API/`](proposals/260811-history清理API/) — history 数据清理（暂不做）
 - [`260811-sqlc代替gorm/`](proposals/260811-sqlc代替gorm/) — sqlc 代替 gorm（暂不做，未来方向）
 
+### [archived/](archived/) — 已完成提案归档
+
+已实现的需求总结（从 proposals 移入，记录最终落地形态与方案演变）。
+
+- [`260811-server后台常驻与HTTP管理/`](archived/260811-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
+
 ### [references/](references/) — 参考文献目录
 
 同类工具的深度分析。
