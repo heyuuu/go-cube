@@ -37,6 +37,6 @@ func Fork(port int) (int, error) {
 	// Release 让 Go runtime 放弃跟踪该 pid，回收由 init 完成。
 	_ = cmd.Process.Release()
 
-	slog.Info("serve: forked server subprocess", "pid", pid, "port", port)
+	slog.Info("serve: 已 fork server 子进程", "pid", pid, "port", port)
 	return pid, nil
 }

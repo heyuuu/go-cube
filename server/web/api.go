@@ -36,12 +36,12 @@ type humaHandler[I, O any] = func(context.Context, *I) (*O, error)
 // api 注册的统一入口
 func apiRegister[I, O any](api huma.API, op huma.Operation, handler humaHandler[I, O]) {
 	if op.Method == "" {
-		panic("api method must be specified in operation")
+		panic("operation 必须指定 method")
 	}
 	if op.Path == "" {
-		panic("api path must be specified in operation")
+		panic("operation 必须指定 path")
 	} else if !strings.HasPrefix(op.Path, "/api/") {
-		panic("api path must start with /api/")
+		panic("api path 必须以 /api/ 开头")
 	}
 
 	group, operationId := parseInfoFromPath(op.Path)

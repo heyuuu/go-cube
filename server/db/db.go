@@ -12,7 +12,7 @@ import (
 
 func Init(dsn string, models ...any) (*gorm.DB, error) {
 	// 连接到 SQLite 数据库
-	slog.Info("init db", "dsn", dsn)
+	slog.Info("初始化 db", "dsn", dsn)
 
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: newGormLogger(),

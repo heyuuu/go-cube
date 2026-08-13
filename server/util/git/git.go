@@ -38,7 +38,7 @@ func Run(dir string, args ...string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 
-	slog.Info("Run cmd", "cmd", cmd.String())
+	slog.Info("执行命令", "cmd", cmd.String())
 	return cmd.Run()
 }
 

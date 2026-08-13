@@ -13,7 +13,7 @@ type Item[T any] struct {
 
 func NewItem[T any](loader func() T) *Item[T] {
 	if loader == nil {
-		panic("nil loader")
+		panic("loader 不能为 nil")
 	}
 	return &Item[T]{
 		loader: loader,

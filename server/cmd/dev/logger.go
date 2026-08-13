@@ -83,7 +83,7 @@ func caseAttrs() error {
 
 func caseErrorAttr() error {
 	// Any 会把 error 当作 slog.LogValuer，输出 error 字符串
-	err := errors.New("db connection refused")
+	err := errors.New("db 连接被拒绝")
 	slog.Error("查询失败", "err", err, "query", "SELECT 1")
 
 	// 包装后的 error 链

@@ -72,7 +72,7 @@ func (s *Server) Start(addr string) error {
 
 	errCh := make(chan error, 1)
 	go func() {
-		slog.Info("server starting", "addr", addr)
+		slog.Info("server 启动", "addr", addr)
 		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err
 		}
@@ -86,7 +86,7 @@ func (s *Server) Start(addr string) error {
 	case err := <-errCh:
 		return fmt.Errorf("server 启动失败: %w", err)
 	case sig := <-sigCh:
-		slog.Info("server shutting down", "signal", sig)
+		slog.Info("server 关闭中", "signal", sig)
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		return server.Shutdown(ctx)
