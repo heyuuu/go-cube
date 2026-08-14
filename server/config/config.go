@@ -47,29 +47,31 @@ type OpenerConfig struct {
 }
 
 // Load 从 path 读取 JSON 配置。
+// path 通常来自 -c 命令行参数（或默认值 ~/.config/cube/config.json），
+// 故按命令行输入解析：支持 ~ 前缀与基于 cwd 的相对路径。
 func Load(path string) (*Config, error) {
-	path = pathkit.RealPath(path)
-	if path == "" {
-		return nil, fmt.Errorf("配置目录不可为空")
+	absPath, err := pathkit.AbsPath(path)
+	if err != nil {
+		return nil, fmt.Errorf("解析配置路径失败: path=%s err=%w", path, err)
 	}
 
 	cfg := &Config{}
 
-	raw, err := os.ReadFile(path)
+	raw, err := os.ReadFile(absPath)
 	if err != nil {
 		// 文件不存在（或权限等不可读问题）→ 降级为默认值，不报错。
 		if os.IsNotExist(err) {
-			return applyDefaults(cfg, path), nil
+			return applyDefaults(cfg, absPath), nil
 		}
-		return nil, fmt.Errorf("读取配置文件失败: path=%s err=%w", path, err)
+		return nil, fmt.Errorf("读取配置文件失败: path=%s err=%w", absPath, err)
 	}
 
 	// 反序列化
 	if err := json.Unmarshal(raw, cfg); err != nil {
-		return nil, fmt.Errorf("解析配置文件失败: path=%s err=%w", path, err)
+		return nil, fmt.Errorf("解析配置文件失败: path=%s err=%w", absPath, err)
 	}
 
-	return applyDefaults(cfg, path), nil
+	return applyDefaults(cfg, absPath), nil
 }
 
 func applyDefaults(cfg *Config, path string) *Config {

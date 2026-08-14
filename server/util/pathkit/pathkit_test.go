@@ -3,90 +3,173 @@ package pathkit
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
-// ---------- RealPath ----------
+// ---------- resolveAbs / StaticAbsPath / AbsPath ----------
 
-func TestRealPath(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("os.UserHomeDir() 失败: %v", err)
-	}
+// TestResolveAbs 绝对化核心逻辑：baseDir 注入式表驱动，不依赖进程 cwd。
+func TestResolveAbs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home) // 固定 home，让 ~ 展开结果可预期
 
 	cases := []struct {
-		name string
-		in   string
-		want string
+		name    string
+		in      string
+		baseDir string
+		want    string
+		wantErr bool
 	}{
-		{"tilde 展开", "~/code", filepath.Join(home, "code")},
-		{"无 tilde 原样返回", "/usr/local/bin", "/usr/local/bin"},
-		{"相对路径原样返回", "foo/bar", "foo/bar"},
-		{"仅波浪号本身不展开(非 ~/ 前缀)", "~user/x", "~user/x"},
-		{"空串原样返回", "", ""},
-		{"单个 ~ 指代 home 目录", "~", home},
+		// 绝对路径：baseDir 不参与（Node path.resolve 的「绝对参数覆盖基准」语义）
+		{"绝对路径无视 baseDir", "/abs/path", "/base", "/abs/path", false},
+		{"绝对路径无 baseDir", "/abs/path", "", "/abs/path", false},
+		{"绝对路径脏输入归一化", "/abs//x/./y/", "", "/abs/x/y", false},
+		{"绝对路径含 .. 回退", "/abs/sub/../x", "", "/abs/x", false},
 
-		// 脏输入：冗余分隔符 / . / .. 按 filepath.Clean 规范化
-		{"绝对路径双斜杠折叠", "/usr//local/bin", "/usr/local/bin"},
-		{"绝对路径 . 段清理", "/usr/./local/bin", "/usr/local/bin"},
-		{"绝对路径 .. 回退", "/usr/local/../bin", "/usr/bin"},
-		{"tilde 展开含双斜杠", "~/code//app", filepath.Join(home, "code", "app")},
-		{"tilde 展开含 . 段", "~/code/./app", filepath.Join(home, "code", "app")},
-		{"相对路径双斜杠折叠", "foo//bar", "foo/bar"},
+		// 空串
+		{"空串报错", "", "", "", true},
+		{"空串带 baseDir 也报错", "", "/base", "", true},
+
+		// ~ 前缀展开（优先于 baseDir）
+		{"~ 指 home", "~", "", home, false},
+		{"~/ 指 home", "~/", "", home, false},
+		{"~/sub/x 展开", "~/sub/x", "", filepath.Join(home, "sub", "x"), false},
+		{"~ 展开脏输入归一化", "~/a//b/./c", "", filepath.Join(home, "a", "b", "c"), false},
+		{"~ 优先于 baseDir", "~/x", "/base", filepath.Join(home, "x"), false},
+
+		// 相对路径：仅接受 . / .. / ./x / ../x 显式语法（与 cmd 层 isPathQuery 的前缀分流对齐）
+		{"单点指 baseDir", ".", "/base", "/base", false},
+		{"./x 基于 baseDir", "./x", "/base", "/base/x", false},
+		{"../x 越过 baseDir 下层", "../x", "/base/sub", "/base/x", false},
+		{".. 指 baseDir 父", "..", "/base/sub", "/base", false},
+		{"相对脏输入归一化", "./a//b/./c", "/base", "/base/a/b/c", false},
+		{"相对 .. 回退出 baseDir", "../../x", "/base/sub", "/x", false},
+		{"baseDir 带尾斜杠", "./x", "/base/", "/base/x", false},
+		{"不是相对路径但以 . 开头的写法", ".abc", "/base/", "", true},
+		{"隐藏名以 . 开头是裸相对", ".git", "/base", "", true},
+
+		// 裸相对路径：不收（cmd 层走 name 分支，到这里说明调用方传错）
+		{"裸相对路径报错", "sub/x", "/base", "", true},
+		{"裸相对无基准报错", "x", "", "", true},
+
+		// ~user 语法不支持：非 ~ / ~/ 前缀，落到报错
+		{"~user 语法报错", "~user/x", "/base", "", true},
+
+		// 显式相对但无 baseDir：报错（StaticAbsPath 语义）
+		{"相对路径无基准报错", "./x", "", "", true},
+		{".. 无基准报错", "..", "", "", true},
+
+		// baseDir 不变量断言
+		{"baseDir 相对路径报错", "x", "relative-base", "", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if got := RealPath(c.in); got != c.want {
-				t.Fatalf("RealPath(%q) = %q, want %q", c.in, got, c.want)
+			got, err := resolveAbs(c.in, c.baseDir)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("resolveAbs(%q, %q) 期望报错，实际返回 %q", c.in, c.baseDir, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("resolveAbs(%q, %q) 出错: %v", c.in, c.baseDir, err)
+			}
+			if got != c.want {
+				t.Fatalf("resolveAbs(%q, %q) = %q, want %q", c.in, c.baseDir, got, c.want)
 			}
 		})
 	}
 }
 
-// ---------- ResolvePath ----------
+// TestResolveAbs_HomeUnavailable HOME 缺失时 ~ 展开报错，而非静默降级。
+func TestResolveAbs_HomeUnavailable(t *testing.T) {
+	t.Setenv("HOME", "")
+	if _, err := resolveAbs("~/x", ""); err == nil {
+		t.Fatal("HOME 缺失时 ~/ 展开应报错")
+	}
+}
 
-func TestResolvePath(t *testing.T) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("os.UserHomeDir() 失败: %v", err)
+// TestResolveAbs_InvariantFirst p 与 baseDir 双非法时，不变量断言（代码 bug）优先于判空（业务错误）。
+func TestResolveAbs_InvariantFirst(t *testing.T) {
+	_, err := resolveAbs("", "relative-base")
+	if err == nil || !strings.Contains(err.Error(), "baseDir") {
+		t.Fatalf("双非法时应优先报 baseDir 不变量错误，实际: %v", err)
 	}
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("os.Getwd() 失败: %v", err)
+}
+
+// TestStaticAbsPath 静态绝对化糖层：仅接受绝对路径与 ~ 前缀，相对路径一律报错。
+func TestStaticAbsPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	okCases := []struct{ name, in, want string }{
+		{"绝对路径", "/abs/path", "/abs/path"},
+		{"~ 展开", "~/code", filepath.Join(home, "code")},
+		{"~ 本身指 home", "~", home},
 	}
+	for _, c := range okCases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := StaticAbsPath(c.in)
+			if err != nil {
+				t.Fatalf("StaticAbsPath(%q) 出错: %v", c.in, err)
+			}
+			if got != c.want {
+				t.Fatalf("StaticAbsPath(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+
+	errCases := []struct{ name, in string }{
+		{"./ 相对路径", "./x"},
+		{"裸相对路径", "x"},
+		{"上跳相对路径", "../x"},
+		{"空串", ""},
+	}
+	for _, c := range errCases {
+		t.Run(c.name, func(t *testing.T) {
+			if _, err := StaticAbsPath(c.in); err == nil {
+				t.Fatalf("StaticAbsPath(%q) 相对路径应报错", c.in)
+			}
+		})
+	}
+}
+
+// TestAbsPath 基于 cwd 的绝对化糖层：相对路径以进程当前目录为基准。
+func TestAbsPath(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	dir := t.TempDir()
+	t.Chdir(dir) // 固定 cwd，测试不依赖外部目录
 
 	cases := []struct {
-		name string
-		in   string
-		want string
+		name    string
+		in      string
+		want    string
+		wantErr bool
 	}{
-		// 已是绝对路径：原样返回（Clean 规范化冗余段）
-		{"绝对路径原样返回", "/usr/local/bin", "/usr/local/bin"},
-		{"绝对路径脏输入双斜杠", "/usr//local/bin", "/usr/local/bin"},
-		{"绝对路径脏输入点段", "/usr/./local/bin", "/usr/local/bin"},
-		{"绝对路径脏输入双点回退", "/usr/local/../bin", "/usr/bin"},
-
-		// ~/ 前缀：先展开成 home 绝对路径（不再相对 cwd）
-		{"tilde 展开为绝对", "~/code", filepath.Join(home, "code")},
-		{"tilde 展开含脏输入", "~/code//app", filepath.Join(home, "code", "app")},
-		// 仅波浪号本身不展开（非 ~/ 前缀），按相对路径处理 → 相对 cwd
-		{"仅波浪号走相对路径", "~user/x", filepath.Join(wd, "~user", "x")},
-
-		// 相对路径：基于 cwd 转 abs
-		{"相对路径转绝对", "foo/bar", filepath.Join(wd, "foo", "bar")},
-		{"相对路径脏输入双斜杠", "foo//bar", filepath.Join(wd, "foo", "bar")},
-		{"相对路径点段", "foo/./bar", filepath.Join(wd, "foo", "bar")},
-		{"相对路径双点回退", "a/b/../../c", filepath.Join(wd, "c")},
-		{"相对单点", "./app", filepath.Join(wd, "app")},
+		{"单点指 cwd", ".", dir, false},
+		{"./sub 基于 cwd", "./sub", filepath.Join(dir, "sub"), false},
+		{"../x 越过 cwd", "../x", filepath.Clean(filepath.Join(dir, "..", "x")), false},
+		{"绝对路径覆盖 cwd", "/abs", "/abs", false},
+		{"~ 展开优先于 cwd", "~/code", filepath.Join(home, "code"), false},
+		{"空串报错", "", "", true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := ResolvePath(c.in)
+			got, err := AbsPath(c.in)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("AbsPath(%q) 期望报错，实际返回 %q", c.in, got)
+				}
+				return
+			}
 			if err != nil {
-				t.Fatalf("ResolvePath(%q) 出错: %v", c.in, err)
+				t.Fatalf("AbsPath(%q) 出错: %v", c.in, err)
 			}
 			if got != c.want {
-				t.Fatalf("ResolvePath(%q) = %q, want %q", c.in, got, c.want)
+				t.Fatalf("AbsPath(%q) = %q, want %q", c.in, got, c.want)
 			}
 		})
 	}

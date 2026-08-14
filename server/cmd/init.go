@@ -43,7 +43,7 @@ func newInitCmd(a *app.App) *cobra.Command {
   - 目录下已有文件时，询问是否 git add . 并提交 'init'。`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 解析为绝对路径
-			absPath, err := filepath.Abs(pathkit.RealPath(projectPath))
+			absPath, err := pathkit.AbsPath(projectPath)
 			if err != nil {
 				return fmt.Errorf("解析路径失败: %w", err)
 			}

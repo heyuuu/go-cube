@@ -21,14 +21,16 @@ type Paths struct {
 }
 
 func NewPaths(dataDir string) *Paths {
-	dataDir = pathkit.RealPath(dataDir)
-	if dataDir == "" {
-		panic(fmt.Errorf("数据目录不可为空: dir=%s", dataDir))
+	// dataDir 来自 config.json，配置路径不得依赖执行目录（否则换个 cwd 运行数据就漂移），
+	// 相对路径直接 panic 而非静默降级
+	absDataDir, err := pathkit.StaticAbsPath(dataDir)
+	if err != nil {
+		panic(fmt.Errorf("数据目录路径无效: dir=%s err=%w", dataDir, err))
 	}
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
-		panic(fmt.Errorf("创建数据目录失败: dir=%s err=%w", dataDir, err))
+	if err = os.MkdirAll(absDataDir, 0o755); err != nil {
+		panic(fmt.Errorf("创建数据目录失败: dir=%s err=%w", absDataDir, err))
 	}
-	return &Paths{dataDir: dataDir}
+	return &Paths{dataDir: absDataDir}
 }
 
 func (p *Paths) DataDir() string    { return p.dataDir }

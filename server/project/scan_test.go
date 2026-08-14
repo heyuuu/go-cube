@@ -168,6 +168,10 @@ func TestFindByPathAndName(t *testing.T) {
 	if p := s.FindByPath("/nonexistent"); p != nil {
 		t.Fatalf("不存在 path 应返回 nil")
 	}
+	// 相对路径不基于 cwd 猜测（调用方是 web，server 的 cwd 无意义），视为未找到
+	if p := s.FindByPath("./proj"); p != nil {
+		t.Fatalf("相对路径应返回 nil，实际: %v", p)
+	}
 
 	// name 格式 = group:subpath，这里 = g1:proj
 	if p := s.FindByName("g1:proj"); p == nil {
@@ -270,6 +274,27 @@ func TestCloneRule_LocalPathExpansion(t *testing.T) {
 	}
 	if rules[0].LocalPath != home+"/src" {
 		t.Fatalf("clone LocalPath 未展开 ~/，实际 %q，期望 %q", rules[0].LocalPath, home+"/src")
+	}
+}
+
+// TestCloneRule_InvalidLocalPathSkipped clone 规则 LocalPath 为相对路径时降级跳过（不阻断其它规则）。
+// 配置路径不得依赖执行目录，相对路径是配置错误。
+func TestCloneRule_InvalidLocalPathSkipped(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	cfg := config.ProjectConfig{
+		Clone: []config.CloneRuleConfig{
+			{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "relative/src"}, // 相对路径，跳过
+			{RepoHost: "gitee.com", RepoPrefix: "/heyuuu", LocalPath: ws.Dir},          // 绝对路径，保留
+		},
+	}
+	s := NewService(cfg, ws.Mkdir("cache"))
+
+	rules := s.CloneRules()
+	if len(rules) != 1 {
+		t.Fatalf("应只保留 1 条合法 clone 规则，实际 %d", len(rules))
+	}
+	if rules[0].RepoHost != "gitee.com" {
+		t.Fatalf("保留的应是绝对路径规则，实际 host=%s", rules[0].RepoHost)
 	}
 }
 

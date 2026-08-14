@@ -2,6 +2,7 @@ package project
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
@@ -50,10 +51,12 @@ func (s *Service) BuildTree(root string) (TreeNode, error) {
 	if root == "" {
 		root = pathkit.CommonPrefix(paths)
 	} else {
-		root = pathkit.RealPath(root)
-		if abs, err := filepath.Abs(root); err == nil {
-			root = abs
+		// root 来自 web 请求，server 进程的 cwd 对其无意义，只接受绝对路径/~ 前缀
+		abs, err := pathkit.StaticAbsPath(root)
+		if err != nil {
+			return TreeNode{}, fmt.Errorf("解析树根路径失败: root=%s err=%w", root, err)
 		}
+		root = abs
 	}
 
 	// 仅保留 root 子树下的项目

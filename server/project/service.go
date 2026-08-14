@@ -32,9 +32,9 @@ func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 	// scan 规则：展开 ~/ 为绝对路径，校验目录存在（不存在的规则降级跳过，不阻断）
 	var scanRules []ScanRule
 	for _, r := range cfg.Scan {
-		absPath := pathkit.RealPath(r.Path)
-		if absPath == "" {
-			slog.Warn("scan 规则路径为空，跳过", "group", r.Group, "path", r.Path)
+		absPath, err := pathkit.StaticAbsPath(r.Path)
+		if err != nil {
+			slog.Warn("scan 规则路径配置错误，跳过", "group", r.Group, "path", r.Path, "err", err)
 			continue
 		}
 		if info, err := os.Stat(absPath); err != nil || !info.IsDir() {
@@ -49,13 +49,19 @@ func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 	}
 
 	// clone 规则：LocalPath 展开 ~/ 为绝对路径（不校验存在——clone 时会自动创建）
-	cloneRules := slicekit.Map(cfg.Clone, func(r config.CloneRuleConfig) CloneRule {
-		return CloneRule{
+	var cloneRules []CloneRule
+	for _, r := range cfg.Clone {
+		absLocalPath, err := pathkit.StaticAbsPath(r.LocalPath)
+		if err != nil {
+			slog.Warn("clone 本地路径配置错误", "localPath", r.LocalPath, "err", err)
+			continue
+		}
+		cloneRules = append(cloneRules, CloneRule{
 			RepoHost:   r.RepoHost,
 			RepoPrefix: r.RepoPrefix,
-			LocalPath:  pathkit.RealPath(r.LocalPath),
-		}
-	})
+			LocalPath:  absLocalPath,
+		})
+	}
 
 	// 加载 git 信息缓存（降级优先：失败返回空缓存，不报错）
 	gitCache, err := gitcache.Load(cacheDir)
@@ -101,13 +107,15 @@ func (s *Service) FindByName(name string) *Project {
 }
 
 func (s *Service) FindByPath(path string) *Project {
-	realPath := pathkit.RealPath(path)
-	if realPath == "" {
+	// 仅接受绝对路径/~ 前缀（调用方是 web，server 进程的 cwd 对请求路径无意义）；
+	// 相对路径视为未找到而非报错，与「查无此项目」语义一致
+	absPath, err := pathkit.StaticAbsPath(path)
+	if err != nil {
 		return nil
 	}
 
 	for _, proj := range s.Projects() {
-		if proj.Path() == realPath {
+		if proj.Path() == absPath {
 			return proj
 		}
 	}
@@ -121,21 +129,24 @@ func (s *Service) SearchByName(query string) []*Project {
 // SearchByPath 通过路径搜索项目列表
 // up 表示是否向上搜索。用于通过项目子目录标定当前目录时使用。
 // 因为项目子目录不可能是另一个项目的目录或父目录，所以当向上匹配成功时不会出现其他项目
+//
+// path 只接受绝对路径或 ~ 前缀（经 StaticAbsPath 归一化，兼容 web 直接传 ~/xxx）；
+// 相对路径的 cwd 解析是出口层职责（cmd 用 AbsPath），到这里说明调用方传错，按未找到处理。
 func (s *Service) SearchByPath(path string, up bool) []*Project {
-	realPath := pathkit.RealPath(path)
-	if realPath == "" {
+	absPath, err := pathkit.StaticAbsPath(path)
+	if err != nil {
 		return nil
 	}
 
 	var result []*Project
 	for _, proj := range s.Projects() {
 		// 判断 proj 是否在 realpath 目录及子目录中
-		if pathkit.HasPrefix(proj.Path(), realPath) {
+		if pathkit.HasPrefix(proj.Path(), absPath) {
 			result = append(result, proj)
 			continue
 		}
 		// 若向上查找， 判断 proj.Path() 是否在 realpath 父目录
-		if up && pathkit.HasPrefix(realPath, proj.Path()) {
+		if up && pathkit.HasPrefix(absPath, proj.Path()) {
 			result = append(result, proj)
 			continue
 		}

@@ -32,7 +32,10 @@ query 支持两种搜索模式：
 			query := getArg(args, 0)
 
 			// 项目列表
-			projects := searchProjects(a.ProjectService(), query, false)
+			projects, err := searchProjects(a.ProjectService(), query, false)
+			if err != nil {
+				return err
+			}
 
 			// 按 group 过滤
 			if len(group) > 0 {

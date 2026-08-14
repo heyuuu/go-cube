@@ -1,37 +1,64 @@
 package pathkit
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-func RealPath(path string) string {
-	if path == "" {
-		return ""
+func resolveAbs(p string, baseDir string) (string, error) {
+	// 不变量断言：baseDir 只能是 "" 或绝对路径（调用域全在包内，违反即包内代码 bug）。
+	// 代码 bug 优先于业务数据错误暴露，避免被下面的判空掩盖。
+	if baseDir != "" && !filepath.IsAbs(baseDir) {
+		return "", fmt.Errorf("baseDir 必须为绝对路径或为空: %s", baseDir)
 	}
+	// 判空
+	if p == "" {
+		return "", errors.New("路径不可为空")
+	}
+
+	// 绝对路径，baseDir 不参与
+	if filepath.IsAbs(p) {
+		return filepath.Clean(p), nil
+	}
+
 	// 支持 ~ 前缀
-	if path == "~" || strings.HasPrefix(path, "~/") {
-		if home, err := os.UserHomeDir(); err == nil && home != "" {
-			if path == "~" {
-				return home
-			} else {
-				return filepath.Join(home, path[2:])
-			}
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("获取 home 路径失败: %w", err)
+		} else if home == "" {
+			return "", errors.New("home 路径为空")
 		}
+		// TrimPrefix 后 "~" 得 ""（Join 返回 home 本身），两种形态统一处理
+		return filepath.Join(home, strings.TrimPrefix(p, "~")), nil
 	}
-	return filepath.Clean(path)
+
+	// 显式相对路径语法：. / .. / ./x / ../x，基于 baseDir 解析。
+	// .abc 这类以点开头的文件名不算——那是裸相对，和 sub/x 一样说明调用方传错，
+	// 报错而非猜测拼接（cmd 层靠前缀区分 path/name 两种 query 模式，裸相对走 name 分支）。
+	if baseDir != "" && (p == "." || p == ".." || strings.HasPrefix(p, "./") || strings.HasPrefix(p, "../")) {
+		return filepath.Join(baseDir, p), nil
+	}
+
+	// 无 baseDir 时相对路径无处解析
+	return "", fmt.Errorf("路径必须是绝对路径、~ 前缀或显式相对路径(./ ../): %s", p)
 }
 
-// ResolvePath 把用户输入的路径展开为绝对路径：先用 RealPath 展开 ~/，
-// 再用 filepath.Abs 把相对路径基于当前工作目录转为绝对路径。
-func ResolvePath(p string) (string, error) {
-	abs, err := filepath.Abs(RealPath(p))
+// StaticAbsPath 解析 path 对应的绝对路径，支持以 ~ 表示 home 路径，不支持绝对路径
+func StaticAbsPath(p string) (string, error) {
+	return resolveAbs(p, "")
+}
+
+// AbsPath 解析 path 对应的绝对路径，支持以 ~ 表示 home 路径，支持 . 或 .. 开头的相对路径
+func AbsPath(p string) (string, error) {
+	wd, err := os.Getwd()
 	if err != nil {
-		return "", fmt.Errorf("解析路径失败: %w", err)
+		return "", fmt.Errorf("获取当前目录失败: %w", err)
 	}
-	return abs, nil
+	return resolveAbs(p, wd)
 }
 
 func PrettyPath(path string) string {

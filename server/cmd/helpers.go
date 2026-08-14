@@ -26,13 +26,20 @@ func isPathQuery(query string) bool {
 
 // searchProjects 搜索项目列表
 //
-// query 为搜索关键词，默认为搜索项目名；当以`.`/`~`/`/` 开头时，当做路径
+// query 为搜索关键词，默认为搜索项目名；当以`.`/`~`/`/` 开头时，当做路径。
+// 路径 query 在本层用 AbsPath 基于 cwd 解析为绝对路径后再传入 domain——
+// cwd 依赖属于出口层职责，domain 只接受绝对路径/~ 前缀。
 // upper 表示是否向上搜索。仅 query 为路径时生效，用于在项目子目录标定当前目录时使用。
-func searchProjects(service *project.Service, query string, up bool) []*project.Project {
+func searchProjects(service *project.Service, query string, up bool) ([]*project.Project, error) {
 	if isPathQuery(query) {
-		return service.SearchByPath(query, up)
+		absPath, err := pathkit.AbsPath(query)
+		if err != nil {
+			return nil, fmt.Errorf("解析路径 query 失败: query=%s err=%w", query, err)
+		}
+
+		return service.SearchByPath(absPath, up), nil
 	} else {
-		return service.SearchByName(query)
+		return service.SearchByName(query), nil
 	}
 }
 
@@ -40,7 +47,11 @@ func searchProjects(service *project.Service, query string, up bool) []*project.
 //
 // 非交互环境不支持多项选择，会报错提示使用精确名称或路径。
 func pickProject(service *project.Service, query string) (*project.Project, error) {
-	projects := searchProjects(service, query, true)
+	projects, err := searchProjects(service, query, true)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(projects) == 0 {
 		return nil, fmt.Errorf("未找到匹配的 project: query=`%s`", query)
 	} else if len(projects) == 1 {
@@ -64,7 +75,7 @@ func pickProject(service *project.Service, query string) (*project.Project, erro
 // checkOpenPath 解析并校验路径：返回绝对路径及其是否为目录。
 func checkOpenPath(path string) (absPath string, isDir bool, err error) {
 	// 获取绝对路径
-	absPath, err = pathkit.ResolvePath(path)
+	absPath, err = pathkit.AbsPath(path)
 	if err != nil {
 		return "", false, err
 	}
