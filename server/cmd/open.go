@@ -1,33 +1,36 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/spf13/cobra"
 
 	"cube/app"
+	"cube/opener"
 )
 
-// cmd `project open`
+// cmd `cube open`
 func newOpenCmd(a *app.App) *cobra.Command {
-	var appName string
+	var openerName string
 	cmd := &cobra.Command{
-		Use:   "open {project : 项目名} {--app= : 打开项目的App}",
+		Use:   "open [query] [-o|--opener=打开工具名]",
 		Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			query := args[0]
+		Long: `用指定 app(opener) 打开一个已收录的项目目录。
 
-			// 获取打开项目的app
-			openerService := a.OpenerService()
-			openApp := openerService.FindByName(appName)
-			if openApp == nil {
-				return errors.New("未找到指定app: " + appName)
-			}
+query 支持项目名和项目列表模糊搜索，具体规则同 info 命令。
+--opener 为 opener 名称，支持模糊搜索。`,
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			query := getArg(args, 0)
 
 			// 匹配项目
 			proj, err := pickProject(a.ProjectService(), query)
+			if err != nil {
+				return err
+			}
+
+			// 选 opener
+			openApp, err := pickOpener(a.OpenerService(), opener.RoleOpenDir, openerName)
 			if err != nil {
 				return err
 			}
@@ -41,6 +44,6 @@ func newOpenCmd(a *app.App) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVar(&appName, "app", "", "打开项目的App")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 支持模糊搜索")
 	return cmd
 }

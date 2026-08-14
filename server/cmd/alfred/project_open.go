@@ -30,7 +30,7 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 				return errors.New("未找到指定项目: " + projectName)
 			}
 
-			// 获取打开项目的app
+			// 按 opener 名精确查找（区别于主命令的模糊 pickOpener）
 			openerService := a.OpenerService()
 			opener := openerService.FindByName(openerName)
 			if opener == nil {
@@ -47,6 +47,6 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开项目的 Opener")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 精确匹配")
 	return cmd
 }

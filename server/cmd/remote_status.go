@@ -8,35 +8,37 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/util/git"
 	"cube/util/gogit"
-	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
-// remoteStatusCmd 是 `cube gitx remote-status` 命令入口。
+// newRemoteStatusCmd 是 `cube remote-status` 命令入口。
 //
+// query 定位已收录项目（规则同 info），以项目根为 git 仓库。
 // 列出「本地分支 ∩ 各 remote 同名分支的并集」中，每个分支相对每个 remote 上
 // 对应分支的 ahead / behind commit 数。宽表：每 remote 占一列，内容形如 "+3/-1"。
 // 当前分支用 "*" 标记；某 remote 没有该分支则该格显示 "-"。
 func newRemoteStatusCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "remote-status [仓库路径]",
+		Use:   "remote-status [query]",
 		Short: "列出本地分支与各 remote 对应分支的 commit 差距（ahead/behind）",
+		Long: `以宽表展示每个本地分支相对各 remote 同名分支的 commit 差距，
+每个 remote 占一列，内容形如 "+3/-1"。
+
+只统计本地与任一 remote 同名的分支；当前分支名前带 "*"，
+某 remote 没有该分支显示 "-"，已同步（0/0）显示 "✓"。
+
+query 定位目标项目（支持项目名或路径模糊搜索，规则同 info 命令），
+不传时交互选择；以项目根目录作为 git 仓库。`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 解析仓库根
-			var pathHint string
-			if len(args) > 0 {
-				pathHint = args[0]
-			}
-			start, err := pathkit.ResolvePath(pathHint)
+			// 1. 定位项目：query 匹配（规则同 info），以项目根为仓库
+			query := getArg(args, 0)
+			proj, err := pickProject(a.ProjectService(), query)
 			if err != nil {
 				return err
 			}
-			repoPath, ok := git.FindGitRoot(start)
-			if !ok {
-				return fmt.Errorf("未找到 git 仓库（向上探测 .git 失败）: %s", start)
-			}
+			repoPath := proj.Path()
 
 			// 2. 收集数据：本地分支 / 当前分支 / remote 列表 / 远程分支
 			localBranches, currentBranch, err := gogit.Branches(repoPath)

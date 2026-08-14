@@ -19,11 +19,20 @@ const (
 
 var allCheckItems = []string{checkItemCloneRules, checkItemGitDirty}
 
-// cmd `project list`
+// cmd `cube check`
 func newCheckCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check <options>...",
 		Short: "检查项目(目前 options 有: clone-rules)，不传会检查所有项目",
+		Long: `对已收录的项目做批量体检，找出需要关注的项目。
+
+目前支持的检查项：
+  - clone-rules：repoUrl 能匹配 clone 规则、但实际路径
+    与规则预期路径不一致的项目。
+  - git-dirty：未与 remote 默认分支保持一致的项目，
+    包括不在默认分支、有 ahead/behind 差异、工作区 dirty。
+
+不传 options 时，依次执行全部检查项。`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			options := args
 			if len(options) == 0 {
@@ -87,7 +96,7 @@ func checkCloneRules(service *project.Service) {
 	tui.PrintTable(headers, rows)
 }
 
-// 过滤出所有 remote 但不与 remote 主分支保持一致的项目
+// 过滤出未与 remote 默认分支保持一致的项目
 func checkGitDirty(service *project.Service) {
 	projects := service.Projects()
 

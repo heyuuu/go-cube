@@ -17,7 +17,7 @@ func newProjectsCmd(a *app.App) *cobra.Command {
 	var group string
 	cmd := &cobra.Command{
 		Use:   "projects [query] [-g|--group=组名]",
-		Short: "项目列表(支持模糊搜索)",
+		Short: "项目列表(支持项目名或项目路径模糊搜索)",
 		Long: `显示项目列表，支持按项目名称或项目路径进行搜索。
 
 query 支持两种搜索模式：

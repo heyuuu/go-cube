@@ -19,7 +19,13 @@ func newOpenapiCmd(a *app.App) *cobra.Command {
 		Use:     "openapi",
 		Aliases: []string{"api"},
 		Short:   "生成 OpenAPI 3.1 spec 到文件",
-		Args:    cobra.NoArgs,
+		Long: `导出 cube server HTTP API 的 OpenAPI 3.1 spec 到文件，
+用于人工检查或给对接工具使用。
+
+生成不依赖 server 运行，直接来自装配好的路由；输出为
+2 空格缩进的格式化 JSON，默认写 openapi.json，
+-o 可指定输出路径（所在目录不存在会自动创建）。`,
+		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return writeOpenAPIFile(a.Server(), outPath)
 		},

@@ -199,6 +199,87 @@ func TestAheadBehind_NoRemote(t *testing.T) {
 	_ = behind
 }
 
+// TestBranches_OnlyLocalRefs 带斜杠的本地分支（feature/fix-bug）必须返回，
+// 远程跟踪引用（refs/remotes/origin/*）不得混入（push 依赖此约定选本地分支）。
+func TestBranches_OnlyLocalRefs(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{RemoteUrl: "/tmp/some-remote.git"})
+
+	_, current, err := Branches(dir)
+	if err != nil {
+		t.Fatalf("Branches 出错: %v", err)
+	}
+	// 建带斜杠的本地分支 + 造一个远程跟踪引用（比 fetch 轻，refs 层面等价）
+	directGit(t, dir, "branch", "feature/fix-bug")
+	directGit(t, dir, "update-ref", "refs/remotes/origin/"+current, "refs/heads/"+current)
+
+	branches, _, err := Branches(dir)
+	if err != nil {
+		t.Fatalf("Branches 出错: %v", err)
+	}
+	hasSlashBranch := false
+	for _, b := range branches {
+		if b == "origin/"+current {
+			t.Fatalf("分支列表 %v 混入了远程跟踪分支 origin/%s", branches, current)
+		}
+		if b == "feature/fix-bug" {
+			hasSlashBranch = true
+		}
+	}
+	if !hasSlashBranch {
+		t.Fatalf("分支列表 %v 不含带斜杠的本地分支 feature/fix-bug", branches)
+	}
+}
+
+// TestAheadBehindRemote_SlashBranch 斜杠分支（feature/fix-bug）端到端：
+// 本地领先 remote 2 个 commit；同时验证 RemoteBranches 对斜杠远程分支的解析
+// （remote-status 宽表按短名交集 + 每格调 AheadBehindRemote，依赖这两个行为）。
+func TestAheadBehindRemote_SlashBranch(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "master"})
+
+	// remote 跟踪引用停在 master 当前位置，本地 feature/fix-bug 在其上追加 2 commit
+	directGit(t, dir, "branch", "feature/fix-bug")
+	directGit(t, dir, "update-ref", "refs/remotes/origin/feature/fix-bug", "refs/heads/master")
+	directGit(t, dir, "checkout", "feature/fix-bug")
+	directGit(t, dir, "commit", "--allow-empty", "-m", "ahead 1")
+	directGit(t, dir, "commit", "--allow-empty", "-m", "ahead 2")
+
+	ahead, behind, err := AheadBehindRemote(dir, "feature/fix-bug", "origin", "feature/fix-bug")
+	if err != nil {
+		t.Fatalf("AheadBehindRemote 出错: %v", err)
+	}
+	if ahead != 2 || behind != 0 {
+		t.Fatalf("ahead/behind = %d/%d，期望 2/0", ahead, behind)
+	}
+
+	// RemoteBranches 解析：refs/remotes/origin/feature/fix-bug → {origin, feature/fix-bug}
+	remoteBranches, err := RemoteBranches(dir)
+	if err != nil {
+		t.Fatalf("RemoteBranches 出错: %v", err)
+	}
+	found := false
+	for _, rb := range remoteBranches {
+		if rb.Remote == "origin" && rb.Branch == "feature/fix-bug" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("RemoteBranches %v 不含 {origin, feature/fix-bug}", remoteBranches)
+	}
+}
+
+// directGit 在 dir 下直接调 git（带测试 user 配置），fixture 未覆盖的场景用。
+func directGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git",
+		append([]string{"-c", "user.email=test@cube.local", "-c", "user.name=cube-test"}, args...)...)
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v in %s 失败: %v\n%s", args, dir, err, out)
+	}
+}
+
 // directAddRemote 直接调 git remote add（fixture 只支持 origin，额外 remote 在此加）。
 func directAddRemote(t *testing.T, dir, name, url string) {
 	t.Helper()

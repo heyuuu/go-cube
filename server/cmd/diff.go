@@ -11,13 +11,19 @@ import (
 	"cube/util/tui"
 )
 
-// RootCmd 是 `cube diff` 命令入口。
+// newDiffCmd 是 `cube diff` 命令入口。
 func newDiffCmd(a *app.App) *cobra.Command {
 	var openerName string
 	cmd := &cobra.Command{
-		Use:   "diff <path1> <path2> [:-o|--opener= 对比工具名]",
+		Use:   "diff <path1> <path2> [-o|--opener=打开工具名]",
 		Short: "用对比工具(opener)对比两个路径（同为 dir 或同为 file）",
-		Args:  cobra.ExactArgs(2),
+		Long: `用对比工具(opener)对比两个路径，路径须真实存在且类型一致
+（同为目录或同为文件）。
+
+按路径类型自动选择 role（目录 → diff-dir，文件 → diff-file），
+再从声明了该 role 的 opener 中挑选：-o 精确指定名称；
+未指定时模糊匹配，命中多个则进入交互选择。`,
+		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查两个路径
 			path1, isDir1, err := checkOpenPath(args[0])
@@ -56,6 +62,6 @@ func newDiffCmd(a *app.App) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "对比工具(opener)名")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 支持模糊搜索")
 	return cmd
 }

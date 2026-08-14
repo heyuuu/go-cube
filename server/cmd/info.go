@@ -11,11 +11,17 @@ import (
 
 func newInfoCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "info <query>",
-		Short: "项目详情(支持模糊搜索)",
-		Args:  cobra.ExactArgs(1),
+		Use:   "info [query]",
+		Short: "项目详情(支持项目名或项目路径模糊搜索)",
+		Long: `显示单个项目的详情。
+
+query 支持两种搜索模式：
+  - 项目名称搜索：按关键词模糊匹配项目名称（默认）。
+  - 项目路径搜索：当 query 以 '.'、'~' 或 '/' 开头时触发，
+    搜索给定路径及其所有子目录中的项目。`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			query := args[0]
+			query := getArg(args, 0)
 
 			// 匹配项目
 			proj, err := pickProject(a.ProjectService(), query)

@@ -1,6 +1,6 @@
 // Package server 提供 `cube server` 命令族：管理本地 web server 的生命周期。
 //
-// 命令族（进程管理走 HTTP API，参 docs/proposals/260811-server按需启动/）：
+// 命令族（进程管理走 HTTP API，参 docs/archived/260811-server后台常驻与HTTP管理/）：
 //
 //	cube server              # = cube server start（兼容现状）
 //	cube server start        # 前台启动（开发/调试用）

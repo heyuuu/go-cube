@@ -27,12 +27,20 @@ const defaultGitignore = `# macOS
 tmp/
 `
 
-// cmd `project init`
+// cmd `cube init`
 func newInitCmd(a *app.App) *cobra.Command {
 	var projectPath string
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "在指定目录初始化一个项目(本质是初始化 git 仓库)",
+		Long: `在指定目录初始化一个新项目，本质是初始化 git 仓库。
+
+目录必须已存在，且从该目录向上探测不得已有 .git
+（不允许在已有仓库内重复初始化）。
+
+初始化过程按需交互确认：
+  - 目录下没有 .gitignore 时，询问是否用内置模板创建一个。
+  - 目录下已有文件时，询问是否 git add . 并提交 'init'。`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 解析为绝对路径
 			absPath, err := filepath.Abs(pathkit.RealPath(projectPath))

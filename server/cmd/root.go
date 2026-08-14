@@ -21,6 +21,15 @@ func newRootCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cube",
 		Short: "cube " + version.Version,
+		Long: `cube —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。
+
+命令按领域分组：
+  - 项目：projects(列表) info(详情) open(打开) init/clone(初始化) check(检查)
+  - opener：openers(列表) open-path(打开路径) diff(对比)
+  - git：push(批量推送) remote-status(分支与 remote 差距)
+  - Web：server(本地服务) openapi(导出 API spec)
+
+配置默认在 ~/.config/cube/，全局 flag -c 可覆盖配置目录，-d 开 debug 日志。`,
 	}
 
 	cmd.AddCommand(newVersionCmd(a))

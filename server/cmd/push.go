@@ -10,15 +10,15 @@ import (
 	"cube/app"
 	"cube/util/git"
 	"cube/util/gogit"
-	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
-// pushCmd 是 `cube gitx push` 命令入口。
+// newPushCmd 是 `cube push` 命令入口。
 //
-// 行为：在指定仓库（默认从当前工作目录向上探测）里，把多个分支 / tag
-// 批量推送到多个 remote。remotes 与 refs 都通过 TUI 多选交互确认；
-// 当前分支默认勾选，全部 remote 默认勾选。最后展示推送计划并二次确认后执行。
+// 行为：query 定位已收录项目（规则同 info），以项目根为 git 仓库，
+// 把多个分支 / tag 批量推送到多个 remote。remotes 与 refs 都通过 TUI
+// 多选交互确认；当前分支默认勾选，全部 remote 默认勾选。最后展示推送
+// 计划并二次确认后执行。
 //
 // 非 TTY 环境（脚本）下可改用 flag 显式指定：--remote（可多次）/ --ref（可多次），
 // 此时跳过对应交互；--force 启用 --force-with-lease。
@@ -30,22 +30,28 @@ func newPushCmd(a *app.App) *cobra.Command {
 		yes     bool
 	)
 	cmd := &cobra.Command{
-		Use:   "push [仓库路径]",
+		Use:   "push [query]",
 		Short: "把选中的分支/tag 批量推送到多个 remote",
+		Long: `把多个分支 / tag 批量推送到多个 remote。
+
+query 定位目标项目（支持项目名或路径模糊搜索，规则同 info 命令），
+不传时交互选择；以项目根目录作为 git 仓库执行后续操作。
+
+remote 与 ref 默认通过 TUI 多选交互确认：remote 默认全选，
+ref 默认勾选当前分支；执行前展示推送计划并二次确认。
+
+非 TTY 环境（脚本）改用 flag 显式指定：--remote / --ref
+（均可多次指定），跳过对应交互；--force 走 --force-with-lease，
+--yes 跳过最终确认。单条 push 失败不中断，最后汇总结果。`,
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 解析仓库根：参数路径（可空）展开为绝对路径，再向上探测 .git
-			var pathHint string
-			if len(args) > 0 {
-				pathHint = args[0]
-			}
-			start, err := pathkit.ResolvePath(pathHint)
+			// 1. 定位项目：query 匹配（规则同 info），以项目根为仓库
+			query := getArg(args, 0)
+			proj, err := pickProject(a.ProjectService(), query)
 			if err != nil {
 				return err
 			}
-			repoPath, ok := git.FindGitRoot(start)
-			if !ok {
-				return fmt.Errorf("未找到 git 仓库（向上探测 .git 失败）: %s", start)
-			}
+			repoPath := proj.Path()
 
 			// 2. 收集 remote / refs 候选
 			repoRemotes, err := gogit.Remotes(repoPath)
@@ -56,11 +62,10 @@ func newPushCmd(a *app.App) *cobra.Command {
 				return errors.New("仓库未配置任何 remote，无可推送目标")
 			}
 
-			localBranches, currentBranch, err := gogit.Branches(repoPath)
+			branches, currentBranch, err := gogit.Branches(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取分支列表失败: %w", err)
 			}
-			branches := filterLocalBranches(localBranches)
 			tags, err := gogit.Tags(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 tag 列表失败: %w", err)
@@ -113,18 +118,6 @@ func newPushCmd(a *app.App) *cobra.Command {
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "强制推送（使用 --force-with-lease）")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "跳过最终确认，直接推送")
 	return cmd
-}
-
-// filterLocalBranches 从 gogit.Branches 的输出里筛出本地分支（去掉 origin/* 这种远程分支）。
-func filterLocalBranches(all []string) []string {
-	var local []string
-	for _, b := range all {
-		if strings.Contains(b, "/") {
-			continue // origin/master 等远程分支
-		}
-		local = append(local, b)
-	}
-	return local
 }
 
 // pickRemotes 决定要推送的 remote 集合：flag 显式指定优先，否则 TUI 多选（默认全选）。
