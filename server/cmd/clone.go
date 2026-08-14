@@ -14,7 +14,7 @@ func newCloneCmd(a *app.App) *cobra.Command {
 	var depth int
 	var branch string
 	cmd := &cobra.Command{
-		Use:   "clone [repoUrl [--depth=克隆深度，默认为不限制] [--b|branch=分支名]",
+		Use:   "clone <repoUrl> [--depth=克隆深度，默认为不限制] [--b|branch=分支名]",
 		Short: "使用 RepoUrl 初始化项目",
 		Long: `按 clone 规则克隆仓库，自动落地到规则推导出的本地路径。
 

@@ -192,6 +192,63 @@ func TestScanRules_Getter(t *testing.T) {
 	}
 }
 
+// TestMatchScanRule 判定「git init 后能否被 scan 收录为新项目」（纯函数，表驱动）。
+// 判定语义需与 scanOne 遍历一致：位于规则根下 maxDepth 层级内，
+// 且从规则根到目标路径的各级目录名不以 . / _ 开头。
+func TestMatchScanRule(t *testing.T) {
+	rules := []ScanRule{
+		{Group: "g", Path: "/w/code", MaxDepth: 2},
+		{Group: "go", Path: "/w/code/go", MaxDepth: 3},
+		{Group: "hid", Path: "/w/.hidden", MaxDepth: 3},
+	}
+
+	cases := []struct {
+		name     string
+		path     string
+		wantOK   bool
+		wantName string
+	}{
+		{"规则根直接子目录", "/w/code/proj", true, "g:proj"},
+		{"目标即规则根本身", "/w/code", true, "g:g"},
+		{"深度恰好等于 maxDepth", "/w/code/a/b", true, "g:a/b"},
+		{"深度超出全部规则", "/w/code/a/b/c", false, ""},
+		{"多规则命中取最内层", "/w/code/go/x", true, "go:x"},
+		{"外层规则超深但内层命中", "/w/code/go/x/y", true, "go:x/y"},
+		{"规则根本身以 . 开头", "/w/.hidden/proj", false, ""},
+		{"中间目录以 _ 开头", "/w/code/_drafts/proj", false, ""},
+		{"目标目录自身以 . 开头", "/w/code/.config", false, ""},
+		{"不在任何规则目录下", "/w/other/proj", false, ""},
+		{"仅前缀字符串相似的兄弟路径", "/w/code2/proj", false, ""},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, name, ok := MatchScanRule(c.path, rules)
+			if ok != c.wantOK {
+				t.Fatalf("ok = %v，期望 %v", ok, c.wantOK)
+			}
+			if ok && name != c.wantName {
+				t.Fatalf("name = %q，期望 %q", name, c.wantName)
+			}
+		})
+	}
+}
+
+// TestService_MatchScanRule Service 委托方法用构造时的规则判定。
+func TestService_MatchScanRule(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	root := ws.Mkdir("root")
+	s := newServiceAt(t, root, "g1", 3)
+
+	rule, name, ok := s.MatchScanRule(ws.Join("root", "proj"))
+	if !ok || rule.Group != "g1" || name != "g1:proj" {
+		t.Fatalf("MatchScanRule = (group=%q, name=%q, ok=%v)，期望 (g1, g1:proj, true)", rule.Group, name, ok)
+	}
+	if _, _, ok := s.MatchScanRule("/nonexistent/outside"); ok {
+		t.Fatalf("规则外路径不应命中")
+	}
+}
+
 // TestScan_HomePathExpansion 验证 scan 规则路径里的 ~/ 被展开为绝对路径。
 // 这是用户配置常见场景（写 ~/Code 而非 /Users/xxx/Code）。
 func TestScan_HomePathExpansion(t *testing.T) {

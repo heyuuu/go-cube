@@ -77,10 +77,14 @@ func scanOne(r ScanRule) ([]*Project, error) {
 	return projects, nil
 }
 
+// skipDirName 判断目录名是否被扫描跳过（以 "." 或 "_" 开头）。
+func skipDirName(name string) bool {
+	return strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_")
+}
+
 func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 	// 跳过特殊前缀的目录
-	var name = filepath.Base(path)
-	if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "_") {
+	if skipDirName(filepath.Base(path)) {
 		return false, nil, fs.SkipDir
 	}
 
@@ -109,4 +113,54 @@ func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 		return true, tags, nil
 	}
 	return false, nil, nil
+}
+
+// MatchScanRule 判断 absPath（git init 后）能否被 scan 收录为新项目，
+// 返回匹配的规则及对应项目名。多条规则命中时取根路径最长的一条（最内层规则），
+// 与 MatchCloneRule 的最长前缀取舍一致。
+//
+// 判定条件与 scanOne 的遍历语义一致：
+//   - absPath 位于规则根目录之下（或即根目录本身），相对深度 <= maxDepth
+//   - 从规则根（含）到 absPath 的每一级目录名均不以 "." 或 "_" 开头——
+//     否则遍历在上级就返回 SkipDir，永远不会到达 absPath
+func MatchScanRule(absPath string, rules []ScanRule) (rule ScanRule, name string, ok bool) {
+	for _, r := range rules {
+		rel, err := filepath.Rel(r.Path, absPath)
+		if err != nil || strings.HasPrefix(rel, "..") {
+			continue // absPath 不在该规则根目录之下
+		}
+
+		// 深度检查：rel == "." 表示 absPath 即规则根自身（深度 0）
+		depth := 0
+		if rel != "." {
+			depth = strings.Count(rel, string(filepath.Separator)) + 1
+		}
+		if depth > r.MaxDepth {
+			continue
+		}
+
+		// 前缀检查：规则根到 absPath 的每一级目录都不得以 "." / "_" 开头
+		if skipDirName(filepath.Base(r.Path)) || relHasSkipDirName(rel) {
+			continue
+		}
+
+		if !ok || len(r.Path) > len(rule.Path) {
+			rule, name, ok = r, projectName(r, absPath), true
+		}
+	}
+	return
+}
+
+// relHasSkipDirName 判断相对路径 rel 的任一级目录名是否被扫描跳过。
+// rel 为 "."（路径即规则根，无中间层级）时返回 false。
+func relHasSkipDirName(rel string) bool {
+	if rel == "." {
+		return false
+	}
+	for _, part := range strings.Split(rel, string(filepath.Separator)) {
+		if skipDirName(part) {
+			return true
+		}
+	}
+	return false
 }

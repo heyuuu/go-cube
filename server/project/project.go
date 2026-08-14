@@ -10,19 +10,23 @@ type Project struct {
 }
 
 func newProject(r ScanRule, path string, tags []string) *Project {
-	// 尝试使用相对工作区路径作为项目名；若整个工作区即为当前项目，则直接使用工作区名
-	subName, _ := filepath.Rel(r.Path, path)
-	if subName == "." {
-		subName = r.Group
-	}
-
 	// 构建项目数据
 	return &Project{
 		path:  path,
 		group: r.Group,
-		name:  r.Group + ":" + subName,
+		name:  projectName(r, path),
 		tags:  tags,
 	}
+}
+
+// projectName 计算项目展示名 `{组名}:{组内相对路径}`。
+// 若整个工作区即为当前项目（path 即规则根），则直接使用工作区名。
+func projectName(r ScanRule, path string) string {
+	subName, _ := filepath.Rel(r.Path, path)
+	if subName == "." {
+		subName = r.Group
+	}
+	return r.Group + ":" + subName
 }
 
 func (p *Project) Group() string  { return p.group }

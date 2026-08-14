@@ -1,60 +1,35 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 
 	"cube/app"
+	"cube/opener"
 	"cube/util/git"
 	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
-// defaultGitignore 是新建 .gitignore 时使用的最小模板
-const defaultGitignore = `# macOS
-.DS_Store
-
-# IDE
-.idea/
-.vscode/
-*.swp
-
-# 日志与临时文件
-*.log
-tmp/
-`
-
 // cmd `cube init`
 func newInitCmd(a *app.App) *cobra.Command {
-	var projectPath string
 	cmd := &cobra.Command{
-		Use:   "init",
+		Use:   "init <path>",
 		Short: "在指定目录初始化一个项目(本质是初始化 git 仓库)",
 		Long: `在指定目录初始化一个新项目，本质是初始化 git 仓库。
 
-目录必须已存在，且从该目录向上探测不得已有 .git
-（不允许在已有仓库内重复初始化）。
-
-初始化过程按需交互确认：
-  - 目录下没有 .gitignore 时，询问是否用内置模板创建一个。
-  - 目录下已有文件时，询问是否 git add . 并提交 'init'。`,
+目录必须能被 scan 规则收录为新项目，否则初始化出来的目录 cube 无法识别。`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			rawPath := args[0]
+
 			// 解析为绝对路径
-			absPath, err := pathkit.AbsPath(projectPath)
+			absPath, err := pathkit.AbsPath(rawPath)
 			if err != nil {
 				return fmt.Errorf("解析路径失败: %w", err)
-			}
-
-			// 目录必须存在
-			info, err := os.Stat(absPath)
-			if err != nil {
-				return fmt.Errorf("目录不存在或不可访问: %s", absPath)
-			}
-			if !info.IsDir() {
-				return fmt.Errorf("指定路径不是目录: %s", absPath)
 			}
 
 			// 检查：从当前目录向上查找，若任意层级已存在 .git 则报错退出
@@ -63,74 +38,77 @@ func newInitCmd(a *app.App) *cobra.Command {
 					pathkit.PrettyPath(absPath), pathkit.PrettyPath(existingGit))
 			}
 
+			// 检查：路径能被 scan 规则收录为新项目（init 出一个 cube 看不见的目录没有意义）
+			_, projName, ok := a.ProjectService().MatchScanRule(absPath)
+			if !ok {
+				return fmt.Errorf("路径 %s 无法被 scan 收录为项目：需位于某条 scan 规则目录的 maxDepth 层级内，且各级目录名不以 . 或 _ 开头",
+					pathkit.PrettyPath(absPath))
+			}
+
+			// 已存在时必须是目录；不存在走后面的创建流程
+			info, err := os.Stat(absPath)
+			if err == nil { // 路径存在时，判断是否为目录
+				if !info.IsDir() {
+					return fmt.Errorf("指定路径不是目录: %s", absPath)
+				}
+			} else if os.IsNotExist(err) { // 路径不存在时，询问是否创建
+				err = confirmForCreateDir(absPath)
+				if err != nil {
+					return err
+				}
+			} else {
+				return fmt.Errorf("目录不可访问: %s", absPath)
+			}
+
 			// 执行 git init
 			fmt.Printf("> 在 %s 执行 git init\n", pathkit.PrettyPath(absPath))
 			if err = git.Init(absPath); err != nil {
 				return fmt.Errorf("git init 失败: %w", err)
 			}
 
-			// 若当前目录没有 .gitignore，询问是否创建一个
-			gitignorePath := filepath.Join(absPath, ".gitignore")
-			if _, err = os.Stat(gitignorePath); os.IsNotExist(err) {
-				ok, err := tui.Confirm("当前目录没有 .gitignore，是否创建一个？")
-				if err != nil {
-					return err
-				}
-				if ok {
-					if err = os.WriteFile(gitignorePath, []byte(defaultGitignore), 0644); err != nil {
-						return fmt.Errorf("创建 .gitignore 失败: %w", err)
-					}
-					fmt.Println("> 已创建 .gitignore")
-				}
-			}
-
-			// 若当前目录有文件，询问是否 git add . 及是否 git commit -m 'init'
-			if hasFiles(absPath) {
-				ok, err := tui.Confirm("当前目录存在文件，是否执行 git add . ？")
-				if err != nil {
-					return err
-				}
-				if ok {
-					if err = git.Add(absPath, "."); err != nil {
-						return fmt.Errorf("git add 失败: %w", err)
-					}
-					fmt.Println("> git add . 完成")
-
-					ok, err := tui.Confirm("是否执行 git commit -m 'init' ？")
-					if err != nil {
-						return err
-					}
-					if ok {
-						if err = git.Commit(absPath, "init"); err != nil {
-							return fmt.Errorf("git commit 失败: %w", err)
-						}
-						fmt.Println("> git commit 完成")
-					}
-				}
-			}
-
 			fmt.Printf("\n> 项目初始化完成: %s\n", pathkit.PrettyPath(absPath))
+			fmt.Printf("> 后续可用 cube open %s 打开项目\n", projName)
+
+			// TTY 环境询问是否直接打开项目。不走项目搜索——新项目要下次扫描才会出现在列表里
+			if !tui.IsTTY() {
+				return nil
+			}
+			open, err := tui.Confirm("是否直接打开项目？")
+			if err != nil {
+				if errors.Is(err, tui.ErrNotTTY) {
+					return nil // 非交互环境跳过打开询问；init 本身已完成，不报为失败
+				}
+				return err
+			}
+			if !open {
+				return nil
+			}
+
+			// 打开逻辑同 cube open：按 open-dir role 挑选 opener 后打开目录
+			openApp, err := pickOpener(a.OpenerService(), opener.RoleOpenDir, "")
+			if err != nil {
+				return err
+			}
+			if err = openApp.Open(absPath); err != nil {
+				return fmt.Errorf("打开失败: %w", err)
+			}
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&projectPath, "path", "p", ".", "待初始化的项目目录")
 	return cmd
 }
 
-// findGitRoot / runGit 等 git 操作已合并入 util/git 包
-// （对应 git.FindGitRoot / git.Run / git.Init / git.Add / git.Commit）。
-
-// hasFiles 判断目录下是否存在任何条目（不递归，忽略 .git）。
-func hasFiles(dir string) bool {
-	entries, err := os.ReadDir(dir)
+func confirmForCreateDir(dir string) error {
+	create, err := tui.Confirm(fmt.Sprintf("目录 %s 不存在，是否创建？", pathkit.PrettyPath(dir)))
 	if err != nil {
-		return false
+		return fmt.Errorf("询问是否创建目录失败: %w", err)
 	}
-	for _, e := range entries {
-		if e.Name() == ".git" {
-			continue
-		}
-		return true
+	if !create {
+		return errors.New("用户取消创建目录，初始化终止")
 	}
-	return false
+	if err = os.MkdirAll(dir, 0o755); err != nil {
+		return fmt.Errorf("创建目录失败: %w", err)
+	}
+	fmt.Printf("> 已创建目录 %s\n", pathkit.PrettyPath(dir))
+	return nil
 }

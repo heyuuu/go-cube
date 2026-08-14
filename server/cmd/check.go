@@ -22,7 +22,7 @@ var allCheckItems = []string{checkItemCloneRules, checkItemGitDirty}
 // cmd `cube check`
 func newCheckCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "check <options>...",
+		Use:   "check [options...]",
 		Short: "检查项目(目前 options 有: clone-rules)，不传会检查所有项目",
 		Long: `对已收录的项目做批量体检，找出需要关注的项目。
 

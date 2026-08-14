@@ -154,6 +154,14 @@ func (s *Service) SearchByPath(path string, up bool) []*Project {
 	return result
 }
 
+// --- scan 相关 ---
+
+// MatchScanRule 判断 absPath（git init 后）能否被 scan 收录为新项目（供 init 命令预检）。
+// 返回匹配的规则与项目名；不满足收录条件时 ok=false。
+func (s *Service) MatchScanRule(absPath string) (rule ScanRule, name string, ok bool) {
+	return MatchScanRule(absPath, s.scanRules)
+}
+
 // --- clone 相关 ---
 
 func (s *Service) MatchCloneRule(repoUrl string) (rule CloneRule, localPath string, ok bool) {
