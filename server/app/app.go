@@ -69,3 +69,14 @@ func (a *App) Server() *web.Server              { return a.server }
 func (a *App) ProjectService() *project.Service { return a.projectService }
 func (a *App) OpenerService() *opener.Service   { return a.openerService }
 func (a *App) HistoryService() *history.Service { return a.historyService }
+
+// StartBackgroundJobs 启动常驻进程的后台任务（各 service 的定时刷新等）。
+// 仅常驻 server 调用；CLI 短命进程不调用。新 service 需要后台任务时在此追加。
+func (a *App) StartBackgroundJobs() {
+	a.projectService.StartRefreshTicker(0)
+}
+
+// StopBackgroundJobs 停止后台任务（server 退出时调）。
+func (a *App) StopBackgroundJobs() {
+	a.projectService.StopRefreshTicker()
+}

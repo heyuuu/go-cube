@@ -1,7 +1,12 @@
 # gitcache 常驻化重构
 
-> **状态**：📋 待办（重构现有 domain 内部机制，非加法）
-> **依赖**：[`260811-server按需启动`](../260811-server按需启动/)（server 常驻是前提）
+> **状态**：✅ 已实现（2026-08）
+> **历史**：原依赖提案 `260811-server按需启动`（lazy 拉起方案），该提案实施时改为 nginx 模式（server 由用户显式 `start`，不 lazy 拉起）。本重构照常进行——server 在跑时定时刷新，没跑时 CLI 读上次快照（可接受，见 alternatives.md 方案 2/3 论证）。
+>
+> **实施偏差**（相对原计划）：
+> - 定时器接入点定为 `cmd/server/start.go` 的 `startServer()`（原计划同），由 `project.Service.StartRefreshTicker`/`StopRefreshTicker` 提供能力，不挂 web 层（alternatives.md 方案 4 否决）。
+> - 定时器间隔写死 5 分钟（`defaultRefreshInterval`），未走 config。
+> - CLI 不加刷新兜底，纯读快照。
 
 ## 背景
 

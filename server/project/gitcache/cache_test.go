@@ -4,7 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"cube/internal/testfixture"
 )
@@ -85,36 +84,6 @@ func TestLoad_CorruptFile(t *testing.T) {
 	}
 }
 
-// TestShouldRefresh 各场景 TTL 判断。
-func TestShouldRefresh(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.Mkdir("cache")
-	ttl := time.Minute
-
-	// 无 lock 文件 → 需要刷新（冷启动）
-	if !shouldRefresh(dir, ttl) {
-		t.Fatalf("无 lock 文件应返回 true")
-	}
-
-	// 写入「刚刷新」的 lock 文件（LastRefreshAt = now）→ 不需要刷新
-	writeLockState(filepath.Join(dir, lockFileName), lockState{LastRefreshAt: time.Now()})
-	if shouldRefresh(dir, ttl) {
-		t.Fatalf("TTL 内的 lock 应返回 false")
-	}
-
-	// 写入「很久以前」的 lock 文件 → 需要刷新
-	writeLockState(filepath.Join(dir, lockFileName), lockState{LastRefreshAt: time.Now().Add(-2 * time.Minute)})
-	if !shouldRefresh(dir, ttl) {
-		t.Fatalf("超过 TTL 的 lock 应返回 true")
-	}
-
-	// 写入损坏的 lock 文件 → 需要刷新
-	os.WriteFile(filepath.Join(dir, lockFileName), []byte("garbage"), 0644)
-	if !shouldRefresh(dir, ttl) {
-		t.Fatalf("损坏 lock 应返回 true")
-	}
-}
-
 // TestCache_GetSetMutate 内存态 Get 命中/未命中。
 func TestCache_Get(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -134,7 +103,10 @@ func TestCollectEntry_RealRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
 
-	e := collectEntry(repo)
+	e, err := collectEntry(repo)
+	if err != nil {
+		t.Fatalf("collectEntry 不应返回 error: %v", err)
+	}
 	if e == nil {
 		t.Fatalf("collectEntry 不应返回 nil")
 	}
@@ -143,17 +115,17 @@ func TestCollectEntry_RealRepo(t *testing.T) {
 	}
 }
 
-// TestCollectEntry_NonRepo 非仓库目录返回 nil（降级）。
+// TestCollectEntry_NonRepo 非仓库目录：gogit 各函数返回零值，collectEntry 拼出零值 entry。
 func TestCollectEntry_NonRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.Mkdir("empty")
 
-	e := collectEntry(dir)
-	// 非仓库：gogit 各函数返回零值，collectEntry 拼出的 entry 字段为零值，但非 nil
-	// （除非 RemoteUrl 等全失败；实际 collectEntry 总会构造一个 entry）
+	e, err := collectEntry(dir)
+	if err != nil {
+		t.Fatalf("非仓库 collectEntry 不应返回 error: %v", err)
+	}
 	if e == nil {
-		// 也接受 nil（采集中 panic recover 会留 nil）
-		return
+		t.Fatalf("collectEntry 应返回非 nil entry")
 	}
 	// 字段应为零值
 	if e.CurrentBranch != "" {

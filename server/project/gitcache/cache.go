@@ -1,14 +1,11 @@
 // Package gitcache 提供 git 信息的本地缓存。
 //
-// cube 是 CLI 模式执行，每次 `project list --status` 都要为每个 git 项目采集 git 信息。
-// 对几十个项目的全量采集仍是 IO 密集型操作，每次 CLI 调用都跑一遍会明显卡顿。
+// 对几十个 git 项目的全量采集是 IO 密集型操作，每次都跑会明显卡顿。
+// 本包把采集结果缓存到 ~/.config/cube/cache/git.json：
+//   - CLI（短命进程）启动时 Load 一次快照到内存，只读不刷新；
+//   - 常驻 server 进程内 goroutine 定时 Refresh 采集，写内存 + flush git.json。
 //
-// 本包把这些信息缓存到 ~/.config/cube/cache/git.json：
-//   - 前台读命令（project list/info）从缓存读，几乎零开销；
-//   - 后台子进程（由 refresh.go 触发）异步采集并回写缓存。
-//
-// 本文件 (cache.go) 只负责「数据层」：结构定义、Load/Get/Save/Refresh。
-// 进程调度（flock/fork/TTL）见 refresh.go。
+// git.json 的角色是「跨重启持久化缓存」：server 重启后秒恢复，CLI 读最近一次落盘。
 package gitcache
 
 import (
@@ -53,10 +50,10 @@ type cacheFile struct {
 
 // Cache 内存态缓存。读多写少，用 RWMutex 保护 entries map。
 //
-// 并发模型：
-//   - 同进程内：RWMutex 保护 map 读写；Refresh 整条 entry 替换（非字段级原地改）。
-//   - 跨进程：由 refresh.go 的 flock 保证同一时刻只有一个采集进程在写文件；
-//     读进程加载快照到内存后只读不改，不存在真并发修改。
+// 并发模型（单写者）：
+//   - 常驻 server 是 git.json 的唯一写方，CLI 只读不写，无跨进程并发写问题。
+//   - 进程内：RWMutex 保护 map 读写；Refresh 每次整表重建（全新 map 覆盖 c.entries）。
+//   - 落盘靠 Save() 的原子写（tmp + rename）保证，无需 flock。
 type Cache struct {
 	dir       string // 缓存目录（~/.config/cube/cache/）
 	mu        sync.RWMutex
@@ -69,19 +66,6 @@ func (c *Cache) UpdatedAt() time.Time {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.updatedAt
-}
-
-// IsStale 判断磁盘缓存文件是否比内存新（即后台子进程已刷新落盘，需 Reload）。
-// 用磁盘文件的 mod-time 对比内存记录的 UpdatedAt；磁盘更新则视为 stale。
-func (c *Cache) IsStale() bool {
-	info, err := os.Stat(c.path())
-	if err != nil {
-		return false
-	}
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	// 磁盘 mtime 比内存 updatedAt 晚至少 1 秒才判 stale（避免同秒内抖动）
-	return info.ModTime().After(c.updatedAt.Add(time.Second))
 }
 
 // Load 从 dir 加载缓存。
@@ -101,50 +85,28 @@ func Load(dir string) (*Cache, error) {
 	path := c.path()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		if os.IsNotExist(err) {
-			return c, nil // 正常的冷启动
-		}
-		return c, nil // 其他读错误也降级
+		return c, nil // 文件不存在或其他读错误，降级返回空缓存
 	}
 
-	c.loadFromBytes(path, data)
-	return c, nil
-}
-
-// loadFromBytes 解析缓存文件字节并写回内存（entries + updatedAt）。供 Load / Reload 复用。
-func (c *Cache) loadFromBytes(path string, data []byte) {
+	// 解析失败：备份损坏文件，返回空缓存（降级优先）
 	var file cacheFile
 	if err := json.Unmarshal(data, &file); err != nil {
-		slog.Warn("git cache file corrupted, backing up and starting fresh",
-			"path", path, "err", err)
+		slog.Warn("git 缓存文件损坏，备份后从空重建", "path", path, "err", err)
 		backupCorrupt(path, data)
-		return
+		return c, nil
 	}
 	c.mu.Lock()
-	defer c.mu.Unlock()
 	if file.Entries != nil {
 		c.entries = file.Entries
 	}
 	c.updatedAt = file.UpdatedAt
+	c.mu.Unlock()
+
+	return c, nil
 }
 
-// Reload 重新从磁盘读取缓存文件，刷新内存里的 entries + updatedAt。
-// 供长驻进程（web server）感知后台子进程的刷新结果：子进程 fork 采集落盘后，
-// 父进程调 Reload 即可拿到最新数据，无需重启。
-func (c *Cache) Reload() {
-	path := c.path()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return // 文件不存在/读失败：保持旧内存数据（降级）
-	}
-	c.loadFromBytes(path, data)
-}
-
-// path 返回缓存文件完整路径（包内自用，对外只暴露 Dir）。
+// path 返回缓存文件完整路径（包内自用）。
 func (c *Cache) path() string { return filepath.Join(c.dir, cacheFileName) }
-
-// Dir 返回缓存目录路径。供 refresh.go 的 TTL/flock 等调度逻辑使用。
-func (c *Cache) Dir() string { return c.dir }
 
 // Get 读取单个项目的缓存条目；未命中返回 (nil, false)。
 func (c *Cache) Get(path string) (*Entry, bool) {
@@ -184,59 +146,25 @@ func (c *Cache) Save() error {
 	return nil
 }
 
-// Refresh 用给定的项目路径列表并发采集 git 信息，写回内存 + 落盘。
+// Refresh 用给定的项目路径列表并发采集 git 信息，整表重建后写回内存 + 落盘。
+//
+// 整表重建语义：以本次采集结果为准，旧 entries 被完全覆盖——
+//   - 采集成功的项目写入新 entry；
+//   - 采集失败（collectEntry 返回 error）或已不在 paths 中的项目，其 entry 不进入新表，自然丢弃。
+//
+// 刻意不保留失败项目的旧 entry：避免某个项目长期异常、旧快照却一直存在而不被发现。
 //
 // 入参用 []string（项目绝对路径）而非 []*project.Project，刻意解耦对 project 包的依赖，
 // 避免 project → gitcache → project 的循环 import。
 //
-// 并发上限由包内 defaultWorkers 固定为 8（go-git 状态读取是 IO 密集型，过高并发
-// 会与系统其他 IO 抢资源）。
-// 单项目采集 panic 会被 recover 吞掉（该项目保留旧 entry）。
+// 并发模型：固定 defaultWorkers 个 worker 从 tasks channel 抢活——worker 数即并发上限
+// （go-git 状态读取是 IO 密集型，过高并发会与系统其他 IO 抢资源），无需额外信号量。
+// 单项目采集失败（collectEntry 返回 error）会 Warn 记录后跳过。
 func (c *Cache) Refresh(paths []string) error {
-	if len(paths) == 0 {
-		return c.Save() // 无项目也刷一次 UpdatedAt
-	}
-
-	// 并发采集
-	type result struct {
-		path  string
-		entry *Entry
-	}
-	sem := make(chan struct{}, defaultWorkers)
-	results := make(chan result, len(paths))
-	var wg sync.WaitGroup
-
-	for _, path := range paths {
-		wg.Add(1)
-		go func(path string) {
-			defer wg.Done()
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Warn("collect git entry panicked",
-						"path", path, "panic", r)
-				}
-			}()
-
-			// 限制并发
-			sem <- struct{}{}
-			defer func() { <-sem }()
-
-			entry := collectEntry(path)
-			results <- result{path: path, entry: entry}
-		}(path)
-	}
-	wg.Wait()
-	close(results)
-
-	// 合并结果到内存（整条 entry 替换）
+	entries := collectEntries(paths)
 	c.mu.Lock()
-	for r := range results {
-		if r.entry != nil {
-			c.entries[r.path] = r.entry
-		} // nil 表示采集失败，保留旧 entry
-	}
+	c.entries = entries
 	c.mu.Unlock()
-
 	return c.Save()
 }
 
@@ -244,9 +172,69 @@ func (c *Cache) Refresh(paths []string) error {
 // 偏保守：go-git 状态读取是 IO 密集型，过高并发会与系统其他 IO 抢资源。
 const defaultWorkers = 8
 
+func collectEntries(paths []string) map[string]*Entry {
+	if len(paths) == 0 {
+		return make(map[string]*Entry)
+	}
+
+	type result struct {
+		path  string
+		entry *Entry
+	}
+	tasks := make(chan string)
+	results := make(chan result, len(paths))
+
+	// 固定数量 worker，从 tasks 取任务执行
+	var wg sync.WaitGroup
+	for range defaultWorkers {
+		wg.Go(func() {
+			for path := range tasks {
+				entry, err := collectEntry(path)
+				if err != nil {
+					slog.Warn("采集 git entry 失败", "path", path, "err", err)
+					continue // 采集失败跳过，该项目不进入本次结果（整表重建，不保留旧 entry）
+				}
+				results <- result{path: path, entry: entry}
+			}
+		})
+	}
+
+	// 派发任务（独立 goroutine，避免 tasks 写入与 worker 读取互锁）
+	go func() {
+		for _, p := range paths {
+			tasks <- p
+		}
+		close(tasks)
+	}()
+
+	// worker 全部退出 = 所有结果已写入 results，可安全关闭
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	// 合并本次采集结果（只含采集成功的项目）
+	entries := make(map[string]*Entry, len(paths))
+	for r := range results {
+		if r.entry != nil {
+			entries[r.path] = r.entry
+		}
+	}
+	return entries
+}
+
 // collectEntry 采集单个项目的 git 信息。
 // 依赖 util/git 包的错误约定：业务空值场景返回零值+nil，所以这里基本不会拿到 error。
-func collectEntry(path string) *Entry {
+// 内部用 recover 兜底 panic（go-git 在某些畸形仓库上可能 panic），转成 error 返回，
+// 避免单个项目拖垮整个 Refresh。
+func collectEntry(path string) (entry *Entry, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("采集 git entry panic: %v", r)
+			entry = nil
+		}
+	}()
+
 	repoUrl, _ := gogit.RemoteUrl(path)
 	branches, currBranch, _ := gogit.Branches(path)
 	defaultBranch, _ := gogit.DefaultBranch(path)
@@ -267,7 +255,7 @@ func collectEntry(path string) *Entry {
 		Dirty:         dirty,
 		WorktreeMain:  worktreeMain,
 		CollectedAt:   time.Now(),
-	}
+	}, nil
 }
 
 // detectWorktreeMain 检测 path 是否是 git worktree，若是返回主仓库目录。
@@ -307,8 +295,8 @@ func detectWorktreeMain(path string) string {
 func backupCorrupt(path string, data []byte) {
 	bk := fmt.Sprintf("%s.corrupt-%d", path, time.Now().Unix())
 	if err := os.WriteFile(bk, data, 0644); err != nil {
-		slog.Warn("backup corrupt cache file failed", "src", path, "backup", bk, "err", err)
+		slog.Warn("备份损坏的 cache 文件失败", "src", path, "backup", bk, "err", err)
 		return
 	}
-	slog.Info("corrupt cache file backed up", "src", path, "backup", bk)
+	slog.Info("损坏的 cache 文件已备份", "src", path, "backup", bk)
 }

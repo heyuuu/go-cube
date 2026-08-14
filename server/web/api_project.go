@@ -14,48 +14,32 @@ import (
 )
 
 // --- dto ---
-
 type ProjectDTO struct {
 	Name    string          `json:"name"`
 	Group   string          `json:"group"`
 	Path    string          `json:"path"`
-	RepoUrl string          `json:"repoUrl"`
 	Tags    []string        `json:"tags"`
 	GitInfo *gitcache.Entry `json:"gitInfo"` // git 状态快照，可能为 nil（未采集）
 }
 
-func toProjectDTO(entity *project.Project) *ProjectDTO {
-	if entity == nil {
-		return nil
-	}
-
-	return &ProjectDTO{
-		Name:    entity.Name(),
-		Group:   entity.Group(),
-		Path:    entity.Path(),
-		RepoUrl: entity.RepoUrl(),
-		Tags:    entity.Tags(),
-		GitInfo: entity.GitInfo(),
-	}
-}
-
-// ProjectListResult 列表接口返回结构：含项目列表 + git 缓存整体刷新时间。
+// ProjectListResult 列表接口返回结构：含项目列表 + 两类刷新时间。
 type ProjectListResult struct {
-	List            []*ProjectDTO `json:"list"`
-	GitCacheUpdated time.Time     `json:"gitCacheUpdated"` // git 缓存最近一次落盘时间（零值=无缓存）
+	List          []*ProjectDTO `json:"list"`
+	ScanUpdatedAt time.Time     `json:"scanUpdatedAt"` // 项目列表最近一次重扫完成时间（零值=未刷新过）
+	GitUpdatedAt  time.Time     `json:"gitUpdatedAt"`  // git 缓存最近一次落盘时间（零值=无缓存）
 }
 
 // --- handler ---
 
 type ProjectHandler struct {
-	service       *project.Service
-	openerService *opener.Service
+	projectService *project.Service
+	openerService  *opener.Service
 }
 
-func NewProjectHandler(service *project.Service, openerService *opener.Service) *ProjectHandler {
+func NewProjectHandler(projectService *project.Service, openerService *opener.Service) *ProjectHandler {
 	return &ProjectHandler{
-		service:       service,
-		openerService: openerService,
+		projectService: projectService,
+		openerService:  openerService,
 	}
 }
 
@@ -69,34 +53,55 @@ func (h *ProjectHandler) Register(api huma.API) {
 }
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
-	// web server 是长驻进程：内存里的 git 缓存是启动时的快照，后台 fork 子进程
-	// 刷新的是磁盘文件，父进程不会自动感知。返回前先检测磁盘是否更新，若是则 Reload。
-	h.service.ReloadGitCacheIfStale()
-	// 读快照返回前触发一次异步刷新（TTL 1min 内不重复 fork），与 CLI list 对齐
-	h.service.TriggerAsyncRefresh()
-
-	projects := h.service.Projects()
-	list := slicekit.Map(projects, toProjectDTO)
+	projects := h.projectService.Projects()
+	list := slicekit.Map(projects, h.toProjectDTO)
 	return ProjectListResult{
-		List:            list,
-		GitCacheUpdated: h.service.GitCacheUpdatedAt(),
+		List:          list,
+		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
+		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
 	}, nil
+}
+
+// ProjectInfoResult 详情接口返回结构：含项目 DTO + 两类刷新时间。
+type ProjectInfoResult struct {
+	Project       *ProjectDTO `json:"project"`
+	ScanUpdatedAt time.Time   `json:"scanUpdatedAt"`
+	GitUpdatedAt  time.Time   `json:"gitUpdatedAt"`
 }
 
 func (h *ProjectHandler) projectInfo(input struct {
 	Name string `json:"name"`
-}) (result *ProjectDTO, err error) {
-	proj := h.service.FindByName(input.Name)
-	return toProjectDTO(proj), nil
+}) (ProjectInfoResult, error) {
+	proj := h.projectService.FindByName(input.Name)
+	return ProjectInfoResult{
+		Project:       h.toProjectDTO(proj),
+		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
+		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
+	}, nil
+}
+
+func (h *ProjectHandler) toProjectDTO(entity *project.Project) *ProjectDTO {
+	if entity == nil {
+		return nil
+	}
+
+	info, _ := h.projectService.GitInfo(entity.Path())
+	return &ProjectDTO{
+		Name:    entity.Name(),
+		Group:   entity.Group(),
+		Path:    entity.Path(),
+		Tags:    entity.Tags(),
+		GitInfo: info,
+	}
 }
 
 func (h *ProjectHandler) scanRules(_ struct{}) (ListResult[project.ScanRule], error) {
-	rules := h.service.ScanRules()
+	rules := h.projectService.ScanRules()
 	return listResult(rules), nil
 }
 
 func (h *ProjectHandler) cloneRules(_ struct{}) (ListResult[project.CloneRule], error) {
-	rules := h.service.CloneRules()
+	rules := h.projectService.CloneRules()
 	return listResult(rules), nil
 }
 
@@ -129,7 +134,7 @@ type ProjectTreeInput struct {
 }
 
 func (h *ProjectHandler) projectTree(input ProjectTreeInput) (TreeNodeDTO, error) {
-	root, err := h.service.BuildTree(input.Root)
+	root, err := h.projectService.BuildTree(input.Root)
 	if err != nil {
 		return TreeNodeDTO{}, err
 	}
@@ -152,7 +157,7 @@ func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, er
 	}
 
 	// 校验项目
-	proj := h.service.FindByPath(input.Body.Path)
+	proj := h.projectService.FindByPath(input.Body.Path)
 	if proj == nil {
 		return nil, errors.New("未找到指定项目: " + input.Body.Path)
 	}

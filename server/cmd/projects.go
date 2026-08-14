@@ -42,7 +42,7 @@ query 支持两种搜索模式：
 			}
 
 			// 展示项目列表
-			showProjects(projects)
+			showProjects(a.ProjectService(), projects)
 
 			return nil
 		},
@@ -52,7 +52,7 @@ query 支持两种搜索模式：
 }
 
 // 输出表格
-func showProjects(projects []*project.Project) {
+func showProjects(service *project.Service, projects []*project.Project) {
 	tui.PrintTable(
 		[]string{
 			fmt.Sprintf("项目(%d)", len(projects)),
@@ -60,10 +60,14 @@ func showProjects(projects []*project.Project) {
 			"RepoUrl",
 		},
 		slicekit.Map(projects, func(p *project.Project) []string {
+			repoUrl := ""
+			if info, ok := service.GitInfo(p.Path()); ok {
+				repoUrl = info.RepoUrl
+			}
 			return []string{
 				p.Name(),
 				pathkit.PrettyPath(p.Path()),
-				p.RepoUrl(),
+				repoUrl,
 			}
 		}),
 	)

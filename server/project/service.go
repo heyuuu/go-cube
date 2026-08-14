@@ -18,10 +18,14 @@ type Service struct {
 	// scan
 	scanRules []ScanRule                  // 项目扫描规则
 	scanCache *easycache.Item[[]*Project] // 项目扫描的缓存
-	// git info cache
-	gitCache *gitcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
 	// clone
 	cloneRules []CloneRule // 项目 clone 规则
+	// git info cache
+	gitCache *gitcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
+	// 刷新时间戳（供前端展示数据新鲜度；零值 = 未刷新过）
+	scanUpdatedAt time.Time // 项目列表最近一次重扫完成时间
+	// 定时刷新（仅常驻 server 启用，CLI 不启用）
+	stopCh chan struct{} // nil = 未启用；非 nil = 定时器在跑
 }
 
 func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
@@ -56,7 +60,7 @@ func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 	// 加载 git 信息缓存（降级优先：失败返回空缓存，不报错）
 	gitCache, err := gitcache.Load(cacheDir)
 	if err != nil {
-		log.Printf("load git cache failed: %v", err)
+		log.Printf("加载 git 缓存失败: %v", err)
 	}
 
 	s := &Service{
@@ -64,12 +68,10 @@ func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 		scanCache: easycache.NewItem(func() []*Project {
 			projects, err := scan(scanRules)
 			if err != nil {
-				slog.Error("scanWithGitCache failed: %v", "err", err)
+				slog.Error("扫描项目失败", "err", err)
 				return nil
 			}
-			for _, p := range projects {
-				p.gitInfo, _ = gitCache.Get(p.Path())
-			}
+			slog.Info("scan 项目完成", "count", len(projects))
 			return projects
 		}),
 		gitCache:   gitCache,
@@ -141,6 +143,12 @@ func (s *Service) SearchByPath(path string, up bool) []*Project {
 	return result
 }
 
+// --- clone 相关 ---
+
+func (s *Service) MatchCloneRule(repoUrl string) (rule CloneRule, localPath string, ok bool) {
+	return MatchCloneRule(repoUrl, s.cloneRules)
+}
+
 // --- git 缓存相关 ---
 
 // GitInfo 读取项目的 git 信息缓存条目；未命中返回 (nil, false)。
@@ -152,42 +160,88 @@ func (s *Service) GitInfo(path string) (*gitcache.Entry, bool) {
 	return s.gitCache.Get(path)
 }
 
-// GitCacheUpdatedAt 返回 git 缓存整体最近一次落盘时间；无缓存返回零值。
+// ScanUpdatedAt 返回项目列表最近一次重扫完成时间；未刷新过返回零值。
+func (s *Service) ScanUpdatedAt() time.Time { return s.scanUpdatedAt }
+
+// GitUpdatedAt 返回 git 缓存最近一次落盘时间；无缓存返回零值。
 // 区别于单项目的 CollectedAt：这是整个 cache 文件的刷新时间。
-func (s *Service) GitCacheUpdatedAt() time.Time {
+func (s *Service) GitUpdatedAt() time.Time {
 	if s.gitCache == nil {
 		return time.Time{}
 	}
 	return s.gitCache.UpdatedAt()
 }
 
-// ReloadGitCacheIfStale 检测磁盘 git.json 是否比内存新，若是则重新加载。
-// 供长驻 web server 感知后台 fork 子进程的刷新结果：web 进程内存里的 cache
-// 是启动时的快照，子进程写盘后父进程不会自动感知，需主动 Reload。
-// Reload 后同时清空 scanCache，让下次 Projects() 重新用新 gitInfo 构造项目。
-func (s *Service) ReloadGitCacheIfStale() {
-	if s.gitCache == nil {
-		return
+// defaultRefreshInterval 默认定时刷新间隔。
+// 主要受限于 git 采集（单次约数十秒级，取决于项目数）；扫描本身极快（毫秒级）。
+// 过短会让后台频繁读几十个仓库；过长则缓存陈旧。
+// StartRefreshTicker 传 interval <= 0 时用此默认值。
+const defaultRefreshInterval = 5 * time.Minute
+
+// StartRefreshTicker 启动后台定时刷新 project 视图（项目列表 + git info）的 goroutine（仅常驻 server 调用）。
+//
+// interval <= 0 时用 defaultRefreshInterval。重复调用安全：已在跑则直接返回。
+// 启动后立即刷新一次（避免冷启动空窗），之后按 interval 定时刷新。
+// 刷新动作：重扫项目列表（毫秒级）→ 记录 scanUpdatedAt → 用最新列表采集 git 信息（数十秒级）→ 记录 gitUpdatedAt。
+// 两个时间戳分开记录：扫描极快、git 采集慢，前端需据此分别判断「项目列表新鲜度」和「git 状态新鲜度」。
+//
+// CLI 不调用此方法（CLI 短命，只读启动时 Load 的快照）。
+func (s *Service) StartRefreshTicker(interval time.Duration) {
+	if s.gitCache == nil || s.stopCh != nil {
+		return // 无缓存或已在跑
 	}
-	if !s.gitCache.IsStale() {
-		return
+	if interval <= 0 {
+		interval = defaultRefreshInterval
 	}
-	s.gitCache.Reload()
-	s.scanCache.Clear() // gitInfo 变了，项目数据需重建
+
+	stopCh := make(chan struct{})
+	s.stopCh = stopCh
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				slog.Error("project 视图刷新 ticker panic", "err", r)
+			}
+		}()
+
+		s.refresh() // 启动即刷一次，避免冷启动空窗
+
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.refresh()
+			case <-stopCh:
+				return
+			}
+		}
+	}()
 }
 
-// TriggerAsyncRefresh 触发一次异步刷新：TTL 内直接返回，否则 fork 子进程后台采集。
-// 非阻塞，立即返回。供读命令（list/info）在返回前调用。
-func (s *Service) TriggerAsyncRefresh() {
-	if s.gitCache == nil {
+// StopRefreshTicker 停止定时刷新 goroutine（server shutdown 时调）。
+// 未启用时调用安全（空操作）。
+func (s *Service) StopRefreshTicker() {
+	if s.stopCh == nil {
 		return
 	}
-	// TTL 固定用 gitcache 包的默认值（1 分钟）；如需调整再暴露参数。
-	gitcache.TryAsyncRefresh(s.gitCache.Dir(), time.Minute)
+	close(s.stopCh)
+	s.stopCh = nil
 }
 
-// --- clone 相关 ---
+// refresh 刷新 project 视图：先重扫项目列表（纳入新增/剔除已删），再用最新列表采集 git 信息。
+// 采集异常不抛出（降级优先）：失败只 slog 记录，不影响 server 进程。
+func (s *Service) refresh() {
+	// 强制重扫项目列表
+	projects := s.scanCache.Reload()
+	s.scanUpdatedAt = time.Now() // 记录项目列表刷新时间
 
-func (s *Service) MatchCloneRule(repoUrl string) (rule CloneRule, localPath string, ok bool) {
-	return MatchCloneRule(repoUrl, s.cloneRules)
+	// 刷新 git 信息
+	paths := slicekit.Map(projects, (*Project).Path)
+	if err := s.gitCache.Refresh(paths); err != nil {
+		slog.Warn("刷新 git 缓存失败", "err", err, "projects", len(paths))
+		return
+	}
+
+	slog.Debug("project 视图刷新完成", "projects", len(paths))
 }

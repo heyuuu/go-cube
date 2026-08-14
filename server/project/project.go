@@ -1,19 +1,12 @@
 package project
 
-import (
-	"path/filepath"
-
-	"cube/project/gitcache"
-)
-
-type GitInfo = gitcache.Entry
+import "path/filepath"
 
 type Project struct {
-	path    string   // 项目路径，唯一标识
-	group   string   // 所属工作区名
-	name    string   // 项目展示名，格式 `{组名}:{组内相对路径}`
-	tags    []string // 标签列表
-	gitInfo *GitInfo // git 信息
+	path  string   // 项目路径，唯一标识
+	group string   // 所属工作区名
+	name  string   // 项目展示名，格式 `{组名}:{组内相对路径}`
+	tags  []string // 标签列表
 }
 
 func newProject(r ScanRule, path string, tags []string) *Project {
@@ -36,11 +29,3 @@ func (p *Project) Group() string  { return p.group }
 func (p *Project) Name() string   { return p.name }
 func (p *Project) Path() string   { return p.path }
 func (p *Project) Tags() []string { return p.tags }
-
-func (p *Project) GitInfo() *GitInfo { return p.gitInfo }
-func (p *Project) RepoUrl() string {
-	if p.gitInfo == nil {
-		return ""
-	}
-	return p.gitInfo.RepoUrl
-}

@@ -52,8 +52,10 @@
       <div>
         <div class="page-title">Projects</div>
         <div class="page-meta">
-          git 缓存更新：<span class="meta-time" x-text="gitCacheUpdatedText"></span>
-          <span class="meta-tip" x-show="gitCacheUpdated" :title="formatTime(gitCacheUpdated)">ⓘ</span>
+          项目列表：<span class="meta-time" x-text="scanUpdatedAtText"></span>
+          <span class="meta-tip" x-show="scanUpdatedAt" :title="formatTime(scanUpdatedAt)">ⓘ</span>
+          ｜ git 状态：<span class="meta-time" x-text="gitUpdatedAtText"></span>
+          <span class="meta-tip" x-show="gitUpdatedAt" :title="formatTime(gitUpdatedAt)">ⓘ</span>
         </div>
       </div>
       <div class="page-actions">
@@ -349,7 +351,7 @@
             <div class="drawer-label">基本信息</div>
             <dl class="kv">
               <dt>group</dt><dd x-text="drawer.group"></dd>
-              <dt>repo</dt><dd x-text="drawer.repoUrl || '-'"></dd>
+              <dt>repo</dt><dd x-text="drawer.gitInfo?.repoUrl || '-'"></dd>
               <dt>tags</dt>
               <dd>
                 <template x-for="t in drawer.tags" :key="t">

@@ -29,9 +29,9 @@ cva + clsx + tailwind-merge + lucide-react（cube-next 已验证）。
 
 核心策略：**复用后端 gitcache，前端只做轻轮询**。
 
-- 后端已有成熟的 git 信息异步缓存机制（`project/gitcache`）：读命令读缓存快照（不阻塞），fork 子进程后台采集回写。
-- 前端用 React Query 的 `refetchInterval`（如 30s）重新 `GET /api/project/list` 即可拿到**已被后台子进程刷新**的新快照。
-- **前端不自己采集 git 信息，也不需要 SSE**。后端 fork 子进程采集 + 前端轮询拉快照，是已验证的成熟链路。
+- 后端有 git 信息缓存机制（`project/gitcache`）：常驻 server 进程内 goroutine 定时采集（默认 5 分钟）回写 git.json；读 API 读内存快照（不阻塞）。
+- 前端用 React Query 的 `refetchInterval`（如 30s）重新 `GET /api/project/list` 即可拿到**已被 server 定时刷新**的新快照。
+- **前端不自己采集 git 信息，也不需要 SSE**。后端定时采集 + 前端轮询拉快照，是已验证的成熟链路。
 - 预留 SSE hook 位（空实现），仅当未来「批量 pull 进度」等场景真需要实时推送时再填。
 
 详细的数据流设计（Query keys / Mutations 失效策略等）见历史文档 `docs/design/v3-frontend.md` 第六节（该文档即将删除，如需参考请从 git 历史查阅）。

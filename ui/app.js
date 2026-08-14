@@ -4,7 +4,7 @@
 // 本文件定义主干（公共状态 + init + 扩展合并）。加载顺序：
 //   app.js（本文件，定义 cubeApp + extras 机制）→ views/*.js（注册扩展）→ alpine.min.js
 //
-// 数据：fetch /api/project/list → ApiOutput{ok,message,data:{list, gitCacheUpdated}}
+// 数据：fetch /api/project/list → ApiOutput{ok,message,data:{list, scanUpdatedAt, gitUpdatedAt}}
 // 实时性：复用后端 gitcache，前端 30s 轮询拉快照（后端 fork 子进程异步刷新）
 
 // 扩展注册表：各视图文件 push 自己的状态/方法/getter
@@ -22,7 +22,8 @@ function cubeApp() {
     // 公共数据
     projects: [],
     openers: [],
-    gitCacheUpdated: null,
+    scanUpdatedAt: null,
+    gitUpdatedAt: null,
     loading: false,
     error: '',
 
@@ -133,7 +134,8 @@ function cubeApp() {
         const json = await res.json();
         if (!json.ok) throw new Error(json.message || '请求失败');
         this.projects = json.data?.list || [];
-        this.gitCacheUpdated = json.data?.gitCacheUpdated || null;
+        this.scanUpdatedAt = json.data?.scanUpdatedAt || null;
+        this.gitUpdatedAt = json.data?.gitUpdatedAt || null;
         // 首次加载完成后，若 URL 指向某个 project 详情，补开抽屉（init 时 projects 还空）
         if (!this._drawerResolved) {
           this._drawerResolved = true;
@@ -199,10 +201,23 @@ function cubeApp() {
       return home;
     },
 
-    // 缓存更新时间相对描述
-    get gitCacheUpdatedText() {
-      if (!this.gitCacheUpdated) return '-';
-      const diff = Date.now() - new Date(this.gitCacheUpdated).getTime();
+    // 项目列表刷新时间相对描述
+    get scanUpdatedAtText() {
+      if (!this.scanUpdatedAt) return '-';
+      const diff = Date.now() - new Date(this.scanUpdatedAt).getTime();
+      if (isNaN(diff)) return '-';
+      const min = Math.floor(diff / 60000);
+      if (min < 1) return '刚刚';
+      if (min < 60) return min + ' 分钟前';
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return hr + ' 小时前';
+      return Math.floor(hr / 24) + ' 天前';
+    },
+
+    // git 缓存刷新时间相对描述
+    get gitUpdatedAtText() {
+      if (!this.gitUpdatedAt) return '-';
+      const diff = Date.now() - new Date(this.gitUpdatedAt).getTime();
       if (isNaN(diff)) return '-';
       const min = Math.floor(diff / 60000);
       if (min < 1) return '刚刚';

@@ -8,7 +8,6 @@ import (
 
 	"cube/app"
 	"cube/serve"
-	"cube/web"
 )
 
 // DefaultPort server 默认端口。
@@ -33,7 +32,7 @@ func newStartCmdEx(a *app.App, use string, short string) *cobra.Command {
 			if detach {
 				return startDetached(port)
 			}
-			return startServer(a.Server(), port)
+			return startServer(a, port)
 		},
 	}
 	cmd.Flags().IntVarP(&port, "port", "p", DefaultPort, "server port")
@@ -52,11 +51,15 @@ func startDetached(port int) error {
 	return nil
 }
 
-func startServer(server *web.Server, port int) error {
+func startServer(a *app.App, port int) error {
+	// 常驻 server 启动后台任务（项目视图定时刷新等）；server 退出（Start 返回）时停止。
+	a.StartBackgroundJobs()
+	defer a.StopBackgroundJobs()
+
 	fmt.Printf("server 启动中\n")
 	fmt.Printf("  访问地址：%s\n", serverURL(port))
-	slog.Info("server starting", "port", port)
-	return server.Start(fmt.Sprintf(":%d", port))
+	slog.Info("server 启动中", "port", port)
+	return a.Server().Start(fmt.Sprintf(":%d", port))
 }
 
 // serverURL 拼出 server 的访问地址。

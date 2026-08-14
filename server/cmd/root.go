@@ -24,9 +24,11 @@ func newRootCmd(a *app.App) *cobra.Command {
 	}
 
 	cmd.AddCommand(newVersionCmd(a))
+
 	// web server 相关
 	cmd.AddCommand(server.NewCmd(a))
 	cmd.AddCommand(newOpenapiCmd(a))
+
 	// project 相关
 	cmd.AddCommand(newProjectsCmd(a)) // 项目列表
 	cmd.AddCommand(newInfoCmd(a))     // 项目信息
@@ -50,7 +52,6 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 	// 待整理命令
 	cmd.AddCommand(newCheckCmd(a))
-	cmd.AddCommand(newRefreshGitCacheCmd(a))
 
 	return cmd
 }
@@ -67,7 +68,7 @@ func Execute() {
 
 	// 尽量在其他行为前初始化 Logger
 	logger.Init(cfg.Log, debug)
-	slog.Info("init logger", "debug", debug)
+	slog.Info("初始化 logger", "debug", debug)
 
 	// 初始化 App
 	a, err := app.New(cfg)

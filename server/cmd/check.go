@@ -55,7 +55,11 @@ func checkCloneRules(service *project.Service) {
 	var headers = []string{"Name", "Path", "预期 Path", "RepoUrl"}
 	var rows [][]string
 	for _, p := range projects {
-		repoUrl := p.RepoUrl()
+		info, ok := service.GitInfo(p.Path())
+		repoUrl := ""
+		if ok {
+			repoUrl = info.RepoUrl
+		}
 		if repoUrl == "" {
 			continue
 		}
@@ -88,8 +92,8 @@ func checkGitDirty(service *project.Service) {
 	projects := service.Projects()
 
 	targets := slicekit.Filter(projects, func(p *project.Project) bool {
-		info := p.GitInfo()
-		if info == nil || len(info.RepoUrl) == 0 {
+		info, ok := service.GitInfo(p.Path())
+		if !ok || len(info.RepoUrl) == 0 {
 			return false
 		}
 
@@ -112,5 +116,5 @@ func checkGitDirty(service *project.Service) {
 	})
 
 	fmt.Printf("> github dirty 的项目 %d 个:\n", len(targets))
-	showProjects(targets)
+	showProjects(service, targets)
 }
