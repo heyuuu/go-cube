@@ -11,8 +11,17 @@
     "check:fix": "oxfmt . && oxlint --fix . && tsgo --noEmit"
   },
   "dependencies": {
+    "@base-ui/react": "^1.7.0",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.31.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4.3.3",
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",
@@ -26,6 +35,7 @@
     "babel-plugin-react-compiler": "^1.0.0",
     "oxfmt": "^0.63.0",
     "oxlint": "^1.75.0",
+    "shadcn": "^4.18.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
   }
