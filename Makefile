@@ -27,7 +27,7 @@ build: build-ui
 	@echo "==> built $(OUTPUT) ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
 	@$(OUTPUT) version
 
-install:
+install: build-ui
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
 	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
