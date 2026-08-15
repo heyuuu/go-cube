@@ -115,7 +115,7 @@ func TestCollectEntry_RealRepo(t *testing.T) {
 	}
 }
 
-// TestCollectEntry_NonRepo 非仓库目录：gogit 各函数返回零值，collectEntry 拼出零值 entry。
+// TestCollectEntry_NonRepo 非仓库目录：git 读函数返回零值，collectEntry 拼出零值 entry。
 func TestCollectEntry_NonRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.Mkdir("empty")

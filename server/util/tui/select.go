@@ -99,11 +99,13 @@ func MultiSelectWithDefaults[T any](title string, options []Option[T], selected 
 		huhOptions[i] = huh.NewOption(o.Label, i)
 	}
 
-	// 启动 Select，返回 indices（用默认勾选初始化）
+	// 显式设置字段高度（选项行数 + 标题 1 行）：huh v2.0.3 的 MultiSelect 在自动
+	// 高度模式下会把标题行数从 viewport 高度里再扣一次（Select 无此问题），
+	// 导致 N 个选项只显示 N-1 个、单选项时整个列表空白。
 	indices := defaultIndices
 	err := huh.NewForm(
 		huh.NewGroup(
-			huh.NewMultiSelect[int]().Title(title).Options(huhOptions...).Value(&indices),
+			huh.NewMultiSelect[int]().Title(title).Height(len(huhOptions) + 1).Options(huhOptions...).Value(&indices),
 		),
 	).Run()
 	if err != nil {

@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"log"
 	"log/slog"
 	"os"
@@ -251,16 +252,29 @@ func (s *Service) StopRefreshTicker() {
 // refresh 刷新 project 视图：先重扫项目列表（纳入新增/剔除已删），再用最新列表采集 git 信息。
 // 采集异常不抛出（降级优先）：失败只 slog 记录，不影响 server 进程。
 func (s *Service) refresh() {
-	// 强制重扫项目列表
+	total, collected, err := s.Refresh()
+	if err != nil {
+		slog.Warn("刷新 git 缓存失败", "err", err, "projects", total)
+		return
+	}
+	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
+}
+
+// Refresh 立即完整刷新 project 视图：重扫项目列表（纳入新增/剔除已删）→
+// 整表采集 git 信息（写内存 + 落盘 git.json）。返回 (项目总数, 采集成功数, 错误)。
+//
+// 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
+// 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
+func (s *Service) Refresh() (total int, collected int, err error) {
 	projects := s.scanCache.Reload()
 	s.scanUpdatedAt = time.Now() // 记录项目列表刷新时间
 
-	// 刷新 git 信息
 	paths := slicekit.Map(projects, (*Project).Path)
-	if err := s.gitCache.Refresh(paths); err != nil {
-		slog.Warn("刷新 git 缓存失败", "err", err, "projects", len(paths))
-		return
+	if s.gitCache == nil {
+		return len(paths), 0, errors.New("git 缓存未初始化")
 	}
-
-	slog.Debug("project 视图刷新完成", "projects", len(paths))
+	if err := s.gitCache.Refresh(paths); err != nil {
+		return len(paths), 0, err
+	}
+	return len(paths), s.gitCache.Size(), nil
 }

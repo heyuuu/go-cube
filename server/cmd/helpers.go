@@ -76,7 +76,12 @@ func searchProjects(service *project.Service, query string, up bool) ([]*project
 // pickProject 根据关键词匹配项目：精确匹配直接返回，多项匹配则交互选择。
 //
 // 非交互环境不支持多项选择，会报错提示使用精确名称或路径。
+// --local 模式（cubex 入口）下 query 缺省视作 "."，以 cwd 为起点定位项目；
+// 显式给了 query 则不干预，--local 对其无效果。
 func pickProject(service *project.Service, query string) (*project.Project, error) {
+	if localMode && query == "" {
+		query = "."
+	}
 	projects, err := searchProjects(service, query, true)
 	if err != nil {
 		return nil, err

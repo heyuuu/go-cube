@@ -10,7 +10,6 @@ import (
 
 	"cube/app"
 	"cube/util/git"
-	"cube/util/gogit"
 	"cube/util/tui"
 )
 
@@ -116,9 +115,9 @@ func printInfoSection(title string) {
 // remote 列表实时读本地 .git/config（毫秒级、不联网）；读不到时回退缓存快照里的
 // origin 地址，保持仓库已不可读场景下的展示能力。
 func printInfoRemotes(repoPath string, cacheUrl string) {
-	remotes, _ := gogit.Remotes(repoPath)
+	remotes, _ := git.Remotes(repoPath)
 	if len(remotes) == 0 && cacheUrl != "" {
-		remotes = []gogit.Remote{{Name: "origin", Fetch: cacheUrl, Push: cacheUrl}}
+		remotes = []git.Remote{{Name: "origin", Fetch: cacheUrl, Push: cacheUrl}}
 	}
 
 	if len(remotes) <= 1 {
@@ -140,7 +139,7 @@ func printInfoRemotes(repoPath string, cacheUrl string) {
 }
 
 // buildInfoRemoteLines 构造多 remote 场景下每行「名字  url (网页地址)」，名字列按最长名对齐。
-func buildInfoRemoteLines(remotes []gogit.Remote) []string {
+func buildInfoRemoteLines(remotes []git.Remote) []string {
 	nameWidth := 0
 	for _, r := range remotes {
 		if len(r.Name) > nameWidth {
@@ -176,7 +175,7 @@ func formatInfoSnapshot(t time.Time) string {
 // 读失败按 info 的容错基调降级为警告行，不中断整体输出。
 func printInfoVerbose(repoPath string) {
 	// ── 未提交改动：工作区干净时整段不显示 ──
-	files, err := gogit.StatusFiles(repoPath)
+	files, err := git.StatusFiles(repoPath)
 	if err != nil {
 		printInfoSection("未提交改动")
 		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取工作区状态失败: %v", err)) + "\n")
@@ -188,19 +187,19 @@ func printInfoVerbose(repoPath string) {
 	}
 
 	// ── 分支同步状态 + 同步建议：无 remote 时提示后结束 ──
-	remotes, _ := gogit.Remotes(repoPath)
+	remotes, _ := git.Remotes(repoPath)
 	if len(remotes) == 0 {
 		printInfoSection("分支同步状态")
 		tui.Print("仓库未配置任何 remote\n")
 		return
 	}
-	localBranches, currentBranch, err := gogit.Branches(repoPath)
+	localBranches, currentBranch, err := git.Branches(repoPath)
 	if err != nil {
 		printInfoSection("分支同步状态")
 		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取分支列表失败: %v", err)) + "\n")
 		return
 	}
-	remoteBranches, err := gogit.RemoteBranches(repoPath)
+	remoteBranches, err := git.RemoteBranches(repoPath)
 	if err != nil {
 		printInfoSection("分支同步状态")
 		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取远程分支失败: %v", err)) + "\n")
@@ -236,7 +235,7 @@ func printInfoVerbose(repoPath string) {
 
 // formatInfoFileLine 渲染一行未提交文件状态：XY 码 + 路径。
 // 有实际改动（M/A/D/R/U）黄色提示；未跟踪（??）灰色弱化。
-func formatInfoFileLine(f gogit.FileStatus) string {
+func formatInfoFileLine(f git.FileStatus) string {
 	if strings.Contains(f.Code, "?") {
 		return infoDimStyle.Render(f.Code) + " " + f.Path
 	}

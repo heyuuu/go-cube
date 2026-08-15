@@ -18,7 +18,7 @@ import (
 	"sync"
 	"time"
 
-	"cube/util/gogit"
+	"cube/util/git"
 )
 
 // 当前缓存文件格式版本；结构变更时递增，用于后续做兼容迁移。
@@ -116,6 +116,13 @@ func (c *Cache) Get(path string) (*Entry, bool) {
 	return e, ok
 }
 
+// Size 返回缓存条目数（最近一次采集成功的项目数）。
+func (c *Cache) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.entries)
+}
+
 // Save 原子写入 git.json。
 // 流程：序列化 → 写 git.json.tmp → rename 覆盖 git.json。
 // rename 保证原子性（同文件系统下）；tmp 与目标同目录以满足这一前提。
@@ -158,18 +165,33 @@ func (c *Cache) Save() error {
 // 避免 project → gitcache → project 的循环 import。
 //
 // 并发模型：固定 defaultWorkers 个 worker 从 tasks channel 抢活——worker 数即并发上限
-// （go-git 状态读取是 IO 密集型，过高并发会与系统其他 IO 抢资源），无需额外信号量。
+// （采集是子进程 + IO 密集型，过高并发会与系统其他 IO 抢资源），无需额外信号量。
 // 单项目采集失败（collectEntry 返回 error）会 Warn 记录后跳过。
 func (c *Cache) Refresh(paths []string) error {
+	start := time.Now()
 	entries := collectEntries(paths)
 	c.mu.Lock()
 	c.entries = entries
 	c.mu.Unlock()
-	return c.Save()
+	if err := c.Save(); err != nil {
+		return err
+	}
+	// 采集汇总日志：排查「缓存为何没更新 / 采集耗时异常」时直接查这一条。
+	// 失败数 = 项目数 - 成功数（失败项目另有逐条 Warn 日志）。
+	// 耗时用 String() 而非 time.Duration 原值：JSON handler 会把 Duration 序列化成纳秒整数，不可读。
+	slog.Info("git 缓存采集完成",
+		"项目数", len(paths),
+		"成功", len(entries),
+		"失败", len(paths)-len(entries),
+		"开始", start.Format("15:04:05.000"),
+		"结束", time.Now().Format("15:04:05.000"),
+		"耗时", time.Since(start).Round(time.Millisecond).String(),
+	)
+	return nil
 }
 
 // defaultWorkers 默认并发数。
-// 偏保守：go-git 状态读取是 IO 密集型，过高并发会与系统其他 IO 抢资源。
+// 偏保守：采集是子进程 + IO 密集型，过高并发会与系统其他 IO 抢资源。
 const defaultWorkers = 8
 
 func collectEntries(paths []string) map[string]*Entry {
@@ -225,25 +247,16 @@ func collectEntries(paths []string) map[string]*Entry {
 
 // collectEntry 采集单个项目的 git 信息。
 // 依赖 util/git 包的错误约定：业务空值场景返回零值+nil，所以这里基本不会拿到 error。
-// 内部用 recover 兜底 panic（go-git 在某些畸形仓库上可能 panic），转成 error 返回，
-// 避免单个项目拖垮整个 Refresh。
-func collectEntry(path string) (entry *Entry, err error) {
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("采集 git entry panic: %v", r)
-			entry = nil
-		}
-	}()
-
-	repoUrl, _ := gogit.RemoteUrl(path)
-	branches, currBranch, _ := gogit.Branches(path)
-	defaultBranch, _ := gogit.DefaultBranch(path)
+func collectEntry(path string) (*Entry, error) {
+	repoUrl, _ := git.RemoteUrl(path)
+	branches, currBranch, _ := git.Branches(path)
+	defaultBranch, _ := git.DefaultBranch(path)
 	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较
 	var ahead, behind int
 	if defaultBranch != "" {
-		ahead, behind, _ = gogit.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
+		ahead, behind, _ = git.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
 	}
-	dirty, _ := gogit.IsDirty(path)
+	dirty, _ := git.IsDirty(path)
 	worktreeMain := detectWorktreeMain(path)
 	return &Entry{
 		RepoUrl:       repoUrl,

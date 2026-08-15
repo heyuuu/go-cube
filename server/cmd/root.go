@@ -29,7 +29,9 @@ func newRootCmd(a *app.App) *cobra.Command {
   - git：push(批量推送) pull(批量拉取)
   - Web：server(本地服务) openapi(导出 API spec)
 
-配置默认在 ~/.config/cube/，全局 flag -c 可覆盖配置目录，-d 开 debug 日志。`,
+配置默认在 ~/.config/cube/，全局 flag -c 可覆盖配置目录，-d 开 debug 日志。
+--local 让 query 缺省的命令（info/pull/push/open）以当前目录定位项目，
+等同在命令末尾补 query 为 "."。`,
 	}
 
 	cmd.AddCommand(newVersionCmd(a))
@@ -67,9 +69,14 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 const defaultConfigPath = "~/.config/cube/config.json"
 
+// localMode 是 --local 全局 flag 的落点：query 缺省的命令（info/pull/push/open）
+// 在此模式下以 cwd 为起点定位项目（等同 query="."）。由 Execute 在预解析后赋值。
+var localMode bool
+
 func Execute() {
-	// 在 cobra 初始化之前，使用 Go 原生 flag 包预解析全局 flag（--config, --debug）
-	cfgFile, debug, remaining := extractGlobalFlags(os.Args[1:], defaultConfigPath)
+	// 在 cobra 初始化之前，使用 Go 原生 flag 包预解析全局 flag（--config, --debug, --local）
+	cfgFile, debug, local, remaining := extractGlobalFlags(os.Args[1:], defaultConfigPath)
+	localMode = local
 
 	// 初始化配置
 	cfg, err := config.Load(cfgFile)
@@ -87,9 +94,10 @@ func Execute() {
 	cmd := newRootCmd(a)
 	cmd.SetArgs(remaining)
 
-	// cmd 上绑定全局 flag，仅用于生成 help 提示(此时 --config 及 --debug 早解析完了)
+	// cmd 上绑定全局 flag，仅用于生成 help 提示(此时 --config/--debug/--local 早解析完了)
 	cmd.PersistentFlags().String("config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
 	cmd.PersistentFlags().BoolP("debug", "D", false, "enable debug mode")
+	cmd.PersistentFlags().Bool("local", false, "query 缺省时以当前目录定位项目（cubex 入口即此模式）")
 
 	// 执行命令
 	err = cmd.Execute()
@@ -105,15 +113,18 @@ func checkError(err error, msg string) {
 	}
 }
 
-// extractGlobalFlags 从 args 任意位置摘出 --debug / --config，返回 (cfgFile, debug, 剩余 args)。
+// extractGlobalFlags 从 args 任意位置摘出 --debug / --config / --local，
+// 返回 (cfgFile, debug, local, 剩余 args)。
 // 不识别的 token（含子命令、子命令自己的 flag、位置参数）原样留在 remaining 里。
-func extractGlobalFlags(args []string, defaultCfg string) (cfgFile string, debug bool, remaining []string) {
+func extractGlobalFlags(args []string, defaultCfg string) (cfgFile string, debug, local bool, remaining []string) {
 	cfgFile = defaultCfg
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		switch {
 		case arg == "--debug" || arg == "-D":
 			debug = true
+		case arg == "--local":
+			local = true
 		case arg == "--config":
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				cfgFile = args[i+1]

@@ -4,13 +4,13 @@ import (
 	"reflect"
 	"testing"
 
-	"cube/util/gogit"
+	"cube/util/git"
 )
 
 // TestBuildRemoteBranchMap 验证远程分支按短名组织成 map[branch]set[remote]，
 // 含斜杠分支名（feature/fix-bug）在多 remote 下的归属。
 func TestBuildRemoteBranchMap(t *testing.T) {
-	m := buildRemoteBranchMap([]gogit.RemoteBranch{
+	m := buildRemoteBranchMap([]git.RemoteBranch{
 		{Remote: "origin", Branch: "master"},
 		{Remote: "origin", Branch: "feature/fix-bug"},
 		{Remote: "upstream", Branch: "feature/fix-bug"},
@@ -44,7 +44,7 @@ func TestPickSharedBranches(t *testing.T) {
 // TestBuildStatusRowsFromDiffs 验证由预计算差距构造宽表行：
 // 同步 ✓、落后 +N、领先 -N、remote 无该分支 -、当前分支 * 标记。
 func TestBuildStatusRowsFromDiffs(t *testing.T) {
-	remotes := []gogit.Remote{{Name: "origin"}, {Name: "gitee"}}
+	remotes := []git.Remote{{Name: "origin"}, {Name: "gitee"}}
 	branches := []string{"develop", "master"}
 	diffs := []branchRemoteDiff{
 		{Branch: "develop", Remote: "origin", Behind: 2},
