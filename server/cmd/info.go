@@ -42,7 +42,7 @@ query 支持两种搜索模式：
 
 -v 显示扩展信息（实时读仓库，不依赖缓存快照）：
   - 未提交的文件列表（类似 git status --short）；
-  - 各本地分支与每个 remote 同名分支的 ahead/behind 宽表（同 remote-status）；
+  - 各本地分支与每个 remote 同名分支的 ahead/behind 宽表；
   - 按差距生成的 cube pull / cube push 建议命令。`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -172,7 +172,7 @@ func formatInfoSnapshot(t time.Time) string {
 }
 
 // printInfoVerbose 打印 -v 的三段扩展：未提交文件 / 分支同步状态 / pull·push 建议。
-// 数据实时读本地仓库（与 remote-status 同口径），不依赖缓存快照；
+// 数据实时读本地仓库（remote 跟踪分支口径，不联网），不依赖缓存快照；
 // 读失败按 info 的容错基调降级为警告行，不中断整体输出。
 func printInfoVerbose(repoPath string) {
 	// ── 未提交改动：工作区干净时整段不显示 ──

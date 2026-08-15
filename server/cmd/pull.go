@@ -131,7 +131,7 @@ type branchDiff struct {
 }
 
 // pullCandidates 计算与 remoteName 同名的本地分支列表及各自 ahead/behind。
-// 数据基于本地记录的 remote 跟踪分支（不联网），与 remote-status 的口径一致。
+// 数据基于本地记录的 remote 跟踪分支（不联网），实际拉取时以远端最新状态为准。
 func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, error) {
 	localBranches, currentBranch, err := gogit.Branches(repoPath)
 	if err != nil {

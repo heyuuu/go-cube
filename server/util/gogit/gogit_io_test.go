@@ -233,7 +233,7 @@ func TestBranches_OnlyLocalRefs(t *testing.T) {
 
 // TestAheadBehindRemote_SlashBranch 斜杠分支（feature/fix-bug）端到端：
 // 本地领先 remote 2 个 commit；同时验证 RemoteBranches 对斜杠远程分支的解析
-// （remote-status 宽表按短名交集 + 每格调 AheadBehindRemote，依赖这两个行为）。
+// （info -v 分支同步宽表按短名交集 + 每格调 AheadBehindRemote，依赖这两个行为）。
 func TestAheadBehindRemote_SlashBranch(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "master"})
