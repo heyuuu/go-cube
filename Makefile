@@ -17,6 +17,12 @@ LDFLAGS := \
 
 ZSH_COMPLETION_FILE := ~/.config/cube/zsh.sh
 
+# go install 的落地目录：GOBIN 未设时退回 GOPATH/bin
+GOBIN_DIR := $(shell go env GOBIN)
+ifeq ($(GOBIN_DIR),)
+GOBIN_DIR := $(shell go env GOPATH)/bin
+endif
+
 build-ui:
 	rm -rf ./server/web/ui
 	cp -r ./ui ./server/web/ui
@@ -31,9 +37,13 @@ install:
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
 	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
+	# cubex 是本目录模式 wrapper：cubex <args> == cube <args> --local（query 缺省以 cwd 定位项目）
+	@printf '#!/bin/sh\nexec $(GOBIN_DIR)/cube "$$@" --local\n' > $(GOBIN_DIR)/cubex
+	@chmod +x $(GOBIN_DIR)/cubex
 	cube version
-	# install zsh completion
+	# install zsh completion（末尾追加 compdef，让 cubex 复用 _cube 的补全）
 	cube completion zsh > $(ZSH_COMPLETION_FILE)
+	echo "compdef _cube cubex" >> $(ZSH_COMPLETION_FILE)
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
 	@set -e; \

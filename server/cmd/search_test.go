@@ -55,6 +55,47 @@ func TestSearchProjects_PathQueryCwd(t *testing.T) {
 	}
 }
 
+// TestPickProject_LocalMode 验证 --local（cubex 入口）模式：
+//   - query 缺省以 cwd 为起点定位项目（子目录内向上标定项目根）；
+//   - 非 local 模式下 query 空匹配多个项目，非 TTY 无法交互选择而报错（守住原有行为）；
+//   - 显式 query 不受 --local 干预，仍按名称搜索。
+func TestPickProject_LocalMode(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	root := ws.Mkdir("root")
+	repoA := ws.MakeProjectDir(path.Join("root", "projA"))
+	repoB := ws.MakeProjectDir(path.Join("root", "projB"))
+	s := newCmdServiceAt(t, root, "g1", 5)
+
+	orig := localMode
+	defer func() { localMode = orig }()
+
+	// 非 local：query 空匹配两个项目，走交互选择，非 TTY 下报错
+	localMode = false
+	if _, err := pickProject(s, ""); err == nil {
+		t.Fatalf("非 local 模式下 query 空应因多项匹配无法交互而报错")
+	}
+
+	// local：query 缺省以 cwd 定位，在 projA 子目录内向上命中唯一项目
+	localMode = true
+	t.Chdir(ws.Mkdir(path.Join("root", "projA", "sub")))
+	proj, err := pickProject(s, "")
+	if err != nil {
+		t.Fatalf("local 模式下 pickProject(\"\") 出错: %v", err)
+	}
+	if proj.Path() != repoA {
+		t.Fatalf("local 模式应命中 %s，实际 %s", repoA, proj.Path())
+	}
+
+	// local 下显式 query 不干预：仍按名称搜索命中 projB
+	proj, err = pickProject(s, "projB")
+	if err != nil {
+		t.Fatalf("pickProject(\"projB\") 出错: %v", err)
+	}
+	if proj.Path() != repoB {
+		t.Fatalf("显式 query 应命中 %s，实际 %s", repoB, proj.Path())
+	}
+}
+
 // TestSearchProjects_QueryModes name query 不走路径解析；不支持的路径语法显式报错。
 func TestSearchProjects_QueryModes(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
