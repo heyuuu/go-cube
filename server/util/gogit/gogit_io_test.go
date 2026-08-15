@@ -302,3 +302,95 @@ func TestFixture_Smoke(t *testing.T) {
 		t.Fatalf("fixture 未建出 .git: %v", err)
 	}
 }
+
+// TestStatusFiles_States 验证各文件状态映射为 git status --short 的 XY 码：
+// 未跟踪 / 暂存新增 / 暂存删除，以及按路径排序。
+// （工作区修改 " M" 场景由 TestStatusFiles_WorktreeModified 覆盖。）
+func TestStatusFiles_States(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+
+	// 先提交一个已跟踪文件，再制造各类工作区状态
+	writeAbsFile := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+			t.Fatalf("写文件失败: %v", err)
+		}
+	}
+	writeAbsFile("tracked.txt", "v1")
+	directGit(t, dir, "add", "tracked.txt")
+	directGit(t, dir, "commit", "-m", "init tracked")
+
+	writeAbsFile("tracked.txt", "v2")    // 工作区修改 → " M"
+	writeAbsFile("untracked.txt", "new") // 未跟踪 → "??"
+	writeAbsFile("added.txt", "added")   // 暂存新增 → "A "
+	directGit(t, dir, "add", "added.txt")
+	directGit(t, dir, "rm", "-f", "tracked.txt") // 暂存删除（含磁盘；文件有改动须 -f）→ "D "
+
+	files, err := StatusFiles(dir)
+	if err != nil {
+		t.Fatalf("StatusFiles 出错: %v", err)
+	}
+
+	byPath := make(map[string]string, len(files))
+	for _, f := range files {
+		byPath[f.Path] = f.Code
+	}
+	for path, wantCode := range map[string]string{
+		"untracked.txt": "??",
+		"added.txt":     "A ",
+		"tracked.txt":   "D ",
+	} {
+		if code, ok := byPath[path]; !ok || code != wantCode {
+			t.Errorf("文件 %s 状态 = (%q, 存在=%v)，期望 %q（全部: %v）", path, code, ok, wantCode, byPath)
+		}
+	}
+
+	// 排序断言：按展示路径升序
+	for i := 1; i < len(files); i++ {
+		if files[i-1].Path > files[i].Path {
+			t.Errorf("StatusFiles 未按路径排序: %v", files)
+			break
+		}
+	}
+}
+
+// TestStatusFiles_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
+func TestStatusFiles_WorktreeModified(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+
+	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatalf("写文件失败: %v", err)
+	}
+	directGit(t, dir, "add", "tracked.txt")
+	directGit(t, dir, "commit", "-m", "init")
+	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("v2"), 0644); err != nil {
+		t.Fatalf("写文件失败: %v", err)
+	}
+
+	files, err := StatusFiles(dir)
+	if err != nil {
+		t.Fatalf("StatusFiles 出错: %v", err)
+	}
+	if len(files) != 1 || files[0].Path != "tracked.txt" || files[0].Code != " M" {
+		t.Fatalf("期望单条 [tracked.txt \" M\"]，实际 %v", files)
+	}
+}
+
+// TestStatusFiles_CleanAndNonRepo 干净仓库与非仓库目录都返回空不报错（降级约定）。
+func TestStatusFiles_CleanAndNonRepo(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+
+	cleanDir := ws.MakeGitRepo("clean")
+	files, err := StatusFiles(cleanDir)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("干净仓库应返回空，实际 (%v, %v)", files, err)
+	}
+
+	nonRepo := ws.Mkdir("empty")
+	files, err = StatusFiles(nonRepo)
+	if err != nil || len(files) != 0 {
+		t.Fatalf("非仓库目录应返回空不报错，实际 (%v, %v)", files, err)
+	}
+}

@@ -26,7 +26,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 命令按领域分组：
   - 项目：projects(列表) info(详情) open(打开) init/clone(初始化) check(检查)
   - opener：openers(列表) open-path(打开路径) diff(对比)
-  - git：push(批量推送) remote-status(分支与 remote 差距)
+  - git：push(批量推送) pull(批量拉取) remote-status(分支与 remote 差距)
   - Web：server(本地服务) openapi(导出 API spec)
 
 配置默认在 ~/.config/cube/，全局 flag -c 可覆盖配置目录，-d 开 debug 日志。`,
@@ -53,6 +53,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 	// git 相关
 	cmd.AddCommand(newPushCmd(a))
+	cmd.AddCommand(newPullCmd(a))
 	cmd.AddCommand(newRemoteStatusCmd(a))
 
 	// 内部命令

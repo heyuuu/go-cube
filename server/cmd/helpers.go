@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"cube/opener"
 	"cube/project"
@@ -17,6 +18,35 @@ func getArg(args []string, index int) string {
 		return args[index]
 	}
 	return ""
+}
+
+// prettyTime 把时间格式化为「x秒前 / x分钟前 / x小时前 ...」等相对形式。
+//
+// 过去时间以「前」结尾，未来时间以「后」结尾（如「30秒后」）。
+// 单位按秒/分钟/小时/天/月/年逐级放大，不保留零头（3 小时 20 分 → 「3小时前」）。
+func prettyTime(t time.Time) string {
+	d := time.Since(t)
+	suffix := "前"
+	if d < 0 {
+		d = -d
+		suffix = "后"
+	}
+
+	secs := int64(d.Seconds())
+	switch {
+	case secs < 60:
+		return fmt.Sprintf("%d秒%s", secs, suffix)
+	case secs < 3600:
+		return fmt.Sprintf("%d分钟%s", secs/60, suffix)
+	case secs < 86400:
+		return fmt.Sprintf("%d小时%s", secs/3600, suffix)
+	case secs < 30*86400:
+		return fmt.Sprintf("%d天%s", secs/86400, suffix)
+	case secs < 365*86400:
+		return fmt.Sprintf("%d月%s", secs/(30*86400), suffix)
+	default:
+		return fmt.Sprintf("%d年%s", secs/(365*86400), suffix)
+	}
 }
 
 // isPathQuery 判断 query 是否为路径(以`.`/`~`/`/` 开头时，当做路径)

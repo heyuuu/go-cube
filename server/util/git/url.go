@@ -50,3 +50,15 @@ func ParseRepoUrl(rawURL string) (*RepoUrl, error) {
 }
 
 func (u *RepoUrl) IsSSH() bool { return u.Scheme == "git" }
+
+// WebUrl 把仓库地址转成可在浏览器打开的网页地址（直接拿 host+path 拼 https）。
+//
+// 适用于 github/gitee 等公开托管平台；自建私服或无法识别 host 时返回空串。
+// 网络协议展示统一走 https——网页访问通常也是 https，无需区分 ssh/http。
+func (u *RepoUrl) WebUrl() string {
+	if u.Host == "" || u.Path == "" {
+		return ""
+	}
+	path := strings.TrimSuffix(u.Path, ".git")
+	return "https://" + u.Host + "/" + strings.TrimPrefix(path, "/")
+}

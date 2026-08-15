@@ -92,6 +92,21 @@ func Push(dir string, remote string, ref string, force bool) error {
 	return Run(dir, args...)
 }
 
+// Pull 快进合并 remote 的指定分支到当前分支（git pull --ff-only remote ref）。
+// 仅快进：本地与远端分叉时 git 报错退出，不产生 merge commit、不动工作区。
+func Pull(dir string, remote string, ref string) error {
+	return Run(dir, "pull", "--ff-only", remote, ref)
+}
+
+// FetchIntoBranch 把 remote 上的指定分支快进更新到本地同名分支
+// （git fetch remote branch:branch）。
+//
+// 用于批量更新非当前分支（当前分支 git 不允许 fetch 直接更新，须走 Pull）。
+// 仅快进：本地有领先提交时 git 拒绝写入，不会覆盖本地工作。
+func FetchIntoBranch(dir string, remote string, branch string) error {
+	return Run(dir, "fetch", remote, branch+":"+branch)
+}
+
 // FindGitRoot 从 dir 开始向上查找，返回最先出现 .git(文件或目录均可) 的目录。
 //
 // 与 git 自身的向上查找语义一致：能识别普通仓库的 .git 目录，也能识别 worktree /

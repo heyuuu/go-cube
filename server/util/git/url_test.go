@@ -75,6 +75,29 @@ func TestParseRepoUrl(t *testing.T) {
 	}
 }
 
+func TestRepoUrl_WebUrl(t *testing.T) {
+	tests := []struct {
+		name string
+		u    *RepoUrl
+		want string
+	}{
+		{"ssh 地址转 github 网页", &RepoUrl{Scheme: "git", Host: "github.com", Path: "/heyuuu/cube.git"}, "https://github.com/heyuuu/cube"},
+		{"https 地址保留 host+path", &RepoUrl{Scheme: "https", Host: "github.com", Path: "/heyuuu/cube.git"}, "https://github.com/heyuuu/cube"},
+		{"https 无 .git 后缀", &RepoUrl{Scheme: "https", Host: "gitee.com", Path: "/org/repo"}, "https://gitee.com/org/repo"},
+		{"多级路径", &RepoUrl{Scheme: "git", Host: "gitee.com", Path: "/org/sub/repo.git"}, "https://gitee.com/org/sub/repo"},
+		{"缺 host 返回空串", &RepoUrl{Scheme: "git", Path: "/heyuuu/cube.git"}, ""},
+		{"缺 path 返回空串", &RepoUrl{Scheme: "git", Host: "github.com"}, ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.u.WebUrl(); got != tt.want {
+				t.Errorf("WebUrl() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRepoUrl_IsSSH(t *testing.T) {
 	tests := []struct {
 		name string

@@ -418,3 +418,43 @@ func IsDirty(path string) (bool, error) {
 	}
 	return !status.IsClean(), nil
 }
+
+// FileStatus 单个文件的工作区状态，展示形态对齐 git status --short。
+type FileStatus struct {
+	Code string // 两字符状态码 XY（X=暂存区，Y=工作区），如 "M " / " M" / "??" / "A " / "D "
+	Path string // 相对仓库根路径
+}
+
+// StatusFiles 返回 path 处仓库工作区有变动的文件列表（含 untracked，尊重 .gitignore），
+// 按路径排序。非仓库目录或工作区干净时返回 (nil, nil)，不视为错误。
+//
+// 注意：go-git 不做 rename 检测，改名文件表现为「旧路径 D + 新路径 A」两行
+// （git status --short 会合并显示为 R 行，此处不合并）。
+func StatusFiles(path string) ([]FileStatus, error) {
+	repo, err := openRepo(path)
+	if err != nil {
+		return nil, nil
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		return nil, err
+	}
+	status, err := wt.Status()
+	if err != nil {
+		return nil, err
+	}
+
+	var files []FileStatus
+	for path, fs := range status {
+		// 两列都是空格（unmodified）的行不展示，与 git status --short 行为一致
+		if fs.Staging == gogit.Unmodified && fs.Worktree == gogit.Unmodified {
+			continue
+		}
+		files = append(files, FileStatus{
+			Code: string(rune(fs.Staging)) + string(rune(fs.Worktree)),
+			Path: path,
+		})
+	}
+	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
+	return files, nil
+}
