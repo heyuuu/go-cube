@@ -10,7 +10,7 @@ import (
 )
 
 // newServiceAt 为测试构造一个扫描指定根目录的 Service。
-// 就地写而非放进 testfixture，是因为 testfixture 不能 import project（会导致 gogit 等底层包测试循环依赖）。
+// 就地写而非放进 testfixture，是因为 testfixture 不能 import project（会导致 git 等底层包测试循环依赖）。
 func newServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *Service {
 	t.Helper()
 	ws := testfixture.NewWorkspace(t)

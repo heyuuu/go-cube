@@ -8,7 +8,6 @@ import (
 
 	"cube/app"
 	"cube/util/git"
-	"cube/util/gogit"
 	"cube/util/slicekit"
 	"cube/util/tui"
 )
@@ -61,7 +60,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 			repoPath := proj.Path()
 
 			// 2. 收集 remote 列表
-			repoRemotes, err := gogit.Remotes(repoPath)
+			repoRemotes, err := git.Remotes(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 remote 列表失败: %w", err)
 			}
@@ -133,11 +132,11 @@ type branchDiff struct {
 // pullCandidates 计算与 remoteName 同名的本地分支列表及各自 ahead/behind。
 // 数据基于本地记录的 remote 跟踪分支（不联网），实际拉取时以远端最新状态为准。
 func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, error) {
-	localBranches, currentBranch, err := gogit.Branches(repoPath)
+	localBranches, currentBranch, err := git.Branches(repoPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("读取分支列表失败: %w", err)
 	}
-	remoteBranches, err := gogit.RemoteBranches(repoPath)
+	remoteBranches, err := git.RemoteBranches(repoPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("读取远程分支失败: %w", err)
 	}
@@ -149,7 +148,7 @@ func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, e
 		if !remoteHasBranch[b][remoteName] {
 			continue
 		}
-		ahead, behind, _ := gogit.AheadBehindRemote(repoPath, b, remoteName, b)
+		ahead, behind, _ := git.AheadBehindRemote(repoPath, b, remoteName, b)
 		diffs = append(diffs, branchDiff{Branch: b, Ahead: ahead, Behind: behind})
 	}
 	return diffs, currentBranch, nil
@@ -157,11 +156,11 @@ func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, e
 
 // pickPullRemote 决定拉取来源 remote：flag 指定优先；仅 1 个自动选中；
 // 多个时交互单选（pull 一次只面对一个 remote，与 push 的多选不同）。
-func pickPullRemote(all []gogit.Remote, flagRemote string) (gogit.Remote, error) {
+func pickPullRemote(all []git.Remote, flagRemote string) (git.Remote, error) {
 	if flagRemote != "" {
 		rs, err := resolveRemotesByName(all, []string{flagRemote})
 		if err != nil {
-			return gogit.Remote{}, err
+			return git.Remote{}, err
 		}
 		return rs[0], nil
 	}
@@ -169,9 +168,9 @@ func pickPullRemote(all []gogit.Remote, flagRemote string) (gogit.Remote, error)
 		return all[0], nil
 	}
 	if !tui.IsTTY() {
-		return gogit.Remote{}, fmt.Errorf("非交互环境(tty)下必须通过 --remote 指定 remote（可选: %s）", joinRemoteNames(all))
+		return git.Remote{}, fmt.Errorf("非交互环境(tty)下必须通过 --remote 指定 remote（可选: %s）", joinRemoteNames(all))
 	}
-	return tui.SelectItem("选择拉取来源 remote", all, func(r gogit.Remote) string {
+	return tui.SelectItem("选择拉取来源 remote", all, func(r git.Remote) string {
 		return fmt.Sprintf("%s  (%s)", r.Name, r.Fetch)
 	})
 }
@@ -248,7 +247,7 @@ func pullBranchLabel(d branchDiff, currentBranch string) string {
 }
 
 // confirmPullPlan 打印拉取计划表并要求二次确认。返回 (是否确认, 错误)。
-func confirmPullPlan(repoPath string, remote gogit.Remote, branches []string, currentBranch string) (bool, error) {
+func confirmPullPlan(repoPath string, remote git.Remote, branches []string, currentBranch string) (bool, error) {
 	fmt.Println()
 	fmt.Printf("仓库: %s\n", repoPath)
 	fmt.Printf("Remote: %s  (%s)\n", remote.Name, remote.Fetch)

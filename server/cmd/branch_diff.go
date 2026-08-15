@@ -6,16 +6,15 @@ package cmd
 // 即上次 fetch 时的远端状态。
 
 import (
+	"cube/util/git"
 	"fmt"
 	"sort"
 	"strings"
-
-	"cube/util/gogit"
 )
 
 // buildRemoteBranchMap 把远程分支列表组织成 map[branch]set[remote]，便于 O(1) 查询
 // 「某 remote 是否有某分支」。
-func buildRemoteBranchMap(remoteBranches []gogit.RemoteBranch) map[string]map[string]bool {
+func buildRemoteBranchMap(remoteBranches []git.RemoteBranch) map[string]map[string]bool {
 	m := make(map[string]map[string]bool)
 	for _, rb := range remoteBranches {
 		if m[rb.Branch] == nil {
@@ -40,7 +39,7 @@ func pickSharedBranches(localBranches []string, remoteHasBranch map[string]map[s
 }
 
 // buildStatusHeaders 构造宽表表头：Branch + 每个 remote 名。
-func buildStatusHeaders(remotes []gogit.Remote) []string {
+func buildStatusHeaders(remotes []git.Remote) []string {
 	headers := make([]string, 0, 1+len(remotes))
 	headers = append(headers, "Branch")
 	for _, r := range remotes {
@@ -63,7 +62,7 @@ type branchRemoteDiff struct {
 func collectBranchRemoteDiffs(
 	repoPath string,
 	branches []string,
-	remotes []gogit.Remote,
+	remotes []git.Remote,
 	remoteHasBranch map[string]map[string]bool,
 ) []branchRemoteDiff {
 	var diffs []branchRemoteDiff
@@ -72,7 +71,7 @@ func collectBranchRemoteDiffs(
 			if !remoteHasBranch[b][r.Name] {
 				continue
 			}
-			ahead, behind, _ := gogit.AheadBehindRemote(repoPath, b, r.Name, b)
+			ahead, behind, _ := git.AheadBehindRemote(repoPath, b, r.Name, b)
 			diffs = append(diffs, branchRemoteDiff{Branch: b, Remote: r.Name, Ahead: ahead, Behind: behind})
 		}
 	}
@@ -85,7 +84,7 @@ func collectBranchRemoteDiffs(
 //   - 否则 → "+ahead/-behind"（任一项为 0 时省略，如 "+3" / "-1"）
 //
 // 当前分支名前加 "*"。
-func buildStatusRowsFromDiffs(diffs []branchRemoteDiff, branches []string, remotes []gogit.Remote, currentBranch string) [][]string {
+func buildStatusRowsFromDiffs(diffs []branchRemoteDiff, branches []string, remotes []git.Remote, currentBranch string) [][]string {
 	// (branch, remote) → diff 索引，避免在表格构造里重复算 ahead/behind
 	diffAt := make(map[string]branchRemoteDiff, len(diffs))
 	for _, d := range diffs {

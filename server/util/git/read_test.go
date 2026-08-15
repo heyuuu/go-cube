@@ -1,9 +1,10 @@
-package gogit
+package git
 
 import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"testing"
 
 	"cube/internal/testfixture"
@@ -69,6 +70,21 @@ func TestBranches_CleanRepo(t *testing.T) {
 	}
 }
 
+// TestBranches_DetachedHead detached HEAD 时当前分支为空串（symbolic-ref 失败降级）。
+func TestBranches_DetachedHead(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+	directGit(t, dir, "checkout", "--detach")
+
+	_, current, err := Branches(dir)
+	if err != nil {
+		t.Fatalf("Branches 出错: %v", err)
+	}
+	if current != "" {
+		t.Fatalf("detached HEAD 时 current 应为空，实际 %q", current)
+	}
+}
+
 // TestBranches_NonRepo 非仓库目录返回空不报错。
 func TestBranches_NonRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -131,6 +147,21 @@ func TestIsDirty_CleanAndDirty(t *testing.T) {
 	}
 }
 
+// TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
+func TestDefaultBranch_OriginHEAD(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
+	directGit(t, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop")
+
+	db, err := DefaultBranch(dir)
+	if err != nil {
+		t.Fatalf("DefaultBranch 出错: %v", err)
+	}
+	if db != "develop" {
+		t.Fatalf("DefaultBranch = %q，期望 develop（origin/HEAD 指向）", db)
+	}
+}
+
 // TestDefaultBranch_NoOriginRemote 无 origin remote 时按本地 master/main 兜底。
 func TestDefaultBranch_NoOriginRemote(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -185,18 +216,58 @@ func TestRemotes_WithMultipleRemotes(t *testing.T) {
 	}
 }
 
-// TestAheadBehind_NoRemote 无 remote 时 ahead/behind 应为 0 或不报错（无 origin/xxx ref 即跳过）。
+// TestRemotes_SeparatePushUrl 配置独立 pushurl 时 Fetch 与 Push 不同。
+func TestRemotes_SeparatePushUrl(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+		RemoteUrl: "https://github.com/a/b.git",
+	})
+	directGit(t, dir, "remote", "set-url", "--push", "origin", "git@github.com:a/b.git")
+
+	remotes, err := Remotes(dir)
+	if err != nil || len(remotes) != 1 {
+		t.Fatalf("Remotes = (%v, %v)，期望单个 remote", remotes, err)
+	}
+	r := remotes[0]
+	if r.Fetch != "https://github.com/a/b.git" || r.Push != "git@github.com:a/b.git" {
+		t.Fatalf("pushurl remote 异常：%+v", r)
+	}
+}
+
+// TestAheadBehind_NoRemote 无 remote 时（origin/xxx ref 不存在）返回 (0,0,nil)。
 func TestAheadBehind_NoRemote(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
-	// 无 origin/master，应返回 0,0,nil（gogit 内 resolveBranchHash 找不到 ref 返回 false，函数返回零值）
 	ahead, behind, err := AheadBehind(dir, "master", "origin/master")
 	if err != nil {
 		t.Fatalf("无 remote AheadBehind 不应报错: %v", err)
 	}
-	// 这两个值无明确语义（找不到远程 ref），只要不报错即可
-	_ = ahead
-	_ = behind
+	if ahead != 0 || behind != 0 {
+		t.Fatalf("无 remote AheadBehind 应为 (0,0)，实际 (%d,%d)", ahead, behind)
+	}
+}
+
+// TestAheadBehindRemote_Diverged 分叉场景：ahead/behind 方向正确（本地独有 / 远端独有）。
+func TestAheadBehindRemote_Diverged(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "master"})
+
+	// 同步点 → 本地 master 加 1 commit；base 分支上加另 1 commit 当作远端状态
+	directGit(t, dir, "update-ref", "refs/remotes/origin/master", "refs/heads/master")
+	directGit(t, dir, "branch", "base")
+	directGit(t, dir, "commit", "--allow-empty", "-m", "local ahead")
+	directGit(t, dir, "checkout", "base")
+	directGit(t, dir, "commit", "--allow-empty", "-m", "remote ahead")
+	directGit(t, dir, "update-ref", "refs/remotes/origin/master", "HEAD")
+	directGit(t, dir, "checkout", "master")
+
+	ahead, behind, err := AheadBehindRemote(dir, "master", "origin", "master")
+	if err != nil {
+		t.Fatalf("AheadBehindRemote 出错: %v", err)
+	}
+	if ahead != 1 || behind != 1 {
+		t.Fatalf("ahead/behind = %d/%d，期望 1/1（双方各独有 1 个 commit）", ahead, behind)
+	}
 }
 
 // TestBranches_OnlyLocalRefs 带斜杠的本地分支（feature/fix-bug）必须返回，
@@ -293,16 +364,6 @@ func directAddRemote(t *testing.T, dir, name, url string) {
 	}
 }
 
-// TestFixture_Smoke 验证 testfixture 的 git builder 能正常工作（基础设施冒烟）。
-func TestFixture_Smoke(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
-	// 验证 .git 目录存在
-	if _, err := os.Stat(filepath.Join(dir, ".git")); err != nil {
-		t.Fatalf("fixture 未建出 .git: %v", err)
-	}
-}
-
 // TestStatusFiles_States 验证各文件状态映射为 git status --short 的 XY 码：
 // 未跟踪 / 暂存新增 / 暂存删除，以及按路径排序。
 // （工作区修改 " M" 场景由 TestStatusFiles_WorktreeModified 覆盖。）
@@ -355,6 +416,27 @@ func TestStatusFiles_States(t *testing.T) {
 	}
 }
 
+// TestStatusFiles_Rename 已暂存改名（git mv）合并为单条 R 行，展示 "旧 -> 新"。
+func TestStatusFiles_Rename(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+
+	if err := os.WriteFile(filepath.Join(dir, "old.txt"), []byte("v1"), 0644); err != nil {
+		t.Fatalf("写文件失败: %v", err)
+	}
+	directGit(t, dir, "add", "old.txt")
+	directGit(t, dir, "commit", "-m", "init")
+	directGit(t, dir, "mv", "old.txt", "new.txt")
+
+	files, err := StatusFiles(dir)
+	if err != nil {
+		t.Fatalf("StatusFiles 出错: %v", err)
+	}
+	if len(files) != 1 || files[0].Code != "R " || files[0].Path != "old.txt -> new.txt" {
+		t.Fatalf("期望单条 [R  old.txt -> new.txt]，实际 %v", files)
+	}
+}
+
 // TestStatusFiles_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
 func TestStatusFiles_WorktreeModified(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -397,8 +479,8 @@ func TestStatusFiles_CleanAndNonRepo(t *testing.T) {
 
 // TestStatusFiles_GlobalIgnore 全局忽略规则生效：被 ~/.gitconfig 的
 // core.excludesFile 或 XDG 默认 ignore 匹配的文件不算 untracked、不算 dirty。
-// 通过 HOME / XDG_CONFIG_HOME 指向测试目录隔离真实用户配置
-// （os.UserHomeDir / os.UserConfigDir 读环境变量）。
+// 原生 git 子进程继承测试进程环境，通过 HOME / XDG_CONFIG_HOME 指向测试目录
+// 隔离真实用户配置。
 func TestStatusFiles_GlobalIgnore(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
@@ -459,6 +541,115 @@ func TestStatusFiles_GlobalIgnore(t *testing.T) {
 	for _, want := range []string{"keep.txt", "debug.log", ".DS_Store"} {
 		if _, ok := byPath[want]; !ok {
 			t.Fatalf("文件 %s 应出现（空 HOME 下无全局规则）: %v", want, files)
+		}
+	}
+}
+
+// --- 纯函数表驱动测试 ---
+
+// TestParseRemotesVerbose 解析 git remote -v 输出：fetch/push 合并、
+// 独立 pushurl、同名多行取第一条、无 TAB 的行跳过、按名排序。
+func TestParseRemotesVerbose(t *testing.T) {
+	out := "origin\tgit@github.com:a/b.git (fetch)\n" +
+		"origin\tgit@github.com:a/b.git (push)\n" +
+		"upstream\thttps://x/y.git (fetch)\n" +
+		"upstream\tgit@x:y.git (push)\n" +
+		"garbage-no-tab\n" +
+		"\n"
+
+	got := parseRemotesVerbose(out)
+	want := []Remote{
+		{Name: "origin", Fetch: "git@github.com:a/b.git", Push: "git@github.com:a/b.git"},
+		{Name: "upstream", Fetch: "https://x/y.git", Push: "git@x:y.git"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parseRemotesVerbose = %v，期望 %v", got, want)
+	}
+	if parseRemotesVerbose("") != nil {
+		t.Fatalf("空输入应返回 nil")
+	}
+}
+
+// TestParseCountPair 解析 rev-list --left-right --count 的 "ahead\tbehind" 输出。
+func TestParseCountPair(t *testing.T) {
+	cases := []struct {
+		in     string
+		ahead  int
+		behind int
+		ok     bool
+	}{
+		{"2\t0\n", 2, 0, true},
+		{"0\t3\n", 0, 3, true},
+		{"12\t34", 12, 34, true},
+		{"1", 0, 0, false},      // 缺 tab
+		{"a\tb\n", 0, 0, false}, // 非数字
+		{"", 0, 0, false},
+	}
+	for _, c := range cases {
+		ahead, behind, ok := parseCountPair(c.in)
+		if ok != c.ok || ahead != c.ahead || behind != c.behind {
+			t.Errorf("parseCountPair(%q) = (%d,%d,%v)，期望 (%d,%d,%v)",
+				c.in, ahead, behind, ok, c.ahead, c.behind, c.ok)
+		}
+	}
+}
+
+// TestParseStatusPorcelain 解析 status --porcelain -z 输出：
+// 普通行、rename/copy 双路径行、尾部 NUL、短记录跳过。
+func TestParseStatusPorcelain(t *testing.T) {
+	out := "?? a.txt\x00" + " M b.txt\x00" + "R  new.txt\x00old.txt\x00" + "C  c2.txt\x00c1.txt\x00" + "A  d.txt\x00"
+
+	got := parseStatusPorcelain(out)
+	want := []FileStatus{
+		{Code: "??", Path: "a.txt"},
+		{Code: " M", Path: "b.txt"},
+		{Code: "R ", Path: "old.txt -> new.txt"},
+		{Code: "C ", Path: "c1.txt -> c2.txt"},
+		{Code: "A ", Path: "d.txt"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("parseStatusPorcelain = %v，期望 %v", got, want)
+	}
+	if parseStatusPorcelain("") != nil {
+		t.Fatalf("空输入应返回 nil")
+	}
+}
+
+// TestSplitRemoteBranchShortName 远程分支短名拆分。
+func TestSplitRemoteBranchShortName(t *testing.T) {
+	cases := []struct {
+		in         string
+		wantRemote string
+		wantBranch string
+		wantOK     bool
+	}{
+		{"origin/master", "origin", "master", true},
+		{"origin/feature/x", "origin", "feature/x", true},
+		{"upstream/main", "upstream", "main", true},
+		{"master", "", "", false}, // 无 remote 前缀
+		{"", "", "", false},       // 空
+		{"/foo", "", "", false},   // remote 名为空（idx<=0）
+	}
+	for _, c := range cases {
+		remote, branch, ok := splitRemoteBranchShortName(c.in)
+		if ok != c.wantOK || remote != c.wantRemote || branch != c.wantBranch {
+			t.Errorf("splitRemoteBranchShortName(%q) = (%q,%q,%v)，期望 (%q,%q,%v)",
+				c.in, remote, branch, ok, c.wantRemote, c.wantBranch, c.wantOK)
+		}
+	}
+}
+
+// TestFirstLine 取输出首行。
+func TestFirstLine(t *testing.T) {
+	cases := map[string]string{
+		"git@x:a/b\nsecond\n": "git@x:a/b",
+		"only\n":              "only",
+		"":                    "",
+		"  \n":                "",
+	}
+	for in, want := range cases {
+		if got := firstLine(in); got != want {
+			t.Errorf("firstLine(%q) = %q，期望 %q", in, got, want)
 		}
 	}
 }

@@ -17,7 +17,7 @@
 
 ```
 基础设施  config / db / logger / version / runtime               所有层共享
-能力      opener / util(git / gogit / fuzzy / easycache / pathkit / slicekit / tui)  通用动作, 不含业务实体
+能力      opener / util(git / fuzzy / easycache / pathkit / slicekit / tui)  通用动作, 不含业务实体
 领域      project (含 gitcache / scan / clone) / history          业务 domain, 含实体和规则
 出口      cmd / web                                               把领域包成 CLI/Web
 装配      app / main                                              接线
@@ -78,12 +78,12 @@ repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
 ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 ```
 
-**为什么 testfixture 不 import `project` 包**：底层包（`gogit`/`gitcache`）的测试要用 testfixture，而 `project → gitcache → gogit` 是依赖链。若 testfixture 反向依赖 project 会形成循环。所以「构造 project.Service」这种依赖 `project` 包的逻辑写在调用方测试里（见 `project/scan_test.go` 的 `newServiceAt`），不沉淀进 testfixture。
+**为什么 testfixture 不 import `project` 包**：底层包（`git`/`gitcache`）的测试要用 testfixture，而 `project → gitcache → git` 是依赖链。若 testfixture 反向依赖 project 会形成循环。所以「构造 project.Service」这种依赖 `project` 包的逻辑写在调用方测试里（见 `project/scan_test.go` 的 `newServiceAt`），不沉淀进 testfixture。
 
 ### 测试策略（什么测、什么不测）
 
-- **纯函数**（解析、计算、字符串处理）：普通表驱动测试。`fuzzy`/`pathkit`/`git/url`/`gogit 纯函数`/`slicekit`/`easycache`/`opener 解析`。
-- **依赖外部进程/库的 IO**（go-git 读仓库、git 二进制）：**用 testfixture 建真实临时仓库测**，不 mock。`gogit` 的 `Branches/Remotes/Tags/IsDirty`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
+- **纯函数**（解析、计算、字符串处理）：普通表驱动测试。`fuzzy`/`pathkit`/`git/url`/`git 读输出解析`/`slicekit`/`easycache`/`opener 解析`。
+- **依赖外部进程/库的 IO**（git 二进制读/写仓库）：**用 testfixture 建真实临时仓库测**，不 mock。`git` 的 `Branches/Remotes/Tags/IsDirty/StatusFiles`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
 - **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
 - **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
 - **opener 执行类**：通过 `Executor` 接口注入 fake，不真的启动编辑器。见 `opener/opener_test.go`。
@@ -134,8 +134,8 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
 10. **优先复用 `util/` 下的辅助函数**，能力收敛在各 util 子包内，不在调用方就地重造：
-    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读走 `util/gogit`（分支 / remote / tag / ahead-behind / dirty），git 写走 `util/git`（push / clone / commit / `FindGitRoot`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
-    - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录）；其它 util 包（`git` / `gogit` / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
+    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读写统一走 `util/git`（读：分支 / remote / tag / ahead-behind / dirty，见 `read.go`；写：push / clone / commit / `FindGitRoot`，见 `git.go`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
+    - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录；`git` 的 `runOut` 为子进程显式构造环境属于其执行职责，不算读环境）；其它 util 包（`git` 的纯解析函数 / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
     - 警惕功能重叠：例如「向上探测 `.git` 根」已有 `git.FindGitRoot(dir)`，调用方就不该再写一遍 `os.Stat(filepath.Join(..., ".git"))` 的循环。
 11. **注释只写「为什么」和「目的」，不要复述「执行过程」**。函数体内的步骤标号（`// 1. 先读 pid 文件 // 2. 再发信号`）、逐行翻译式注释（`// 遍历列表`、`// 返回结果`）属于过程复述——代码本身已经表达了执行过程，注释再写一遍只会制造**两个需要同步维护的事实源**，代码改了忘改注释就会两边对不上。应保留的是代码读不出来的信息：设计意图（如「端口冲突要报错，否则造孤儿」）、非显然的取舍（如「用 SIGKILL 兜底而不是无限等」）、外部约束（如「子进程 stdio 接 /dev/null，日志走 slog」）。判断标准：如果删掉这条注释，读者看代码能否理解「在做什么」——能，就删；读者看代码无法理解「为什么这么做」，就留。
 

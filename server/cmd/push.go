@@ -9,7 +9,6 @@ import (
 
 	"cube/app"
 	"cube/util/git"
-	"cube/util/gogit"
 	"cube/util/tui"
 )
 
@@ -54,7 +53,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 			repoPath := proj.Path()
 
 			// 2. 收集 remote / refs 候选
-			repoRemotes, err := gogit.Remotes(repoPath)
+			repoRemotes, err := git.Remotes(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 remote 列表失败: %w", err)
 			}
@@ -62,11 +61,11 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return errors.New("仓库未配置任何 remote，无可推送目标")
 			}
 
-			branches, currentBranch, err := gogit.Branches(repoPath)
+			branches, currentBranch, err := git.Branches(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取分支列表失败: %w", err)
 			}
-			tags, err := gogit.Tags(repoPath)
+			tags, err := git.Tags(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 tag 列表失败: %w", err)
 			}
@@ -121,7 +120,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 }
 
 // pickRemotes 决定要推送的 remote 集合：flag 显式指定优先，否则 TUI 多选（默认全选）。
-func pickRemotes(all []gogit.Remote, flagRemotes []string) ([]gogit.Remote, error) {
+func pickRemotes(all []git.Remote, flagRemotes []string) ([]git.Remote, error) {
 	if len(flagRemotes) > 0 {
 		return resolveRemotesByName(all, flagRemotes)
 	}
@@ -132,18 +131,18 @@ func pickRemotes(all []gogit.Remote, flagRemotes []string) ([]gogit.Remote, erro
 	return tui.MultiSelectItemWithDefaults(
 		"选择目标 remote（空格勾选，回车确认）",
 		all,
-		func(r gogit.Remote) string { return fmt.Sprintf("%s  (%s)", r.Name, r.Push) },
+		func(r git.Remote) string { return fmt.Sprintf("%s  (%s)", r.Name, r.Push) },
 		all,
 	)
 }
 
-// resolveRemotesByName 把 flag 传入的 remote 名解析成 gogit.Remote（找不到则报错）。
-func resolveRemotesByName(all []gogit.Remote, names []string) ([]gogit.Remote, error) {
-	byName := make(map[string]gogit.Remote, len(all))
+// resolveRemotesByName 把 flag 传入的 remote 名解析成 git.Remote（找不到则报错）。
+func resolveRemotesByName(all []git.Remote, names []string) ([]git.Remote, error) {
+	byName := make(map[string]git.Remote, len(all))
 	for _, r := range all {
 		byName[r.Name] = r
 	}
-	var result []gogit.Remote
+	var result []git.Remote
 	for _, n := range names {
 		r, ok := byName[n]
 		if !ok {
@@ -208,7 +207,7 @@ func pickRefs(branches []string, tags []string, currentBranch string, flagRefs [
 }
 
 // confirmPlan 打印推送计划表并要求二次确认。返回 (是否确认, 错误)。
-func confirmPlan(repoPath string, remotes []gogit.Remote, refs []string, force bool) (bool, error) {
+func confirmPlan(repoPath string, remotes []git.Remote, refs []string, force bool) (bool, error) {
 	fmt.Println()
 	fmt.Printf("仓库: %s\n", repoPath)
 	if force {
@@ -224,7 +223,7 @@ func confirmPlan(repoPath string, remotes []gogit.Remote, refs []string, force b
 }
 
 // buildPlanRows 展开成 (remote × ref) 行用于表格展示。
-func buildPlanRows(remotes []gogit.Remote, refs []string) [][]string {
+func buildPlanRows(remotes []git.Remote, refs []string) [][]string {
 	var rows [][]string
 	for _, r := range remotes {
 		for _, ref := range refs {
@@ -238,7 +237,7 @@ func buildPlanRows(remotes []gogit.Remote, refs []string) [][]string {
 //
 // 单条 push 失败不中断后续（一个 remote 网络抖动不应阻断其它 remote），
 // 全部跑完后若有失败则汇总返回一个 error。
-func runPush(repoPath string, remotes []gogit.Remote, refs []string, force bool) error {
+func runPush(repoPath string, remotes []git.Remote, refs []string, force bool) error {
 	total := len(remotes) * len(refs)
 	failed := 0
 	i := 0
@@ -270,7 +269,7 @@ func forceFlagSuffix(force bool) string {
 }
 
 // joinRemoteNames 把 remote 名列表拼成逗号分隔串，用于错误提示。
-func joinRemoteNames(remotes []gogit.Remote) string {
+func joinRemoteNames(remotes []git.Remote) string {
 	names := make([]string, len(remotes))
 	for i, r := range remotes {
 		names[i] = r.Name

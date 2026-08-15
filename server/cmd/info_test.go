@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"cube/util/gogit"
+	"cube/util/git"
 )
 
 // stripAnsi 去掉 lipgloss 渲染产生的 ANSI 转义码，便于对输出做内容断言。
@@ -56,7 +56,7 @@ func TestBuildSyncSuggestions(t *testing.T) {
 
 // TestBuildInfoRemoteLines 多 remote 行：名字列按最长名对齐，行内含地址与网页地址。
 func TestBuildInfoRemoteLines(t *testing.T) {
-	lines := buildInfoRemoteLines([]gogit.Remote{
+	lines := buildInfoRemoteLines([]git.Remote{
 		{Name: "origin", Fetch: "git@github.com:heyuuu/cube.git"},
 		{Name: "gitee", Fetch: "git@gitee.com:heyuuu/cube.git"},
 	})
