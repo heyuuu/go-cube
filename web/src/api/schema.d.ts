@@ -29,7 +29,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取 opener 详情 */
-        get: operations["opener./info"];
+        get: operations["opener.info"];
         put?: never;
         post?: never;
         delete?: never;
@@ -46,7 +46,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取 opener 列表 */
-        get: operations["opener./list"];
+        get: operations["opener.list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -63,7 +63,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取 clone 规则 */
-        get: operations["project./clone-rules"];
+        get: operations["project.cloneRules"];
         put?: never;
         post?: never;
         delete?: never;
@@ -80,7 +80,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取项目详情 */
-        get: operations["project./info"];
+        get: operations["project.info"];
         put?: never;
         post?: never;
         delete?: never;
@@ -97,7 +97,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取项目列表 */
-        get: operations["project./list"];
+        get: operations["project.list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -116,7 +116,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** 用指定 opener 打开项目 */
-        post: operations["project./open"];
+        post: operations["project.open"];
         delete?: never;
         options?: never;
         head?: never;
@@ -131,7 +131,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取扫描规则 */
-        get: operations["project./scan-rules"];
+        get: operations["project.scanRules"];
         put?: never;
         post?: never;
         delete?: never;
@@ -148,7 +148,7 @@ export interface paths {
             cookie?: never;
         };
         /** 获取项目目录树 */
-        get: operations["project./tree"];
+        get: operations["project.tree"];
         put?: never;
         post?: never;
         delete?: never;
@@ -165,7 +165,7 @@ export interface paths {
             cookie?: never;
         };
         /** 服务身份探活 */
-        get: operations["system./whoami"];
+        get: operations["system.whoami"];
         put?: never;
         post?: never;
         delete?: never;
@@ -185,7 +185,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputConfigBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["Config"];
             message: string;
             ok: boolean;
         };
@@ -196,7 +196,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputListResultCloneRuleBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["ListResultCloneRule"];
             message: string;
             ok: boolean;
         };
@@ -207,7 +207,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputListResultOpenerDTOBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["ListResultOpenerDTO"];
             message: string;
             ok: boolean;
         };
@@ -218,7 +218,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputListResultScanRuleBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["ListResultScanRule"];
             message: string;
             ok: boolean;
         };
@@ -229,7 +229,9 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputMapStringInterface {}Body.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: {
+                [key: string]: unknown;
+            };
             message: string;
             ok: boolean;
         };
@@ -240,7 +242,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputOpenerDTOBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["OpenerDTO"];
             message: string;
             ok: boolean;
         };
@@ -251,7 +253,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputProjectInfoResultBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["ProjectInfoResult"];
             message: string;
             ok: boolean;
         };
@@ -262,7 +264,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputProjectListResultBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["ProjectListResult"];
             message: string;
             ok: boolean;
         };
@@ -273,7 +275,7 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputTreeNodeDTOBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["TreeNodeDTO"];
             message: string;
             ok: boolean;
         };
@@ -284,9 +286,39 @@ export interface components {
              * @example https://example.com/schemas/ApiOutputWhoamiResponseBody.json
              */
             readonly $schema?: string;
-            data: unknown;
+            data: components["schemas"]["WhoamiResponse"];
             message: string;
             ok: boolean;
+        };
+        CloneRule: {
+            localPath: string;
+            repoHost: string;
+            repoPrefix: string;
+        };
+        CloneRuleConfig: {
+            localPath: string;
+            repoHost: string;
+            repoPrefix: string;
+        };
+        Config: {
+            dataDir: string;
+            log: components["schemas"]["LogConfig"];
+            openers: components["schemas"]["OpenerConfig"][] | null;
+            project: components["schemas"]["ProjectConfig"];
+        };
+        Entry: {
+            /** Format: int64 */
+            ahead: number;
+            /** Format: int64 */
+            behind: number;
+            branches: string[] | null;
+            /** Format: date-time */
+            collectedAt: string;
+            currentBranch: string;
+            defaultBranch: string;
+            dirty: boolean;
+            repoUrl: string;
+            worktreeMain: string;
         };
         ErrorDetail: {
             /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -335,6 +367,55 @@ export interface components {
              */
             type: string;
         };
+        ListResultCloneRule: {
+            list: components["schemas"]["CloneRule"][] | null;
+        };
+        ListResultOpenerDTO: {
+            list: components["schemas"]["OpenerDTO"][] | null;
+        };
+        ListResultScanRule: {
+            list: components["schemas"]["ScanRule"][] | null;
+        };
+        LogConfig: {
+            format: string;
+            level: string;
+            path: string;
+        };
+        OpenerConfig: {
+            cmd: string[] | null;
+            name: string;
+            roles: string[] | null;
+        };
+        OpenerDTO: {
+            cmd: string[] | null;
+            name: string;
+            roles: string[] | null;
+        };
+        ProjectConfig: {
+            clone: components["schemas"]["CloneRuleConfig"][] | null;
+            scan: components["schemas"]["ScanRuleConfig"][] | null;
+        };
+        ProjectDTO: {
+            gitInfo: components["schemas"]["Entry"];
+            group: string;
+            name: string;
+            path: string;
+            tags: string[] | null;
+        };
+        ProjectInfoResult: {
+            /** Format: date-time */
+            gitUpdatedAt: string;
+            project: components["schemas"]["ProjectDTO"];
+            /** Format: date-time */
+            scanUpdatedAt: string;
+        };
+        ProjectListResult: {
+            /** Format: date-time */
+            gitUpdatedAt: string;
+            list: components["schemas"]["ProjectDTO"][] | null;
+            /** Format: date-time */
+            scanUpdatedAt: string;
+        };
         ProjectOpenInputBody: {
             /**
              * Format: uri
@@ -346,6 +427,28 @@ export interface components {
             app: string;
             /** @description 项目绝对路径 */
             path: string;
+        };
+        ScanRule: {
+            group: string;
+            /** Format: int64 */
+            maxDepth: number;
+            path: string;
+        };
+        ScanRuleConfig: {
+            group: string;
+            /** Format: int64 */
+            maxDepth: number;
+            path: string;
+        };
+        TreeNodeDTO: {
+            children: components["schemas"]["TreeNodeDTO"][] | null;
+            kind: string;
+            name: string;
+            path: string;
+        };
+        WhoamiResponse: {
+            app: string;
+            version: string;
         };
     };
     responses: never;
@@ -385,7 +488,7 @@ export interface operations {
             };
         };
     };
-    "opener./info": {
+    "opener.info": {
         parameters: {
             query?: never;
             header?: never;
@@ -414,7 +517,7 @@ export interface operations {
             };
         };
     };
-    "opener./list": {
+    "opener.list": {
         parameters: {
             query?: never;
             header?: never;
@@ -443,7 +546,7 @@ export interface operations {
             };
         };
     };
-    "project./clone-rules": {
+    "project.cloneRules": {
         parameters: {
             query?: never;
             header?: never;
@@ -472,7 +575,7 @@ export interface operations {
             };
         };
     };
-    "project./info": {
+    "project.info": {
         parameters: {
             query?: never;
             header?: never;
@@ -501,7 +604,7 @@ export interface operations {
             };
         };
     };
-    "project./list": {
+    "project.list": {
         parameters: {
             query?: never;
             header?: never;
@@ -530,7 +633,7 @@ export interface operations {
             };
         };
     };
-    "project./open": {
+    "project.open": {
         parameters: {
             query?: never;
             header?: never;
@@ -563,7 +666,7 @@ export interface operations {
             };
         };
     };
-    "project./scan-rules": {
+    "project.scanRules": {
         parameters: {
             query?: never;
             header?: never;
@@ -592,7 +695,7 @@ export interface operations {
             };
         };
     };
-    "project./tree": {
+    "project.tree": {
         parameters: {
             query?: {
                 root?: string;
@@ -623,7 +726,7 @@ export interface operations {
             };
         };
     };
-    "system./whoami": {
+    "system.whoami": {
         parameters: {
             query?: never;
             header?: never;

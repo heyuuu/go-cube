@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"unicode"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -16,7 +17,7 @@ type ApiOutput[T any] struct {
 	Body struct {
 		Ok      bool   `json:"ok"`
 		Message string `json:"message"`
-		Data    any    `json:"data"`
+		Data    *T     `json:"data"`
 	}
 }
 
@@ -75,10 +76,28 @@ func parseInfoFromPath(p string) (group string, operationId string) {
 		return p, p + ".index"
 	} else {
 		group = p[:idx]
-		rest := p[idx:] // todo 去除 /, 驼峰处理等
+		rest := toCamelPath(p[idx+1:])
 		operationId = group + "." + rest
 		return
 	}
+}
+
+// toCamelPath 把路径段转驼峰："/clone-rules" → "cloneRules"（"-"后字母大写，其余原样）
+func toCamelPath(p string) string {
+	var b strings.Builder
+	upper := false
+	for _, r := range p {
+		switch {
+		case r == '-' || r == '/':
+			upper = true
+		case upper:
+			b.WriteRune(unicode.ToUpper(r))
+			upper = false
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // --- handlers ---
@@ -95,7 +114,7 @@ func jsonHandler[I, O any](h func(I) (O, error)) humaHandler[I, ApiOutput[O]] {
 		} else {
 			output.Body.Ok = true
 			output.Body.Message = ""
-			output.Body.Data = data
+			output.Body.Data = &data
 		}
 		return &output, nil
 	}
