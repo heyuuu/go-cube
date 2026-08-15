@@ -1,13 +1,14 @@
 {
   "name": "cube-ui",
-  "private": true,
   "version": "0.0.0",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "oxfmt --check . && oxlint . && tsgo --noEmit",
+    "check:fix": "oxfmt . && oxlint --fix . && tsgo --noEmit"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -20,8 +21,10 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@typescript/native-preview": "7.0.0-dev.20260707.2",
     "@vitejs/plugin-react": "^6.0.4",
     "babel-plugin-react-compiler": "^1.0.0",
+    "oxfmt": "^0.63.0",
     "oxlint": "^1.75.0",
     "typescript": "~6.0.2",
     "vite": "^8.2.0"
