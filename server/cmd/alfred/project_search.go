@@ -20,12 +20,10 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 			query := strings.Join(args, " ")
 
 			// 项目列表
-			service := a.ProjectService()
-			projects := service.SearchByName(query)
+			projects := a.ProjectService().SearchByName(query)
 
 			// 最近打开日志
-			historyService := a.HistoryService()
-			history := historyService.LeastSelectedProjects(10, true)
+			history := a.HistoryService().LeastSelectedProjects(10, true)
 			sortProjectsWithHistory(projects, history)
 
 			// 返回结果

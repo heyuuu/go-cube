@@ -24,15 +24,13 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 			a.HistoryService().AddProjectOpenLog(projectName, openerName, true)
 
 			// 匹配项目
-			projService := a.ProjectService()
-			proj := projService.FindByName(projectName)
+			proj := a.ProjectService().FindByName(projectName)
 			if proj == nil {
 				return errors.New("未找到指定项目: " + projectName)
 			}
 
 			// 按 opener 名精确查找（区别于主命令的模糊 pickOpener）
-			openerService := a.OpenerService()
-			opener := openerService.FindByName(openerName)
+			opener := a.OpenerService().FindByName(openerName)
 			if opener == nil {
 				return errors.New("未找到指定 opener: " + openerName)
 			}

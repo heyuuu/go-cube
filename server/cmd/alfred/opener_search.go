@@ -26,13 +26,11 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 			}
 
 			// 获取匹配的命令列表
-			service := a.OpenerService()
-			openers := service.SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
+			openers := a.OpenerService().SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
 			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
 			if len(projectName) > 0 {
-				historyService := a.HistoryService()
-				history := historyService.LeastProjectOpenApps(projectName, 3, true)
+				history := a.HistoryService().LeastProjectOpenApps(projectName, 3, true)
 				openers = sortOpeners(openers, history)
 			}
 
