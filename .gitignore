@@ -1,6 +1,7 @@
 tmp
 runtime
 server/web/ui
+openapi.json
 
 #
 .claude/plans
