@@ -116,6 +116,13 @@ func (c *Cache) Get(path string) (*Entry, bool) {
 	return e, ok
 }
 
+// Size 返回缓存条目数（最近一次采集成功的项目数）。
+func (c *Cache) Size() int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return len(c.entries)
+}
+
 // Save 原子写入 git.json。
 // 流程：序列化 → 写 git.json.tmp → rename 覆盖 git.json。
 // rename 保证原子性（同文件系统下）；tmp 与目标同目录以满足这一前提。
