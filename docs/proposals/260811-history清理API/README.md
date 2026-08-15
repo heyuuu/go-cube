@@ -1,7 +1,6 @@
 # history 清理 API
 
 > **状态**：⏸️ 暂不做（等触发条件再评估）
-> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../../tech-notes/cube-next-absorption.md) 第 3 条）
 
 ## 背景
 

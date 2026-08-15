@@ -1,7 +1,6 @@
 # sqlc 代替 gorm
 
 > **状态**：⏸️ 暂不做（记录为未来方向，可能在新项目实验）
-> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../../tech-notes/cube-next-absorption.md) 第 5 条）
 
 ## 背景
 

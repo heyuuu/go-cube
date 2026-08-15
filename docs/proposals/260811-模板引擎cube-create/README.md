@@ -1,11 +1,10 @@
 # 模板引擎（cube create）
 
 > **状态**：📋 待办（设计已完整，启动时直接用）
-> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../../tech-notes/cube-next-absorption.md) 第 13.1 条）
 
 ## 说明
 
-模板引擎的**设计产出在 cube 自己的仓库**，cube-next 只是引用说「旧设计可直接继承」，无新增内容。启动 `cube create` 时直接回看本提案下的设计文档：
+启动 `cube create` 时直接回看本提案下的设计文档：
 
 - [`design/README.md`](design/README.md) —— 结论综述
 - [`design/discussion.md`](design/discussion.md) —— 讨论详情（为什么这么定）

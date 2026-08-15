@@ -1,7 +1,6 @@
 # workspace 工作台 + diff / 伪终端
 
 > **状态**：📋 待办（需求刚澄清，形态未定，讨论处于极早期）
-> **来源**：cube-next 吸收讨论（详见 [`docs/tech-notes/cube-next-absorption.md`](../../tech-notes/cube-next-absorption.md) 第 13.2 条）
 
 ## 需求本质
 
@@ -20,8 +19,6 @@
 | 命令行 | Web 里跑命令（预设命令 or 真 PTY 终端） | 真 PTY 需 WebSocket 长连接，是架构临界点 |
 
 ## 启动讨论时的起点（关键）
-
-详细分析见 cube-next `docs/deferred-features.md`（`/Users/heyu/Code/heyuuu/cube-next/docs/deferred-features.md`）。
 
 **启动讨论时必须先定深度档位再动手**：
 

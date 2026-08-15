@@ -34,13 +34,6 @@
 - [`mani.md`](references/mani.md) — alajmo/mani 竞品分析
 - [`gitbatch.md`](references/gitbatch.md) — isacikgoz/gitbatch 竞品分析（含批量操作避坑点）
 
-### [tech-notes/](tech-notes/) — 技术笔记
-
-设计历史、讨论记录。
-
-- [`cube-next-absorption.md`](tech-notes/cube-next-absorption.md) — cube-next 可吸收内容讨论记录
-- [`v3-设计历史.md`](tech-notes/v3-设计历史.md) — v3 设计决策推理与里程碑历史
-
 ### [misc/](misc/) — 杂项
 
 暂时不好划分的文件。

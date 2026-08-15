@@ -2,7 +2,7 @@
 
 面向未来 ZCode agent 的项目工作规则。先读此文件，再动手改 cube。
 
-> 项目采用 SDD（Spec-Driven Development）管理演进，**当前现状见 [`docs/spec/现状.md`](./docs/spec/现状.md)**（定位/架构/命令/API/数据/配置）。改动功能或架构前，先读 现状.md 对应段落。本文件与 现状.md 冲突时，**现状.md 是事实基准**（它描述代码「是什么」），本文件侧重「怎么改」。未来需求提案在 [`docs/proposals/`](./docs/proposals/)，设计历史与讨论记录在 [`docs/tech-notes/`](./docs/tech-notes/)。
+> 项目采用 SDD（Spec-Driven Development）管理演进，**当前现状见 [`docs/spec/现状.md`](./docs/spec/现状.md)**（定位/架构/命令/API/数据/配置）。改动功能或架构前，先读 现状.md 对应段落。本文件与 现状.md 冲突时，**现状.md 是事实基准**（它描述代码「是什么」），本文件侧重「怎么改」。未来需求提案在 [`docs/proposals/`](./docs/proposals/)。
 
 ## 项目简介
 
@@ -145,7 +145,6 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 
 - [`docs/spec/现状.md`](./docs/spec/现状.md) —— 项目现状（定位/架构/命令/API/数据/配置）。改架构边界或加 domain 前必读。**与代码冲突时以代码为准**。
 - [`docs/proposals/`](./docs/proposals/) —— 待办需求提案（按 `日期-主题/` 目录组织，每个提案含 README.md，部分含 alternatives.md / design/）。
-- [`docs/tech-notes/`](./docs/tech-notes/) —— 设计历史与讨论记录（含 cube-next 吸收记录、v3 设计历史）。
 - [`docs/references/`](./docs/references/) —— 竞品分析（mani / gitbatch，做批量操作前必读 gitbatch 避坑点）。
 - `README.md` —— 项目主要变更总览。
 
