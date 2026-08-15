@@ -19,17 +19,92 @@ package gogit
 //   - 真实读取错误（损坏的 .git、IO 异常等）：返回零值 + error，由调用方决定是否记录。
 
 import (
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 
+	"github.com/go-git/go-billy/v5/osfs"
 	gogit "github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/format/gitignore"
 	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 // openRepo 在 path 处打开一个 git 仓库（DetectDotGit: 允许从子目录向上探测 .git）。
 func openRepo(path string) (*gogit.Repository, error) {
 	return gogit.PlainOpenWithOptions(path, &gogit.PlainOpenOptions{DetectDotGit: false})
+}
+
+// globalIgnorePatterns 收集进程外的全局忽略规则，对齐系统 git 的生效范围：
+//   - ~/.gitconfig 里 core.excludesFile 指向的文件（LoadGlobalPatterns）；
+//   - 未配置 core.excludesFile 时的 XDG 默认 ~/.config/git/ignore；
+//   - /etc/gitconfig 里 core.excludesFile 指向的文件（LoadSystemPatterns）。
+//
+// go-git 的 Status 只读仓库内的 .gitignore 与 .git/info/exclude，全局规则须由
+// 调用方填进 Worktree.Excludes——不补的话，被全局忽略的文件（如 .DS_Store）
+// 会被误报为 untracked / dirty。读不到时返回 nil（降级：当没有全局规则）。
+func globalIgnorePatterns() []gitignore.Pattern {
+	patterns, err := gitignore.LoadGlobalPatterns(osfs.New("/"))
+	if err != nil {
+		patterns = nil
+	}
+	if len(patterns) == 0 {
+		// core.excludesFile 的默认值即 XDG ignore，git 在未显式配置时读它。
+		// 不用 os.UserConfigDir：darwin 上它返回 ~/Library/Application Support，
+		// 与 git 的 XDG 语义（$XDG_CONFIG_HOME 或 ~/.config）不一致。
+		if dir := xdgConfigDir(); dir != "" {
+			patterns = parseIgnoreFile(filepath.Join(dir, "git", "ignore"))
+		}
+	}
+	if sys, err := gitignore.LoadSystemPatterns(osfs.New("/")); err == nil {
+		patterns = append(patterns, sys...)
+	}
+	return patterns
+}
+
+// xdgConfigDir 解析 XDG 配置目录：$XDG_CONFIG_HOME，未设置时为 ~/.config。
+func xdgConfigDir() string {
+	if dir := os.Getenv("XDG_CONFIG_HOME"); dir != "" {
+		return dir
+	}
+	if home, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(home, ".config")
+	}
+	return ""
+}
+
+// parseIgnoreFile 按行解析 ignore 文件（跳过空行与 # 注释），不可读时返回 nil。
+func parseIgnoreFile(path string) []gitignore.Pattern {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	var patterns []gitignore.Pattern
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, gitignore.ParsePattern(line, nil))
+	}
+	return patterns
+}
+
+// openWorktree 打开 path 处仓库的工作区，并注入全局忽略规则（见 globalIgnorePatterns），
+// 之后 wt.Status() 的结果才与系统 git status 一致。
+// 非仓库目录或 bare 仓库返回 nil，与 openRepo 的降级约定一致。
+func openWorktree(path string) *gogit.Worktree {
+	repo, err := openRepo(path)
+	if err != nil {
+		return nil
+	}
+	wt, err := repo.Worktree()
+	if err != nil {
+		return nil // bare 仓库无工作区
+	}
+	wt.Excludes = append(wt.Excludes, globalIgnorePatterns()...)
+	return wt
 }
 
 // RemoteUrl 返回 path 处仓库 origin remote 的 URL。
@@ -401,16 +476,13 @@ func reachableCommits(repo *gogit.Repository, from plumbing.Hash) (map[plumbing.
 	return set, nil
 }
 
-// IsDirty 返回 path 处仓库的工作区是否有改动（含 untracked，但尊重 .gitignore）。
+// IsDirty 返回 path 处仓库的工作区是否有改动（含 untracked，尊重仓库内
+// .gitignore 与全局忽略规则）。
 // 非仓库目录返回 (false, nil)。
 func IsDirty(path string) (bool, error) {
-	repo, err := openRepo(path)
-	if err != nil {
-		return false, nil
-	}
-	wt, err := repo.Worktree()
-	if err != nil {
-		return false, err
+	wt := openWorktree(path)
+	if wt == nil {
+		return false, nil // 非仓库目录或 bare 仓库
 	}
 	status, err := wt.Status()
 	if err != nil {
@@ -425,19 +497,16 @@ type FileStatus struct {
 	Path string // 相对仓库根路径
 }
 
-// StatusFiles 返回 path 处仓库工作区有变动的文件列表（含 untracked，尊重 .gitignore），
-// 按路径排序。非仓库目录或工作区干净时返回 (nil, nil)，不视为错误。
+// StatusFiles 返回 path 处仓库工作区有变动的文件列表（含 untracked，尊重仓库内
+// .gitignore 与全局忽略规则），按路径排序。
+// 非仓库目录或工作区干净时返回 (nil, nil)，不视为错误。
 //
 // 注意：go-git 不做 rename 检测，改名文件表现为「旧路径 D + 新路径 A」两行
 // （git status --short 会合并显示为 R 行，此处不合并）。
 func StatusFiles(path string) ([]FileStatus, error) {
-	repo, err := openRepo(path)
-	if err != nil {
-		return nil, nil
-	}
-	wt, err := repo.Worktree()
-	if err != nil {
-		return nil, err
+	wt := openWorktree(path)
+	if wt == nil {
+		return nil, nil // 非仓库目录或 bare 仓库
 	}
 	status, err := wt.Status()
 	if err != nil {

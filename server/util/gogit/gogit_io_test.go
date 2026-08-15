@@ -394,3 +394,71 @@ func TestStatusFiles_CleanAndNonRepo(t *testing.T) {
 		t.Fatalf("非仓库目录应返回空不报错，实际 (%v, %v)", files, err)
 	}
 }
+
+// TestStatusFiles_GlobalIgnore 全局忽略规则生效：被 ~/.gitconfig 的
+// core.excludesFile 或 XDG 默认 ignore 匹配的文件不算 untracked、不算 dirty。
+// 通过 HOME / XDG_CONFIG_HOME 指向测试目录隔离真实用户配置
+// （os.UserHomeDir / os.UserConfigDir 读环境变量）。
+func TestStatusFiles_GlobalIgnore(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+
+	// --- 场景一：~/.gitconfig 显式配置 core.excludesFile ---
+	home := ws.Mkdir("home")
+	ws.WriteFile("home/.gitignore_global", []byte("*.log\n.DS_Store\n"))
+	ws.WriteFile("home/.gitconfig", []byte(
+		"[core]\n\texcludesFile = "+ws.Join("home", ".gitignore_global")+"\n"))
+
+	ws.WriteFile("repo/keep.txt", []byte("x"))  // 普通未跟踪 → 应出现
+	ws.WriteFile("repo/debug.log", []byte("x")) // 全局忽略 → 不应出现
+	ws.WriteFile("repo/.DS_Store", []byte("x")) // 全局忽略 → 不应出现
+
+	t.Setenv("HOME", home)
+	files, err := StatusFiles(dir)
+	if err != nil {
+		t.Fatalf("StatusFiles 出错: %v", err)
+	}
+	if len(files) != 1 || files[0].Path != "keep.txt" {
+		t.Fatalf("全局忽略未生效，期望仅 [keep.txt]，实际 %v", files)
+	}
+
+	// 只有全局忽略文件的仓库不应误报 dirty
+	cleanDir := ws.MakeGitRepo("only-ignored")
+	ws.WriteFile("only-ignored/.DS_Store", []byte("x"))
+	ws.WriteFile("only-ignored/a.log", []byte("x"))
+	dirty, err := IsDirty(cleanDir)
+	if err != nil {
+		t.Fatalf("IsDirty 出错: %v", err)
+	}
+	if dirty {
+		t.Fatalf("只含全局忽略文件的仓库 IsDirty 应为 false")
+	}
+
+	// --- 场景二：无 .gitconfig 时走 XDG 默认（$XDG_CONFIG_HOME/git/ignore）---
+	// 空 HOME 下没有 excludesFile，*.log/.DS_Store 不再被忽略（正确的 git 语义），
+	// 本场景只验证 XDG 的 skip.txt 被过滤。
+	emptyHome := ws.Mkdir("empty-home")
+	xdg := ws.Mkdir("xdg")
+	ws.WriteFile("xdg/git/ignore", []byte("skip.txt\n"))
+
+	ws.WriteFile("repo/skip.txt", []byte("x")) // XDG 忽略 → 不应出现
+
+	t.Setenv("HOME", emptyHome)
+	t.Setenv("XDG_CONFIG_HOME", xdg)
+	files, err = StatusFiles(dir)
+	if err != nil {
+		t.Fatalf("StatusFiles 出错: %v", err)
+	}
+	byPath := make(map[string]string, len(files))
+	for _, f := range files {
+		byPath[f.Path] = f.Code
+	}
+	if _, ok := byPath["skip.txt"]; ok {
+		t.Fatalf("XDG 默认 ignore 未生效，skip.txt 不应出现: %v", files)
+	}
+	for _, want := range []string{"keep.txt", "debug.log", ".DS_Store"} {
+		if _, ok := byPath[want]; !ok {
+			t.Fatalf("文件 %s 应出现（空 HOME 下无全局规则）: %v", want, files)
+		}
+	}
+}
