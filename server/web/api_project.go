@@ -70,7 +70,7 @@ type ProjectInfoResult struct {
 }
 
 func (h *ProjectHandler) projectInfo(input struct {
-	Name string `json:"name"`
+	Name string `query:"name" required:"true"`
 }) (ProjectInfoResult, error) {
 	proj := h.projectService.FindByName(input.Name)
 	return ProjectInfoResult{

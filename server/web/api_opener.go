@@ -53,7 +53,7 @@ func (h *OpenerHandler) openerList(_ struct{}) (ListResult[*OpenerDTO], error) {
 }
 
 func (h *OpenerHandler) openerInfo(input struct {
-	Name string `json:"name"`
+	Name string `query:"name" required:"true"`
 }) (*OpenerDTO, error) {
 	o := h.service.FindByName(input.Name)
 	return toOpenerDTO(o), nil
