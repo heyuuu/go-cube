@@ -48,6 +48,20 @@ function loadMdTheme(): MdThemeId {
   return mdThemes.some((t) => t.id === v) ? (v as MdThemeId) : 'default';
 }
 
+// 正文视图模式：渲染 / 源码 / 分栏（左渲染右源码对照）。持久化同主题。
+const MD_VIEW_KEY = 'md.viewMode';
+const mdViews = [
+  { id: 'render', label: '渲染' },
+  { id: 'source', label: '源码' },
+  { id: 'split', label: '分栏' },
+] as const;
+type MdViewId = (typeof mdViews)[number]['id'];
+
+function loadMdView(): MdViewId {
+  const v = localStorage.getItem(MD_VIEW_KEY);
+  return mdViews.some((t) => t.id === v) ? (v as MdViewId) : 'render';
+}
+
 // 侧栏宽度持久化：localStorage 记住用户拖出来的宽度，刷新不变
 const SIDEBAR_WIDTH_KEY = 'md.sidebarWidth';
 const SIDEBAR_WIDTH_DEFAULT = 256;
@@ -191,11 +205,15 @@ function MdContent({
   theme,
   onThemeChange,
   onNavigate,
+  viewMode,
+  onViewChange,
 }: {
   file: string | null;
   theme: MdThemeId;
   onThemeChange: (t: MdThemeId) => void;
   onNavigate: (absPath: string) => void;
+  viewMode: MdViewId;
+  onViewChange: (v: MdViewId) => void;
 }) {
   const themeLabel = mdThemes.find((t) => t.id === theme)?.label ?? theme;
   const q = useMdContent(file ?? '');
@@ -213,6 +231,23 @@ function MdContent({
           <div className="mt-1 font-mono text-xs text-muted-foreground" title={file}>
             {file}
           </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-0.5 rounded-md border p-0.5">
+          {mdViews.map((v) => (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => onViewChange(v.id)}
+              className={cn(
+                'rounded-sm px-2 py-0.5 text-xs transition-colors',
+                viewMode === v.id
+                  ? 'bg-background font-medium shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {v.label}
+            </button>
+          ))}
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-xs" />}>
@@ -240,7 +275,7 @@ function MdContent({
       </header>
       {q.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
       {q.error && <ErrorBanner message={`读取失败：${q.error.message}`} />}
-      {q.data && (
+      {q.data && viewMode === 'render' && (
         <article
           className={cn(
             'prose prose-sm mb-10 max-w-none',
@@ -260,6 +295,37 @@ function MdContent({
             {q.data.content}
           </Markdown>
         </article>
+      )}
+      {q.data && viewMode === 'source' && (
+        <pre className="mb-10 rounded-lg border bg-muted/30 p-4 font-mono text-xs break-words whitespace-pre-wrap">
+          {q.data.content}
+        </pre>
+      )}
+      {q.data && viewMode === 'split' && (
+        <div className="mb-10 grid gap-6 md:grid-cols-2">
+          <article
+            className={cn(
+              'prose prose-sm max-w-none',
+              theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
+            )}
+          >
+            <Markdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                a: ({ href, children }) => (
+                  <MdLink href={href} base={file} onNavigate={onNavigate}>
+                    {children}
+                  </MdLink>
+                ),
+              }}
+            >
+              {q.data.content}
+            </Markdown>
+          </article>
+          <pre className="rounded-lg border bg-muted/30 p-4 font-mono text-xs break-words whitespace-pre-wrap">
+            {q.data.content}
+          </pre>
+        </div>
       )}
     </>
   );
@@ -282,10 +348,16 @@ export function MdPage() {
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sidebarW, setSidebarW] = useState(loadSidebarWidth);
   const [theme, setTheme] = useState(loadMdTheme);
+  const [viewMode, setViewMode] = useState(loadMdView);
 
   function switchTheme(t: MdThemeId) {
     setTheme(t);
     localStorage.setItem(MD_THEME_KEY, t);
+  }
+
+  function switchView(v: MdViewId) {
+    setViewMode(v);
+    localStorage.setItem(MD_VIEW_KEY, v);
   }
   const selected = dirMode ? (picked !== undefined ? picked : readmeOf(files, path)) : path || null;
 
@@ -439,7 +511,14 @@ export function MdPage() {
           {list.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
           {listError && <ErrorBanner message={listError} />}
           {!list.isPending && !listError && (
-            <MdContent file={selected} theme={theme} onThemeChange={switchTheme} onNavigate={navigateLink} />
+            <MdContent
+              file={selected}
+              theme={theme}
+              onThemeChange={switchTheme}
+              onNavigate={navigateLink}
+              viewMode={viewMode}
+              onViewChange={switchView}
+            />
           )}
         </div>
       </main>
