@@ -14,7 +14,6 @@
 
 未来需求的提案，每个提案一个目录（`YYMMDD-提案名/`）。
 
-- [`260811-前端栈迁移/`](proposals/260811-前端栈迁移/) — Alpine.js → Vite+React+TS+React Query 整体迁移
 - [`260811-模板引擎cube-create/`](proposals/260811-模板引擎cube-create/) — `cube create` 模板引擎（设计已完整）
 - [`260811-workspace工作台/`](proposals/260811-workspace工作台/) — workspace 工作台 + diff / 伪终端
 - [`260811-web层测试补全/`](proposals/260811-web层测试补全/) — 为零测试的 web 层补测试基建
@@ -26,6 +25,7 @@
 已实现的需求总结（从 proposals 移入，记录最终落地形态与方案演变）。
 
 - [`260811-server后台常驻与HTTP管理/`](archived/260811-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
+- [`260811-前端栈迁移/`](archived/260811-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口
 
 ### [references/](references/) — 参考文献目录
 

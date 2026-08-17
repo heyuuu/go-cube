@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router';
 
 import { cn } from '@/lib/utils';
 
-// 导航只放当前可用页面；新增页面在此追加（终态地图见 docs/proposals/260811-前端栈迁移）
+// 导航只放当前可用页面；新增页面在此追加（终态地图见 docs/archived/260811-前端栈迁移）
 const navItems = [{ to: '/projects', label: 'Projects' }];
 
 export function Layout() {
