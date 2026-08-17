@@ -16,7 +16,6 @@
 
 - [`260811-模板引擎cube-create/`](proposals/260811-模板引擎cube-create/) — `cube create` 模板引擎（设计已完整）
 - [`260811-workspace工作台/`](proposals/260811-workspace工作台/) — workspace 工作台 + diff / 伪终端
-- [`260811-web层测试补全/`](proposals/260811-web层测试补全/) — 为零测试的 web 层补测试基建
 - [`260811-history清理API/`](proposals/260811-history清理API/) — history 数据清理（暂不做）
 - [`260811-sqlc代替gorm/`](proposals/260811-sqlc代替gorm/) — sqlc 代替 gorm（暂不做，未来方向）
 
@@ -26,6 +25,7 @@
 
 - [`260811-server后台常驻与HTTP管理/`](archived/260811-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
 - [`260811-前端栈迁移/`](archived/260811-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口
+- [`260811-web层测试补全/`](archived/260811-web层测试补全/) — httptest 集成测试基建 + 全部 handler 用例
 
 ### [references/](references/) — 参考文献目录
 

@@ -54,6 +54,9 @@ func NewServer(handlers ...Handler) *Server {
 
 func (s *Server) API() huma.API { return s.api }
 
+// Handler 返回底层 http.Handler，供 httptest 拉起真实路由做集成测试。
+func (s *Server) Handler() http.Handler { return s.mux }
+
 // OpenAPIJSON 返回 OpenAPI 3.1 spec 的 JSON 字节。供 generate 命令或 /openapi.json 端点使用。
 func (s *Server) OpenAPIJSON() ([]byte, error) {
 	return s.api.OpenAPI().MarshalJSON()

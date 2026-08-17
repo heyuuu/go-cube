@@ -87,12 +87,13 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
 - **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
 - **opener 执行类**：通过 `Executor` 接口注入 fake，不真的启动编辑器。见 `opener/opener_test.go`。
+- **web 层**：httptest 拉起真实 `Server.Handler()` 打真实 HTTP 请求（见 `web/server_test.go` 的 newTestEnv 基建），断言路由 / DTO / envelope / nil 序列化 / 静态资源契约。新增 handler 时在此模式上补用例。
 - **不写单测的（靠手动/集成验证）**：
   - `git.Run`/`git.Clone`/`git.Push`（透传 stdio 到 `os.Stdout`，无法捕获输出；且本质是组装 git 参数）
   - `gitcache.TryAsyncRefresh`（fork 自身可执行文件跑子命令，进程编排非逻辑）
   - `opener.Open` 的真实进程启动（已用 Executor 隔离，但默认实现的真启动仍靠手动验证）
   - `config`/`db`（全局单例无 setter，测试无法隔离）
-  - `cmd/*`（cobra 命令编排）、`web`（huma 路由 + envelope，集成测比单测值）
+  - `cmd/*`（cobra 命令编排）
 
 ## 必须遵守的编码规则
 

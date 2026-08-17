@@ -44,10 +44,12 @@ func New(cfg *config.Config) (*App, error) {
 	configHandler := web.NewConfigHandler(cfg)
 	projectHandler := web.NewProjectHandler(projectService, openerService)
 	openerHandler := web.NewOpenerHandler(openerService)
+	mdHandler := web.NewMdHandler()
 	server := web.NewServer(
 		configHandler,
 		projectHandler,
 		openerHandler,
+		mdHandler,
 	)
 
 	return &App{
