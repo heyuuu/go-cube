@@ -158,9 +158,9 @@ function MdTreeRow({
   return (
     <div
       className={cn(
-        'group flex cursor-pointer items-center gap-1 rounded-md py-1 pr-1 text-xs hover:bg-muted/50',
+        'group flex cursor-pointer items-center gap-1 rounded-md py-1 pr-1 text-xs hover:bg-primary/15 dark:hover:bg-primary/25',
         isDir ? 'text-muted-foreground' : 'text-foreground',
-        !isDir && n.path === selected && 'bg-primary/15 font-medium text-foreground dark:bg-primary/25',
+        !isDir && n.path === selected && 'bg-primary/30 font-medium text-foreground dark:bg-primary/40',
       )}
       style={{ paddingLeft: row.depth * 16 + 4 }}
       onClick={() => (isDir ? onDir(n.path) : onFile(n.path))}
