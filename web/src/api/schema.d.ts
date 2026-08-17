@@ -4,755 +4,759 @@
  */
 
 export interface paths {
-    "/api/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取配置信息 */
-        get: operations["config.index"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  '/api/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/opener/info": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取 opener 详情 */
-        get: operations["opener.info"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取配置信息 */
+    get: operations['config.index'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/info': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/opener/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取 opener 列表 */
-        get: operations["opener.list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取 opener 详情 */
+    get: operations['opener.info'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/clone-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取 clone 规则 */
-        get: operations["project.cloneRules"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取 opener 列表 */
+    get: operations['opener.list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/clone-rules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/info": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取项目详情 */
-        get: operations["project.info"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取 clone 规则 */
+    get: operations['project.cloneRules'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/info': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取项目列表 */
-        get: operations["project.list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取项目详情 */
+    get: operations['project.info'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/open": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** 用指定 opener 打开项目 */
-        post: operations["project.open"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取项目列表 */
+    get: operations['project.list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/scan-rules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取扫描规则 */
-        get: operations["project.scanRules"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** 用指定 opener 打开项目 */
+    post: operations['project.open'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/scan-rules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/project/tree": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 获取项目目录树 */
-        get: operations["project.tree"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取扫描规则 */
+    get: operations['project.scanRules'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/tree': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/system/whoami": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** 服务身份探活 */
-        get: operations["system.whoami"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** 获取项目目录树 */
+    get: operations['project.tree'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/system/whoami': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** 服务身份探活 */
+    get: operations['system.whoami'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        ApiOutputConfigBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputConfigBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["Config"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputListResultCloneRuleBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputListResultCloneRuleBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["ListResultCloneRule"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputListResultOpenerDTOBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputListResultOpenerDTOBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["ListResultOpenerDTO"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputListResultScanRuleBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputListResultScanRuleBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["ListResultScanRule"];
-            message: string;
-            ok: boolean;
-        };
-        "ApiOutputMapStringInterface {}Body": {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputMapStringInterface {}Body.json
-             */
-            readonly $schema?: string;
-            data: {
-                [key: string]: unknown;
-            };
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputOpenerDTOBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputOpenerDTOBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["OpenerDTO"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputProjectInfoResultBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputProjectInfoResultBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["ProjectInfoResult"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputProjectListResultBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputProjectListResultBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["ProjectListResult"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputTreeNodeDTOBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputTreeNodeDTOBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["TreeNodeDTO"];
-            message: string;
-            ok: boolean;
-        };
-        ApiOutputWhoamiResponseBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ApiOutputWhoamiResponseBody.json
-             */
-            readonly $schema?: string;
-            data: components["schemas"]["WhoamiResponse"];
-            message: string;
-            ok: boolean;
-        };
-        CloneRule: {
-            localPath: string;
-            repoHost: string;
-            repoPrefix: string;
-        };
-        CloneRuleConfig: {
-            localPath: string;
-            repoHost: string;
-            repoPrefix: string;
-        };
-        Config: {
-            dataDir: string;
-            log: components["schemas"]["LogConfig"];
-            openers: components["schemas"]["OpenerConfig"][] | null;
-            project: components["schemas"]["ProjectConfig"];
-        };
-        Entry: {
-            /** Format: int64 */
-            ahead: number;
-            /** Format: int64 */
-            behind: number;
-            branches: string[] | null;
-            /** Format: date-time */
-            collectedAt: string;
-            currentBranch: string;
-            defaultBranch: string;
-            dirty: boolean;
-            repoUrl: string;
-            worktreeMain: string;
-        };
-        ErrorDetail: {
-            /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
-            location?: string;
-            /** @description Error message text */
-            message?: string;
-            /** @description The value at the given location */
-            value?: unknown;
-        };
-        ErrorModel: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ErrorModel.json
-             */
-            readonly $schema?: string;
-            /**
-             * @description A human-readable explanation specific to this occurrence of the problem.
-             * @example Property foo is required but is missing.
-             */
-            detail?: string;
-            /** @description Optional list of individual error details */
-            errors?: components["schemas"]["ErrorDetail"][] | null;
-            /**
-             * Format: uri
-             * @description A URI reference that identifies the specific occurrence of the problem.
-             * @example https://example.com/error-log/abc123
-             */
-            instance?: string;
-            /**
-             * Format: int64
-             * @description HTTP status code
-             * @example 400
-             */
-            status?: number;
-            /**
-             * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
-             * @example Bad Request
-             */
-            title?: string;
-            /**
-             * Format: uri
-             * @description A URI reference to human-readable documentation for the error.
-             * @default about:blank
-             * @example https://example.com/errors/example
-             */
-            type: string;
-        };
-        ListResultCloneRule: {
-            list: components["schemas"]["CloneRule"][] | null;
-        };
-        ListResultOpenerDTO: {
-            list: components["schemas"]["OpenerDTO"][] | null;
-        };
-        ListResultScanRule: {
-            list: components["schemas"]["ScanRule"][] | null;
-        };
-        LogConfig: {
-            format: string;
-            level: string;
-            path: string;
-        };
-        OpenerConfig: {
-            cmd: string[] | null;
-            name: string;
-            roles: string[] | null;
-        };
-        OpenerDTO: {
-            cmd: string[] | null;
-            name: string;
-            roles: string[] | null;
-        };
-        ProjectConfig: {
-            clone: components["schemas"]["CloneRuleConfig"][] | null;
-            scan: components["schemas"]["ScanRuleConfig"][] | null;
-        };
-        ProjectDTO: {
-            gitInfo: components["schemas"]["Entry"];
-            group: string;
-            name: string;
-            path: string;
-            tags: string[] | null;
-        };
-        ProjectInfoResult: {
-            /** Format: date-time */
-            gitUpdatedAt: string;
-            project: components["schemas"]["ProjectDTO"];
-            /** Format: date-time */
-            scanUpdatedAt: string;
-        };
-        ProjectListResult: {
-            /** Format: date-time */
-            gitUpdatedAt: string;
-            list: components["schemas"]["ProjectDTO"][] | null;
-            /** Format: date-time */
-            scanUpdatedAt: string;
-        };
-        ProjectOpenInputBody: {
-            /**
-             * Format: uri
-             * @description A URL to the JSON Schema for this object.
-             * @example https://example.com/schemas/ProjectOpenInputBody.json
-             */
-            readonly $schema?: string;
-            /** @description opener 名称（finder / vscode / idea ...） */
-            app: string;
-            /** @description 项目绝对路径 */
-            path: string;
-        };
-        ScanRule: {
-            group: string;
-            /** Format: int64 */
-            maxDepth: number;
-            path: string;
-        };
-        ScanRuleConfig: {
-            group: string;
-            /** Format: int64 */
-            maxDepth: number;
-            path: string;
-        };
-        TreeNodeDTO: {
-            children: components["schemas"]["TreeNodeDTO"][] | null;
-            kind: string;
-            name: string;
-            path: string;
-        };
-        WhoamiResponse: {
-            app: string;
-            version: string;
-        };
+  schemas: {
+    ApiOutputConfigBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputConfigBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['Config'];
+      message: string;
+      ok: boolean;
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    ApiOutputListResultCloneRuleBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultCloneRuleBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultCloneRule'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputListResultOpenerDTOBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultOpenerDTOBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultOpenerDTO'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputListResultScanRuleBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultScanRuleBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultScanRule'];
+      message: string;
+      ok: boolean;
+    };
+    'ApiOutputMapStringInterface {}Body': {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputMapStringInterface {}Body.json
+       */
+      readonly $schema?: string;
+      data: {
+        [key: string]: unknown;
+      };
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputOpenerDTOBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputOpenerDTOBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['OpenerDTO'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputProjectInfoResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputProjectInfoResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ProjectInfoResult'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputProjectListResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputProjectListResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ProjectListResult'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputTreeNodeDTOBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputTreeNodeDTOBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['TreeNodeDTO'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputWhoamiResponseBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputWhoamiResponseBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['WhoamiResponse'];
+      message: string;
+      ok: boolean;
+    };
+    CloneRule: {
+      localPath: string;
+      repoHost: string;
+      repoPrefix: string;
+    };
+    CloneRuleConfig: {
+      localPath: string;
+      repoHost: string;
+      repoPrefix: string;
+    };
+    Config: {
+      dataDir: string;
+      log: components['schemas']['LogConfig'];
+      openers: components['schemas']['OpenerConfig'][] | null;
+      project: components['schemas']['ProjectConfig'];
+    };
+    Entry: {
+      /** Format: int64 */
+      ahead: number;
+      /** Format: int64 */
+      behind: number;
+      branches: string[] | null;
+      /** Format: date-time */
+      collectedAt: string;
+      currentBranch: string;
+      defaultBranch: string;
+      dirty: boolean;
+      repoUrl: string;
+      worktreeMain: string;
+    };
+    ErrorDetail: {
+      /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
+      location?: string;
+      /** @description Error message text */
+      message?: string;
+      /** @description The value at the given location */
+      value?: unknown;
+    };
+    ErrorModel: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ErrorModel.json
+       */
+      readonly $schema?: string;
+      /**
+       * @description A human-readable explanation specific to this occurrence of the problem.
+       * @example Property foo is required but is missing.
+       */
+      detail?: string;
+      /** @description Optional list of individual error details */
+      errors?: components['schemas']['ErrorDetail'][] | null;
+      /**
+       * Format: uri
+       * @description A URI reference that identifies the specific occurrence of the problem.
+       * @example https://example.com/error-log/abc123
+       */
+      instance?: string;
+      /**
+       * Format: int64
+       * @description HTTP status code
+       * @example 400
+       */
+      status?: number;
+      /**
+       * @description A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+       * @example Bad Request
+       */
+      title?: string;
+      /**
+       * Format: uri
+       * @description A URI reference to human-readable documentation for the error.
+       * @default about:blank
+       * @example https://example.com/errors/example
+       */
+      type: string;
+    };
+    ListResultCloneRule: {
+      list: components['schemas']['CloneRule'][] | null;
+    };
+    ListResultOpenerDTO: {
+      list: components['schemas']['OpenerDTO'][] | null;
+    };
+    ListResultScanRule: {
+      list: components['schemas']['ScanRule'][] | null;
+    };
+    LogConfig: {
+      format: string;
+      level: string;
+      path: string;
+    };
+    OpenerConfig: {
+      cmd: string[] | null;
+      name: string;
+      roles: string[] | null;
+    };
+    OpenerDTO: {
+      cmd: string[] | null;
+      name: string;
+      roles: string[] | null;
+    };
+    ProjectConfig: {
+      clone: components['schemas']['CloneRuleConfig'][] | null;
+      scan: components['schemas']['ScanRuleConfig'][] | null;
+    };
+    ProjectDTO: {
+      gitInfo: components['schemas']['Entry'];
+      group: string;
+      name: string;
+      path: string;
+      tags: string[] | null;
+    };
+    ProjectInfoResult: {
+      /** Format: date-time */
+      gitUpdatedAt: string;
+      project: components['schemas']['ProjectDTO'];
+      /** Format: date-time */
+      scanUpdatedAt: string;
+    };
+    ProjectListResult: {
+      /** Format: date-time */
+      gitUpdatedAt: string;
+      list: components['schemas']['ProjectDTO'][] | null;
+      /** Format: date-time */
+      scanUpdatedAt: string;
+    };
+    ProjectOpenInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ProjectOpenInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description opener 名称（finder / vscode / idea ...） */
+      app: string;
+      /** @description 项目绝对路径 */
+      path: string;
+    };
+    ScanRule: {
+      group: string;
+      /** Format: int64 */
+      maxDepth: number;
+      path: string;
+    };
+    ScanRuleConfig: {
+      group: string;
+      /** Format: int64 */
+      maxDepth: number;
+      path: string;
+    };
+    TreeNodeDTO: {
+      children: components['schemas']['TreeNodeDTO'][] | null;
+      kind: string;
+      name: string;
+      path: string;
+    };
+    WhoamiResponse: {
+      app: string;
+      version: string;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    "config.index": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputConfigBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
+  'config.index': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "opener.info": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputOpenerDTOBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ApiOutputConfigBody'];
         };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
     };
-    "opener.list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputListResultOpenerDTOBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
+  };
+  'opener.info': {
+    parameters: {
+      query: {
+        name: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "project.cloneRules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputListResultCloneRuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ApiOutputOpenerDTOBody'];
         };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
     };
-    "project.info": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputProjectInfoResultBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
+  };
+  'opener.list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "project.list": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputProjectListResultBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultOpenerDTOBody'];
         };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
     };
-    "project.open": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProjectOpenInputBody"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputMapStringInterface {}Body"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
+  };
+  'project.cloneRules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "project.scanRules": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputListResultScanRuleBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultCloneRuleBody'];
         };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
     };
-    "project.tree": {
-        parameters: {
-            query?: {
-                root?: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputTreeNodeDTOBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
-        };
+  };
+  'project.info': {
+    parameters: {
+      query: {
+        name: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "system.whoami": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ApiOutputWhoamiResponseBody"];
-                };
-            };
-            /** @description Error */
-            default: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ErrorModel"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['ApiOutputProjectInfoResultBody'];
         };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
     };
+  };
+  'project.list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputProjectListResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProjectOpenInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.scanRules': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultScanRuleBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.tree': {
+    parameters: {
+      query?: {
+        root?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputTreeNodeDTOBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'system.whoami': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputWhoamiResponseBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
 }
