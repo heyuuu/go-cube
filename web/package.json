@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "check": "oxfmt --check . && oxlint . && tsgo -b --noEmit",
     "check:fix": "oxfmt . && oxlint --fix . && tsgo -b --noEmit",
-    "gen:api": "../run.sh openapi -o openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts && oxfmt src/api/schema.d.ts"
+    "gen:api": "../run.sh openapi -o openapi.json && openapi-typescript openapi.json -o src/api/schema.d.ts && oxfmt src/api/schema.d.ts",
+    "verify:shadcn": "node scripts/verify-shadcn.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
