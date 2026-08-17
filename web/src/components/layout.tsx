@@ -1,4 +1,4 @@
-import { ExternalLink, Settings } from 'lucide-react';
+import { Box, ExternalLink, Settings } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 
 import { cn } from '@/lib/utils';
@@ -10,8 +10,9 @@ export function Layout() {
   return (
     <div className="flex h-dvh">
       <aside className="flex w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
-        <div className="px-4 pt-5 pb-4 text-base font-semibold tracking-wide">
-          <span className="text-sidebar-primary">▣</span> cube
+        <div className="flex items-center gap-2 px-4 pt-5 pb-4 text-base font-semibold tracking-wide">
+          <Box className="size-4 text-sidebar-primary" />
+          cube
         </div>
         <nav className="flex flex-col gap-0.5 px-2">
           {navItems.map((item) => (
