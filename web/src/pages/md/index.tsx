@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Ellipsis, Folder, FileText } from 'lucide-react';
-import { useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Markdown from 'react-markdown';
 import { useSearchParams } from 'react-router';
 import remarkGfm from 'remark-gfm';
@@ -218,6 +218,24 @@ function MdContent({
   const themeLabel = mdThemes.find((t) => t.id === theme)?.label ?? theme;
   const q = useMdContent(file ?? '');
 
+  // 分栏滚动同步：两边按滚动比例互相跟随（渲染段落与源码行无一一对应，
+  // 只能做到近似对照——这是 diff 工具对非等高内容的通行做法）
+  const renderRef = useRef<HTMLDivElement>(null);
+  const sourceRef = useRef<HTMLDivElement>(null);
+  const syncing = useRef(false);
+  function syncScroll(from: 'render' | 'source') {
+    if (syncing.current) return;
+    const a = (from === 'render' ? renderRef : sourceRef).current;
+    const b = (from === 'render' ? sourceRef : renderRef).current;
+    if (!a || !b) return;
+    const aMax = a.scrollHeight - a.clientHeight;
+    const bMax = b.scrollHeight - b.clientHeight;
+    if (aMax <= 0 || bMax <= 0) return;
+    syncing.current = true;
+    b.scrollTop = (a.scrollTop / aMax) * bMax;
+    syncing.current = false;
+  }
+
   if (!file) {
     return <div className="mt-10 text-center text-xs text-muted-foreground">此目录没有 README.md，从左侧选择文件</div>;
   }
@@ -302,29 +320,41 @@ function MdContent({
         </pre>
       )}
       {q.data && viewMode === 'split' && (
-        <div className="mb-10 grid gap-6 md:grid-cols-2">
-          <article
-            className={cn(
-              'prose prose-sm max-w-none',
-              theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
-            )}
+        <div className="grid gap-6 md:grid-cols-2">
+          <div
+            ref={renderRef}
+            onScroll={() => syncScroll('render')}
+            className="max-h-[calc(100dvh-11rem)] overflow-y-auto pr-1"
           >
-            <Markdown
-              remarkPlugins={[remarkGfm]}
-              components={{
-                a: ({ href, children }) => (
-                  <MdLink href={href} base={file} onNavigate={onNavigate}>
-                    {children}
-                  </MdLink>
-                ),
-              }}
+            <article
+              className={cn(
+                'prose prose-sm max-w-none',
+                theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
+              )}
             >
+              <Markdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  a: ({ href, children }) => (
+                    <MdLink href={href} base={file} onNavigate={onNavigate}>
+                      {children}
+                    </MdLink>
+                  ),
+                }}
+              >
+                {q.data.content}
+              </Markdown>
+            </article>
+          </div>
+          <div
+            ref={sourceRef}
+            onScroll={() => syncScroll('source')}
+            className="max-h-[calc(100dvh-11rem)] overflow-y-auto pr-1"
+          >
+            <pre className="rounded-lg border bg-muted/30 p-4 font-mono text-xs break-words whitespace-pre-wrap">
               {q.data.content}
-            </Markdown>
-          </article>
-          <pre className="rounded-lg border bg-muted/30 p-4 font-mono text-xs break-words whitespace-pre-wrap">
-            {q.data.content}
-          </pre>
+            </pre>
+          </div>
         </div>
       )}
     </>
