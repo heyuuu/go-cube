@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { guessHome, prettyPath } from '@/lib/path';
-import { formatDateTime, formatRelative } from '@/lib/time';
+import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useOpenProject, useOpenerList, useProjectList } from '@/queries/project';
@@ -320,9 +320,9 @@ export function ProjectsPage() {
         meta={
           <div>
             项目列表：
-            <span title={formatDateTime(list.data?.scanUpdatedAt)}>{formatRelative(list.data?.scanUpdatedAt)}</span>
+            <span title={formatDateTime(list.data?.scanUpdatedAt)}>{prettyTime(list.data?.scanUpdatedAt)}</span>
             {' ｜ '}git 状态：
-            <span title={formatDateTime(list.data?.gitUpdatedAt)}>{formatRelative(list.data?.gitUpdatedAt)}</span>
+            <span title={formatDateTime(list.data?.gitUpdatedAt)}>{prettyTime(list.data?.gitUpdatedAt)}</span>
           </div>
         }
         actions={
