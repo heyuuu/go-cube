@@ -25,6 +25,7 @@
 
 - [`260811-server后台常驻与HTTP管理/`](archived/260811-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
 - [`260811-前端栈迁移/`](archived/260811-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口
+- [`260811-md渲染/`](archived/260811-md渲染/) — `cube md` Web 渲染 markdown：零模板渲染 + 目录浏览模式 + opener 打开归一
 - [`260811-web层测试补全/`](archived/260811-web层测试补全/) — httptest 集成测试基建 + 全部 handler 用例
 
 ### [references/](references/) — 参考文献目录
