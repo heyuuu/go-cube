@@ -1,5 +1,5 @@
 import { Dialog as SheetPrimitive } from '@base-ui/react/dialog';
-import { X } from 'lucide-react';
+import { XIcon } from 'lucide-react';
 import * as React from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ function SheetContent({
             data-slot="sheet-close"
             render={<Button variant="ghost" className="absolute top-4 right-4" size="icon-sm" />}
           >
-            <X />
+            <XIcon />
             <span className="sr-only">Close</span>
           </SheetPrimitive.Close>
         )}
@@ -83,7 +83,7 @@ function SheetTitle({ className, ...props }: SheetPrimitive.Title.Props) {
   return (
     <SheetPrimitive.Title
       data-slot="sheet-title"
-      className={cn('cn-font-heading text-sm font-medium text-foreground', className)}
+      className={cn('font-heading text-sm font-medium text-foreground', className)}
       {...props}
     />
   );
