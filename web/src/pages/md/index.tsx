@@ -75,9 +75,16 @@ function loadSidebarWidth(): number {
 
 // resolveRel 把文内相对链接解析为绝对路径（基于当前文件所在目录，处理 ./ ../）
 function resolveRel(currentFile: string, href: string): string {
+  // 有的 md 源码里链接本身写成百分号编码（如 %E7%8E%B0），先解码再参与路径解析
+  let rel = href.split(/[?#]/)[0];
+  try {
+    rel = decodeURIComponent(rel);
+  } catch {
+    // 坏编码保持原样，交给后续「未识别 → 新 Tab」分支兜底
+  }
   const dir = currentFile.slice(0, currentFile.lastIndexOf('/'));
   const out: string[] = [];
-  for (const p of `${dir}/${href.split(/[?#]/)[0]}`.split('/')) {
+  for (const p of `${dir}/${rel}`.split('/')) {
     if (p === '' || p === '.') continue;
     if (p === '..') out.pop();
     else out.push(p);
