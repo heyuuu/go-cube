@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Folder, FolderGit2, FolderOpen, GitBranch, RefreshCw } from 'lucide-react';
+import { ChevronRight, Folder, FolderGit2, RefreshCw } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -9,14 +9,6 @@ import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { guessHome, prettyPath } from '@/lib/path';
@@ -24,6 +16,10 @@ import { formatDateTime, formatRelative } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useOpenProject, useOpenerList, useProjectList } from '@/queries/project';
+
+import { ProjectActions } from './actions';
+import { ProjectDrawer } from './drawer';
+import { tagVariants } from './shared';
 
 type GitStatus = 'clean' | 'dirty' | 'ahead' | 'behind' | 'none';
 
@@ -44,18 +40,6 @@ function gitStatusOf(p: Project): GitStatus {
   if (g.behind > 0) return 'behind';
   return 'clean';
 }
-
-// tag → badge 配色；未收录的 tag 落到 outline
-const tagVariants: Record<string, 'default' | 'secondary' | 'outline'> = {
-  worktree: 'secondary',
-  godot: 'default',
-};
-
-// 行内固定快捷打开（opener 名对应 /api/opener/list）；调整入口在此
-const quickOpens: { opener: string; title: string; icon: ReactNode }[] = [
-  { opener: 'finder', title: '打开所在目录', icon: <FolderOpen className="size-3.5" /> },
-  { opener: 'stree', title: '打开 Git 信息', icon: <GitBranch className="size-3.5" /> },
-];
 
 // 筛选行标签：名称 + 单选/多选标注（与旧页面一致）
 function FilterLabel({ label, mode }: { label: string; mode: '单选' | '多选' }) {
@@ -140,61 +124,6 @@ function GitCell({ p, onFilter }: { p: Project; onFilter: (s: GitStatus) => void
   );
 }
 
-// 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。表格行与树的项目行共用。
-function ProjectActions({
-  p,
-  openerList,
-  open,
-  onOpen,
-}: {
-  p: Project;
-  openerList: Opener[];
-  open: ReturnType<typeof useOpenProject>;
-  onOpen: (path: string, app: string) => void;
-}) {
-  const openerNames = new Set(openerList.map((op) => op.name));
-  return (
-    <div className="flex items-center gap-0.5">
-      {quickOpens
-        .filter((q) => openerNames.has(q.opener))
-        .map((q) => (
-          <Button
-            key={q.opener}
-            variant="ghost"
-            size="icon-sm"
-            title={q.title}
-            aria-label={`${q.title}（${p.name}）`}
-            disabled={open.isPending && open.variables?.path === p.path && open.variables?.app === q.opener}
-            onClick={() => onOpen(p.path, q.opener)}
-          >
-            {q.icon}
-          </Button>
-        ))}
-      <DropdownMenu>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
-          <ChevronDown className="size-3.5" />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-32">
-          {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-            {openerList.map((op) => (
-              <DropdownMenuItem
-                key={op.name}
-                onClick={() => onOpen(p.path, op.name)}
-                disabled={open.isPending && open.variables?.path === p.path && open.variables?.app === op.name}
-              >
-                {op.name}
-              </DropdownMenuItem>
-            ))}
-            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  );
-}
-
 // 树行：目录行整行点击折叠/展开；项目行带 tags / git 信息与打开动作（根行显示 ~ 缩写路径）
 function TreeRowView({
   row,
@@ -205,6 +134,7 @@ function TreeRowView({
   onToggle,
   onFilterGit,
   onFilterTag,
+  onDetail,
 }: {
   row: TreeRow;
   home: string;
@@ -214,6 +144,7 @@ function TreeRowView({
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
   onFilterTag: (t: string) => void;
+  onDetail: (p: Project) => void;
 }) {
   const n = row.node;
   const p = n.project;
@@ -235,9 +166,20 @@ function TreeRowView({
       ) : (
         <Folder className="size-3.5 shrink-0 text-muted-foreground" />
       )}
-      <span className={cn('truncate text-xs', p ? 'font-medium' : 'text-muted-foreground')} title={n.path}>
-        {row.isRoot ? prettyPath(n.path, home) : n.name}
-      </span>
+      {p ? (
+        <button
+          type="button"
+          className="truncate text-left text-xs font-medium hover:underline"
+          title={n.path}
+          onClick={() => onDetail(p)}
+        >
+          {row.isRoot ? prettyPath(n.path, home) : n.name}
+        </button>
+      ) : (
+        <span className="truncate text-xs text-muted-foreground" title={n.path}>
+          {n.name}
+        </span>
+      )}
       {p && (
         <>
           {(p.tags ?? []).map((t) => (
@@ -271,6 +213,7 @@ export function ProjectsPage() {
   const [tagFilter, setTagFilter] = useState('all');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [openError, setOpenError] = useState('');
+  const [drawer, setDrawer] = useState<Project | null>(null);
   // 显示模式走 URL（?view=tree）：可刷新保状态、可分享；两种模式共用筛选状态，切换不丢
   const [searchParams, setSearchParams] = useSearchParams();
   const mode: 'table' | 'tree' = searchParams.get('view') === 'tree' ? 'tree' : 'table';
@@ -480,6 +423,7 @@ export function ProjectsPage() {
                   onToggle={toggleTreeNode}
                   onFilterGit={toggleGitSolo}
                   onFilterTag={toggleTagSolo}
+                  onDetail={setDrawer}
                 />
               ))}
             </div>
@@ -517,7 +461,13 @@ export function ProjectsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="text-xs font-medium">{p.name}</span>
+                        <button
+                          type="button"
+                          className="text-left text-xs font-medium hover:underline"
+                          onClick={() => setDrawer(p)}
+                        >
+                          {p.name}
+                        </button>
                         {(p.tags ?? []).map((t) => (
                           <ClickBadge
                             key={t}
@@ -565,6 +515,15 @@ export function ProjectsPage() {
           </div>
         </div>
       )}
+
+      <ProjectDrawer
+        project={drawer}
+        home={home}
+        openerList={openerList}
+        open={open}
+        onOpen={openProject}
+        onClose={() => setDrawer(null)}
+      />
     </div>
   );
 }
