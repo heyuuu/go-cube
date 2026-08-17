@@ -396,11 +396,17 @@ export function MdPage() {
     setViewMode(v);
     localStorage.setItem(MD_VIEW_KEY, v);
   }
-  const fileParam = searchParams.get('file');
+  // file 参数支持相对路径（相对当前根，URL 更短）；绝对路径向后兼容
+  const fileParamRaw = searchParams.get('file');
+  const fileParam = !fileParamRaw
+    ? null
+    : fileParamRaw.startsWith('/')
+      ? fileParamRaw
+      : `${path}/${fileParamRaw.replace(/^\.?\//, '')}`;
   const selected = dirMode ? (files.includes(fileParam ?? '') ? fileParam : readmeOf(files, path)) : path || null;
 
   function selectFile(f: string) {
-    setSearchParams({ path, file: f });
+    setSearchParams({ path, file: f.startsWith(`${path}/`) ? f.slice(path.length + 1) : f });
   }
 
   const rows = tree ? flattenFileTree(tree, (p) => expanded.has(p)) : [];
