@@ -156,4 +156,4 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - `logger` 包用 `runtime.Callers` 在 `init()` 里推算项目绝对路径（`relativeProjPath = "../../"`），移动/重命名 logger 源文件位置会让日志里的 `file` 相对路径错位。
 - `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `web/dist` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
 - 默认配置目录是 `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）都落在那里。
-- **前端源码在 `web/`（仓库根）**，`make build-ui` 时 `pnpm -C web build` 后把 `web/dist` 拷到 `server/web/ui` 供 go:embed 嵌入。改前端改 `web/`，不要直接改 `server/web/ui/`（会被覆盖）；根目录 `ui/` 是旧版 vanilla 前端遗留，勿在其上开发。
+- **前端源码在 `web/`（仓库根）**，`make build-ui` 时 `pnpm -C web build` 后把 `web/dist` 拷到 `server/web/ui` 供 go:embed 嵌入。改前端改 `web/`，不要直接改 `server/web/ui/`（会被覆盖）；旧版 vanilla 前端 `ui/` 已删除。

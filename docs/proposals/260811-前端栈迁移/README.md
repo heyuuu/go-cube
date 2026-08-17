@@ -103,3 +103,14 @@ cva + clsx + tailwind-merge + lucide-react（cube-next 已验证）。
 ## 备注
 
 本次讨论不做任何前端代码改动，现有 Alpine.js 前端维持运行。
+
+## 落地结果（260817，基线清单全部完成）
+
+1. 工程脚手架：源码定在仓库根 **`web/`**（非提案所写的 `ui/`），栈为 Vite 8 + React 19 + React Compiler + tsgo + Tailwind 4 + **Base UI 风味 shadcn**（`rsc: false`）+ React Query；oxfmt/oxlint 管格式与 lint，`verify:shadcn` 守基件无漂移。
+2. 契约链路：`cube openapi` → openapi-typescript → `api/client.ts` 泛型分发（`apiGet`/`apiPost` 扁平传参，必填 query 编译期强制，契约由 `client.type-test.ts` 锁定）。
+3. Go SPA fallback 已实现（`/api`、`/docs`、`/openapi.json` 不回退）。
+4. `/projects`：列表 + 树双模式（`?view=tree`）；**树改为前端自计算，后端 `/api/project/tree` 已移除**（连带删除 `project/tree.go`）；筛选谓词化、徽标点击联动、行点击开抽屉。
+5. 详情抽屉（Sheet）：基本信息 / git 状态 / 打开动作 / 复制路径；未采集降级提示。
+6. `/config` 只读页：基本信息 / scan / clone / openers。
+
+顺带修复：`web/jsonfmt.go` 深拷贝清零所有 `time.Time`（响应时间字段全为 0001-01-01）的序列化 bug。旧 `ui/` 目录已删除。
