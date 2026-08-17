@@ -41,7 +41,7 @@
 构建 / 安装（Makefile 在**仓库根**，已注入 version ldflags；go 源码在 `server/`）：
 
 ```bash
-make build        # 先 cp -r ui server/web/ui (go:embed)，再 cd server && go build 到 tmp/cube
+make build        # 先 pnpm -C web build 并拷 web/dist 到 server/web/ui (go:embed)，再 cd server && go build 到 tmp/cube
 make install      # cd server && go install + 安装 zsh completion
 make tag          # 当前位置打递增版本 tag（末位 +1）
 ```
@@ -138,6 +138,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
     - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录；`git` 的 `runOut` 为子进程显式构造环境属于其执行职责，不算读环境）；其它 util 包（`git` 的纯解析函数 / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
     - 警惕功能重叠：例如「向上探测 `.git` 根」已有 `git.FindGitRoot(dir)`，调用方就不该再写一遍 `os.Stat(filepath.Join(..., ".git"))` 的循环。
 11. **注释只写「为什么」和「目的」，不要复述「执行过程」**。函数体内的步骤标号（`// 1. 先读 pid 文件 // 2. 再发信号`）、逐行翻译式注释（`// 遍历列表`、`// 返回结果`）属于过程复述——代码本身已经表达了执行过程，注释再写一遍只会制造**两个需要同步维护的事实源**，代码改了忘改注释就会两边对不上。应保留的是代码读不出来的信息：设计意图（如「端口冲突要报错，否则造孤儿」）、非显然的取舍（如「用 SIGKILL 兜底而不是无限等」）、外部约束（如「子进程 stdio 接 /dev/null，日志走 slog」）。判断标准：如果删掉这条注释，读者看代码能否理解「在做什么」——能，就删；读者看代码无法理解「为什么这么做」，就留。
+12. **前端 shadcn 基于 Base UI，不可使用 Radix UI 写法**。前端源码在 `web/`（仓库根），shadcn style 为 `base-mira`，UI 原语统一从 `@base-ui/react/<模块>` 子路径导入并按命名空间使用部件（如 `@base-ui/react/checkbox` 的 `CheckboxPrimitive.Root` / `.Indicator`）。AI 训练语料中的 shadcn 示例绝大多数是 Radix 版本，写/改 `web/src` 时**勿照搬 Radix 写法**：不引入 `@radix-ui/*` 依赖；组件多态渲染用 `render` prop 而非 `asChild`；状态样式用 `data-open` / `data-checked` 等具体布尔属性而非 `data-state="..."`。不确定 API 时以 `web/src/components/ui/` 现有组件为准，参考 [Base UI 文档](https://base-ui.com)。
 
 ## 文档
 
@@ -153,6 +154,6 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **go 源码根在 `server/`**，不是仓库根。`go build` / `go test` / `goimports` / `go vet` 都要在 `server/` 下跑（Makefile 和 run.sh 已处理 `cd`，手动执行时别忘）。
 - **module path 是 `cube`**（不是 `github.com/heyuuu/cube`——README 里写的旧值，以 go.mod 为准）。import 路径写 `cube/...`。
 - `logger` 包用 `runtime.Callers` 在 `init()` 里推算项目绝对路径（`relativeProjPath = "../../"`），移动/重命名 logger 源文件位置会让日志里的 `file` 相对路径错位。
-- `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `ui/` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
+- `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `web/dist` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
 - 默认配置目录是 `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）都落在那里。
-- **前端资源在 `ui/`（仓库根）**，`make build` 时 `cp -r ui server/web/ui` 后用 go:embed 嵌入。改前端改 `ui/`，不要直接改 `server/web/ui/`（会被覆盖）。
+- **前端源码在 `web/`（仓库根）**，`make build-ui` 时 `pnpm -C web build` 后把 `web/dist` 拷到 `server/web/ui` 供 go:embed 嵌入。改前端改 `web/`，不要直接改 `server/web/ui/`（会被覆盖）；根目录 `ui/` 是旧版 vanilla 前端遗留，勿在其上开发。
