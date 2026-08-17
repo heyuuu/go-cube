@@ -32,13 +32,24 @@ const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
   { value: 'none', label: '未采集' },
 ];
 
-function gitStatusOf(p: Project): GitStatus {
+// 谓词式匹配（非互斥分桶）：项目可能同时 dirty + ahead，
+// 筛 ahead 应包含所有 ahead > 0 的项目，而不是被 dirty 优先级吞掉。
+function matchGitFilter(p: Project, filter: GitStatus | 'all'): boolean {
   const g = p.gitInfo;
-  if (!g) return 'none';
-  if (g.dirty) return 'dirty';
-  if (g.ahead > 0) return 'ahead';
-  if (g.behind > 0) return 'behind';
-  return 'clean';
+  if (filter === 'all') return true;
+  if (!g) return filter === 'none';
+  switch (filter) {
+    case 'none':
+      return false;
+    case 'dirty':
+      return g.dirty;
+    case 'ahead':
+      return g.ahead > 0;
+    case 'behind':
+      return g.behind > 0;
+    case 'clean':
+      return !g.dirty && g.ahead === 0 && g.behind === 0;
+  }
 }
 
 // 筛选行标签：名称 + 单选/多选标注（与旧页面一致）
@@ -238,7 +249,7 @@ export function ProjectsPage() {
     const kw = keyword.trim().toLowerCase();
     if (kw && !(p.name.toLowerCase().includes(kw) || p.path.toLowerCase().includes(kw))) return false;
     if (groupFilter.length > 0 && !groupFilter.includes(p.group)) return false;
-    if (gitFilter !== 'all' && gitFilter !== gitStatusOf(p)) return false;
+    if (!matchGitFilter(p, gitFilter)) return false;
     if (tagFilter !== 'all' && !(p.tags ?? []).includes(tagFilter)) return false;
     return true;
   });
