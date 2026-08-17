@@ -284,3 +284,81 @@
 .md-theme-nord :where(th) {
   background-color: #3b4252;
 }
+
+/* Solarized Light（官方 Ethan Schoonover 调色板） */
+.md-theme-solarized-light {
+  --tw-prose-body: #657b83;
+  --tw-prose-headings: #586e75;
+  --tw-prose-bold: #073642;
+  --tw-prose-counters: #586e75;
+  --tw-prose-bullets: #2aa198;
+  --tw-prose-links: #268bd2;
+  --tw-prose-quotes: #93a1a1;
+  --tw-prose-quote-borders: #eee8d5;
+  --tw-prose-hr: #eee8d5;
+  --tw-prose-code: #cb4b16;
+  --tw-prose-pre-code: #657b83;
+  --tw-prose-pre-bg: #fdf6e3;
+  --tw-prose-th-borders: #eee8d5;
+  --tw-prose-td-borders: #eee8d5;
+  --tw-prose-captions: #93a1a1;
+}
+.md-theme-solarized-light :where(pre) {
+  border: 1px solid #eee8d5;
+  border-radius: 8px;
+}
+.md-theme-solarized-light :where(th) {
+  background-color: #eee8d5;
+}
+
+/* Gruvbox Light（官方调色板） */
+.md-theme-gruvbox-light {
+  --tw-prose-body: #3c3836;
+  --tw-prose-headings: #282828;
+  --tw-prose-bold: #282828;
+  --tw-prose-counters: #3c3836;
+  --tw-prose-bullets: #b57614;
+  --tw-prose-links: #076678;
+  --tw-prose-quotes: #7c6f64;
+  --tw-prose-quote-borders: #d5c4a1;
+  --tw-prose-hr: #d5c4a1;
+  --tw-prose-code: #9d0006;
+  --tw-prose-pre-code: #3c3836;
+  --tw-prose-pre-bg: #fbf1c7;
+  --tw-prose-th-borders: #d5c4a1;
+  --tw-prose-td-borders: #d5c4a1;
+  --tw-prose-captions: #7c6f64;
+}
+.md-theme-gruvbox-light :where(pre) {
+  border: 1px solid #d5c4a1;
+  border-radius: 8px;
+}
+.md-theme-gruvbox-light :where(th) {
+  background-color: #ebdbb2;
+}
+
+/* Nord Light（Snow Storm 调色板） */
+.md-theme-nord-light {
+  --tw-prose-body: #2e3440;
+  --tw-prose-headings: #2e3440;
+  --tw-prose-bold: #2e3440;
+  --tw-prose-counters: #4c566a;
+  --tw-prose-bullets: #81a1c1;
+  --tw-prose-links: #5e81ac;
+  --tw-prose-quotes: #4c566a;
+  --tw-prose-quote-borders: #d8dee9;
+  --tw-prose-hr: #d8dee9;
+  --tw-prose-code: #b48ead;
+  --tw-prose-pre-code: #2e3440;
+  --tw-prose-pre-bg: #eceff4;
+  --tw-prose-th-borders: #d8dee9;
+  --tw-prose-td-borders: #d8dee9;
+  --tw-prose-captions: #4c566a;
+}
+.md-theme-nord-light :where(pre) {
+  border: 1px solid #d8dee9;
+  border-radius: 8px;
+}
+.md-theme-nord-light :where(th) {
+  background-color: #e5e9f0;
+}

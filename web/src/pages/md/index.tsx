@@ -32,6 +32,9 @@ const MD_THEME_KEY = 'md.theme';
 const mdThemes = [
   { id: 'default', label: '默认', dark: false },
   { id: 'github', label: 'GitHub', dark: false },
+  { id: 'solarized-light', label: 'Solarized Light', dark: false },
+  { id: 'gruvbox-light', label: 'Gruvbox Light', dark: false },
+  { id: 'nord-light', label: 'Nord Light', dark: false },
   { id: 'default-dark', label: '暗色', dark: true },
   { id: 'github-dark', label: 'GitHub Dark', dark: true },
   { id: 'one-dark', label: 'One Dark', dark: true },
@@ -217,11 +220,21 @@ function MdContent({
             <ChevronDown className="size-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {mdThemes.map((t) => (
-              <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
-                {t.label}
-              </DropdownMenuItem>
-            ))}
+            {mdThemes
+              .filter((t) => !t.dark)
+              .map((t) => (
+                <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
+            <DropdownMenuSeparator />
+            {mdThemes
+              .filter((t) => t.dark)
+              .map((t) => (
+                <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
+                  {t.label}
+                </DropdownMenuItem>
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
