@@ -38,7 +38,7 @@ export async function unwrap<T extends Envelope>(
 // MethodResponse 工具类型），不再退化成所有端点的 union。
 //   const list = await apiGet('/api/project/list');            // list: ProjectListResult
 //   await apiGet('/api/project/info', { name });               // query 扁平直传
-//   await apiPost('/api/project/open', { path, app });         // body 类型来自 ProjectOpenInputBody
+//   await apiPost('/api/opener/open', { path, app });          // body 类型来自 OpenerOpenInputBody
 
 type GetPaths = ClientPathsWithMethod<typeof apiClient, 'get'>;
 type PostPaths = ClientPathsWithMethod<typeof apiClient, 'post'>;

@@ -13,7 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { useOpenProject } from '@/queries/project';
+import { useOpenerOpen } from '@/queries/project';
 
 import { quickOpens, tagVariants } from './shared';
 
@@ -26,7 +26,7 @@ export function ProjectActions({
 }: {
   p: Project;
   openerList: Opener[];
-  open: ReturnType<typeof useOpenProject>;
+  open: ReturnType<typeof useOpenerOpen>;
   onOpen: (path: string, app: string) => void;
 }) {
   const openerNames = new Set(openerList.map((op) => op.name));

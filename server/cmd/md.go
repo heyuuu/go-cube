@@ -42,10 +42,9 @@ func runMd(rawPath string, port int) error {
 	if err != nil {
 		return fmt.Errorf("解析路径失败: %w", err)
 	}
-	if info, err := os.Stat(absPath); err != nil {
-		return fmt.Errorf("文件不存在: %s", absPath)
-	} else if info.IsDir() {
-		return fmt.Errorf("路径是目录而非文件: %s", absPath)
+	// 目录也放行：/md 页对目录展示左侧文件树（无 md 的目录显示空态）
+	if _, err := os.Stat(absPath); err != nil {
+		return fmt.Errorf("路径不存在: %s", absPath)
 	}
 
 	// 前置：server 必须在跑（渲染页面由 server 的前端承载）

@@ -1,8 +1,6 @@
 package web
 
 import (
-	"bytes"
-	"encoding/json"
 	"net/http"
 	"testing"
 
@@ -120,59 +118,5 @@ func TestProjectCloneRules(t *testing.T) {
 	}
 	if got.List[0].RepoHost != "github.com" || got.List[0].LocalPath != env.ws.Join("repo") {
 		t.Errorf("clone 规则字段不符: %+v", got.List[0])
-	}
-}
-
-func TestProjectOpen(t *testing.T) {
-	env := newTestEnv(t)
-
-	post := func(body string) envelope {
-		resp, err := http.Post(env.url("/api/project/open"), "application/json", bytes.NewReader([]byte(body)))
-		if err != nil {
-			t.Fatalf("POST open 失败: %v", err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Fatalf("POST open 应为 200, got %d", resp.StatusCode)
-		}
-		var env2 envelope
-		if err := json.NewDecoder(resp.Body).Decode(&env2); err != nil {
-			t.Fatalf("open 响应解析失败: %v", err)
-		}
-		return env2
-	}
-
-	// 正常打开：executor 收到组装完成的命令（$0 槽位替换为项目路径）
-	env1 := post(`{"path":"` + env.proj1Path() + `","app":"finder"}`)
-	if !env1.Ok {
-		t.Fatalf("open 应成功, message=%q", env1.Message)
-	}
-	if env.exec.callCount() != 1 {
-		t.Fatalf("executor 应被调 1 次, got %d", env.exec.callCount())
-	}
-	call := env.exec.lastCall()
-	if len(call) != 2 || call[0] != "/usr/bin/open" || call[1] != env.proj1Path() {
-		t.Errorf("命令组装不符: %v", call)
-	}
-
-	// 未配置的 opener：ok=false + 中文错误信息
-	env2 := post(`{"path":"` + env.proj1Path() + `","app":"nope"}`)
-	if env2.Ok {
-		t.Error("未配置 opener 应失败")
-	}
-	if !contains(env2.Message, "未找到指定 app") {
-		t.Errorf("错误信息应含「未找到指定 app」, got %q", env2.Message)
-	}
-
-	// 不存在的项目路径
-	env3 := post(`{"path":"/not/exist","app":"finder"}`)
-	if env3.Ok {
-		t.Error("不存在的项目路径应失败")
-	}
-	if !contains(env3.Message, "未找到指定项目") {
-		t.Errorf("错误信息应含「未找到指定项目」, got %q", env3.Message)
-	}
-	if env.exec.callCount() != 1 {
-		t.Errorf("失败路径不应触发执行, got %d 次", env.exec.callCount())
 	}
 }

@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/md/list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 列出目录下的 markdown 文件 */
+    get: operations['md.list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/info': {
     parameters: {
       query?: never;
@@ -66,6 +83,23 @@ export interface paths {
     get: operations['opener.list'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 用指定 opener 打开任意文件或目录 */
+    post: operations['opener.open'];
     delete?: never;
     options?: never;
     head?: never;
@@ -117,23 +151,6 @@ export interface paths {
     get: operations['project.list'];
     put?: never;
     post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/project/open': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 用指定 opener 打开项目 */
-    post: operations['project.open'];
     delete?: never;
     options?: never;
     head?: never;
@@ -243,6 +260,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['MdContentResult'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputMdListResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputMdListResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['MdListResult'];
       message: string;
       ok: boolean;
     };
@@ -384,6 +412,10 @@ export interface components {
     MdContentResult: {
       content: string;
     };
+    MdListResult: {
+      dir: boolean;
+      files: string[] | null;
+    };
     OpenerConfig: {
       cmd: string[] | null;
       name: string;
@@ -393,6 +425,18 @@ export interface components {
       cmd: string[] | null;
       name: string;
       roles: string[] | null;
+    };
+    OpenerOpenInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerOpenInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description opener 名称 */
+      app: string;
+      /** @description 文件或目录绝对路径 */
+      path: string;
     };
     ProjectConfig: {
       clone: components['schemas']['CloneRuleConfig'][] | null;
@@ -418,18 +462,6 @@ export interface components {
       list: components['schemas']['ProjectDTO'][] | null;
       /** Format: date-time */
       scanUpdatedAt: string;
-    };
-    ProjectOpenInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ProjectOpenInputBody.json
-       */
-      readonly $schema?: string;
-      /** @description opener 名称（finder / vscode / idea ...） */
-      app: string;
-      /** @description 项目绝对路径 */
-      path: string;
     };
     ScanRule: {
       group: string;
@@ -516,6 +548,37 @@ export interface operations {
       };
     };
   };
+  'md.list': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMdListResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'opener.info': {
     parameters: {
       query: {
@@ -563,6 +626,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultOpenerDTOBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerOpenInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */
@@ -652,39 +748,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputProjectListResultBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'project.open': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ProjectOpenInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

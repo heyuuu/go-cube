@@ -15,8 +15,9 @@ export function useOpenerList() {
   return useQuery({ queryKey: ['opener', 'list'], queryFn: () => apiGet('/api/opener/list') });
 }
 
-export function useOpenProject() {
+// 用指定 opener 打开任意文件/目录（项目打开也走这里；role 由后端按路径类型校验）
+export function useOpenerOpen() {
   return useMutation({
-    mutationFn: (input: { path: string; app: string }) => apiPost('/api/project/open', input),
+    mutationFn: (input: { path: string; app: string }) => apiPost('/api/opener/open', input),
   });
 }

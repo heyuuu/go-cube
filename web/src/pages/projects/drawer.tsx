@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { prettyPath } from '@/lib/path';
 import { formatDateTime } from '@/lib/time';
-import { useOpenProject } from '@/queries/project';
+import { useOpenerOpen } from '@/queries/project';
 
 import { ProjectActions, TagBadges } from './actions';
 
@@ -40,7 +40,7 @@ export function ProjectDrawer({
   project: Project | null;
   home: string;
   openerList: Opener[];
-  open: ReturnType<typeof useOpenProject>;
+  open: ReturnType<typeof useOpenerOpen>;
   onOpen: (path: string, app: string) => void;
   onClose: () => void;
 }) {

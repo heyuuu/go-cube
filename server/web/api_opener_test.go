@@ -1,7 +1,10 @@
 package web
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -61,5 +64,48 @@ func TestOpenerInfo(t *testing.T) {
 	resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
 		t.Errorf("缺必填 name 应非 200, got %d", resp.StatusCode)
+	}
+}
+
+func TestOpenerOpen(t *testing.T) {
+	env := newTestEnv(t)
+	md := env.ws.Join("notes/readme.md")
+	env.ws.WriteFile("notes/readme.md", []byte("a"))
+
+	post := func(body string) envelope {
+		resp, err := http.Post(env.url("/api/opener/open"), "application/json", bytes.NewReader([]byte(body)))
+		if err != nil {
+			t.Fatalf("POST opener/open 失败: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("POST opener/open 应为 200, got %d", resp.StatusCode)
+		}
+		var env2 envelope
+		if err := json.NewDecoder(resp.Body).Decode(&env2); err != nil {
+			t.Fatalf("md/open 响应解析失败: %v", err)
+		}
+		return env2
+	}
+
+	// 打开目录：finder（open-dir）合法，fakeExecutor 应收到组装后的命令
+	env1 := post(`{"path":"` + env.ws.Join("notes") + `","app":"finder"}`)
+	if !env1.Ok {
+		t.Fatalf("打开目录应成功, message=%q", env1.Message)
+	}
+	if env.exec.callCount() != 1 || env.exec.lastCall()[0] != "/usr/bin/open" {
+		t.Errorf("executor 应收到 finder 命令, calls=%v", env.exec.calls)
+	}
+
+	// role 不匹配：finder 只有 open-dir，开文件应报错
+	env2 := post(`{"path":"` + md + `","app":"finder"}`)
+	if env2.Ok || !strings.Contains(env2.Message, "open-file") {
+		t.Errorf("open-dir opener 开文件应报 role 错误, got ok=%v message=%q", env2.Ok, env2.Message)
+	}
+
+	// 不存在的 opener
+	env3 := post(`{"path":"` + md + `","app":"nope"}`)
+	if env3.Ok || !strings.Contains(env3.Message, "未找到指定 app") {
+		t.Errorf("未知 opener 应报错, got ok=%v message=%q", env3.Ok, env3.Message)
 	}
 }

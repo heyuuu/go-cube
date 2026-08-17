@@ -64,9 +64,10 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 
 	srv := NewServer(
-		NewProjectHandler(projSvc, openerSvc),
+		NewProjectHandler(projSvc),
 		NewOpenerHandler(openerSvc),
 		NewConfigHandler(cfg),
+		NewMdHandler(),
 	)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)

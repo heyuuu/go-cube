@@ -134,3 +134,40 @@
     font-size: clamp(1rem, 0.71875rem + 0.293vw, 1.1875rem);
   }
 }
+
+/* md 渲染主题：通过覆盖 typography 的 --tw-prose-* 变量实现（GitHub 配色取自 Primer 设计系统） */
+.md-theme-github {
+  --tw-prose-body: #1f2328;
+  --tw-prose-headings: #1f2328;
+  --tw-prose-bold: #1f2328;
+  --tw-prose-counters: #1f2328;
+  --tw-prose-bullets: #1f2328;
+  --tw-prose-links: #0969da;
+  --tw-prose-quotes: #59636e;
+  --tw-prose-quote-borders: #d1d9e0;
+  --tw-prose-hr: #d1d9e0;
+  --tw-prose-code: #1f2328;
+  --tw-prose-pre-code: #1f2328;
+  --tw-prose-pre-bg: #f6f8fa;
+  --tw-prose-th-borders: #d1d9e0;
+  --tw-prose-td-borders: #d1d9e0;
+  --tw-prose-captions: #59636e;
+}
+
+/* GitHub 特有形态：链接不常驻下划线（hover 才有）、行内代码胶囊底、代码块圆角描边、表头灰底 */
+.md-theme-github :where(a):not(:hover) {
+  text-decoration: none;
+}
+.md-theme-github :where(code):not(:where(pre code)) {
+  border-radius: 6px;
+  padding: 0.15em 0.4em;
+  background-color: rgba(175, 184, 193, 0.25);
+  font-weight: 500;
+}
+.md-theme-github :where(pre) {
+  border: 1px solid #d1d9e0;
+  border-radius: 6px;
+}
+.md-theme-github :where(th) {
+  background-color: #f6f8fa;
+}

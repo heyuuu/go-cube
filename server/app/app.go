@@ -42,7 +42,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// 组装 web server
 	configHandler := web.NewConfigHandler(cfg)
-	projectHandler := web.NewProjectHandler(projectService, openerService)
+	projectHandler := web.NewProjectHandler(projectService)
 	openerHandler := web.NewOpenerHandler(openerService)
 	mdHandler := web.NewMdHandler()
 	server := web.NewServer(

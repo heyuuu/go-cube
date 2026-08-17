@@ -146,3 +146,86 @@ export function collectExpandablePaths(root: TreeNode): string[] {
   walk(root);
   return paths;
 }
+
+// --- md 目录浏览用的通用文件树（无业务实体，按文件绝对路径构建） ---
+
+export interface FileTreeNode {
+  name: string;
+  path: string;
+  kind: 'dir' | 'file';
+  children: FileTreeNode[]; // dir 节点的子节点（同级按名称字典序排序）
+}
+
+interface FileBuildNode {
+  name: string;
+  path: string;
+  kind: 'dir' | 'file';
+  children: Map<string, FileBuildNode>;
+}
+
+// buildFileTree 以 root 为根把一组文件路径组织成骨架树；目录链折叠规则同项目树。
+// 只有通往文件的目录会出现——「无 md 文件的目录不显示」由调用方传入的文件列表天然保证。
+export function buildFileTree(root: string, files: string[]): FileTreeNode {
+  const rootNode: FileBuildNode = {
+    name: root.split('/').pop() || root,
+    path: root,
+    kind: 'dir',
+    children: new Map(),
+  };
+  for (const f of files) {
+    const segs = f.slice(root.length).replace(/^\/+/, '').split('/');
+    let cur = rootNode;
+    for (let i = 0; i < segs.length; i++) {
+      const seg = segs[i]!;
+      const isLast = i === segs.length - 1;
+      let child = cur.children.get(seg);
+      if (!child) {
+        const childPath = cur.path === '/' ? `/${seg}` : `${cur.path}/${seg}`;
+        child = { name: seg, path: childPath, kind: isLast ? 'file' : 'dir', children: new Map() };
+        cur.children.set(seg, child);
+      }
+      cur = child;
+    }
+  }
+  return toFileNode(rootNode);
+}
+
+// toFileNode 转排序树并自底向上折叠单链目录（name 取合并后路径，path 取最深层目录）
+// 同级排序：先目录后文件（文件混在目录间不易发现），各自按名称字典序
+function toFileNode(n: FileBuildNode): FileTreeNode {
+  const children = [...n.children.values()]
+    .sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    })
+    .map(toFileNode);
+  let node: FileTreeNode = { name: n.name, path: n.path, kind: n.kind, children };
+  while (node.kind === 'dir' && node.children.length === 1 && node.children[0].kind === 'dir') {
+    const c = node.children[0];
+    node = { ...node, name: `${node.name}/${c.name}`, path: c.path, children: c.children };
+  }
+  return node;
+}
+
+export interface FileTreeRow {
+  node: FileTreeNode;
+  depth: number;
+  hasChildren: boolean;
+  expanded: boolean; // 该行自身是否展开（根恒为 true）
+  isRoot: boolean;
+}
+
+// flattenFileTree 拍平成可见行，供侧栏渲染；根恒展开。
+export function flattenFileTree(root: FileTreeNode, isExpanded: (path: string) => boolean): FileTreeRow[] {
+  const rows: FileTreeRow[] = [];
+  const walk = (node: FileTreeNode, depth: number, isRoot: boolean) => {
+    const hasChildren = node.children.length > 0;
+    const expanded = isRoot || isExpanded(node.path);
+    rows.push({ node, depth, hasChildren, expanded, isRoot });
+    if (hasChildren && expanded) {
+      for (const c of node.children) walk(c, depth + 1, false);
+    }
+  };
+  walk(root, 0, true);
+  return rows;
+}

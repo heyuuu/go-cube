@@ -1,13 +1,10 @@
 package web
 
 import (
-	"errors"
-	"fmt"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"cube/opener"
 	"cube/project"
 	"cube/project/gitcache"
 	"cube/util/slicekit"
@@ -33,13 +30,11 @@ type ProjectListResult struct {
 
 type ProjectHandler struct {
 	projectService *project.Service
-	openerService  *opener.Service
 }
 
-func NewProjectHandler(projectService *project.Service, openerService *opener.Service) *ProjectHandler {
+func NewProjectHandler(projectService *project.Service) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: projectService,
-		openerService:  openerService,
 	}
 }
 
@@ -48,7 +43,6 @@ func (h *ProjectHandler) Register(api huma.API) {
 	apiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
 	apiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
 	apiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
-	apiPost(api, "/api/project/open", "用指定 opener 打开项目", h.projectOpen)
 }
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
@@ -102,33 +96,4 @@ func (h *ProjectHandler) scanRules(_ struct{}) (ListResult[project.ScanRule], er
 func (h *ProjectHandler) cloneRules(_ struct{}) (ListResult[project.CloneRule], error) {
 	rules := h.projectService.CloneRules()
 	return listResult(rules), nil
-}
-
-// ProjectOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。
-type ProjectOpenInput struct {
-	Body struct {
-		Path string `json:"path" doc:"项目绝对路径"`
-		App  string `json:"app" doc:"opener 名称（finder / vscode / idea ...）"`
-	}
-}
-
-func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, error) {
-	// 校验 opener
-	openApp := h.openerService.FindByName(input.Body.App)
-	if openApp == nil {
-		return nil, fmt.Errorf("未找到指定 app: %s", input.Body.App)
-	}
-
-	// 校验项目
-	proj := h.projectService.FindByPath(input.Body.Path)
-	if proj == nil {
-		return nil, errors.New("未找到指定项目: " + input.Body.Path)
-	}
-
-	// 打开（opener 是 fire-and-forget，启动子进程后立即返回）
-	if err := openApp.Open(proj.Path()); err != nil {
-		return nil, fmt.Errorf("打开失败: %w", err)
-	}
-
-	return map[string]any{"ok": true}, nil
 }

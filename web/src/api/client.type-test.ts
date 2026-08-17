@@ -15,8 +15,8 @@ export async function typeContractProbe() {
   void wrong;
 
   // 路径约束：必须是真实存在的 GET 端点
-  // @ts-expect-error /api/project/open 是 POST 端点
-  void apiGet('/api/project/open');
+  // @ts-expect-error /api/opener/open 是 POST 端点
+  void apiGet('/api/opener/open');
   // @ts-expect-error 不存在的路径
   void apiGet('/api/not-exist');
 
@@ -31,8 +31,8 @@ export async function typeContractProbe() {
   // 说明：「query 全可选可省」分支（原 /api/project/tree 探针）在端点移除后暂无真实
   // 端点可测，QueryArg 类型仍保留该分支，待未来出现可选 query 端点时补回探针。
 
-  // POST body 类型应精确为 ProjectOpenInputBody
-  await apiPost('/api/project/open', { path: '/tmp/x', app: 'code' });
+  // POST body 类型应精确为 OpenerOpenInputBody
+  await apiPost('/api/opener/open', { path: '/tmp/x', app: 'code' });
   // @ts-expect-error body 字段名错误
-  await apiPost('/api/project/open', { wrong: 'field' });
+  await apiPost('/api/opener/open', { wrong: 'field' });
 }
