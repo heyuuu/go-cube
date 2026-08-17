@@ -101,9 +101,14 @@ for (const component of components) {
     mismatched = true;
   }
 }
-rmSync(tmpDir, { recursive: true, force: true });
+// 失败时保留临时目录，供 cube diff 人工比对（成功才清理）
+if (!mismatched) rmSync(tmpDir, { recursive: true, force: true });
 
 if (mismatched) {
-  fail('存在不一致的组件。定位具体差异可运行: pnpm dlx shadcn@latest add <组件名> --diff');
+  console.error(`\n用对比工具查看具体差异：`);
+  console.error(`  cube diff ${uiDir} ${tmpUiDir}`);
+  console.error(`（${tmpDir} 为 registry 输出副本，确认后可删除）`);
+  process.exitCode = 1;
+} else {
+  console.log(`✓ ${components.length} 个组件全部与官方 registry 输出一致`);
 }
-console.log(`✓ ${components.length} 个组件全部与官方 registry 输出一致`);
