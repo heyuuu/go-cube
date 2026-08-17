@@ -506,7 +506,7 @@ export function MdPage() {
       )}
 
       <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8">
-        <div className="mx-auto max-w-3xl">
+        <div className={cn(viewMode === 'split' ? 'w-full' : 'mx-auto max-w-3xl')}>
           {openError && <ErrorBanner message={openError} />}
           {list.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
           {listError && <ErrorBanner message={listError} />}
