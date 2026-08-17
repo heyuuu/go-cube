@@ -288,7 +288,7 @@ export function MdPage() {
   const themeDark = mdThemes.find((t) => t.id === theme)?.dark === true;
 
   return (
-    <div className={cn('flex h-dvh', themeDark && 'dark')}>
+    <div className={cn('flex h-dvh bg-background text-foreground', themeDark && 'dark')}>
       {dirMode && (
         <>
           <aside className="shrink-0 overflow-y-auto border-r p-3" style={{ width: sidebarW - 4 }}>
