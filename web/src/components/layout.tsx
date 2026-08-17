@@ -45,7 +45,10 @@ export function Layout() {
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto">
-        <Outlet />
+        {/* 大屏收敛内容宽度并居中，避免表格被拉满全屏显得空旷 */}
+        <div className="mx-auto max-w-7xl">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

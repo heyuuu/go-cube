@@ -15,7 +15,7 @@ var uiFS embed.FS
 
 // registerStaticRoutes 挂载前端静态资源与 SPA fallback：
 //   - GET /assets/*   → Vite 构建产物（文件名带内容 hash，设 immutable 长缓存）
-//   - GET /<文件>     → dist 根级文件（favicon.svg 等），存在即返回 
+//   - GET /<文件>     → dist 根级文件（favicon.svg 等），存在即返回
 //   - GET 其它路径    → index.html（history 路由 fallback，支持 /projects 直达/刷新）
 //   - /api/*、/docs、/openapi.json 的未命中**不走 fallback**，按 404 处理——
 //     否则 API 打错路径会拿到 HTML 200，错误被吞成莫名的解析失败

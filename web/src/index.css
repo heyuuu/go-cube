@@ -126,5 +126,8 @@
   }
   html {
     @apply font-sans;
+    /* 根字号随视口等比放大（间距/字号/图标全是 rem 基准，整体缩放）：
+       ≤1536px 保持 16px（MacBook 不变），2560px 起封顶 19px，缓解大屏字小 */
+    font-size: clamp(1rem, 0.71875rem + 0.293vw, 1.1875rem);
   }
 }
