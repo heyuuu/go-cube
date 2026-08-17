@@ -56,6 +56,54 @@ function loadSidebarWidth(): number {
   return Number.isFinite(v) && v >= SIDEBAR_WIDTH_MIN && v <= SIDEBAR_WIDTH_MAX ? v : SIDEBAR_WIDTH_DEFAULT;
 }
 
+// resolveRel 把文内相对链接解析为绝对路径（基于当前文件所在目录，处理 ./ ../）
+function resolveRel(currentFile: string, href: string): string {
+  const dir = currentFile.slice(0, currentFile.lastIndexOf('/'));
+  const out: string[] = [];
+  for (const p of `${dir}/${href.split(/[?#]/)[0]}`.split('/')) {
+    if (p === '' || p === '.') continue;
+    if (p === '..') out.pop();
+    else out.push(p);
+  }
+  return `/${out.join('/')}`;
+}
+
+// MdLink 文内链接：外链开新页；.md 文件与目录链接站内导航（保持在主题化的查看器内，
+// 避免整页跳出后落到亮色 404 页——此前「跳链接后暗色丢失」即此因）
+function MdLink({
+  href,
+  base,
+  onNavigate,
+  children,
+}: {
+  href?: string;
+  base: string;
+  onNavigate: (absPath: string) => void;
+  children: React.ReactNode;
+}) {
+  if (!href || /^[a-z]+:\/\//i.test(href) || href.startsWith('#')) {
+    const external = !!href && /^[a-z]+:\/\//i.test(href);
+    return external ? (
+      <a href={href} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    ) : (
+      <a href={href ?? '#'}>{children}</a>
+    );
+  }
+  return (
+    <a
+      href="#"
+      onClick={(e) => {
+        e.preventDefault();
+        onNavigate(resolveRel(base, href));
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 // readmeOf 找 dir 目录下的 README.md（文件名不区分大小写）
 function readmeOf(files: string[], dir: string): string | null {
   const prefix = dir.endsWith('/') ? dir : `${dir}/`;
@@ -139,10 +187,12 @@ function MdContent({
   file,
   theme,
   onThemeChange,
+  onNavigate,
 }: {
   file: string | null;
   theme: MdThemeId;
   onThemeChange: (t: MdThemeId) => void;
+  onNavigate: (absPath: string) => void;
 }) {
   const themeLabel = mdThemes.find((t) => t.id === theme)?.label ?? theme;
   const q = useMdContent(file ?? '');
@@ -184,7 +234,18 @@ function MdContent({
             theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
           )}
         >
-          <Markdown remarkPlugins={[remarkGfm]}>{q.data.content}</Markdown>
+          <Markdown
+            remarkPlugins={[remarkGfm]}
+            components={{
+              a: ({ href, children }) => (
+                <MdLink href={href} base={file} onNavigate={onNavigate}>
+                  {children}
+                </MdLink>
+              ),
+            }}
+          >
+            {q.data.content}
+          </Markdown>
         </article>
       )}
     </>
@@ -260,6 +321,40 @@ export function MdPage() {
     open.mutate({ path, app }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 
+  // expandTo 展开目标路径的全部祖先目录节点（含自身；单链折叠节点的 path 是
+  // 最深层目录，逐级前缀里必含它，多余的前缀键是无害的空操作）
+  function expandTo(target: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      const segs = target.slice(path.length).replace(/^\/+/, '').split('/');
+      let cur = path;
+      for (const seg of segs) {
+        cur = `${cur}/${seg}`;
+        next.add(cur);
+      }
+      return next;
+    });
+  }
+
+  // 文内链接导航：根内 md 文件 → 选中并聚焦树节点；根内目录 → 展开 + 聚焦并
+  // 显示其 README（与初始根语义一致）；根外或未识别目标 → 新 Tab 打开
+  function navigateLink(absPath: string) {
+    const inRoot = absPath === path || absPath.startsWith(`${path}/`);
+    if (!inRoot) {
+      window.open(`/md?path=${encodeURIComponent(absPath)}`, '_blank');
+      return;
+    }
+    if (files.includes(absPath)) {
+      setPicked(absPath);
+      expandTo(absPath);
+    } else if (files.some((f) => f.startsWith(`${absPath}/`))) {
+      setPicked(readmeOf(files, absPath));
+      expandTo(absPath);
+    } else {
+      window.open(`/md?path=${encodeURIComponent(absPath)}`, '_blank');
+    }
+  }
+
   // 新页面（新标签）打开单文件模式
   function openExternal(file: string) {
     window.open(`/md?path=${encodeURIComponent(file)}`, '_blank');
@@ -330,7 +425,9 @@ export function MdPage() {
           {openError && <ErrorBanner message={openError} />}
           {list.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
           {listError && <ErrorBanner message={listError} />}
-          {!list.isPending && !listError && <MdContent file={selected} theme={theme} onThemeChange={switchTheme} />}
+          {!list.isPending && !listError && (
+            <MdContent file={selected} theme={theme} onThemeChange={switchTheme} onNavigate={navigateLink} />
+          )}
         </div>
       </main>
     </div>
