@@ -10,9 +10,8 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
@@ -111,20 +110,17 @@ function MdTreeRow({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => onExternal(n.path)}>在新页面打开</DropdownMenuItem>
-            {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
-            <DropdownMenuGroup>
-              <DropdownMenuLabel>Opener（{isDir ? 'open-dir' : 'open-file'}）</DropdownMenuLabel>
-              {openerList
-                .filter((op) => (op.roles ?? []).includes(isDir ? 'open-dir' : 'open-file'))
-                .map((op) => (
-                  <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name)}>
-                    {op.name}
-                  </DropdownMenuItem>
-                ))}
-              {openerList.filter((op) => (op.roles ?? []).includes(isDir ? 'open-dir' : 'open-file')).length === 0 && (
-                <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用 opener</div>
-              )}
-            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            {openerList
+              .filter((op) => (op.roles ?? []).includes(isDir ? 'open-dir' : 'open-file'))
+              .map((op) => (
+                <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name)}>
+                  {op.name}
+                </DropdownMenuItem>
+              ))}
+            {openerList.filter((op) => (op.roles ?? []).includes(isDir ? 'open-dir' : 'open-file')).length === 0 && (
+              <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用 opener</div>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
