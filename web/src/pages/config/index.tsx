@@ -74,22 +74,22 @@ export function ConfigPage() {
             </section>
 
             <ConfigSection
-              title="project.scan"
-              sub="扫描根目录规则"
+              title="扫描规则（project.scan）"
+              sub="扫描根目录与深度"
               head={['group', 'path', 'maxDepth']}
               rows={(cfg.project?.scan ?? []).map((r) => [r.group, r.path, String(r.maxDepth)])}
             />
 
             <ConfigSection
-              title="project.clone"
-              sub="clone 落地路由规则"
+              title="clone 路由（project.clone）"
+              sub="按 repoHost / repoPrefix 匹配落地路径"
               head={['repoHost', 'repoPrefix', 'localPath']}
               rows={(cfg.project?.clone ?? []).map((r) => [r.repoHost, r.repoPrefix, r.localPath])}
             />
 
             <ConfigSection
-              title="openers"
-              sub="打开工具（cmd 用 $0/$1 占位路径槽位）"
+              title="打开工具（openers）"
+              sub="cmd 用 $0/$1 占位路径槽位"
               head={['name', 'cmd', 'roles']}
               rows={(cfg.openers ?? []).map((o) => [o.name, (o.cmd ?? []).join(' '), (o.roles ?? []).join(', ')])}
             />

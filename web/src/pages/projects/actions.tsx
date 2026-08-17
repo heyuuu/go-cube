@@ -31,7 +31,7 @@ export function ProjectActions({
 }) {
   const openerNames = new Set(openerList.map((op) => op.name));
   return (
-    <div className="flex items-center gap-0.5">
+    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       {quickOpens
         .filter((q) => openerNames.has(q.opener))
         .map((q) => (

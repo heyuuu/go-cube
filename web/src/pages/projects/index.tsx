@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, FolderGit2, RefreshCw } from 'lucide-react';
+import { ChevronRight, Folder, FolderGit2, RefreshCw, RotateCcw } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -82,7 +82,15 @@ function ClickBadge({
   children: ReactNode;
 }) {
   return (
-    <Badge variant={variant} title={title} onClick={onClick} className="cursor-pointer hover:ring-2 hover:ring-ring/40">
+    <Badge
+      variant={variant}
+      title={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      className="cursor-pointer hover:ring-2 hover:ring-ring/40"
+    >
       {children}
     </Badge>
   );
@@ -150,9 +158,15 @@ function TreeRowView({
   const p = n.project;
   return (
     <div
-      className={cn('flex items-center gap-1.5 py-1.5 pr-2', row.hasChildren && 'cursor-pointer hover:bg-muted/40')}
+      className={cn(
+        'flex items-center gap-1.5 py-1.5 pr-2',
+        (row.hasChildren || p) && 'cursor-pointer hover:bg-muted/40',
+      )}
       style={{ paddingLeft: row.depth * 20 + 12 }}
-      onClick={() => row.hasChildren && onToggle(n.path)}
+      onClick={() => {
+        if (p) onDetail(p);
+        else if (row.hasChildren) onToggle(n.path);
+      }}
     >
       {row.hasChildren ? (
         <ChevronRight
@@ -250,6 +264,13 @@ export function ProjectsPage() {
     setGitFilter((prev) => (prev === s ? 'all' : s));
   }
 
+  function resetFilters() {
+    setKeyword('');
+    setGroupFilter([]);
+    setGitFilter('all');
+    setTagFilter('all');
+  }
+
   function toggleSelect(path: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -305,10 +326,16 @@ export function ProjectsPage() {
           </div>
         }
         actions={
-          <Button variant="outline" size="sm" onClick={() => list.refetch()} disabled={list.isFetching}>
-            <RefreshCw className={cn(list.isFetching && 'animate-spin')} data-icon="inline-start" />
-            {list.isFetching ? '刷新中…' : '刷新'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={resetFilters} title="清空搜索与筛选条件">
+              <RotateCcw data-icon="inline-start" />
+              重置
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => list.refetch()} disabled={list.isFetching}>
+              <RefreshCw className={cn(list.isFetching && 'animate-spin')} data-icon="inline-start" />
+              {list.isFetching ? '刷新中…' : '刷新'}
+            </Button>
+          </div>
         }
       />
 
@@ -451,8 +478,12 @@ export function ProjectsPage() {
               </TableHeader>
               <TableBody>
                 {filtered.map((p) => (
-                  <TableRow key={p.path} className={cn(selected.has(p.path) && 'bg-muted/50')}>
-                    <TableCell>
+                  <TableRow
+                    key={p.path}
+                    className={cn('cursor-pointer', selected.has(p.path) && 'bg-muted/50')}
+                    onClick={() => setDrawer(p)}
+                  >
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={selected.has(p.path)}
                         onCheckedChange={() => toggleSelect(p.path)}
@@ -495,7 +526,7 @@ export function ProjectsPage() {
                     <TableCell>
                       <GitCell p={p} onFilter={toggleGitSolo} />
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end">
                         <ProjectActions p={p} openerList={openerList} open={open} onOpen={openProject} />
                       </div>
