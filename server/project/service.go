@@ -201,7 +201,7 @@ const defaultRefreshInterval = 5 * time.Minute
 // StartRefreshTicker 启动后台定时刷新 project 视图（项目列表 + git info）的 goroutine（仅常驻 server 调用）。
 //
 // interval <= 0 时用 defaultRefreshInterval。重复调用安全：已在跑则直接返回。
-// 启动后立即刷新一次（避免冷启动空窗），之后按 interval 定时刷新。
+// 启动后立即刷新一次（避免冷启动空窗；磁盘缓存距上次落盘 < interval 时跳过），之后按 interval 定时刷新。
 // 刷新动作：重扫项目列表（毫秒级）→ 记录 scanUpdatedAt → 用最新列表采集 git 信息（数十秒级）→ 记录 gitUpdatedAt。
 // 两个时间戳分开记录：扫描极快、git 采集慢，前端需据此分别判断「项目列表新鲜度」和「git 状态新鲜度」。
 //
@@ -224,7 +224,13 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 			}
 		}()
 
-		s.refresh() // 启动即刷一次，避免冷启动空窗
+		// 启动即刷一次，避免冷启动空窗；但磁盘缓存仍新鲜（距上次落盘 < interval）时跳过——
+		// 开发期 air 等热重载场景每次重启都全量重采上百个仓库，纯属浪费。
+		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
+			slog.Debug("git 缓存新鲜，跳过启动刷新", "上次落盘距今", since.Round(time.Second).String())
+		} else {
+			s.refresh()
+		}
 
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()

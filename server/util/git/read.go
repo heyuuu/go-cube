@@ -30,7 +30,15 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
+
+// readCmdLogEnabled 控制「git 读命令」逐条日志的开关。
+// gitcache 全量采集时一次会跑几百条 git 子进程，逐条 Debug 日志会淹没其他输出；
+// 默认静默，仅设置 CUBE_GITCACHE_TRACE（任意非空值）时打印，级别保持 Debug。
+var readCmdLogEnabled = sync.OnceValue(func() bool {
+	return os.Getenv("CUBE_GITCACHE_TRACE") != ""
+})
 
 // runOut 在 dir 下执行 git 读命令并捕获 stdout（不透传终端）。
 // 与 Run 的差异：输出面向程序解析而非人，因此注入与用户配置无关的稳定环境：
@@ -49,7 +57,9 @@ func runOut(dir string, args ...string) (string, error) {
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	slog.Debug("git 读命令", "cmd", cmd.String())
+	if readCmdLogEnabled() {
+		slog.Debug("git 读命令", "cmd", cmd.String())
+	}
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("git %s 执行失败: %w；stderr: %s",
 			strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
