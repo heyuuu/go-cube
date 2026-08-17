@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"reflect"
 	"testing"
+	"time"
 )
 
 // TestReplaceNilSlices 覆盖 nil→empty 替换的所有边界。
@@ -101,6 +102,28 @@ func TestReplaceNilSlices(t *testing.T) {
 		got := replaceNilSlices(in).(s)
 		if got.Tags == nil || len(got.Tags) != 0 {
 			t.Errorf("Tags 应被替换, got %#v", got.Tags)
+		}
+	})
+
+	// 回归：time.Time 内部字段全为 unexported，逐字段重建曾把它清成零值
+	// （表现为所有响应时间字段变成 0001-01-01）。
+	t.Run("time.Time 字段不被清零", func(t *testing.T) {
+		type s struct {
+			At   time.Time       `json:"at"`
+			Tags []string        `json:"tags"`
+			Sub  struct{ N int } `json:"sub"`
+		}
+		now := time.Date(2026, 8, 17, 12, 0, 0, 0, time.FixedZone("CST", 8*3600))
+		in := s{At: now, Sub: struct{ N int }{7}}
+		got := replaceNilSlices(in).(s)
+		if !got.At.Equal(now) {
+			t.Errorf("At 应保持不变, got %#v want %#v", got.At, now)
+		}
+		if got.Sub.N != 7 {
+			t.Errorf("嵌套标量字段应保持不变, got %d", got.Sub.N)
+		}
+		if got.Tags == nil || len(got.Tags) != 0 {
+			t.Errorf("Tags 应为非 nil 空切片, got %#v", got.Tags)
 		}
 	})
 

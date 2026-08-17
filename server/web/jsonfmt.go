@@ -77,13 +77,15 @@ func replaceNilSlicesValue(rv reflect.Value) reflect.Value {
 		return out
 
 	case reflect.Struct:
-		// 构造副本，逐字段递归替换（跳过 unexported 字段，避免 panic）。
+		// 先整体浅拷贝再替换 exported 字段：unexported 字段（如 time.Time 的
+		// wall/ext/loc）拿不到 reflect 写权限，逐字段重建会把它们清成零值——
+		// 曾导致所有响应里的 time.Time 变成 0001-01-01。浅拷贝保住它们。
 		out := reflect.New(rv.Type()).Elem()
+		out.Set(rv)
 		for i := 0; i < rv.NumField(); i++ {
-			if !rv.Type().Field(i).IsExported() {
-				continue
+			if rv.Type().Field(i).IsExported() {
+				out.Field(i).Set(replaceNilSlicesValue(rv.Field(i)))
 			}
-			out.Field(i).Set(replaceNilSlicesValue(rv.Field(i)))
 		}
 		return out
 	}
