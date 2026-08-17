@@ -140,23 +140,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/project/tree': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 获取项目目录树 */
-    get: operations['project.tree'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/system/whoami': {
     parameters: {
       query?: never;
@@ -265,17 +248,6 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['ProjectListResult'];
-      message: string;
-      ok: boolean;
-    };
-    ApiOutputTreeNodeDTOBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputTreeNodeDTOBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['TreeNodeDTO'];
       message: string;
       ok: boolean;
     };
@@ -438,12 +410,6 @@ export interface components {
       group: string;
       /** Format: int64 */
       maxDepth: number;
-      path: string;
-    };
-    TreeNodeDTO: {
-      children: components['schemas']['TreeNodeDTO'][] | null;
-      kind: string;
-      name: string;
       path: string;
     };
     WhoamiResponse: {
@@ -686,37 +652,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultScanRuleBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'project.tree': {
-    parameters: {
-      query?: {
-        root?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputTreeNodeDTOBody'];
         };
       };
       /** @description Error */

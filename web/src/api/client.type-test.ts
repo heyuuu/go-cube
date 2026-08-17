@@ -24,12 +24,12 @@ export async function typeContractProbe() {
   await apiGet('/api/project/info', { name: 'x123' });
   // @ts-expect-error name 必填，漏传 query 报错
   await apiGet('/api/project/info');
-  await apiGet('/api/project/tree', { root: '/x' });
-  await apiGet('/api/project/tree'); // query 全可选，可省
   // @ts-expect-error query 字段名错误
-  await apiGet('/api/project/tree', { nope: 1 });
+  await apiGet('/api/project/info', { nope: 1 });
   // @ts-expect-error 未声明 query 的端点，传 query 报错
   await apiGet('/api/project/list', { name: 'x' });
+  // 说明：「query 全可选可省」分支（原 /api/project/tree 探针）在端点移除后暂无真实
+  // 端点可测，QueryArg 类型仍保留该分支，待未来出现可选 query 端点时补回探针。
 
   // POST body 类型应精确为 ProjectOpenInputBody
   await apiPost('/api/project/open', { path: '/tmp/x', app: 'code' });

@@ -48,7 +48,6 @@ func (h *ProjectHandler) Register(api huma.API) {
 	apiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
 	apiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
 	apiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
-	apiGet(api, "/api/project/tree", "获取项目目录树", h.projectTree)
 	apiPost(api, "/api/project/open", "用指定 opener 打开项目", h.projectOpen)
 }
 
@@ -103,42 +102,6 @@ func (h *ProjectHandler) scanRules(_ struct{}) (ListResult[project.ScanRule], er
 func (h *ProjectHandler) cloneRules(_ struct{}) (ListResult[project.CloneRule], error) {
 	rules := h.projectService.CloneRules()
 	return listResult(rules), nil
-}
-
-// TreeNodeDTO 树节点 web 输出。把 Style 枚举转成字符串便于前端判断。
-type TreeNodeDTO struct {
-	Name     string        `json:"name"`
-	Path     string        `json:"path"`
-	Kind     string        `json:"kind"` // dir（含项目的目录）/ project（项目）/ other（普通目录）
-	Children []TreeNodeDTO `json:"children"`
-}
-
-func toTreeNodeDTO(n project.TreeNode) TreeNodeDTO {
-	kind := "other"
-	switch n.Style {
-	case project.TreeNodeStyleProject:
-		kind = "project"
-	case project.TreeNodeStyleDir:
-		kind = "dir"
-	}
-	children := make([]TreeNodeDTO, 0, len(n.Children))
-	for _, c := range n.Children {
-		children = append(children, toTreeNodeDTO(c))
-	}
-	return TreeNodeDTO{Name: n.Name, Path: n.Path, Kind: kind, Children: children}
-}
-
-// ProjectTreeInput tree 接口入参：root 可选（空 = 项目公共前缀）。
-type ProjectTreeInput struct {
-	Root string `query:"root"`
-}
-
-func (h *ProjectHandler) projectTree(input ProjectTreeInput) (TreeNodeDTO, error) {
-	root, err := h.projectService.BuildTree(input.Root)
-	if err != nil {
-		return TreeNodeDTO{}, err
-	}
-	return toTreeNodeDTO(root), nil
 }
 
 // ProjectOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。
