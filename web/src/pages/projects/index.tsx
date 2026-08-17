@@ -123,11 +123,7 @@ function GitCell({ p, onFilter }: { p: Project; onFilter: (s: GitStatus) => void
           ↓{g.behind}
         </ClickBadge>
       )}
-      {!g.dirty && g.ahead === 0 && g.behind === 0 && (
-        <ClickBadge variant="secondary" title="筛选 git：clean" onClick={() => onFilter('clean')}>
-          clean
-        </ClickBadge>
-      )}
+      {/* clean 是最干净的状态，不展示徽标；筛选仍走上方 chips 的 clean 选项 */}
     </div>
   );
 }
