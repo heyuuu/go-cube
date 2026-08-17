@@ -369,7 +369,7 @@ function MdContent({
 }
 
 export function MdPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const path = searchParams.get('path') ?? '';
   const list = useMdList(path);
   const openers = useOpenerList();
@@ -380,8 +380,8 @@ export function MdPage() {
   const files = list.data?.files ?? [];
   const tree = dirMode ? buildFileTree(path, files) : null;
 
-  // 用户点击过的文件/目录；undefined = 尚未点击 → 目录模式默认选根 README（无则空），文件模式选自身
-  const [picked, setPicked] = useState<string | null | undefined>(undefined);
+  // 选中文件走 URL 参数 file（天然按目录隔离、可分享、支持前进/后退）；
+  // 缺省/失效时回落根 README（与「默认打开 = 点根目录」语义一致）
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sidebarW, setSidebarW] = useState(loadSidebarWidth);
   const [theme, setTheme] = useState(loadMdTheme);
@@ -396,7 +396,12 @@ export function MdPage() {
     setViewMode(v);
     localStorage.setItem(MD_VIEW_KEY, v);
   }
-  const selected = dirMode ? (picked !== undefined ? picked : readmeOf(files, path)) : path || null;
+  const fileParam = searchParams.get('file');
+  const selected = dirMode ? (files.includes(fileParam ?? '') ? fileParam : readmeOf(files, path)) : path || null;
+
+  function selectFile(f: string) {
+    setSearchParams({ path, file: f });
+  }
 
   const rows = tree ? flattenFileTree(tree, (p) => expanded.has(p)) : [];
 
@@ -467,10 +472,10 @@ export function MdPage() {
       return;
     }
     if (files.includes(absPath)) {
-      setPicked(absPath);
+      selectFile(absPath);
       expandTo(absPath);
     } else if (files.some((f) => f.startsWith(`${absPath}/`))) {
-      setPicked(readmeOf(files, absPath));
+      // 目录链接：展开聚焦；正文保持不动（点目录不切正文的既定语义）
       expandTo(absPath);
     } else {
       window.open(`/md?path=${encodeURIComponent(absPath)}`, '_blank');
@@ -528,7 +533,7 @@ export function MdPage() {
                 key={row.node.path}
                 row={row}
                 selected={selected}
-                onFile={setPicked}
+                onFile={selectFile}
                 onDir={onDir}
                 onExternal={openExternal}
                 openerList={openers.data?.list ?? []}
