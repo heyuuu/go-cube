@@ -21,6 +21,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/md/content': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 读取 markdown 文件原文 */
+    get: operations['md.content'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/info': {
     parameters: {
       query?: never;
@@ -218,6 +235,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputMdContentResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputMdContentResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['MdContentResult'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputOpenerDTOBody: {
       /**
        * Format: uri
@@ -353,6 +381,9 @@ export interface components {
       level: string;
       path: string;
     };
+    MdContentResult: {
+      content: string;
+    };
     OpenerConfig: {
       cmd: string[] | null;
       name: string;
@@ -441,6 +472,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputConfigBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'md.content': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMdContentResultBody'];
         };
       };
       /** @description Error */

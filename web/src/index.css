@@ -1,4 +1,7 @@
 @import 'tailwindcss';
+
+/* md 渲染页的 prose 排版 */
+@plugin '@tailwindcss/typography';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/inter';

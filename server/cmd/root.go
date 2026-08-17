@@ -51,6 +51,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 	// open 相关
 	cmd.AddCommand(newOpenersCmd(a))
 	cmd.AddCommand(newOpenPathCmd(a))
+	cmd.AddCommand(newMdCmd(a)) // 以 Web 方式打开 markdown
 	cmd.AddCommand(newDiffCmd(a))
 
 	// git 相关
