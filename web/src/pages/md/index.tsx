@@ -27,9 +27,16 @@ import { useOpenerList, useOpenerOpen } from '@/queries/project';
 // md 渲染主题：prose 默认 / GitHub（Primer 配色）。新主题 = index.css 加一组
 // --tw-prose-* 变量 + 此处加一个条目，切换 UI 自动带上。
 const MD_THEME_KEY = 'md.theme';
+// 调色板取自各家官方规范（Primer / Atom / Dracula / Nord）；
+// dark 主题会给页面壳挂 dark 类，整站 token 自动翻色（侧栏/正文背景一起暗）
 const mdThemes = [
-  { id: 'default', label: '默认' },
-  { id: 'github', label: 'GitHub' },
+  { id: 'default', label: '默认', dark: false },
+  { id: 'github', label: 'GitHub', dark: false },
+  { id: 'default-dark', label: '暗色', dark: true },
+  { id: 'github-dark', label: 'GitHub Dark', dark: true },
+  { id: 'one-dark', label: 'One Dark', dark: true },
+  { id: 'dracula', label: 'Dracula', dark: true },
+  { id: 'nord', label: 'Nord', dark: true },
 ] as const;
 type MdThemeId = (typeof mdThemes)[number]['id'];
 
@@ -172,7 +179,10 @@ function MdContent({
       {q.error && <ErrorBanner message={`读取失败：${q.error.message}`} />}
       {q.data && (
         <article
-          className={cn('prose prose-sm dark:prose-invert mb-10 max-w-none', theme === 'github' && 'md-theme-github')}
+          className={cn(
+            'prose prose-sm mb-10 max-w-none',
+            theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
+          )}
         >
           <Markdown remarkPlugins={[remarkGfm]}>{q.data.content}</Markdown>
         </article>
@@ -275,8 +285,10 @@ export function MdPage() {
 
   const listError = list.error ? `读取路径失败：${list.error.message}` : '';
 
+  const themeDark = mdThemes.find((t) => t.id === theme)?.dark === true;
+
   return (
-    <div className="flex h-dvh">
+    <div className={cn('flex h-dvh', themeDark && 'dark')}>
       {dirMode && (
         <>
           <aside className="shrink-0 overflow-y-auto border-r p-3" style={{ width: sidebarW - 4 }}>

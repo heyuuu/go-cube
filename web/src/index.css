@@ -171,3 +171,116 @@
 .md-theme-github :where(th) {
   background-color: #f6f8fa;
 }
+
+/* GitHub Dark（Primer dark 调色板） */
+.md-theme-github-dark {
+  --tw-prose-body: #e6edf3;
+  --tw-prose-headings: #e6edf3;
+  --tw-prose-bold: #e6edf3;
+  --tw-prose-counters: #e6edf3;
+  --tw-prose-bullets: #e6edf3;
+  --tw-prose-links: #4493f8;
+  --tw-prose-quotes: #8c959f;
+  --tw-prose-quote-borders: #3d444d;
+  --tw-prose-hr: #3d444d;
+  --tw-prose-code: #e6edf3;
+  --tw-prose-pre-code: #e6edf3;
+  --tw-prose-pre-bg: #151b23;
+  --tw-prose-th-borders: #3d444d;
+  --tw-prose-td-borders: #3d444d;
+  --tw-prose-captions: #8c959f;
+}
+.md-theme-github-dark :where(a):not(:hover) {
+  text-decoration: none;
+}
+.md-theme-github-dark :where(code):not(:where(pre code)) {
+  border-radius: 6px;
+  padding: 0.15em 0.4em;
+  background-color: rgba(110, 118, 129, 0.4);
+  font-weight: 500;
+}
+.md-theme-github-dark :where(pre) {
+  border: 1px solid #3d444d;
+  border-radius: 6px;
+}
+.md-theme-github-dark :where(th) {
+  background-color: #151b23;
+}
+
+/* One Dark（Atom 官方调色板） */
+.md-theme-one-dark {
+  --tw-prose-body: #abb2bf;
+  --tw-prose-headings: #dcdfe4;
+  --tw-prose-bold: #e5e5e5;
+  --tw-prose-counters: #abb2bf;
+  --tw-prose-bullets: #61afef;
+  --tw-prose-links: #61afef;
+  --tw-prose-quotes: #7f848e;
+  --tw-prose-quote-borders: #3e4451;
+  --tw-prose-hr: #3e4451;
+  --tw-prose-code: #d19a66;
+  --tw-prose-pre-code: #abb2bf;
+  --tw-prose-pre-bg: #282c34;
+  --tw-prose-th-borders: #3e4451;
+  --tw-prose-td-borders: #3e4451;
+  --tw-prose-captions: #7f848e;
+}
+.md-theme-one-dark :where(pre) {
+  border: 1px solid #3e4451;
+  border-radius: 8px;
+}
+.md-theme-one-dark :where(th) {
+  background-color: #2c313a;
+}
+
+/* Dracula（官方调色板） */
+.md-theme-dracula {
+  --tw-prose-body: #f8f8f2;
+  --tw-prose-headings: #f8f8f2;
+  --tw-prose-bold: #bd93f9;
+  --tw-prose-counters: #bd93f9;
+  --tw-prose-bullets: #ff79c6;
+  --tw-prose-links: #8be9fd;
+  --tw-prose-quotes: #bd93f9;
+  --tw-prose-quote-borders: #44475a;
+  --tw-prose-hr: #44475a;
+  --tw-prose-code: #ff79c6;
+  --tw-prose-pre-code: #f8f8f2;
+  --tw-prose-pre-bg: #21222c;
+  --tw-prose-th-borders: #44475a;
+  --tw-prose-td-borders: #44475a;
+  --tw-prose-captions: #6272a4;
+}
+.md-theme-dracula :where(pre) {
+  border: 1px solid #44475a;
+  border-radius: 8px;
+}
+.md-theme-dracula :where(th) {
+  background-color: #343746;
+}
+
+/* Nord（官方 Polar Night / Frost / Aurora 调色板） */
+.md-theme-nord {
+  --tw-prose-body: #d8dee9;
+  --tw-prose-headings: #eceff4;
+  --tw-prose-bold: #eceff4;
+  --tw-prose-counters: #d8dee9;
+  --tw-prose-bullets: #81a1c1;
+  --tw-prose-links: #88c0d0;
+  --tw-prose-quotes: #a3be8c;
+  --tw-prose-quote-borders: #434c5e;
+  --tw-prose-hr: #434c5e;
+  --tw-prose-code: #ebcb8b;
+  --tw-prose-pre-code: #d8dee9;
+  --tw-prose-pre-bg: #2e3440;
+  --tw-prose-th-borders: #434c5e;
+  --tw-prose-td-borders: #434c5e;
+  --tw-prose-captions: #7b88a1;
+}
+.md-theme-nord :where(pre) {
+  border: 1px solid #434c5e;
+  border-radius: 8px;
+}
+.md-theme-nord :where(th) {
+  background-color: #3b4252;
+}
