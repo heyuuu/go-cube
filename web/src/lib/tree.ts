@@ -89,12 +89,34 @@ export function buildProjectTree(projects: Project[]): TreeNode | null {
       cur = child;
     }
   }
-  return toTreeNode(rootBuild);
+  return toCompressedTreeNode(rootBuild);
 }
 
 function toTreeNode(n: BuildNode): TreeNode {
   const children = [...n.children.values()].sort((a, b) => a.name.localeCompare(b.name)).map(toTreeNode);
   return { name: n.name, path: n.path, kind: n.kind, children, ...(n.project ? { project: n.project } : {}) };
+}
+
+// toCompressedTreeNode 转成 TreeNode 并折叠单链目录（根不参与，保持 ~ 全路径展示）。
+// 例：~/x 下仅 ~/x/game、~/x/game 下仅 ~/x/game/godot → 一个 x/game/godot 节点。
+// 前端骨架树只含通往项目的目录，故「无其他文件」天然成立；项目节点不并入目录、分叉不折叠。
+function toCompressedTreeNode(rootBuild: BuildNode): TreeNode {
+  const root = toTreeNode(rootBuild);
+  root.children = root.children.map(compressNode);
+  return root;
+}
+
+// compressNode 自底向上折叠：目录有且仅有一个子目录时合并为「a/b/c」。
+// path 取合并后最深层目录（展开态 key 与 tooltip 跟随实际目录）。
+function compressNode(n: TreeNode): TreeNode {
+  const node: TreeNode = { ...n, children: n.children.map(compressNode) };
+  while (node.kind === 'dir' && node.children.length === 1 && node.children[0].kind === 'dir') {
+    const child = node.children[0];
+    node.name = `${node.name}/${child.name}`;
+    node.path = child.path;
+    node.children = child.children;
+  }
+  return node;
 }
 
 // flattenTree 拍平成可见行（depth/hasChildren/expanded），供列表渲染；根恒展开。
