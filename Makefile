@@ -25,7 +25,8 @@ endif
 
 build-ui:
 	rm -rf ./server/web/ui
-	cp -r ./ui ./server/web/ui
+	pnpm -C ./web build
+	cp -r ./web/dist ./server/web/ui
 
 build: build-ui
 	@echo "==> go build ($(VERSION) @ $(COMMIT))"
