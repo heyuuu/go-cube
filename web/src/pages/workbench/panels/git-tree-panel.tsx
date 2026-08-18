@@ -1,5 +1,5 @@
 import { GitBranch, Monitor } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { ErrorBanner } from '@/components/error-banner';
@@ -25,6 +25,8 @@ import { sameSource, selectDiffSide, selectSource, type TreeSource, type Workben
 export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   const { path } = params;
   const info = useWorkbenchInfo(path);
+  // 点击分支的定位信号：即使重复点同一分支（选中值不变）也要重新定位+闪烁
+  const [focusTick, setFocusTick] = useState(0);
 
   if (info.isPending) {
     return <div className="p-3 text-xs text-muted-foreground">加载中…</div>;
@@ -36,9 +38,14 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="shrink-0 overflow-y-auto border-b border-border">
-        <WorktreeSection path={path} worktrees={info.data?.worktrees ?? []} params={params} />
+        <WorktreeSection
+          path={path}
+          worktrees={info.data?.worktrees ?? []}
+          params={params}
+          onBranchPicked={() => setFocusTick((n) => n + 1)}
+        />
       </div>
-      <CommitGraphSection path={path} params={params} />
+      <CommitGraphSection path={path} params={params} focusTick={focusTick} />
     </div>
   );
 }
@@ -49,10 +56,12 @@ function WorktreeSection({
   path,
   worktrees,
   params,
+  onBranchPicked,
 }: {
   path: string;
   worktrees: { path: string; branch: string; detached: boolean; bare: boolean }[];
   params: WorkbenchParams;
+  onBranchPicked: () => void;
 }) {
   const refs = useWorkbenchRefs(path);
 
@@ -71,6 +80,7 @@ function WorktreeSection({
             source={{ type: 'ref', id: b }}
             params={params}
             badge={b === refs.data?.current ? '当前' : undefined}
+            afterSelect={onBranchPicked}
           />
         ))}
       </Section>
@@ -121,7 +131,7 @@ function WorktreeRow({
 
 // --- commit 图 ---
 
-function CommitGraphSection({ path, params }: { path: string; params: WorkbenchParams }) {
+function CommitGraphSection({ path, params, focusTick }: { path: string; params: WorkbenchParams; focusTick: number }) {
   const commits = useWorkbenchCommits(path);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -177,7 +187,7 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
     if (commits.hasNextPage && !commits.isFetchingNextPage) {
       void commits.fetchNextPage();
     }
-  }, [focusBranch, rows, commits]);
+  }, [focusBranch, focusTick, rows, commits]);
 
   const maxLane = useMemo(() => {
     let m = 0;
@@ -313,6 +323,7 @@ type SelectableRowProps = {
   time?: number;
   laneColor?: string; // 泳道色：选中行以分支色描边
   fixedRow?: boolean; // commit 图行：固定 px 高度（外层行 div 已定高），不用 rem 行高
+  afterSelect?: () => void; // 单击选中后回调（分支行用于触发重新定位）
 };
 
 function SelectableRow({
@@ -327,6 +338,7 @@ function SelectableRow({
   time,
   laneColor,
   fixedRow,
+  afterSelect,
 }: SelectableRowProps) {
   const [, setSearchParams] = useSearchParams();
   const handleClick = useCallback(
@@ -338,13 +350,14 @@ function SelectableRow({
             selectDiffSide(next, source);
           } else {
             selectSource(next, source);
+            afterSelect?.();
           }
           return next;
         },
         { replace: true },
       );
     },
-    [source, setSearchParams],
+    [source, setSearchParams, afterSelect],
   );
 
   const isSource = sameSource(params.source, source);

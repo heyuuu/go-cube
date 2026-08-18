@@ -363,18 +363,24 @@
   background-color: #e5e9f0;
 }
 
-/* commit 图定位闪烁：滚动定位到分支 tip 后短暂高亮该行 */
+/* commit 图定位闪烁：滚动定位到分支 tip 后高亮脉冲（三次渐强再消退） */
 @keyframes row-flash {
   0%,
   100% {
     background-color: transparent;
   }
-  20%,
-  60% {
-    background-color: hsl(var(--primary) / 0.2);
+  15%,
+  45%,
+  75% {
+    background-color: hsl(var(--primary) / 0.35);
+  }
+  30%,
+  60%,
+  90% {
+    background-color: hsl(var(--primary) / 0.08);
   }
 }
 
 .row-flash {
-  animation: row-flash 1.6s ease-out 0.2s;
+  animation: row-flash 2.2s ease-in-out 0.15s;
 }
