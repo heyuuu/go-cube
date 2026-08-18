@@ -85,42 +85,51 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 		copy(snapshots[i], lanes)
 	}
 
-	// 连线分两类（行 i → i+1）：
-	//  1. 快照条目线：snapshots[i] 的每个条目落到 snapshots[i+1]（或 i+1 行节点）的新位置；
-	//     条目正是 i+1 行的 commit 时，线进入该节点。
-	//  2. 节点合并线：行 i 节点的首父已占其它泳道时，该节点自身的泳道被删除、
-	//     不再出现在快照里——需要补一段从节点到首父位置的折线（典型合并拐弯）。
+	// 连线（行 i → i+1）。每段两类线，按条目归属判断：
+	//   节点出线：条目是本行 commit 的父提交 → 从节点泳道出发（首父同位时即竖线，
+	//             额外父/合并占位时为拐弯曲线）；
+	//   穿越线：条目在上一行快照已存在（上方有子提交的支线路过本段）→ 从自身位置出发；
+	//           泳道压缩时 to 落在新位置，表现为折线。
+	// 两类可并存（同一父被多条支线共享时，节点出线 + 穿越线同时存在）；
+	// 首父接管原泳道时二者重合，只发一条。
 	for i := 0; i+1 < len(commits); i++ {
 		next := commits[i+1]
-		for from, entry := range snapshots[i] {
-			to := -1
+		parentSet := make(map[string]bool, len(commits[i].Parents))
+		for _, p := range commits[i].Parents {
+			parentSet[p] = true
+		}
+		target := func(entry graphLane) int {
 			if entry.sha == next.Sha {
-				to = nodes[i+1].Lane
-			} else {
-				for j, l := range snapshots[i+1] {
+				return nodes[i+1].Lane
+			}
+			for j, l := range snapshots[i+1] {
+				if l.sha == entry.sha {
+					return j
+				}
+			}
+			return -1
+		}
+		for pos, entry := range snapshots[i] {
+			to := target(entry)
+			if to < 0 {
+				continue
+			}
+			isParent := parentSet[entry.sha]
+			incoming := i == 0 || func() bool {
+				for _, l := range snapshots[i-1] {
 					if l.sha == entry.sha {
-						to = j
-						break
+						return true
 					}
 				}
+				return false
+			}()
+			// 节点出线（父提交）
+			if isParent {
+				wires = append(wires, GraphWire{Row: i, From: nodes[i].Lane, To: to, Color: entry.color})
 			}
-			if to >= 0 {
-				wires = append(wires, GraphWire{Row: i, From: from, To: to, Color: entry.color})
-			}
-		}
-
-		// 补节点合并线（存在快照没覆盖的「节点 → 首父」连线时）
-		if parents := commits[i].Parents; len(parents) > 0 {
-			parentPos := -1
-			for j, l := range snapshots[i] {
-				if l.sha == parents[0] {
-					parentPos = j
-					break
-				}
-			}
-			covered := parentPos == nodes[i].Lane // 首父占位恰为节点泳道 = 首类线已覆盖
-			if parentPos >= 0 && !covered {
-				wires = append(wires, GraphWire{Row: i, From: nodes[i].Lane, To: parentPos, Color: nodes[i].Color})
+			// 穿越线（上方支线延续），首父接管原泳道时与节点出线重合，跳过
+			if incoming && !(isParent && pos == nodes[i].Lane) {
+				wires = append(wires, GraphWire{Row: i, From: pos, To: to, Color: entry.color})
 			}
 		}
 	}
