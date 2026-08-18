@@ -138,6 +138,14 @@ func apiPost[I, O any](api huma.API, path string, summary string, handler func(I
 	}, jsonHandler(handler))
 }
 
+func apiPut[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
+	apiRegister[I, ApiOutput[O]](api, huma.Operation{
+		Method:  http.MethodPut,
+		Path:    path,
+		Summary: summary,
+	}, jsonHandler(handler))
+}
+
 func apiDelete[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
 	apiRegister[I, ApiOutput[O]](api, huma.Operation{
 		Method:  http.MethodDelete,

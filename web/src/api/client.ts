@@ -42,6 +42,7 @@ export async function unwrap<T extends Envelope>(
 
 type GetPaths = ClientPathsWithMethod<typeof apiClient, 'get'>;
 type PostPaths = ClientPathsWithMethod<typeof apiClient, 'post'>;
+type PutPaths = ClientPathsWithMethod<typeof apiClient, 'put'>;
 
 // GET 的 query 类型：来自 op 的 parameters.query 声明；端点未声明时为
 // undefined（query 参数传了就编译报错）。包装层内部转成 openapi-fetch 的
@@ -63,6 +64,24 @@ export async function apiGet<P extends GetPaths>(path: P, ...query: QueryArg<Get
 
 export async function apiPost<P extends PostPaths>(path: P, body: PostBody<P>) {
   return unwrap(postRaw(path, body));
+}
+
+// PUT 的 query + body 组合形态（工作台保存文件：source 走 query、content 走 body）
+type PutQuery<P extends PutPaths> = NonNullable<NonNullable<NonNullable<paths[P]['put']>['parameters']>['query']>;
+type PutBody<P extends PutPaths> = NonNullable<
+  NonNullable<paths[P]['put']>['requestBody']
+>['content']['application/json'];
+
+export async function apiPut<P extends PutPaths>(path: P, query: PutQuery<P>, body: PutBody<P>) {
+  const put = apiClient.PUT as (
+    path: never,
+    init: { params: { query: PutQuery<P> }; body: never },
+  ) => Promise<{
+    data?: Envelope & MethodResponse<typeof apiClient, 'put', P>;
+    error?: unknown;
+    response: Response;
+  }>;
+  return unwrap(put(path as never, { params: { query }, body: body as never }));
 }
 
 // --- 内部分发桥 ---

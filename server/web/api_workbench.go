@@ -1,6 +1,8 @@
 package web
 
 import (
+	"net/http"
+
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/util/git"
@@ -24,6 +26,10 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	apiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
 	apiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
 	apiGet(api, "/api/workbench/status", "获取工作副本状态", h.worktreeStatus)
+	apiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
+	apiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
+	// 同 path 不同 method：显式 operationId 避免与 GET 的 workbench.file 重复
+	apiRegisterOp(api, http.MethodPut, "/api/workbench/file", "保存工作副本文件（唯一写路径）", "workbench.saveFile", h.saveFile)
 }
 
 func (h *WorkbenchHandler) info(input struct {
@@ -53,4 +59,48 @@ func (h *WorkbenchHandler) worktreeStatus(input struct {
 	Dir  string `query:"dir"` // 工作副本目录（主目录或 worktree），空 = 仓库根
 }) (*git.RepoStatus, error) {
 	return h.workbenchService.WorktreeStatus(input.Path, input.Dir)
+}
+
+// 注意：huma 不展开嵌入 struct 的 query tag，参数一律平铺声明。
+func (h *WorkbenchHandler) tree(input struct {
+	Path        string `query:"path" required:"true"`
+	SourceType  string `query:"sourceType" required:"true"`
+	SourceId    string `query:"sourceId" required:"true"`
+	Dir         string `query:"dir"`         // 相对该源根的子目录，空 = 根
+	ShowIgnored bool   `query:"showIgnored"` // 仅 worktree 源生效
+}) ([]workbench.TreeEntry, error) {
+	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.Tree(input.Path, src, input.Dir, input.ShowIgnored)
+}
+
+func (h *WorkbenchHandler) file(input struct {
+	Path       string `query:"path" required:"true"`
+	SourceType string `query:"sourceType" required:"true"`
+	SourceId   string `query:"sourceId" required:"true"`
+	File       string `query:"file" required:"true"`
+}) (*workbench.FileResult, error) {
+	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.ReadFile(input.Path, src, input.File)
+}
+
+func (h *WorkbenchHandler) saveFile(input struct {
+	Path       string `query:"path" required:"true"`
+	SourceType string `query:"sourceType" required:"true"`
+	SourceId   string `query:"sourceId" required:"true"`
+	File       string `query:"file" required:"true"`
+	Body       struct {
+		Content string `json:"content"`
+	}
+}) (*workbench.FileResult, error) {
+	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.SaveFile(input.Path, src, input.File, input.Body.Content)
 }

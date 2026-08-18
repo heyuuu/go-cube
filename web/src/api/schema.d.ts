@@ -208,6 +208,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/file': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 读取 TreeSource 下的文件内容 */
+    get: operations['workbench.file'];
+    /** 保存工作副本文件（唯一写路径） */
+    put: operations['workbench.saveFile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/info': {
     parameters: {
       query?: never;
@@ -259,6 +277,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/tree': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 列出 TreeSource 下的目录树 */
+    get: operations['workbench.tree'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -282,6 +317,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Config'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputFileResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputFileResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['FileResult'];
       message: string;
       ok: boolean;
     };
@@ -326,6 +372,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['ListResultScanRule'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputListTreeEntryBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListTreeEntryBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['TreeEntry'][] | null;
       message: string;
       ok: boolean;
     };
@@ -523,6 +580,12 @@ export interface components {
        */
       type: string;
     };
+    FileResult: {
+      binary: boolean;
+      content: string;
+      /** Format: int64 */
+      size: number;
+    };
     Info: {
       defaultBranch: string;
       root: string;
@@ -623,6 +686,15 @@ export interface components {
       untracked: number;
       upstream: string;
     };
+    SaveFileRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/SaveFileRequest.json
+       */
+      readonly $schema?: string;
+      content: string;
+    };
     ScanRule: {
       group: string;
       /** Format: int64 */
@@ -634,6 +706,13 @@ export interface components {
       /** Format: int64 */
       maxDepth: number;
       path: string;
+    };
+    TreeEntry: {
+      dir: boolean;
+      ignored: boolean;
+      name: string;
+      /** Format: int64 */
+      size: number;
     };
     WhoamiResponse: {
       app: string;
@@ -1021,6 +1100,78 @@ export interface operations {
       };
     };
   };
+  'workbench.file': {
+    parameters: {
+      query: {
+        path: string;
+        sourceType: string;
+        sourceId: string;
+        file: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputFileResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.saveFile': {
+    parameters: {
+      query: {
+        path: string;
+        sourceType: string;
+        sourceId: string;
+        file: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SaveFileRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputFileResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'workbench.info': {
     parameters: {
       query: {
@@ -1102,6 +1253,41 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputRepoStatusBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.tree': {
+    parameters: {
+      query: {
+        path: string;
+        sourceType: string;
+        sourceId: string;
+        dir?: string;
+        showIgnored?: boolean;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListTreeEntryBody'];
         };
       };
       /** @description Error */

@@ -1,7 +1,8 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
-import { apiGet } from '@/api/client';
+import { apiGet, apiPut } from '@/api/client';
 import type { components } from '@/api/schema';
+import type { TreeSource } from '@/pages/workbench/params';
 
 export type WorkbenchInfo = components['schemas']['Info'];
 export type WorkbenchRefs = components['schemas']['Refs'];
@@ -52,4 +53,32 @@ export function useWorkbenchStatus(path: string, dir: string) {
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
+}
+
+export type TreeEntryDTO = components['schemas']['TreeEntry'];
+export type FileResult = components['schemas']['FileResult'];
+
+// 源参数统一从 TreeSource 派生（面板铁律：query key 自包含、从 URL 参数派生）
+function sourceQuery(src: TreeSource) {
+  return { sourceType: src.type, sourceId: src.id };
+}
+
+export function useWorkbenchTree(path: string, src: TreeSource, dir: string) {
+  return useQuery({
+    queryKey: ['workbench', 'tree', path, src.type, src.id, dir],
+    queryFn: () => apiGet('/api/workbench/tree', { path, ...sourceQuery(src), dir }),
+    enabled: path !== '' && !!src,
+  });
+}
+
+export function useWorkbenchFile(path: string, src: TreeSource, file: string) {
+  return useQuery({
+    queryKey: ['workbench', 'file', path, src.type, src.id, file],
+    queryFn: () => apiGet('/api/workbench/file', { path, ...sourceQuery(src), file }),
+    enabled: path !== '' && !!src && file !== '',
+  });
+}
+
+export function saveWorkbenchFile(path: string, src: TreeSource, file: string, content: string) {
+  return apiPut('/api/workbench/file', { path, ...sourceQuery(src), file }, { content });
 }

@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router';
 
 import { Badge } from '@/components/ui/badge';
 
+import { CodeViewPanel } from './panels/code-view-panel';
 import { GitTreePanel } from './panels/git-tree-panel';
 import { ContentPanelPlaceholder, TerminalPanelPlaceholder } from './panels/placeholders';
 import { readWorkbenchParams, sourceLabel, writePathParam } from './params';
@@ -65,13 +66,7 @@ export function WorkbenchPage() {
               }
             />
           ) : params.source ? (
-            <ContentPanelPlaceholder
-              title={
-                <>
-                  浏览 <Badge variant="secondary">{sourceLabel(params.source)}</Badge>
-                </>
-              }
-            />
+            <CodeViewPanel params={params} />
           ) : (
             <ContentPanelPlaceholder title="从左侧选择一个目标开始" />
           )}

@@ -67,6 +67,12 @@ func runOut(dir string, args ...string) (string, error) {
 	return stdout.String(), nil
 }
 
+// RunRead 供领域层直调 git 读命令（带本包 runOut 的稳定环境注入）。
+// 仅限机器可读输出的读命令；输出面向调用方解析。
+func RunRead(dir string, args ...string) (string, error) {
+	return runOut(dir, args...)
+}
+
 // isGitRepo 判断 path 自身是否为 git 仓库根（存在 .git 文件或目录，worktree 的
 // .git 文件也算）。bare 仓库（目录本身即 gitdir，无 .git）按非仓库降级——
 // cube 收录的项目必然是普通工作区副本。
