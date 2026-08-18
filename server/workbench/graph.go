@@ -72,6 +72,19 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 		}
 	}
 
+	// fpChildren[p] = 把 p 作为首父的子提交行号列表。
+	// 首父认领泳道时做「低泳道优先」：若本节点的首父还有其它首父子提交
+	// 正等待在更靠左（更靠近主线）的泳道上，本节点不认领、让位给那条泳道，
+	// 自身按合并处理——否则后切出的支线会把母分支的祖先链拖到右侧泳道，
+	// 母分支反而画成拐弯的侧枝（嵌套分支场景的主视觉 bug）。
+	fpChildren := make(map[string][]int)
+	for i, c := range commits {
+		if len(c.Parents) > 0 {
+			fpChildren[c.Parents[0]] = append(fpChildren[c.Parents[0]], i)
+		}
+	}
+
+	deferred := make(map[int]int) // 行号 → 让位目标泳道（出线拐弯的落点）
 	colorSeq := 0
 	for i, c := range commits {
 		lane := laneIndexOf(c.Sha)
@@ -83,9 +96,22 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 		nodes[i] = GraphCommit{CommitEntry: c, Lane: lane, Color: color}
 
 		if len(c.Parents) > 0 {
-			if laneIndexOf(c.Parents[0]) >= 0 {
-				// 首父已被其它子提交占位 → 合并过去，原泳道留洞（不左移）
+			// 让位判定：存在更靠左的首父兄弟等待条目 → 让出本泳道，出线拐向兄弟泳道
+			deferTo := -1
+			for _, j := range fpChildren[c.Parents[0]] {
+				if j == i {
+					continue
+				}
+				if jl := laneIndexOf(commits[j].Sha); jl >= 0 && jl < lane && (deferTo < 0 || jl < deferTo) {
+					deferTo = jl
+				}
+			}
+			if deferTo >= 0 || laneIndexOf(c.Parents[0]) >= 0 {
+				// 首父已被其它子提交占位（或让位）→ 合并过去，原泳道留洞（不左移）
 				lanes[lane] = graphLane{}
+				if deferTo >= 0 {
+					deferred[i] = deferTo
+				}
 			} else {
 				lanes[lane] = graphLane{sha: c.Parents[0], color: color}
 			}

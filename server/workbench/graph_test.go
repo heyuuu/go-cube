@@ -159,8 +159,8 @@ func TestComputeGraphRealRepo(t *testing.T) {
 }
 
 // 回归：merge 后 topo 序常把支线提交排在主线前（M, f2, f1, m1, c1）。
-// 旧版即时压缩泳道会让 c1 的支线在 m1 行提前左拐（叉出/汇入位置偏一行）；
-// 留洞版应保证：支线（f2/f1）全程 lane1，主线（M/m1）lane0，汇合曲线只出现在 band3。
+// 期望布局（低泳道优先让位后）：支线（f2/f1）全程 lane1，主线（M/m1）与 base 都在
+// lane0，支线在 f1 行拐弯并回主线（band2 的 1→0 曲线），m1 之后全直线。
 func TestComputeGraphLaneStability(t *testing.T) {
 	nodes, wires := computeGraph(mkCommits(
 		[3]string{"M", "m1,f2", "merge"},
@@ -169,26 +169,26 @@ func TestComputeGraphLaneStability(t *testing.T) {
 		[3]string{"m1", "c1", ""},
 		[3]string{"c1", "", ""},
 	))
-	wantLanes := map[string]int{"M": 0, "m1": 0, "f2": 1, "f1": 1, "c1": 1}
+	wantLanes := map[string]int{"M": 0, "m1": 0, "f2": 1, "f1": 1, "c1": 0}
 	for _, n := range nodes {
 		if n.Lane != wantLanes[n.Sha] {
 			t.Errorf("节点 %s lane=%d, want %d", n.Sha, n.Lane, wantLanes[n.Sha])
 		}
 	}
-	// band0 应有 M→lane1 的分叉曲线；band3 应有 m1→c1 的汇合曲线；band1/2 无拐弯（from==to）
+	// band0 有 M→lane1 分叉曲线；band2 有支线并回主线曲线（1→0）；band1/3 无拐弯
 	for _, w := range wires {
 		switch w.Row {
 		case 0:
 			if w.From == 0 && w.To == 1 {
 				// fork curve ✓
 			}
-		case 1, 2:
+		case 1, 3:
 			if w.From != w.To {
 				t.Errorf("band %d 不应拐弯: %+v", w.Row, w)
 			}
-		case 3:
-			if w.From == 0 && w.To == 1 {
-				// merge curve ✓
+		case 2:
+			if w.From == 1 && w.To == 0 {
+				// 支线并回主线的曲线 ✓
 			}
 		}
 	}
