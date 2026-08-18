@@ -1,0 +1,85 @@
+package git
+
+import (
+	"os/exec"
+	"testing"
+
+	"cube/internal/testfixture"
+)
+
+func TestParseWorktreePorcelain(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want []Worktree
+	}{
+		{
+			name: "单工作副本（主目录）",
+			in:   "worktree /Users/x/proj\nHEAD 1a2b3c4\nbranch refs/heads/main\n",
+			want: []Worktree{{Path: "/Users/x/proj", Head: "1a2b3c4", Branch: "main"}},
+		},
+		{
+			name: "主目录 + linked worktree",
+			in: "worktree /Users/x/proj\nHEAD 1a2b3c4\nbranch refs/heads/main\n\n" +
+				"worktree /Users/x/wt-hot\nHEAD 9f8e7d6\nbranch refs/heads/hotfix\n",
+			want: []Worktree{
+				{Path: "/Users/x/proj", Head: "1a2b3c4", Branch: "main"},
+				{Path: "/Users/x/wt-hot", Head: "9f8e7d6", Branch: "hotfix"},
+			},
+		},
+		{
+			name: "detached + bare",
+			in:   "worktree /Users/x/proj\nHEAD 1a2b3c4\ndetached\n\nworktree /Users/x/proj.git\nbare\n",
+			want: []Worktree{
+				{Path: "/Users/x/proj", Head: "1a2b3c4", Detached: true},
+				{Path: "/Users/x/proj.git", Bare: true},
+			},
+		},
+		{name: "空输出", in: "", want: nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := parseWorktreePorcelain(tt.in)
+			if len(got) != len(tt.want) {
+				t.Fatalf("数量不符: want %d, got %d (%+v)", len(tt.want), len(got), got)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Errorf("第 %d 个不符: want %+v, got %+v", i, tt.want[i], got[i])
+				}
+			}
+		})
+	}
+}
+
+func TestWorktreeList(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepo("repo")
+
+	// 加一个 linked worktree（独立分支避免与主目录检出冲突）
+	wtDir := ws.Join("wt-hot")
+	if err := exec.Command("git", "-C", repo, "worktree", "add", "-b", "hotfix", wtDir).Run(); err != nil {
+		t.Fatalf("创建 worktree 失败: %v", err)
+	}
+
+	list, err := WorktreeList(repo)
+	if err != nil {
+		t.Fatalf("WorktreeList 报错: %v", err)
+	}
+	if len(list) != 2 {
+		t.Fatalf("应有 2 个工作副本, got %d (%+v)", len(list), list)
+	}
+	mainWt, hotWt := list[0], list[1]
+	if mainWt.Path != repo || mainWt.Branch == "" || mainWt.Head == "" {
+		t.Errorf("主目录字段不完整: %+v", mainWt)
+	}
+	if hotWt.Path != wtDir || hotWt.Branch != "hotfix" {
+		t.Errorf("linked worktree 字段不符: %+v", hotWt)
+	}
+
+	// 非 git 目录报错
+	if _, err := WorktreeList(ws.Join("plain")); err == nil {
+		t.Error("非 git 目录应报错")
+	}
+}

@@ -21,6 +21,7 @@ import (
 	"cube/internal/testfixture"
 	"cube/opener"
 	"cube/project"
+	"cube/workbench"
 )
 
 // --- 测试环境 ---
@@ -68,6 +69,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		NewOpenerHandler(openerSvc),
 		NewConfigHandler(cfg),
 		NewMdHandler(),
+		NewWorkbenchHandler(workbench.NewService()),
 	)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)

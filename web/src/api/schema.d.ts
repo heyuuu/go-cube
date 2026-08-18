@@ -191,6 +191,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/info': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取工作台项目信息 */
+    get: operations['workbench.info'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/refs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取工作台分支与tag列表 */
+    get: operations['workbench.refs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -203,6 +237,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Config'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputInfoBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputInfoBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['Info'];
       message: string;
       ok: boolean;
     };
@@ -307,6 +352,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputRefsBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputRefsBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['Refs'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputWhoamiResponseBody: {
       /**
        * Format: uri
@@ -395,6 +451,11 @@ export interface components {
        */
       type: string;
     };
+    Info: {
+      defaultBranch: string;
+      root: string;
+      worktrees: components['schemas']['Worktree'][] | null;
+    };
     ListResultCloneRule: {
       list: components['schemas']['CloneRule'][] | null;
     };
@@ -463,6 +524,16 @@ export interface components {
       /** Format: date-time */
       scanUpdatedAt: string;
     };
+    Refs: {
+      current: string;
+      locals: string[] | null;
+      remotes: components['schemas']['RemoteBranch'][] | null;
+      tags: string[] | null;
+    };
+    RemoteBranch: {
+      Branch: string;
+      Remote: string;
+    };
     ScanRule: {
       group: string;
       /** Format: int64 */
@@ -478,6 +549,13 @@ export interface components {
     WhoamiResponse: {
       app: string;
       version: string;
+    };
+    Worktree: {
+      bare: boolean;
+      branch: string;
+      detached: boolean;
+      head: string;
+      path: string;
     };
   };
   responses: never;
@@ -806,6 +884,68 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputWhoamiResponseBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.info': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputInfoBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.refs': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputRefsBody'];
         };
       };
       /** @description Error */
