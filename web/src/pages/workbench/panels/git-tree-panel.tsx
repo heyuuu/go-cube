@@ -164,7 +164,14 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
     if (!focusBranch) return;
     const hit = rows.find((r) => (r.refs ?? []).some((x) => x.name === focusBranch));
     if (hit) {
-      scrollRef.current?.querySelector(`[data-sha="${hit.sha}"]`)?.scrollIntoView({ block: 'center' });
+      const el = scrollRef.current?.querySelector(`[data-sha="${hit.sha}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center' });
+      // 定位闪烁：短暂高亮目标行（class 由命令式添加，React 渲染不冲突，超时移除）
+      el.classList.remove('row-flash');
+      void (el as HTMLElement).offsetWidth; // 重启动画
+      el.classList.add('row-flash');
+      window.setTimeout(() => el.classList.remove('row-flash'), 2000);
       return;
     }
     if (commits.hasNextPage && !commits.isFetchingNextPage) {

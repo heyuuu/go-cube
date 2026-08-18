@@ -362,3 +362,19 @@
 .md-theme-nord-light :where(th) {
   background-color: #e5e9f0;
 }
+
+/* commit 图定位闪烁：滚动定位到分支 tip 后短暂高亮该行 */
+@keyframes row-flash {
+  0%,
+  100% {
+    background-color: transparent;
+  }
+  20%,
+  60% {
+    background-color: hsl(var(--primary) / 0.2);
+  }
+}
+
+.row-flash {
+  animation: row-flash 1.6s ease-out 0.2s;
+}
