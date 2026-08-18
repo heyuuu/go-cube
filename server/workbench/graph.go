@@ -7,10 +7,13 @@ package workbench
 // 按拓扑序遍历 commit（API 层用 --topo-order 保证）：
 //   - lanes 是「等待出现的 commit sha」占位列表，索引即泳道；
 //   - 当前 commit 出现在某泳道 → 节点画在该泳道并腾出位置；
-//     不在任何泳道（根提交等）→ 右侧开新泳道；
+//     不在任何泳道（根提交等）→ 复用最靠左的空洞，无洞则右侧新开；
 //   - 首父占据原泳道（直线延续、继承泳道色）；首父已被其它子提交占位则
-//     合并过去、原泳道删除（列压缩，右侧泳道左移）；
-//   - 其余父各开新泳道（合并曲线的来源）。
+//     合并过去、原泳道留洞；其余父各占新位（合并曲线的来源）；
+//   - **关键：泳道不即时压缩**——空位留洞，只裁剪尾部连续空洞。
+//     即时删除会让右侧泳道整体左移，支线被迫在错误的行提前拐弯
+//     （叉出/汇入位置偏一行）；留洞保证位置稳定，拐弯只出现在
+//     真正 fork/merge 的段上。
 // 连线推导（第二遍，纯查表）：第 i 行到 i+1 行的线段 = lanesAfter[i] 的每个
 // 条目映射到 lanesAfter[i+1] 中的新位置；条目正是 i+1 行的 commit 时映射到
 // 该节点的泳道（线进入节点）。分段表达使前端无需建模跨行整线。
@@ -33,7 +36,7 @@ type GraphCommit struct {
 }
 
 type graphLane struct {
-	sha   string
+	sha   string // 空 sha = 空洞（已腾出待复用的泳道位）
 	color int
 }
 
@@ -51,35 +54,52 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 		}
 		return -1
 	}
+	// newLane：新支线复用最靠左的空洞，没有空洞才在右侧展开（控制总宽度）
+	newLane := func(entry graphLane) int {
+		for i, l := range lanes {
+			if l.sha == "" {
+				lanes[i] = entry
+				return i
+			}
+		}
+		lanes = append(lanes, entry)
+		return len(lanes) - 1
+	}
+	// trimTrailingHoles：裁掉尾部连续空洞（不移动任何占用泳道的位置）
+	trimTrailingHoles := func() {
+		for len(lanes) > 0 && lanes[len(lanes)-1].sha == "" {
+			lanes = lanes[:len(lanes)-1]
+		}
+	}
 
 	colorSeq := 0
 	for i, c := range commits {
 		lane := laneIndexOf(c.Sha)
 		if lane < 0 {
 			colorSeq++
-			lanes = append(lanes, graphLane{sha: c.Sha, color: colorSeq})
-			lane = len(lanes) - 1
+			lane = newLane(graphLane{sha: c.Sha, color: colorSeq})
 		}
 		color := lanes[lane].color
 		nodes[i] = GraphCommit{CommitEntry: c, Lane: lane, Color: color}
 
 		if len(c.Parents) > 0 {
 			if laneIndexOf(c.Parents[0]) >= 0 {
-				// 首父已被其它子提交占位 → 合并到那条泳道，当前泳道删除
-				lanes = append(lanes[:lane], lanes[lane+1:]...)
+				// 首父已被其它子提交占位 → 合并过去，原泳道留洞（不左移）
+				lanes[lane] = graphLane{}
 			} else {
 				lanes[lane] = graphLane{sha: c.Parents[0], color: color}
 			}
-			// 其余父各开新泳道（若未占位）
+			// 其余父各占新位（若未占位）
 			for _, p := range c.Parents[1:] {
 				if laneIndexOf(p) < 0 {
 					colorSeq++
-					lanes = append(lanes, graphLane{sha: p, color: colorSeq})
+					newLane(graphLane{sha: p, color: colorSeq})
 				}
 			}
 		} else {
-			lanes = append(lanes[:lane], lanes[lane+1:]...)
+			lanes[lane] = graphLane{}
 		}
+		trimTrailingHoles()
 
 		snapshots[i] = make([]graphLane, len(lanes))
 		copy(snapshots[i], lanes)
@@ -110,6 +130,9 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 			return -1
 		}
 		for pos, entry := range snapshots[i] {
+			if entry.sha == "" {
+				continue // 空洞
+			}
 			to := target(entry)
 			if to < 0 {
 				continue
