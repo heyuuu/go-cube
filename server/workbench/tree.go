@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"cube/util/git"
@@ -87,6 +88,13 @@ func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeE
 			Ignored: ignoredSet[rel],
 		})
 	}
+	// 排序与虚拟树（ls-tree）一致：目录在前，目录/文件各自按字典序
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Dir != entries[j].Dir {
+			return entries[i].Dir
+		}
+		return entries[i].Name < entries[j].Name
+	})
 	return entries, nil
 }
 

@@ -58,7 +58,8 @@ func (s *Service) DiffTrees(
 
 // diffTreesGit 两侧都是 tree-ish：`git diff --name-status -z -M`。
 func (s *Service) diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	out, err := git.RunRead(root, "diff", "--name-status", "-z", "-M", "--", left.Id, right.Id)
+	// 注意不能用 `--` 分隔：那会把两个 ref 当成 pathspec；ref 形如 sha 时需显式 disambiguate
+	out, err := git.RunRead(root, "diff", "--name-status", "-z", "-M", left.Id, right.Id, "--")
 	if err != nil {
 		return nil, fmt.Errorf("git diff 执行失败: %w", err)
 	}
@@ -432,4 +433,39 @@ func runDiffNoIndex(a, b string) (string, error) {
 		return "", fmt.Errorf("%w；stderr: %s", err, strings.TrimSpace(stderr.String()))
 	}
 	return stdout.String(), nil
+}
+
+// emptyTreeSha git 空树对象 sha（根提交没有父，与空树比即「全部为新增」）
+const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+// Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：
+//   - commit / ref：与父提交（<id>^）比；
+//   - worktree：与该工作副本当前 HEAD 比（= 工作区变更，含 untracked）。
+//
+// 复用 DiffTrees：含 worktree 侧自动走 fs 模式。
+func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	var base string
+	switch src.Type {
+	case SourceTypeWorktree:
+		out, err := git.RunRead(src.Id, "rev-parse", "HEAD")
+		if err != nil {
+			return nil, fmt.Errorf("读取工作副本 HEAD 失败: dir=%s: %w", src.Id, err)
+		}
+		base = strings.TrimSpace(out)
+	case SourceTypeCommit, SourceTypeRef:
+		out, err := git.RunRead(root, "rev-parse", src.Id+"^")
+		if err != nil {
+			// 根提交没有父：与空树比
+			base = emptyTreeSha
+		} else {
+			base = strings.TrimSpace(out)
+		}
+	default:
+		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
+	}
+	return s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
 }

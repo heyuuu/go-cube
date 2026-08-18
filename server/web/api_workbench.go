@@ -37,6 +37,7 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	apiRegisterOp(api, http.MethodPut, "/api/workbench/file", "保存工作副本文件（唯一写路径）", "workbench.saveFile", h.saveFile)
 	apiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
 	apiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
+	apiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
 }
 
 func (h *WorkbenchHandler) info(input struct {
@@ -173,4 +174,16 @@ func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {
 		slog.Warn("pty 会话异常结束", "dir", dir, "err", err)
 		_ = conn.Close(websocket.StatusInternalError, err.Error())
 	}
+}
+
+func (h *WorkbenchHandler) changes(input struct {
+	Path       string `query:"path" required:"true"`
+	SourceType string `query:"sourceType" required:"true"`
+	SourceId   string `query:"sourceId" required:"true"`
+}) (*workbench.DiffTreesResult, error) {
+	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.Changes(input.Path, src)
 }

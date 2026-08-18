@@ -129,3 +129,13 @@ export function useWorkbenchFileDiff(path: string, left: TreeSource, right: Tree
     staleTime: 0,
   });
 }
+
+// 差异模式：源相对上一版本的变更文件（commit/ref vs 父提交；worktree vs HEAD）
+export function useWorkbenchChanges(path: string, src: TreeSource, enabled: boolean) {
+  return useQuery({
+    queryKey: ['workbench', 'changes', path, src.type, src.id],
+    queryFn: () => apiGet('/api/workbench/changes', { path, ...sourceQuery(src) }),
+    enabled: enabled && path !== '' && !!src,
+    staleTime: 0,
+  });
+}

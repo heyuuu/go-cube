@@ -6,9 +6,15 @@ import { useSearchParams } from 'react-router';
 import { CodeEditor } from '@/components/code-editor';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
+import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { saveWorkbenchFile, useWorkbenchFile, useWorkbenchRefs } from '@/queries/workbench';
+import {
+  saveWorkbenchFile,
+  useWorkbenchChanges,
+  useWorkbenchFile,
+  useWorkbenchRefs,
+} from '@/queries/workbench';
 
 import { selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
 
@@ -32,6 +38,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const file = searchParams.get('file') ?? '';
 
   const [editState, setEditState] = useState<EditState | null>(null);
+  const [treeMode, setTreeMode] = useState<'all' | 'diff'>('all');
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -40,9 +47,12 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const content = useWorkbenchFile(path, source!, file);
   const refs = useWorkbenchRefs(path);
+  const changes = useWorkbenchChanges(path, source!, treeMode === 'diff');
   const fileContent = content.data?.content ?? '';
 
   const currentKey = `${source?.type}:${source?.id}:${file}`;
+  const diffFilter =
+    treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
   const editing = editState !== null && editState.key === currentKey;
   const draft = editing ? editState.draft : '';
   const dirty = editing && editState.draft !== fileContent;
@@ -108,7 +118,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   return (
     <div className="flex h-full min-h-0">
       <div className="w-60 shrink-0 overflow-y-auto border-r border-border">
-        <FileTree path={path} source={source} selectedFile={file} onPick={pickFile} />
+        <FileTree path={path} source={source} selectedFile={file} onPick={pickFile} filter={diffFilter} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
@@ -117,6 +127,28 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
           {dirty ? <Badge variant="destructive">未保存</Badge> : null}
           <div className="ml-auto flex items-center gap-1.5">
+            <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
+              {(
+                [
+                  ['all', '全量'],
+                  ['diff', '差异'],
+                ] as const
+              ).map(([m, label]) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={treeMode === 'diff' && changes.isPending}
+                  className={cn(
+                    'px-1.5 py-0.5 transition-colors',
+                    treeMode === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
+                  )}
+                  onClick={() => setTreeMode(m)}
+                  title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
             <SourceSwitcher
               locals={refs.data?.locals ?? []}
               current={source.type === 'ref' ? source.id : ''}

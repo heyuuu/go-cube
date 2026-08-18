@@ -8,20 +8,23 @@ import type { TreeSource } from '../params';
 
 // 文件树（提案 1012）：懒加载展开，每层一次 tree 接口请求。
 // 受控组件（供 1013 diff 面板复用）：selectedFile/onPick 由调用方管理。
+// filter 生效时只显示集合内文件（及其祖先目录）——差异模式用
 export function FileTree({
   path,
   source,
   selectedFile,
   onPick,
+  filter,
 }: {
   path: string;
   source: TreeSource;
   selectedFile: string;
   onPick: (file: string) => void;
+  filter: Set<string> | null;
 }) {
   return (
     <div className="flex h-full flex-col overflow-y-auto p-1 text-xs">
-      <DirNode path={path} source={source} dir="" depth={0} selectedFile={selectedFile} onPick={onPick} />
+      <DirNode path={path} source={source} dir="" depth={0} selectedFile={selectedFile} onPick={onPick} filter={filter} />
     </div>
   );
 }
@@ -33,6 +36,7 @@ function DirNode({
   depth,
   selectedFile,
   onPick,
+  filter,
 }: {
   path: string;
   source: TreeSource;
@@ -40,6 +44,7 @@ function DirNode({
   depth: number;
   selectedFile: string;
   onPick: (file: string) => void;
+  filter: Set<string> | null;
 }) {
   const [expanded, setExpanded] = useState(depth === 0);
   const tree = useWorkbenchTree(path, source, dir);
@@ -59,7 +64,12 @@ function DirNode({
     );
   }
 
-  const entries = tree.data ?? [];
+  // 差异过滤：文件须在集合内；目录须有集合内文件位于其下
+  const entries = (tree.data ?? []).filter((e) => {
+    if (!filter) return true;
+    const rel = dir ? `${dir}/${e.name}` : e.name;
+    return e.dir ? hasFileUnder(filter, rel) : filter.has(rel);
+  });
   return (
     <>
       {entries.map((e) => {
@@ -85,6 +95,7 @@ function DirNode({
                   depth={depth + 1}
                   selectedFile={selectedFile}
                   onPick={onPick}
+                  filter={filter}
                 />
               ) : null}
             </div>
@@ -112,9 +123,17 @@ function DirNode({
       })}
       {entries.length === 0 ? (
         <div className="py-1 text-muted-foreground" style={{ paddingLeft: depth * 12 + 12 }}>
-          （空目录）
+          （{filter ? '无变更文件' : '空目录'}）
         </div>
       ) : null}
     </>
   );
+}
+
+function hasFileUnder(filter: Set<string>, dir: string): boolean {
+  const prefix = dir + '/';
+  for (const f of filter) {
+    if (f.startsWith(prefix)) return true;
+  }
+  return false;
 }

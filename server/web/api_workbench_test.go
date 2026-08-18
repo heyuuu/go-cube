@@ -3,6 +3,7 @@ package web
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/exec"
@@ -448,5 +449,80 @@ func TestWorkbenchPty(t *testing.T) {
 	}
 	if !gotExit {
 		t.Error("子进程退出后应收 exit 帧")
+	}
+}
+
+// --- 排序 + 差异模式 ---
+
+func TestWorkbenchTreeSort(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	env.ws.Mkdir("g1/proj1/zdir")
+	env.ws.WriteFile("g1/proj1/zdir/x.txt", []byte("x"))
+	env.ws.WriteFile("g1/proj1/afile.txt", []byte("a"))
+	env.ws.WriteFile("g1/proj1/bdir-nofile", []byte("b"))
+
+	var got []struct {
+		Name string `json:"name"`
+		Dir  bool   `json:"dir"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &got)
+	var names []string
+	for _, e := range got {
+		names = append(names, fmt.Sprintf("%v:%s", e.Dir, e.Name))
+	}
+	want := []string{"true:zdir", "false:afile.txt", "false:bdir-nofile"}
+	if len(names) != len(want) {
+		t.Fatalf("条目数不符: %v", names)
+	}
+	for i := range want {
+		if names[i] != want[i] {
+			t.Errorf("排序不符: got %v, want %v", names, want)
+			break
+		}
+	}
+}
+
+func TestWorkbenchChanges(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	env.ws.WriteFile("g1/proj1/keep.txt", []byte("same"))
+	env.ws.WriteFile("g1/proj1/old.txt", []byte("v1"))
+	_ = exec.Command("git", "-C", repo, "add", "-A").Run()
+	_ = git.Commit(repo, "base")
+	head := gitHead(t, repo)
+
+	// 工作区改动：mod + 新增（untracked）
+	env.ws.WriteFile("g1/proj1/old.txt", []byte("v2"))
+	env.ws.WriteFile("g1/proj1/new.txt", []byte("n"))
+
+	var wt struct {
+		List []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"list"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &wt)
+	byPath := map[string]string{}
+	for _, e := range wt.List {
+		byPath[e.Path] = e.Status
+	}
+	if byPath["old.txt"] != "modified" || byPath["new.txt"] != "added" {
+		t.Errorf("worktree 差异不符: %v", byPath)
+	}
+	if _, ok := byPath["keep.txt"]; ok {
+		t.Error("未变更文件不应出现")
+	}
+
+	// commit 源：head 与父提交（fixture 根提交）比 → 两个文件都是 added
+	var c struct {
+		List []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"list"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&sourceType=commit&sourceId="+head)), &c)
+	if len(c.List) != 2 {
+		t.Errorf("commit 差异应含 2 个文件: %+v", c.List)
 	}
 }
