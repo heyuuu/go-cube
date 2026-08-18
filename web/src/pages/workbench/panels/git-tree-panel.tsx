@@ -218,12 +218,13 @@ function CommitRow({
           const x1 = LANE_X0 + w.from * LANE_W;
           const x2 = LANE_X0 + w.to * LANE_W;
           const color = LANE_PALETTE[w.color % LANE_PALETTE.length];
+          // 同泳道 = 竖线；换泳道 = 直角折线（竖-横-竖，git log --graph 经典样式），拐点在行高中点
           return x1 === x2 ? (
             <line key={wi} x1={x1} y1={-ROW_H / 2} x2={x2} y2={ROW_H / 2} stroke={color} strokeWidth={1.5} />
           ) : (
             <path
               key={wi}
-              d={`M ${x1} ${-ROW_H / 2} C ${x1} 0, ${x2} 0, ${x2} ${ROW_H / 2}`}
+              d={`M ${x1} ${-ROW_H / 2} L ${x1} 0 L ${x2} 0 L ${x2} ${ROW_H / 2}`}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
