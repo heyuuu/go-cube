@@ -6,12 +6,14 @@ import (
 	"cube/util/git"
 )
 
-// CommitsPageResult commit 图一页数据（提案 1011）。
+// CommitsPageResult commit 图一页数据（提案 1011 + 拓扑升级）。
 // Cursor 用 skip 偏移（依赖 git log 对同一 ref 集合的确定序），前端按 sha 去重兜底翻页边界。
+// lane/连线每次请求从第 0 行重算（无状态、跨页确定一致），只返回本页行段的 wires。
 type CommitsPageResult struct {
-	List       []git.CommitEntry `json:"list"`
-	NextCursor int               `json:"nextCursor"` // 下一页 skip 偏移；HasMore=false 时无意义
-	HasMore    bool              `json:"hasMore"`    // 本页拉满 limit 即认为还有更多
+	List       []GraphCommit `json:"list"`
+	Wires      []GraphWire   `json:"wires"`      // 本页涉及的行间连线（含与上一页末行的接续段），Row 为绝对行号
+	NextCursor int           `json:"nextCursor"` // 下一页 skip 偏移；HasMore=false 时无意义
+	HasMore    bool          `json:"hasMore"`    // 本页拉满 limit 即认为还有更多
 }
 
 // Commits 拉取 commit 图一页。scope=all 走全部分支（--all，首屏拓扑全景），
@@ -37,14 +39,36 @@ func (s *Service) Commits(path string, scope string, ref string, cursor int, lim
 		// 单线模式没给 ref：退化为当前 HEAD（与 all 的区别仍是不带 --all）
 		ref = "HEAD"
 	}
-	list, err := git.CommitsPage(root, scope == "all", ref, cursor, limit)
+
+	// 从头拉 cursor+limit 条再整体算 lane（保证跨页泳道一致），只返回本页切片
+	all, err := git.CommitsPage(root, scope == "all", ref, 0, cursor+limit)
 	if err != nil {
 		return nil, err
 	}
+	nodes, wires := computeGraph(all)
+	end := cursor + limit
+	if end > len(nodes) {
+		end = len(nodes)
+	}
+	page := nodes[cursor:end]
+
+	// 本页 wires：上一页末行 → 本页首行的接续段（cursor-1 起）+ 本页内部各行段
+	var pageWires []GraphWire
+	fromRow := cursor - 1
+	if fromRow < 0 {
+		fromRow = 0
+	}
+	for _, w := range wires {
+		if w.Row >= fromRow && w.Row < end-1 {
+			pageWires = append(pageWires, w)
+		}
+	}
+
 	return &CommitsPageResult{
-		List:       list,
+		List:       page,
+		Wires:      pageWires,
 		NextCursor: cursor + limit,
-		HasMore:    len(list) == limit,
+		HasMore:    len(all) == cursor+limit,
 	}, nil
 }
 

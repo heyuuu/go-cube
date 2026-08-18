@@ -28,7 +28,8 @@ export function useWorkbenchRefs(path: string) {
   });
 }
 
-export type CommitEntry = components['schemas']['CommitEntry'];
+export type GraphCommit = components['schemas']['GraphCommit'];
+export type GraphWire = components['schemas']['GraphWire'];
 
 // commit 图分页：useInfiniteQuery，cursor 为 skip 偏移；翻页边界按 sha 去重兜底
 export function useWorkbenchCommits(path: string) {

@@ -553,21 +553,12 @@ export interface components {
       repoHost: string;
       repoPrefix: string;
     };
-    CommitEntry: {
-      author: string;
-      parents: string[] | null;
-      refs: string[] | null;
-      sha: string;
-      shortSha: string;
-      subject: string;
-      /** Format: int64 */
-      timestamp: number;
-    };
     CommitsPageResult: {
       hasMore: boolean;
-      list: components['schemas']['CommitEntry'][] | null;
+      list: components['schemas']['GraphCommit'][] | null;
       /** Format: int64 */
       nextCursor: number;
+      wires: components['schemas']['GraphWire'][] | null;
     };
     Config: {
       dataDir: string;
@@ -659,6 +650,30 @@ export interface components {
       content: string;
       /** Format: int64 */
       size: number;
+    };
+    GraphCommit: {
+      author: string;
+      /** Format: int64 */
+      color: number;
+      /** Format: int64 */
+      lane: number;
+      parents: string[] | null;
+      refs: string[] | null;
+      sha: string;
+      shortSha: string;
+      subject: string;
+      /** Format: int64 */
+      timestamp: number;
+    };
+    GraphWire: {
+      /** Format: int64 */
+      color: number;
+      /** Format: int64 */
+      from: number;
+      /** Format: int64 */
+      row: number;
+      /** Format: int64 */
+      to: number;
     };
     Hunk: {
       lines: components['schemas']['DiffLine'][] | null;
