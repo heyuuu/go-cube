@@ -130,6 +130,6 @@ design.proto.json（仓库里的结构化设计稿）
 ## 附：相关上下文
 
 - 工作台需求本体：[`README.md`](./README.md)（三聚合方向：代码阅读 / Git 操作 / 命令行 PTY；真 PTY 需 WebSocket 长连接是架构临界点）
-- 代码阅读方向可参考已归档的 [md渲染提案](../../proposals/260811-md渲染/)（其依赖已全部满足，可先行落地作为工作台代码阅读方向的探路石）
+- 代码阅读方向可参考已归档的 [md渲染提案](../../proposals/archived/1005-md渲染/)（其依赖已全部满足，可先行落地作为工作台代码阅读方向的探路石）
 - 新前端工程：`web/`（Vite+React19+React Compiler+tsgo+Tailwind4+Base UI shadcn+React Query），详见 `docs/spec/现状.md` 前端工程章节
 - ZCode 技能目录：`~/.agents/skills/`（Pen SKILL.md 放这里）；ZCode 是 MCP client（可接 OpenDesign/OpenPencil MCP）
