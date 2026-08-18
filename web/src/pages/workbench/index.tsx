@@ -4,7 +4,8 @@ import { useSearchParams } from 'react-router';
 import { CodeViewPanel } from './panels/code-view-panel';
 import { DiffViewPanel } from './panels/diff-view-panel';
 import { GitTreePanel } from './panels/git-tree-panel';
-import { ContentPanelPlaceholder, TerminalPanelPlaceholder } from './panels/placeholders';
+import { ContentPanelPlaceholder } from './panels/placeholders';
+import { TerminalPanel } from './panels/terminal-panel';
 import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
 
@@ -64,7 +65,7 @@ export function WorkbenchPage() {
           )}
         </main>
       </div>
-      <TerminalPanelPlaceholder />
+      <TerminalPanel path={params.path} />
     </div>
   );
 }

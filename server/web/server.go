@@ -22,6 +22,11 @@ type Handler interface {
 	Register(api huma.API)
 }
 
+// RawHandler 可选接口：注册不走 huma 的原生路由（WebSocket upgrade 等）
+type RawHandler interface {
+	RegisterRaw(mux *http.ServeMux)
+}
+
 // Server 服务器，响应 api 请求
 type Server struct {
 	mux *http.ServeMux
@@ -45,6 +50,13 @@ func NewServer(handlers ...Handler) *Server {
 
 	// system 端点（whoami / shutdown）
 	newSystemHandler().Register(api, mux)
+
+	// 支持 handler 注册非 huma 路由（WebSocket upgrade 等）
+	for _, handler := range handlers {
+		if rh, ok := handler.(RawHandler); ok {
+			rh.RegisterRaw(mux)
+		}
+	}
 
 	// 静态前端资源路由（/ 与 /ui/*）
 	registerStaticRoutes(mux)

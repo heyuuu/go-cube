@@ -1,16 +1,21 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"cube/util/git"
 	"cube/workbench"
+
+	"github.com/coder/websocket"
 )
 
 func TestWorkbenchInfo(t *testing.T) {
@@ -384,4 +389,64 @@ func keysOf(m map[string]string) []string {
 		out = append(out, k)
 	}
 	return out
+}
+
+// --- 提案 1014：PTY WebSocket 链路（连接-输入-收输出-退出） ---
+
+func TestWorkbenchPty(t *testing.T) {
+	env := newTestEnv(t)
+	dir := env.ws.Dir
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	wsURL := "ws" + strings.TrimPrefix(env.ts.URL, "http") + "/api/workbench/pty?path=" + urlQueryEscape(dir) + "&cols=100&rows=30"
+	conn, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("ws 连接失败: %v", err)
+	}
+	defer conn.CloseNow()
+
+	// 输入一条命令并执行 exit
+	send := func(msg string) {
+		t.Helper()
+		if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"input","data":`+strconv.Quote(msg)+`}`)); err != nil {
+			t.Fatalf("发送失败: %v", err)
+		}
+	}
+	send("echo cube_pty_marker\r")
+	send("exit\r")
+
+	// 持续读帧，直到看到标记或 exit 帧或超时
+	gotMarker, gotExit := false, false
+	deadline := time.Now().Add(10 * time.Second)
+	for (!gotMarker || !gotExit) && time.Now().Before(deadline) {
+		rctx, rcancel := context.WithTimeout(ctx, 3*time.Second)
+		_, data, err := conn.Read(rctx)
+		rcancel()
+		if err != nil {
+			break
+		}
+		var msg struct {
+			Type string `json:"type"`
+			Data string `json:"data"`
+		}
+		if json.Unmarshal(data, &msg) != nil {
+			continue
+		}
+		switch msg.Type {
+		case "output":
+			if strings.Contains(msg.Data, "cube_pty_marker") {
+				gotMarker = true
+			}
+		case "exit":
+			gotExit = true
+		}
+	}
+	if !gotMarker {
+		t.Error("应在输出中看到 echo 标记")
+	}
+	if !gotExit {
+		t.Error("子进程退出后应收 exit 帧")
+	}
 }

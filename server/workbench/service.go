@@ -4,7 +4,19 @@
 // 分层注意：本包不 import project 包，git 读能力沉淀在 util/git。
 package workbench
 
-// Service 工作台领域服务。纯读、无状态、无后台任务——每次调用直接调 git。
-type Service struct{}
+import (
+	"context"
+	"sync"
+)
 
-func NewService() *Service { return &Service{} }
+// Service 工作台领域服务。git 读路径无状态（每次调用直接调 git）；
+// 唯一的运行期状态是 PTY 会话注册表（server 停机时统一回收，见 pty.go）。
+type Service struct {
+	ptyMu      sync.Mutex
+	ptySeq     int
+	ptyCancels map[int]context.CancelFunc
+}
+
+func NewService() *Service {
+	return &Service{ptyCancels: map[int]context.CancelFunc{}}
+}

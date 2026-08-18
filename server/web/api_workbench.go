@@ -1,7 +1,12 @@
 package web
 
 import (
+	"log/slog"
 	"net/http"
+
+	"strconv"
+
+	"github.com/coder/websocket"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -147,4 +152,25 @@ func (h *WorkbenchHandler) fileDiff(input struct {
 		return nil, err
 	}
 	return h.workbenchService.ReadFileDiff(input.Path, left, right, input.File)
+}
+
+// RegisterRaw 注册 WebSocket 路由（upgrade 不走 huma）
+func (h *WorkbenchHandler) RegisterRaw(mux *http.ServeMux) {
+	mux.HandleFunc("GET /api/workbench/pty", h.ptyWs)
+}
+
+func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {
+	dir := r.URL.Query().Get("path")
+	cols, _ := strconv.Atoi(r.URL.Query().Get("cols"))
+	rows, _ := strconv.Atoi(r.URL.Query().Get("rows"))
+
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.CloseNow()
+	if err := h.workbenchService.ServePty(r.Context(), conn, dir, cols, rows); err != nil {
+		slog.Warn("pty 会话异常结束", "dir", dir, "err", err)
+		_ = conn.Close(websocket.StatusInternalError, err.Error())
+	}
 }
