@@ -2,27 +2,29 @@ package history
 
 import (
 	"testing"
+	"time"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
-// newTestDB 构造一个内存 sqlite 并 AutoMigrate history 的两张表。
+// newTestService 构造内存 sqlite + 建表后的 Service（OnAppCreated 负责建表，与生产路径一致）。
 // :memory: 零磁盘、毫秒级、每次测试干净。
-func newTestDB(t *testing.T) *gorm.DB {
+func newTestService(t *testing.T) *Service {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("打开内存 sqlite 失败: %v", err)
 	}
-	if err := db.AutoMigrate(&ProjectSelectLog{}, &ProjectOpenLog{}); err != nil {
-		t.Fatalf("AutoMigrate 失败: %v", err)
+	s := NewService(db)
+	if err := s.OnAppCreated(); err != nil {
+		t.Fatalf("OnAppCreated 建表失败: %v", err)
 	}
-	return db
+	return s
 }
 
 func TestAddProjectSelectLog_AndLeast(t *testing.T) {
-	s := NewService(newTestDB(t))
+	s := newTestService(t)
 
 	if err := s.AddProjectSelectLog("proj-a", false); err != nil {
 		t.Fatalf("Add 失败: %v", err)
@@ -46,7 +48,7 @@ func TestAddProjectSelectLog_AndLeast(t *testing.T) {
 }
 
 func TestLeastSelectedProjects_LimitAndEmpty(t *testing.T) {
-	s := NewService(newTestDB(t))
+	s := newTestService(t)
 
 	// 空表
 	if got := s.LeastSelectedProjects(5, false); len(got) != 0 {
@@ -69,7 +71,7 @@ func TestLeastSelectedProjects_LimitAndEmpty(t *testing.T) {
 }
 
 func TestAddProjectOpenLog_AndLeastApps(t *testing.T) {
-	s := NewService(newTestDB(t))
+	s := newTestService(t)
 
 	s.AddProjectOpenLog("proj", "code", false)
 	s.AddProjectOpenLog("proj", "idea", false)
@@ -94,7 +96,7 @@ func TestAddProjectOpenLog_AndLeastApps(t *testing.T) {
 }
 
 func TestLeastProjectOpenApps_AlfredFilter(t *testing.T) {
-	s := NewService(newTestDB(t))
+	s := newTestService(t)
 
 	s.AddProjectOpenLog("proj", "code", false)
 	s.AddProjectOpenLog("proj", "idea", true) // 仅 alfred
@@ -110,5 +112,42 @@ func TestLeastProjectOpenApps_AlfredFilter(t *testing.T) {
 	got = s.LeastProjectOpenApps("proj", 10, true)
 	if len(got) != 1 || got[0] != "idea" {
 		t.Fatalf("alfred 过滤异常: %v", got)
+	}
+}
+
+func TestPurgeBefore(t *testing.T) {
+	s := newTestService(t)
+
+	// 旧记录（早于 cutoff）
+	old1 := &ProjectSelectLog{Project: "old-a"}
+	old1.CreatedAt = time.Now().AddDate(0, 0, -100)
+	s.db.Create(old1)
+	old2 := &ProjectOpenLog{Project: "old-a", Opener: "code"}
+	old2.CreatedAt = time.Now().AddDate(0, 0, -100)
+	s.db.Create(old2)
+
+	// 新记录
+	s.AddProjectSelectLog("new-a", false)
+	s.AddProjectOpenLog("new-a", "code", false)
+
+	deleted, err := s.PurgeBefore(time.Now().AddDate(0, 0, -90))
+	if err != nil {
+		t.Fatalf("PurgeBefore 失败: %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("应删除 2 条旧记录，实际 %d", deleted)
+	}
+
+	// 只剩新记录
+	if got := s.LeastSelectedProjects(10, false); len(got) != 1 || got[0] != "new-a" {
+		t.Fatalf("清后 select 日志应只剩 new-a，实际 %v", got)
+	}
+	if got := s.LeastProjectOpenApps("new-a", 10, false); len(got) != 1 {
+		t.Fatalf("清后 open 日志应只剩 new-a，实际 %v", got)
+	}
+
+	// 再清一次应无删除
+	if deleted, _ := s.PurgeBefore(time.Now().AddDate(0, 0, -90)); deleted != 0 {
+		t.Fatalf("重复清理应删除 0 条，实际 %d", deleted)
 	}
 }

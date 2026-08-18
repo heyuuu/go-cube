@@ -19,6 +19,9 @@ type App struct {
 
 	server *web.Server
 
+	// services 有序清单，供生命周期钩子（OnAppCreated / OnServerStart / OnServerStop）分发
+	services []any
+
 	projectService   *project.Service
 	workbenchService *workbench.Service
 	openerService    *opener.Service
@@ -29,10 +32,7 @@ func New(cfg *config.Config) (*App, error) {
 	paths := NewPaths(cfg.DataDir)
 
 	// 初始数数据库
-	dataDb, err := db.Init(paths.DataDbFile(),
-		&history.ProjectSelectLog{},
-		&history.ProjectOpenLog{},
-	)
+	dataDb, err := db.Init(paths.DataDbFile())
 	if err != nil {
 		return nil, err
 	}
@@ -42,6 +42,16 @@ func New(cfg *config.Config) (*App, error) {
 	openerService := opener.NewService(cfg.Openers, nil)
 	historyService := history.NewService(dataDb)
 	workbenchService := workbench.NewService()
+	services := []any{projectService, openerService, historyService, workbenchService}
+
+	// 各 service 就绪后触发一次性初始化（AutoMigrate 等）
+	for _, s := range services {
+		if h, ok := s.(appCreatedHook); ok {
+			if err := h.OnAppCreated(); err != nil {
+				return nil, err
+			}
+		}
+	}
 
 	// 组装 web server
 	configHandler := web.NewConfigHandler(cfg)
@@ -63,6 +73,7 @@ func New(cfg *config.Config) (*App, error) {
 		paths:  paths,
 		server: server,
 
+		services:         services,
 		projectService:   projectService,
 		workbenchService: workbenchService,
 		openerService:    openerService,
@@ -79,13 +90,21 @@ func (a *App) WorkbenchService() *workbench.Service { return a.workbenchService 
 func (a *App) OpenerService() *opener.Service       { return a.openerService }
 func (a *App) HistoryService() *history.Service     { return a.historyService }
 
-// StartBackgroundJobs 启动常驻进程的后台任务（各 service 的定时刷新等）。
-// 仅常驻 server 调用；CLI 短命进程不调用。新 service 需要后台任务时在此追加。
+// StartBackgroundJobs 启动常驻进程的后台任务（分发到各 service 的 OnServerStart 钩子）。
+// 仅常驻 server 调用；CLI 短命进程不调用。
 func (a *App) StartBackgroundJobs() {
-	a.projectService.StartRefreshTicker(0)
+	for _, s := range a.services {
+		if h, ok := s.(serverStartHook); ok {
+			h.OnServerStart()
+		}
+	}
 }
 
-// StopBackgroundJobs 停止后台任务（server 退出时调）。
+// StopBackgroundJobs 停止后台任务（server 退出时调，分发到 OnServerStop 钩子）。
 func (a *App) StopBackgroundJobs() {
-	a.projectService.StopRefreshTicker()
+	for _, s := range a.services {
+		if h, ok := s.(serverStopHook); ok {
+			h.OnServerStop()
+		}
+	}
 }

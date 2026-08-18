@@ -1,24 +1,23 @@
 # history 清理 API
 
-> **状态**：⏸️ 暂不做（等触发条件再评估）
+> **状态**：✅ 已完成
 
 ## 背景
 
 history 当前只有写入和读取，没有任何清理 API——数据只增不减。
 
-## 为什么暂不做
+## 实现形态
 
-1. **写入面极窄**：当前 history 写入只在 alfred 流程（`cmd/alfred/project_search.go` 写 select、`cmd/alfred/project_open.go` 写 open），CLI 的 `open` / web 的 `/api/project/open` 路径都没接 history。
-2. **写入量极小**：单用户、单 alfred 交互，估算一年 ~7300 行/表，sqlite 十年都不会有压力。
-3. **策略无数据支撑**：清理策略（按时间 vs 按条数、阈值多少、触发时机）现在没有实际数据支撑，提前定是凭空猜。
-4. **频率信号价值**：history 核心用途是「最近用排序」（`Order("max(id) desc")`），长期记录有频率信号价值，过早清理反而损信号。
+随着 service 生命周期钩子机制落地（见下），history 清理一并实现：
 
-## 触发条件
+- **`Service.PurgeBefore(cutoff time.Time) (int64, error)`**：删除两表（`project_select_logs` / `project_open_logs`）中 `created_at` 早于 cutoff 的记录，`Unscoped` 硬删，返回删除总行数。
+- **触发**：`history.Service.OnServerStart()` 异步清一次（不阻塞 server 启动），不做定时任务——保留期仅 30 天，server 重启频率足够覆盖。清理失败降级只记 slog，不抛出。
+- **保留期**：包内常量 `retentionDays = 30`（个人项目，不进配置文件）。
+- CLI 短命进程不清理（不走 server 钩子）。
 
-当 history 写入面铺开到 CLI/web 全入口后，重新评估数据增长。
+## 顺带落地的 service 生命周期钩子
 
-## 未来形态（届时参考）
+`app/hooks.go` 定义三个可选接口（app 层类型断言分发，未实现即跳过，新增 domain 无需改 app 的钩子代码）：
 
-- 倾向按时间清理：`PurgeBefore(90天前)`。
-- 触发点：挂 `app.New()` 启动时跑一次（低频安全）。
-- 参考 cube-next `server/history/store.go` 的 `PurgeBefore` 实现。
+- `OnAppCreated() error` — App 构造完成、db 就绪后调用。**AutoMigrate 下沉到各 service 就近处理**（history 的建表在 `history.Service.OnAppCreated`），`app.New` 不再集中写 models。
+- `OnServerStart()` / `OnServerStop()` — 常驻 server 启停后台任务。project 的 git 定时刷新、history 的定时清理挂在这两个钩子上；`app.StartBackgroundJobs/StopBackgroundJobs` 改为遍历 `services` 清单分发。

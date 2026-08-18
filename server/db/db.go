@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func Init(dsn string, models ...any) (*gorm.DB, error) {
+func Init(dsn string) (*gorm.DB, error) {
 	// 连接到 SQLite 数据库
 	slog.Info("初始化 db", "dsn", dsn)
 
@@ -19,14 +19,6 @@ func Init(dsn string, models ...any) (*gorm.DB, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("无法连接到数据库: %w", err)
-	}
-
-	// 自动迁移数据表结构
-	if len(models) > 0 {
-		err = db.AutoMigrate(models...)
-		if err != nil {
-			return nil, fmt.Errorf("数据表结构迁移失败: %w", err)
-		}
 	}
 
 	return db, nil

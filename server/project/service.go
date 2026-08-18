@@ -245,6 +245,12 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 	}()
 }
 
+// OnServerStart 启动后台定时刷新（app 层钩子，仅常驻 server 调用）。等价于 StartRefreshTicker(0)。
+func (s *Service) OnServerStart() { s.StartRefreshTicker(0) }
+
+// OnServerStop 停止后台定时刷新 goroutine（app 层钩子，server shutdown 时调）。
+func (s *Service) OnServerStop() { s.StopRefreshTicker() }
+
 // StopRefreshTicker 停止定时刷新 goroutine（server shutdown 时调）。
 // 未启用时调用安全（空操作）。
 func (s *Service) StopRefreshTicker() {
