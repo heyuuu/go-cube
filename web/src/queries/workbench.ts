@@ -64,10 +64,18 @@ function sourceQuery(src: TreeSource) {
   return { sourceType: src.type, sourceId: src.id };
 }
 
-export function useWorkbenchTree(path: string, src: TreeSource, dir: string) {
+export function treeQueryKey(path: string, src: TreeSource, dir: string, showIgnored: boolean) {
+  return ['workbench', 'tree', path, src.type, src.id, dir, showIgnored] as const;
+}
+
+export function fetchWorkbenchTree(path: string, src: TreeSource, dir: string, showIgnored: boolean) {
+  return apiGet('/api/workbench/tree', { path, ...sourceQuery(src), dir, showIgnored });
+}
+
+export function useWorkbenchTree(path: string, src: TreeSource, dir: string, showIgnored = false) {
   return useQuery({
-    queryKey: ['workbench', 'tree', path, src.type, src.id, dir],
-    queryFn: () => apiGet('/api/workbench/tree', { path, ...sourceQuery(src), dir }),
+    queryKey: treeQueryKey(path, src, dir, showIgnored),
+    queryFn: () => fetchWorkbenchTree(path, src, dir, showIgnored),
     enabled: path !== '' && !!src,
   });
 }

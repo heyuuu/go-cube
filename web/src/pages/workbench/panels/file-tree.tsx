@@ -1,31 +1,42 @@
-import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, ChevronRight, EyeOff, FileText, Folder } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
+import { TreeToolbar } from '@/components/tree-toolbar';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useWorkbenchTree } from '@/queries/workbench';
+import { fetchWorkbenchTree, useWorkbenchTree } from '@/queries/workbench';
 
 import type { TreeSource } from '../params';
 
 // 文件树（提案 1012）：懒加载展开，每层一次 tree 接口请求。
 // 受控组件（供 1013 diff 面板复用）：selectedFile/onPick 由调用方管理。
-// filter 生效时只显示集合内文件（及其祖先目录）——差异模式用
+// filter 生效时只显示集合内文件（及其祖先目录）——差异模式用。
+// 顶部工具条与 md 页共用 TreeToolbar；「含 ignored」开关仅 worktree 源提供
+// （虚拟树没有忽略概念），经 extra 注入。
 export function FileTree({
   path,
   source,
   selectedFile,
   onPick,
   filter,
+  enableIgnoredToggle = false,
 }: {
   path: string;
   source: TreeSource;
   selectedFile: string;
   onPick: (file: string) => void;
   filter: Set<string> | null;
+  enableIgnoredToggle?: boolean;
 }) {
   // 展开状态提升到树级统一管理（按目录相对路径），子节点无状态渲染。
   // 之前各 DirNode 自持 useState，实测出现「点一个目录全部联动开/关」的异常，
   // 提升后状态与节点实例生命周期解耦，也天然在数据刷新后保持。
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(() => new Set(['']));
+  const [showIgnored, setShowIgnored] = useState(false);
+  const [expandBusy, setExpandBusy] = useState(false);
+  const queryClient = useQueryClient();
+
   const toggle = useCallback((dir: string) => {
     setExpandedSet((prev) => {
       const next = new Set(prev);
@@ -37,19 +48,71 @@ export function FileTree({
       return next;
     });
   }, []);
+
+  // 展开全部：BFS 逐层加载（fetchQuery 走同一缓存 key，随后挂载的 DirNode 直接命中）
+  const expandAll = useCallback(async () => {
+    setExpandBusy(true);
+    try {
+      const next = new Set(['']);
+      const queue = [''];
+      while (queue.length > 0) {
+        const dir = queue.shift()!;
+        const entries = await queryClient.fetchQuery({
+          queryKey: ['workbench', 'tree', path, source.type, source.id, dir, showIgnored],
+          queryFn: () => fetchWorkbenchTree(path, source, dir, showIgnored),
+        });
+        for (const e of entries ?? []) {
+          if (!e.dir) continue;
+          const rel = dir ? `${dir}/${e.name}` : e.name;
+          if (!next.has(rel)) {
+            next.add(rel);
+            queue.push(rel);
+          }
+        }
+      }
+      setExpandedSet(next);
+    } finally {
+      setExpandBusy(false);
+    }
+  }, [path, source, showIgnored, queryClient]);
+
+  const collapseAll = useCallback(() => setExpandedSet(new Set([''])), []);
+
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-1 text-xs">
-      <DirNode
-        path={path}
-        source={source}
-        dir=""
-        depth={0}
-        selectedFile={selectedFile}
-        onPick={onPick}
-        filter={filter}
-        expandedSet={expandedSet}
-        onToggle={toggle}
+    <div className="flex h-full flex-col">
+      <TreeToolbar
+        onExpandAll={() => void expandAll()}
+        onCollapseAll={collapseAll}
+        busy={expandBusy}
+        extra={
+          enableIgnoredToggle ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn('h-6 px-2 text-xs', showIgnored && 'bg-primary/15 text-primary')}
+              onClick={() => setShowIgnored((v) => !v)}
+              title="切换显示 .gitignore 忽略的文件"
+            >
+              <EyeOff className="mr-1 size-3.5" />
+              忽略
+            </Button>
+          ) : undefined
+        }
       />
+      <div className="min-h-0 flex-1 overflow-y-auto p-1 text-xs">
+        <DirNode
+          path={path}
+          source={source}
+          dir=""
+          depth={0}
+          selectedFile={selectedFile}
+          onPick={onPick}
+          filter={filter}
+          expandedSet={expandedSet}
+          onToggle={toggle}
+          showIgnored={showIgnored}
+        />
+      </div>
     </div>
   );
 }
@@ -64,6 +127,7 @@ function DirNode({
   filter,
   expandedSet,
   onToggle,
+  showIgnored,
 }: {
   path: string;
   source: TreeSource;
@@ -74,8 +138,9 @@ function DirNode({
   filter: Set<string> | null;
   expandedSet: ReadonlySet<string>;
   onToggle: (dir: string) => void;
+  showIgnored: boolean;
 }) {
-  const tree = useWorkbenchTree(path, source, dir);
+  const tree = useWorkbenchTree(path, source, dir, showIgnored);
 
   if (tree.isPending) {
     return (
@@ -134,6 +199,7 @@ function DirNode({
                   filter={filter}
                   expandedSet={expandedSet}
                   onToggle={onToggle}
+                  showIgnored={showIgnored}
                 />
               ) : null}
             </div>

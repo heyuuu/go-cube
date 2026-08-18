@@ -6,6 +6,7 @@ import remarkGfm from 'remark-gfm';
 
 import type { Opener } from '@/api/client';
 import { ErrorBanner } from '@/components/error-banner';
+import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -540,15 +541,8 @@ export function MdPage() {
       {dirMode && (
         <>
           <aside className="shrink-0 overflow-y-auto border-r p-3" style={{ width: sidebarW - 4 }}>
-            {/* 工具条：树操作按钮位（后续新按钮在此追加） */}
-            <div className="mb-2 flex gap-1 border-b pb-2">
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={expandAll}>
-                全展开
-              </Button>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={collapseAll}>
-                全折叠
-              </Button>
-            </div>
+            {/* 共用目录树工具条（与工作台代码阅读面板同款）；额外按钮经 extra 注入 */}
+            <TreeToolbar onExpandAll={expandAll} onCollapseAll={collapseAll} />
             {list.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
             {listError && <div className="text-xs text-muted-foreground">{listError}</div>}
             {!list.isPending && !listError && rows.length <= 1 && (

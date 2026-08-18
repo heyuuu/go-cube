@@ -112,7 +112,14 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   return (
     <div className="flex h-full min-h-0">
       <div className="w-60 shrink-0 overflow-y-auto border-r border-border">
-        <FileTree path={path} source={source} selectedFile={file} onPick={pickFile} filter={diffFilter} />
+        <FileTree
+          path={path}
+          source={source}
+          selectedFile={file}
+          onPick={pickFile}
+          filter={diffFilter}
+          enableIgnoredToggle={source.type === 'worktree'}
+        />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
