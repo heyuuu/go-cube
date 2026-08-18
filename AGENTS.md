@@ -141,6 +141,10 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 11. **注释只写「为什么」和「目的」，不要复述「执行过程」**。函数体内的步骤标号（`// 1. 先读 pid 文件 // 2. 再发信号`）、逐行翻译式注释（`// 遍历列表`、`// 返回结果`）属于过程复述——代码本身已经表达了执行过程，注释再写一遍只会制造**两个需要同步维护的事实源**，代码改了忘改注释就会两边对不上。应保留的是代码读不出来的信息：设计意图（如「端口冲突要报错，否则造孤儿」）、非显然的取舍（如「用 SIGKILL 兜底而不是无限等」）、外部约束（如「子进程 stdio 接 /dev/null，日志走 slog」）。判断标准：如果删掉这条注释，读者看代码能否理解「在做什么」——能，就删；读者看代码无法理解「为什么这么做」，就留。
 12. **前端 shadcn 基于 Base UI，不可使用 Radix UI 写法**。前端源码在 `web/`（仓库根），shadcn style 为 `base-mira`，UI 原语统一从 `@base-ui/react/<模块>` 子路径导入并按命名空间使用部件（如 `@base-ui/react/checkbox` 的 `CheckboxPrimitive.Root` / `.Indicator`）。AI 训练语料中的 shadcn 示例绝大多数是 Radix 版本，写/改 `web/src` 时**勿照搬 Radix 写法**：不引入 `@radix-ui/*` 依赖；组件多态渲染用 `render` prop 而非 `asChild`；状态样式用 `data-open` / `data-checked` 等具体布尔属性而非 `data-state="..."`。不确定 API 时以 `web/src/components/ui/` 现有组件为准，参考 [Base UI 文档](https://base-ui.com)。
 
+13. **Go struct 与其方法必须放在同一文件中**。同一 struct 的定义（`type Xxx struct { ... }`）和该 struct 的所有方法（`func (x *Xxx) Method()`）必须写在同一个 `.go` 文件里，不要分散到多个文件——方便审阅时一次看完一个类型的全部行为。
+   - 允许拆分的是：与 struct 无关的纯函数/纯辅助工具（如解析函数、常量、独立类型定义），它们可以按职责分文件存放。
+   - 示例：`workbench/service.go` 包含 `Service` struct 定义和全部 17 个方法；`workbench/diff.go` 仅保留 `DiffEntry` 类型、`DiffTreesResult` 类型和纯辅助函数。
+
 ## 文档
 
 改动敏感区域前先读：

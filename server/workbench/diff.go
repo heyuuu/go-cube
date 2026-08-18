@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -34,103 +33,6 @@ type DiffTreesResult struct {
 // DiffTrees 对比两个 TreeSource 的目录树。
 // 筛选项：statusFilter（逗号分隔 added,deleted,modified,renamed）、pathPrefix；
 // showIgnored / showUntracked 仅 fs 模式有效（git 模式下收进 IgnoredFilters）。
-func (s *Service) DiffTrees(
-	path string, left TreeSource, right TreeSource,
-	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
-) (*DiffTreesResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
-	}
-	if left.Type == SourceTypeWorktree || right.Type == SourceTypeWorktree {
-		return s.diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
-	}
-	result, err := s.diffTreesGit(root, left, right)
-	if err != nil {
-		return nil, err
-	}
-	if showIgnored || showUntracked {
-		result.IgnoredFilters = append(result.IgnoredFilters, "showIgnored/showUntracked（git 模式下恒隐藏）")
-	}
-	applyDiffFilters(&result.List, statusFilter, pathPrefix)
-	return result, nil
-}
-
-// diffTreesGit 两侧都是 tree-ish：`git diff --name-status -z -M`。
-func (s *Service) diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	// 注意不能用 `--` 分隔：那会把两个 ref 当成 pathspec；ref 形如 sha 时需显式 disambiguate
-	out, err := git.RunRead(root, "diff", "--name-status", "-z", "-M", left.Id, right.Id, "--")
-	if err != nil {
-		return nil, fmt.Errorf("git diff 执行失败: %w", err)
-	}
-	var list []DiffEntry
-	parts := strings.Split(out, "\x00")
-	for i := 0; i < len(parts); i++ {
-		status := parts[i]
-		if status == "" {
-			continue
-		}
-		if strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C") {
-			// rename/copy：status\0旧路径\0新路径
-			if i+2 < len(parts) {
-				list = append(list, DiffEntry{Path: parts[i+2], OldPath: parts[i+1], Status: "renamed"})
-				i += 2
-				continue
-			}
-		}
-		if i+1 < len(parts) {
-			list = append(list, DiffEntry{Path: parts[i+1], Status: letterToStatus(status[0])})
-			i++
-		}
-	}
-	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
-	return &DiffTreesResult{Mode: "git", List: list}, nil
-}
-
-// diffTreesFs 文件系统层扫描对比（Beyond Compare 模式）：
-// 两侧各收集「路径 → 内容指纹（git blob sha1）」，按路径对齐。
-// worktree 侧走 fs walk；commit/ref 侧走 ls-tree -r（blob sha 现成）。
-// 两个 sha 算法一致（blob sha = sha1("blob <len>\0" + content)），可直接比较。
-func (s *Service) diffTreesFs(
-	root string, left TreeSource, right TreeSource,
-	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
-) (*DiffTreesResult, error) {
-	leftMap, err := sourceFileMap(root, left, showIgnored)
-	if err != nil {
-		return nil, fmt.Errorf("扫描左侧失败: %w", err)
-	}
-	rightMap, err := sourceFileMap(root, right, showIgnored)
-	if err != nil {
-		return nil, fmt.Errorf("扫描右侧失败: %w", err)
-	}
-
-	var list []DiffEntry
-	for p, h := range leftMap {
-		rh, ok := rightMap[p]
-		switch {
-		case !ok:
-			list = append(list, DiffEntry{Path: p, Status: "deleted"})
-		case rh != h:
-			list = append(list, DiffEntry{Path: p, Status: "modified"})
-		}
-	}
-	for p := range rightMap {
-		if _, ok := leftMap[p]; !ok {
-			list = append(list, DiffEntry{Path: p, Status: "added"})
-		}
-	}
-	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
-	result := &DiffTreesResult{Mode: "fs", List: list}
-	if !showUntracked {
-		// fs 模式只过滤 untracked 时按两侧 worktree 的 index 判定成本高，MVP 不做减法，
-		// 返回全集（untracked 也是「工作区状态」的一部分）；显式告知前端该筛选未生效
-		result.IgnoredFilters = append(result.IgnoredFilters, "showUntracked=false（fs 模式下恒包含 untracked）")
-	}
-	applyDiffFilters(&result.List, statusFilter, pathPrefix)
-	return result, nil
-}
-
-// sourceFileMap 收集一个源的「相对路径 → blob sha」全量平铺。
 func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string]string, error) {
 	switch src.Type {
 	case SourceTypeWorktree:
@@ -307,52 +209,6 @@ type FileDiffResult struct {
 // 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
 // 行级 diff 用 `git diff --no-index`（算法与展示语义和 git 完全一致），
 // 内容落临时文件后比较，结束清理。
-func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
-	}
-	leftData, err := readSide(root, left, file)
-	if err != nil {
-		return nil, fmt.Errorf("读取左侧文件失败: %w", err)
-	}
-	rightData, err := readSide(root, right, file)
-	if err != nil {
-		return nil, fmt.Errorf("读取右侧文件失败: %w", err)
-	}
-	if bytes.Equal(leftData, rightData) {
-		return &FileDiffResult{}, nil
-	}
-	if isBinary(leftData) || isBinary(rightData) {
-		return &FileDiffResult{Binary: true}, nil
-	}
-
-	tmpA, err := os.CreateTemp("", "cube-diff-a-*")
-	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer os.Remove(tmpA.Name())
-	tmpB, err := os.CreateTemp("", "cube-diff-b-*")
-	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer os.Remove(tmpB.Name())
-	if _, err := tmpA.Write(leftData); err != nil {
-		return nil, err
-	}
-	if _, err := tmpB.Write(rightData); err != nil {
-		return nil, err
-	}
-	tmpA.Close()
-	tmpB.Close()
-
-	out, err := runDiffNoIndex(tmpA.Name(), tmpB.Name())
-	if err != nil {
-		return nil, fmt.Errorf("git diff --no-index 执行失败: %w", err)
-	}
-	return &FileDiffResult{Hunks: parseUnifiedDiff(out)}, nil
-}
-
 func readSide(root string, src TreeSource, file string) ([]byte, error) {
 	if src.Type == SourceTypeWorktree {
 		full, err := secureJoin(src.Id, file)
@@ -443,29 +299,3 @@ const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 //   - worktree：与该工作副本当前 HEAD 比（= 工作区变更，含 untracked）。
 //
 // 复用 DiffTrees：含 worktree 侧自动走 fs 模式。
-func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
-	}
-	var base string
-	switch src.Type {
-	case SourceTypeWorktree:
-		out, err := git.RunRead(src.Id, "rev-parse", "HEAD")
-		if err != nil {
-			return nil, fmt.Errorf("读取工作副本 HEAD 失败: dir=%s: %w", src.Id, err)
-		}
-		base = strings.TrimSpace(out)
-	case SourceTypeCommit, SourceTypeRef:
-		out, err := git.RunRead(root, "rev-parse", src.Id+"^")
-		if err != nil {
-			// 根提交没有父：与空树比
-			base = emptyTreeSha
-		} else {
-			base = strings.TrimSpace(out)
-		}
-	default:
-		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
-	}
-	return s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
-}

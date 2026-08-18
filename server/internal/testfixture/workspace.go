@@ -120,3 +120,61 @@ func (w *Workspace) WriteFile(path string, content []byte) {
 func (w *Workspace) Cleanup() {
 	_ = os.RemoveAll(w.Dir)
 }
+
+func (w *Workspace) MakeProjectDir(relPath string, opts ...ProjectOption) string {
+	w.Helper()
+	spec := &projectDirSpec{}
+	for _, o := range opts {
+		o(spec)
+	}
+
+	dir := w.Mkdir(relPath)
+	if spec.noGit {
+		return dir
+	}
+
+	if spec.worktree {
+		// 用 .git 文件模拟 worktree（让 checkProjectPath 识别为 worktree project）。
+		// 注意：这只是让扫描识别，不能真跑 git 命令（真 worktree 需 git worktree add）。
+		w.WriteFile(filepath.Join(relPath, ".git"), []byte("gitdir: /tmp/nonexistent/.git/worktrees/fake"))
+	} else {
+		BuildGitRepo(w.TB, dir, GitRepoSpec{MakeDirty: spec.dirty})
+	}
+
+	if spec.godot {
+		w.WriteFile(filepath.Join(relPath, "game.godot"), []byte("godot project"))
+	}
+	return dir
+}
+
+// AssertFileExists 断言 ws 下 relPath 文件存在。
+func (w *Workspace) AssertFileExists(relPath string) {
+	w.Helper()
+	full := w.Join(relPath)
+	if _, err := os.Stat(full); err != nil {
+		w.Fatalf("期望文件存在但缺失: %s (%v)", full, err)
+	}
+}
+
+// AssertFileNotExists 断言 ws 下 relPath 不存在。
+func (w *Workspace) AssertFileNotExists(relPath string) {
+	w.Helper()
+	full := w.Join(relPath)
+	if _, err := os.Stat(full); !os.IsNotExist(err) {
+		w.Fatalf("期望文件不存在但存在: %s", full)
+	}
+}
+func (w *Workspace) MakeGitRepo(name string) string {
+	w.Helper()
+	dir := w.Mkdir(name)
+	BuildGitRepo(w.TB, dir, GitRepoSpec{})
+	return dir
+}
+
+// MakeGitRepoWith 在 ws 下建一个 git 仓库并按 spec 构造状态。
+func (w *Workspace) MakeGitRepoWith(name string, spec GitRepoSpec) string {
+	w.Helper()
+	dir := w.Mkdir(name)
+	BuildGitRepo(w.TB, dir, spec)
+	return dir
+}
