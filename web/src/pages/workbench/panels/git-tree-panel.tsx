@@ -176,14 +176,7 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       {rows.map((c, i) => (
-        <CommitRow
-          key={c.sha}
-          c={c}
-          rowIndex={i}
-          laneWidth={laneWidth}
-          wires={wireMap.get(i - 1) ?? []}
-          params={params}
-        />
+        <CommitRow key={c.sha} c={c} laneWidth={laneWidth} wires={wireMap.get(i - 1) ?? []} params={params} />
       ))}
       <div ref={sentinelRef} className="h-8" />
       {commits.isFetchingNextPage ? (
@@ -197,33 +190,40 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
 
 function CommitRow({
   c,
-  rowIndex,
   laneWidth,
   wires,
   params,
 }: {
   c: GraphCommit;
-  rowIndex: number; // 行号（保留给后续虚拟滚动/调试）
   laneWidth: number;
   wires: GraphWire[];
   params: WorkbenchParams;
 }) {
   const nodeColor = LANE_PALETTE[(c.color ?? 0) % LANE_PALETTE.length];
-  void rowIndex;
   return (
-    <div className="flex items-stretch">
-      {/* 泳道列：本行 svg 画「上一节点中心 → 本节点中心」的连线段（Row = rowIndex-1）+ 本行节点 */}
-      <svg width={laneWidth} height={ROW_H} className="shrink-0 self-center" shapeRendering="geometricPrecision">
+    // 行高用固定 px（与 svg 的 ROW_H 同源）：根字号随视口 clamp 缩放，
+    // rem 行高会与大屏下的 svg px 几何错位
+    <div className="flex items-stretch" style={{ height: ROW_H }}>
+      {/* 泳道列：本行 svg 画「上一节点中心 → 本节点中心」的连线段（Row = rowIndex-1）+ 本行节点。
+          节点圆心在行高中点，线段纵向须跨 -ROW_H/2 ~ +ROW_H/2（上一行圆心到本行圆心），
+          svg 设 overflow visible 允许向上越界绘制 */}
+      <svg
+        width={laneWidth}
+        height={ROW_H}
+        className="shrink-0 self-center"
+        style={{ overflow: 'visible' }}
+        shapeRendering="geometricPrecision"
+      >
         {wires.map((w, wi) => {
           const x1 = LANE_X0 + w.from * LANE_W;
           const x2 = LANE_X0 + w.to * LANE_W;
           const color = LANE_PALETTE[w.color % LANE_PALETTE.length];
           return x1 === x2 ? (
-            <line key={wi} x1={x1} y1={0} x2={x2} y2={ROW_H} stroke={color} strokeWidth={1.5} />
+            <line key={wi} x1={x1} y1={-ROW_H / 2} x2={x2} y2={ROW_H / 2} stroke={color} strokeWidth={1.5} />
           ) : (
             <path
               key={wi}
-              d={`M ${x1} 0 C ${x1} ${ROW_H / 2}, ${x2} ${ROW_H / 2}, ${x2} ${ROW_H}`}
+              d={`M ${x1} ${-ROW_H / 2} C ${x1} 0, ${x2} 0, ${x2} ${ROW_H / 2}`}
               fill="none"
               stroke={color}
               strokeWidth={1.5}
@@ -247,6 +247,7 @@ function CommitRow({
         mono={c.shortSha}
         time={c.timestamp}
         laneColor={nodeColor}
+        fixedRow
         badges={
           <>
             {(c.refs ?? []).slice(0, 3).map((r: string) => (
@@ -284,9 +285,21 @@ type SelectableRowProps = {
   badges?: React.ReactNode;
   time?: number;
   laneColor?: string; // 泳道色：选中行以分支色描边
+  fixedRow?: boolean; // commit 图行：固定 px 高度（外层行 div 已定高），不用 rem 行高
 };
 
-function SelectableRow({ label, source, params, title, mono, badge, badges, time, laneColor }: SelectableRowProps) {
+function SelectableRow({
+  label,
+  source,
+  params,
+  title,
+  mono,
+  badge,
+  badges,
+  time,
+  laneColor,
+  fixedRow,
+}: SelectableRowProps) {
   const [, setSearchParams] = useSearchParams();
   const handleClick = useCallback(
     (e: MouseEvent) => {
@@ -316,7 +329,8 @@ function SelectableRow({ label, source, params, title, mono, badge, badges, time
       title={title}
       onClick={handleClick}
       className={cn(
-        'min-w-0 flex-1 flex items-center gap-1.5 px-2 text-left text-xs leading-7 transition-colors hover:bg-accent',
+        'min-w-0 flex-1 flex items-center gap-1.5 px-2 text-left text-xs transition-colors hover:bg-accent',
+        fixedRow ? 'h-full' : 'leading-7',
         (isSource || isLeft || isRight) && 'bg-primary/15',
       )}
       style={laneColor && (isSource || isLeft || isRight) ? { boxShadow: `inset 2px 0 0 ${laneColor}` } : undefined}

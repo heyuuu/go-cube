@@ -150,9 +150,15 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 				}
 				return false
 			}()
-			// 节点出线（父提交）
+			// 节点出线（父提交）。颜色约定：本行新开的支线（分叉）用新泳道色；
+			// 已存在的支线汇入主线（合并）用子节点自己的颜色——即支线全程同色，
+			// 只有真正的主线竖线用主线色
 			if isParent {
-				wires = append(wires, GraphWire{Row: i, From: nodes[i].Lane, To: to, Color: entry.color})
+				outColor := entry.color
+				if incoming {
+					outColor = nodes[i].Color
+				}
+				wires = append(wires, GraphWire{Row: i, From: nodes[i].Lane, To: to, Color: outColor})
 			}
 			// 穿越线（上方支线延续），首父接管原泳道时与节点出线重合，跳过
 			if incoming && !(isParent && pos == nodes[i].Lane) {
