@@ -10,7 +10,6 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
-	"cube/util/git"
 	"cube/workbench"
 )
 
@@ -30,7 +29,7 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	apiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
 	apiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
 	apiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
-	apiGet(api, "/api/workbench/status", "获取工作副本状态", h.worktreeStatus)
+	apiGet(api, "/api/workbench/worktrees", "全部工作副本的状态快照", h.worktrees)
 	apiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
 	apiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
 	apiPost(api, "/api/workbench/file/save", "保存工作副本文件（唯一写路径）", h.saveFile)
@@ -53,19 +52,16 @@ func (h *WorkbenchHandler) refs(input struct {
 
 func (h *WorkbenchHandler) commits(input struct {
 	Path   string `query:"path" required:"true"`
-	Scope  string `query:"scope"`  // all（默认，全部分支拓扑）| ref（单线历史）
-	Ref    string `query:"ref"`    // scope=ref 时的起点 ref；空 = 当前 HEAD
 	Cursor int    `query:"cursor"` // 分页 skip 偏移
 	Limit  int    `query:"limit"`  // 页大小，默认 50，上限 200
 }) (*workbench.CommitsPageResult, error) {
-	return h.workbenchService.Commits(input.Path, input.Scope, input.Ref, input.Cursor, input.Limit)
+	return h.workbenchService.Commits(input.Path, input.Cursor, input.Limit)
 }
 
-func (h *WorkbenchHandler) worktreeStatus(input struct {
+func (h *WorkbenchHandler) worktrees(input struct {
 	Path string `query:"path" required:"true"`
-	Dir  string `query:"dir"` // 工作副本目录（主目录或 worktree），空 = 仓库根
-}) (*git.RepoStatus, error) {
-	return h.workbenchService.WorktreeStatus(input.Path, input.Dir)
+}) ([]workbench.WorktreeStatus, error) {
+	return h.workbenchService.WorktreeStatuses(input.Path)
 }
 
 // 注意：huma 不展开嵌入 struct 的 query tag，参数一律平铺声明。

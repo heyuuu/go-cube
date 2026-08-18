@@ -9,16 +9,19 @@ import {
   useWorkbenchCommits,
   useWorkbenchInfo,
   useWorkbenchRefs,
-  useWorkbenchStatus,
-  type GraphCommit,
-  type GraphWire,
+  useWorkbenchWorktrees,
+  type CommitEntry,
+  type WorktreeStatus,
 } from '@/queries/workbench';
+
+import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
 
 import { sameSource, selectDiffSide, selectSource, type TreeSource, type WorkbenchParams } from '../params';
 
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
-// 下段 = commit 图（后端 active-lanes 算法产出泳道坐标，SVG 平行线拓扑 + 无限滚动）。
+// 下段 = commit 图（前端本地 active-lanes 布局 + SVG 拓扑 + 无限滚动；
+// dirty 工作副本以虚拟节点挂在各自 HEAD 上方，clean 的以徽标装饰 HEAD 行）。
 // 核心交互「选择」：单击 = 单选（source）；cmd/ctrl 单击 = 追加双选（left/right）。
 // 全部选中态写 URL（params 模块统一管理），本面板只是 URL 的渲染者。
 
@@ -40,7 +43,6 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
       <div className="shrink-0 overflow-y-auto border-b border-border">
         <WorktreeSection
           path={path}
-          worktrees={info.data?.worktrees ?? []}
           params={params}
           onBranchPicked={() => setFocusTick((n) => n + 1)}
         />
@@ -54,22 +56,21 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
 
 function WorktreeSection({
   path,
-  worktrees,
   params,
   onBranchPicked,
 }: {
   path: string;
-  worktrees: { path: string; branch: string; detached: boolean; bare: boolean }[];
   params: WorkbenchParams;
   onBranchPicked: () => void;
 }) {
   const refs = useWorkbenchRefs(path);
+  const worktrees = useWorkbenchWorktrees(path);
 
   return (
     <>
       <Section title="工作副本" icon={<Monitor className="size-3.5" />}>
-        {worktrees.map((wt) => (
-          <WorktreeRow key={wt.path} path={path} wt={wt} params={params} />
+        {(worktrees.data ?? []).map((wt) => (
+          <WorktreeRow key={wt.path} wt={wt} params={params} />
         ))}
       </Section>
       <Section title="分支" icon={<GitBranch className="size-3.5" />}>
@@ -88,16 +89,7 @@ function WorktreeSection({
   );
 }
 
-function WorktreeRow({
-  path,
-  wt,
-  params,
-}: {
-  path: string;
-  wt: { path: string; branch: string; detached: boolean; bare: boolean };
-  params: WorkbenchParams;
-}) {
-  const status = useWorkbenchStatus(path, wt.path);
+function WorktreeRow({ wt, params }: { wt: WorktreeStatus; params: WorkbenchParams }) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
 
@@ -110,24 +102,24 @@ function WorktreeRow({
       badges={
         <>
           {wt.bare ? <Badge variant="outline">bare</Badge> : null}
-          {status.data ? (
-            <>
-              {status.data.ahead > 0 ? <Badge variant="secondary">↑{status.data.ahead}</Badge> : null}
-              {status.data.behind > 0 ? <Badge variant="secondary">↓{status.data.behind}</Badge> : null}
-              {status.data.dirty ? (
-                <Badge variant="destructive" className="px-1">
-                  脏 {status.data.staged + status.data.unstaged + status.data.untracked}
-                </Badge>
-              ) : null}
-            </>
-          ) : wt.detached ? (
-            <Badge variant="outline">detached</Badge>
+          {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
+          {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
+          {wt.dirty ? (
+            <Badge variant="destructive" className="px-1">
+              脏 {wt.staged + wt.unstaged + wt.untracked}
+            </Badge>
           ) : null}
+          {wt.detached ? <Badge variant="outline">detached</Badge> : null}
         </>
       }
     />
   );
 }
+
+// 虚拟节点：dirty worktree 的「未提交状态」合成提交（父 = 该副本 HEAD，无 msg，时间 = 当前）；
+// 选中即浏览该工作副本现场（worktree 源）
+type WorktreeNode = CommitEntry & { worktree: WorktreeStatus };
+type RowCommit = (CommitEntry | WorktreeNode) & LaneInfo;
 
 // --- commit 图 ---
 
@@ -148,23 +140,50 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
     return () => observer.disconnect();
   }, [commits]);
 
-  // 翻页边界去重（仓库有新提交时 skip 分页可能重复）；wires 以绝对行号为键累积
+  const worktrees = useWorkbenchWorktrees(path);
+  // 页拼接去重（skip 分页在仓库有新提交时可能边界重复）→ 注入 worktree 虚拟节点/装饰
+  // → 本地算泳道布局。布局永远从「当前持有数据」推导，不存在跨快照拼接错位。
   const { rows, wireMap } = useMemo(() => {
     const seen = new Set<string>();
-    const list: GraphCommit[] = [];
-    const map = new Map<number, GraphWire[]>();
+    const list: CommitEntry[] = [];
     for (const page of commits.data?.pages ?? []) {
       for (const c of page.list ?? []) {
         if (seen.has(c.sha)) continue;
         seen.add(c.sha);
-        list.push(c);
-      }
-      for (const w of page.wires ?? []) {
-        map.set(w.row, [...(map.get(w.row) ?? []), w]);
+        list.push({ ...c, parents: c.parents ?? [], refs: c.refs ?? [] });
       }
     }
-    return { rows: list, wireMap: map };
-  }, [commits.data]);
+
+    // worktree 视作一个 ref：dirty → 指向虚拟节点（内容 = 未提交状态，父 = HEAD）；
+    // clean → 直接装饰在 HEAD 提交行上。虚拟节点按 worktree 顺序排在最前（时间 = 当前）
+    const decorated = list.map((c) => ({ ...c }));
+    const now = Math.floor(Date.now() / 1000);
+    const virtual: WorktreeNode[] = [];
+    for (const wt of worktrees.data ?? []) {
+      if (wt.bare) continue; // bare 无工作区，无未提交概念
+      const label = wt.path.split('/').pop() || wt.path;
+      if (wt.dirty) {
+        virtual.push({
+          sha: `worktree:${wt.path}`,
+          shortSha: '',
+          parents: [wt.head],
+          author: '',
+          timestamp: now,
+          refs: [{ name: label, kind: 'worktree' }],
+          subject: '',
+          worktree: wt,
+        });
+      } else {
+        const hit = decorated.find((c) => c.sha === wt.head);
+        if (hit) hit.refs = [...(hit.refs ?? []), { name: label, kind: 'worktree' }];
+      }
+    }
+
+    const { nodes, wires } = computeGraph([...virtual, ...decorated]);
+    const map = new Map<number, GraphWire[]>();
+    for (const w of wires) map.set(w.row, [...(map.get(w.row) ?? []), w]);
+    return { rows: nodes, wireMap: map };
+  }, [commits.data, worktrees.data]);
 
   // 点击分支定位：选中的是 ref 时，把 commit 图滚到该分支 tip（refs 装饰所在的行）。
   // tip 未加载时自动翻页寻找（无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
@@ -227,7 +246,7 @@ function CommitRow({
   wires,
   params,
 }: {
-  c: GraphCommit;
+  c: RowCommit;
   laneWidth: number;
   wires: GraphWire[];
   params: WorkbenchParams;
@@ -264,14 +283,27 @@ function CommitRow({
         />
       </svg>
       <SelectableRow
-        label={c.subject}
-        source={{ type: 'commit', id: c.sha }}
+        label={'worktree' in c && c.worktree ? '未提交改动' : c.subject}
+        source={
+          'worktree' in c && c.worktree ? { type: 'worktree', id: c.worktree.path } : { type: 'commit', id: c.sha }
+        }
         params={params}
-        title={`${c.sha}\n${c.author}\n${formatCommitTime(c.timestamp).full}`}
-        mono={c.shortSha}
+        title={
+          'worktree' in c && c.worktree
+            ? `${c.worktree.path}\n未提交：暂存 ${c.worktree.staged} · 修改 ${c.worktree.unstaged} · 未跟踪 ${c.worktree.untracked}`
+            : `${c.sha}\n${c.author}\n${formatCommitTime(c.timestamp).full}`
+        }
+        mono={c.shortSha || undefined}
         time={c.timestamp}
         laneColor={nodeColor}
         fixedRow
+        badges={
+          'worktree' in c && c.worktree ? (
+            <Badge variant="destructive" className="px-1">
+              {c.worktree.staged + c.worktree.unstaged + c.worktree.untracked} 文件
+            </Badge>
+          ) : undefined
+        }
         // 标签挪到 message 前；样式按 ref 类型分组（本地/远程/tag/head），
         // 不跟泳道色——泳道色属于「分支线」，标签属于「引用」两个维度
         prefixBadges={
@@ -301,6 +333,7 @@ const REF_BADGE_STYLE = {
   remote: 'border-muted-foreground/30 text-muted-foreground',
   tag: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
   head: 'border-violet-500/40 text-violet-600 dark:text-violet-400',
+  worktree: 'border-cyan-500/40 text-cyan-600 dark:text-cyan-400',
 } as const;
 
 // 泳道几何：列宽/行高/左边距；调色板与后端 color 索引对应（循环取色）

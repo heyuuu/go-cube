@@ -34,22 +34,14 @@ func NewService() *Service {
 	return &Service{ptyCancels: map[int]context.CancelFunc{}}
 }
 
-// Info 读工作台项目信息：入口目录向上探测仓库根、现场发现全部工作副本、默认分支。
+// Info 读工作台项目信息：入口目录向上探测仓库根、默认分支。
 func (s *Service) Info(path string) (*Info, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	worktrees, err := git.WorktreeList(root)
-	if err != nil {
-		return nil, err
-	}
 	defaultBranch, _ := git.DefaultBranch(root) // 无 remote 返回空，可接受
-	return &Info{
-		Root:          root,
-		Worktrees:     worktrees,
-		DefaultBranch: defaultBranch,
-	}, nil
+	return &Info{Root: root, DefaultBranch: defaultBranch}, nil
 }
 
 // Refs 分支与 tag 列表，作为 git 树面板 / 双选交互的候选目标。
@@ -72,18 +64,11 @@ func (s *Service) Refs(path string) (*Refs, error) {
 	}, nil
 }
 
-// Commits 拉取 commit 图一页。scope=all 走全部分支（--all，首屏拓扑全景），
-// scope=ref 时按 ref 单线历史（大仓库首屏降级路径）。
-func (s *Service) Commits(path string, scope string, ref string, cursor int, limit int) (*CommitsPageResult, error) {
+// Commits 拉取 commit 日志一页（--all 全分支；纯列表，泳道布局由前端对已持有数据计算）。
+func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
-	}
-	if scope == "" {
-		scope = "all"
-	}
-	if scope != "all" && scope != "ref" {
-		return nil, fmt.Errorf("未知的 scope: %q（合法值 all/ref）", scope)
 	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
@@ -91,58 +76,49 @@ func (s *Service) Commits(path string, scope string, ref string, cursor int, lim
 	if cursor < 0 {
 		cursor = 0
 	}
-	if scope == "ref" && ref == "" {
-		// 单线模式没给 ref：退化为当前 HEAD（与 all 的区别仍是不带 --all）
-		ref = "HEAD"
-	}
 
-	// 从头拉 cursor+limit 条再整体算 lane（保证跨页泳道一致），只返回本页切片
-	all, err := git.CommitsPage(root, scope == "all", ref, 0, cursor+limit)
+	list, err := git.CommitsPage(root, cursor, limit)
 	if err != nil {
 		return nil, err
 	}
-	nodes, wires := computeGraph(all)
-	end := cursor + limit
-	if end > len(nodes) {
-		end = len(nodes)
-	}
-	page := nodes[cursor:end]
-
-	// 本页 wires：上一页末行 → 本页首行的接续段（cursor-1 起）+ 本页内部各行段
-	var pageWires []GraphWire
-	fromRow := cursor - 1
-	if fromRow < 0 {
-		fromRow = 0
-	}
-	for _, w := range wires {
-		if w.Row >= fromRow && w.Row < end-1 {
-			pageWires = append(pageWires, w)
-		}
-	}
-
 	return &CommitsPageResult{
-		List:       page,
-		Wires:      pageWires,
+		List:       list,
 		NextCursor: cursor + limit,
-		HasMore:    len(all) == cursor+limit,
+		HasMore:    len(list) == limit,
 	}, nil
 }
 
 // WorktreeStatus 单个工作副本的状态（提案 1011 状态区）。dir 为该工作副本目录
-// （主目录或 linked worktree），不传时取仓库根。
-func (s *Service) WorktreeStatus(path string, dir string) (*git.RepoStatus, error) {
+// WorktreeStatuses 返回全部工作副本的状态快照。工作副本徽标与 commit 图
+// 虚拟节点（前端构造）共用这一份数据——status 只在这里拉，不再分散到各接口。
+func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	if dir == "" {
-		dir = root
-	}
-	st, err := git.LoadRepoStatus(dir)
+	worktrees, err := git.WorktreeList(root)
 	if err != nil {
-		return nil, fmt.Errorf("读取工作副本状态失败: dir=%s: %w", dir, err)
+		return nil, err
 	}
-	return st, nil
+	result := make([]WorktreeStatus, 0, len(worktrees))
+	for _, wt := range worktrees {
+		item := WorktreeStatus{
+			Path:     wt.Path,
+			Head:     wt.Head,
+			Branch:   wt.Branch,
+			Detached: wt.Detached,
+			Bare:     wt.Bare,
+		}
+		// 单副本状态失败不拖垮整张快照（bare 副本 LoadRepoStatus 天然返回零值）
+		if st, err := git.LoadRepoStatus(wt.Path); err != nil {
+			slog.Debug("工作副本状态读取失败，降级为零值", "dir", wt.Path, "err", err)
+		} else if st != nil {
+			item.Dirty, item.Ahead, item.Behind = st.Dirty, st.Ahead, st.Behind
+			item.Staged, item.Unstaged, item.Untracked = st.Staged, st.Unstaged, st.Untracked
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 // ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。

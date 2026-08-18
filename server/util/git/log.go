@@ -17,18 +17,11 @@ type CommitEntry struct {
 	Subject   string      `json:"subject"`   // 提交标题首行
 }
 
-// CommitsPage 按 ref（空 = 当前 HEAD）拉取一页 commit，skip/limit 分页。
-// all=true 时带 --all（全部本地 ref），否则只走 ref 的单线历史。
+// CommitsPage 拉取全部分支（--all）的 commit 一页，skip/limit 分页。
 // 分页稳定性依赖 git 对同一 ref 集合输出顺序确定（topo-order），翻页期间仓库有新提交
 // 时可能出现边界重复，由前端按 sha 去重。
-func CommitsPage(dir string, all bool, ref string, skip, limit int) ([]CommitEntry, error) {
-	args := []string{"log", "--topo-order", "--date-order"}
-	if all {
-		args = append(args, "--all")
-	}
-	if ref != "" {
-		args = append(args, ref)
-	}
+func CommitsPage(dir string, skip, limit int) ([]CommitEntry, error) {
+	args := []string{"log", "--topo-order", "--date-order", "--all"}
 	args = append(args,
 		"--skip="+strconv.Itoa(skip),
 		"--max-count="+strconv.Itoa(limit),

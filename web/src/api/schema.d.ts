@@ -327,23 +327,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/workbench/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 获取工作副本状态 */
-    get: operations['workbench.status'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/workbench/tree': {
     parameters: {
       query?: never;
@@ -353,6 +336,23 @@ export interface paths {
     };
     /** 列出 TreeSource 下的目录树 */
     get: operations['workbench.tree'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/worktrees': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 全部工作副本的状态快照 */
+    get: operations['workbench.worktrees'];
     put?: never;
     post?: never;
     delete?: never;
@@ -475,6 +475,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputListWorktreeStatusBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListWorktreeStatusBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['WorktreeStatus'][] | null;
+      message: string;
+      ok: boolean;
+    };
     'ApiOutputMapStringInterface {}Body': {
       /**
        * Format: uri
@@ -554,17 +565,6 @@ export interface components {
       message: string;
       ok: boolean;
     };
-    ApiOutputRepoStatusBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputRepoStatusBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['RepoStatus'];
-      message: string;
-      ok: boolean;
-    };
     ApiOutputWhoamiResponseBody: {
       /**
        * Format: uri
@@ -586,16 +586,25 @@ export interface components {
       repoHost: string;
       repoPrefix: string;
     };
+    CommitEntry: {
+      author: string;
+      parents: string[] | null;
+      refs: components['schemas']['CommitRef'][] | null;
+      sha: string;
+      shortSha: string;
+      subject: string;
+      /** Format: int64 */
+      timestamp: number;
+    };
     CommitRef: {
       kind: string;
       name: string;
     };
     CommitsPageResult: {
       hasMore: boolean;
-      list: components['schemas']['GraphCommit'][] | null;
+      list: components['schemas']['CommitEntry'][] | null;
       /** Format: int64 */
       nextCursor: number;
-      wires: components['schemas']['GraphWire'][] | null;
     };
     Config: {
       dataDir: string;
@@ -701,30 +710,6 @@ export interface components {
       sourceId: string;
       sourceType: string;
     };
-    GraphCommit: {
-      author: string;
-      /** Format: int64 */
-      color: number;
-      /** Format: int64 */
-      lane: number;
-      parents: string[] | null;
-      refs: components['schemas']['CommitRef'][] | null;
-      sha: string;
-      shortSha: string;
-      subject: string;
-      /** Format: int64 */
-      timestamp: number;
-    };
-    GraphWire: {
-      /** Format: int64 */
-      color: number;
-      /** Format: int64 */
-      from: number;
-      /** Format: int64 */
-      row: number;
-      /** Format: int64 */
-      to: number;
-    };
     Hunk: {
       lines: components['schemas']['DiffLine'][] | null;
       /** Format: int64 */
@@ -739,7 +724,6 @@ export interface components {
     Info: {
       defaultBranch: string;
       root: string;
-      worktrees: components['schemas']['Worktree'][] | null;
     };
     ListResultCloneRule: {
       list: components['schemas']['CloneRule'][] | null;
@@ -819,23 +803,6 @@ export interface components {
       Branch: string;
       Remote: string;
     };
-    RepoStatus: {
-      /** Format: int64 */
-      ahead: number;
-      /** Format: int64 */
-      behind: number;
-      branch: string;
-      detached: boolean;
-      dirty: boolean;
-      sha: string;
-      /** Format: int64 */
-      staged: number;
-      /** Format: int64 */
-      unstaged: number;
-      /** Format: int64 */
-      untracked: number;
-      upstream: string;
-    };
     ScanRule: {
       group: string;
       /** Format: int64 */
@@ -859,12 +826,23 @@ export interface components {
       app: string;
       version: string;
     };
-    Worktree: {
+    WorktreeStatus: {
+      /** Format: int64 */
+      ahead: number;
       bare: boolean;
+      /** Format: int64 */
+      behind: number;
       branch: string;
       detached: boolean;
+      dirty: boolean;
       head: string;
       path: string;
+      /** Format: int64 */
+      staged: number;
+      /** Format: int64 */
+      unstaged: number;
+      /** Format: int64 */
+      untracked: number;
     };
   };
   responses: never;
@@ -1243,8 +1221,6 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        scope?: string;
-        ref?: string;
         cursor?: number;
         limit?: number;
       };
@@ -1478,38 +1454,6 @@ export interface operations {
       };
     };
   };
-  'workbench.status': {
-    parameters: {
-      query: {
-        path: string;
-        dir?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputRepoStatusBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
   'workbench.tree': {
     parameters: {
       query: {
@@ -1532,6 +1476,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListTreeEntryBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.worktrees': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListWorktreeStatusBody'];
         };
       };
       /** @description Error */

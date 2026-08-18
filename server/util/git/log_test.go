@@ -34,14 +34,14 @@ func TestCommitsPage(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main", EmptyCommitCount: 5})
 
-	all, err := CommitsPage(repo, false, "", 0, 3)
+	all, err := CommitsPage(repo, 0, 3)
 	if err != nil {
 		t.Fatalf("CommitsPage 报错: %v", err)
 	}
 	if len(all) != 3 {
 		t.Fatalf("limit=3 应返回 3 条, got %d", len(all))
 	}
-	page2, _ := CommitsPage(repo, false, "", 3, 3)
+	page2, _ := CommitsPage(repo, 3, 3)
 	if len(page2) != 2 {
 		t.Fatalf("第二页应剩 2 条, got %d", len(page2))
 	}

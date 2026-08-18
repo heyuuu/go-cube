@@ -25,23 +25,12 @@ func TestWorkbenchInfo(t *testing.T) {
 	repo := env.ws.Join("g1/proj1")
 
 	var got struct {
-		Root      string `json:"root"`
-		Worktrees []struct {
-			Path   string `json:"path"`
-			Branch string `json:"branch"`
-			Head   string `json:"head"`
-		} `json:"worktrees"`
+		Root          string `json:"root"`
 		DefaultBranch string `json:"defaultBranch"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/info?path="+repo)), &got)
 	if got.Root != repo {
 		t.Errorf("root 应为 %s, got %q", repo, got.Root)
-	}
-	if len(got.Worktrees) != 1 || got.Worktrees[0].Path != repo {
-		t.Fatalf("应有且仅有主工作副本: %+v", got.Worktrees)
-	}
-	if got.Worktrees[0].Branch == "" || got.Worktrees[0].Head == "" {
-		t.Errorf("主工作副本 branch/head 不应为空: %+v", got.Worktrees[0])
 	}
 
 	// 非 git 目录（不能落在任何 git 仓库内，否则向上探测会命中外层仓库根）→ ok=false
@@ -114,34 +103,32 @@ func TestWorkbenchCommits(t *testing.T) {
 		t.Fatalf("第二页应为空: len=%d hasMore=%v", len(p2.List), p2.HasMore)
 	}
 
-	if r := getJSON(t, env.url("/api/workbench/commits?path="+repo+"&scope=bogus")); r.Ok {
-		t.Error("非法 scope 应报错")
-	}
 }
 
-func TestWorkbenchStatus(t *testing.T) {
+func TestWorkbenchWorktrees(t *testing.T) {
 	env := newTestEnv(t)
 	repo := env.ws.Join("g1/proj1")
 
-	var got struct {
-		Branch string `json:"branch"`
-		Sha    string `json:"sha"`
-		Dirty  bool   `json:"dirty"`
+	var got []struct {
+		Path      string `json:"path"`
+		Head      string `json:"head"`
+		Branch    string `json:"branch"`
+		Dirty     bool   `json:"dirty"`
+		Untracked int    `json:"untracked"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/status?path="+repo)), &got)
-	if got.Branch == "" || got.Sha == "" || got.Dirty {
-		t.Errorf("干净仓库状态不符: %+v", got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/worktrees?path="+repo)), &got)
+	if len(got) != 1 || got[0].Path != repo {
+		t.Fatalf("应有且仅有主工作副本: %+v", got)
+	}
+	if got[0].Branch == "" || got[0].Head == "" || got[0].Dirty {
+		t.Errorf("干净副本快照不符: %+v", got[0])
 	}
 
-	// 未提交改动 → dirty
+	// 未提交改动 → dirty + untracked 计数（虚拟节点数据源）
 	env.ws.WriteFile("g1/proj1/dirty.txt", []byte("x"))
-	var dirty struct {
-		Dirty     bool `json:"dirty"`
-		Untracked int  `json:"untracked"`
-	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/status?path="+repo)), &dirty)
-	if !dirty.Dirty || dirty.Untracked != 1 {
-		t.Errorf("dirty 状态不符: %+v", dirty)
+	decodeData(t, getJSON(t, env.url("/api/workbench/worktrees?path="+repo)), &got)
+	if len(got) != 1 || !got[0].Dirty || got[0].Untracked != 1 {
+		t.Errorf("dirty 副本快照不符: %+v", got)
 	}
 }
 

@@ -6,7 +6,6 @@ import type { TreeSource } from '@/pages/workbench/params';
 
 export type WorkbenchInfo = components['schemas']['Info'];
 export type WorkbenchRefs = components['schemas']['Refs'];
-export type WorkbenchWorktree = components['schemas']['Worktree'];
 
 // 工作台数据不走 gitcache、后端无缓存，实时性由这里的 staleTime 控制。
 // info/refs 是低频基础信息，30s 内复用；status/commits 类接口（1011 引入）届时另设更短值。
@@ -28,10 +27,11 @@ export function useWorkbenchRefs(path: string) {
   });
 }
 
-export type GraphCommit = components['schemas']['GraphCommit'];
-export type GraphWire = components['schemas']['GraphWire'];
+export type CommitEntry = components['schemas']['CommitEntry'];
+export type CommitRef = components['schemas']['CommitRef'];
 
-// commit 图分页：useInfiniteQuery，cursor 为 skip 偏移；翻页边界按 sha 去重兜底
+// commit 日志分页：useInfiniteQuery，cursor 为 skip 偏移；翻页边界按 sha 去重兜底。
+// 纯列表——泳道布局由前端对已持有数据计算（graph-layout.ts），接口不带几何信息
 export function useWorkbenchCommits(path: string) {
   return useInfiniteQuery({
     queryKey: ['workbench', 'commits', path],
@@ -43,14 +43,15 @@ export function useWorkbenchCommits(path: string) {
   });
 }
 
-export type RepoStatus = components['schemas']['RepoStatus'];
+export type WorktreeStatus = components['schemas']['WorktreeStatus'];
 
-// 工作副本状态：实时性要求高，不走 gitcache、后端直读；staleTime 短 + 窗口聚焦重取
-export function useWorkbenchStatus(path: string, dir: string) {
+// 工作副本状态快照（全部副本一次拿全）：行徽标与 commit 图虚拟节点的共同数据源。
+// 实时性要求高，staleTime 短 + 窗口聚焦重取
+export function useWorkbenchWorktrees(path: string) {
   return useQuery({
-    queryKey: ['workbench', 'status', path, dir],
-    queryFn: () => apiGet('/api/workbench/status', { path, dir }),
-    enabled: path !== '' && dir !== '',
+    queryKey: ['workbench', 'worktrees', path],
+    queryFn: () => apiGet('/api/workbench/worktrees', { path }),
+    enabled: path !== '',
     staleTime: 15_000,
     refetchOnWindowFocus: true,
   });
