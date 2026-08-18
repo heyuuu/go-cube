@@ -156,6 +156,22 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
     return { rows: list, wireMap: map };
   }, [commits.data]);
 
+  // 点击分支定位：选中的是 ref 时，把 commit 图滚到该分支 tip（refs 装饰所在的行）。
+  // tip 未加载时自动翻页寻找（无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
+  const focusBranch = params.source?.type === 'ref' ? params.source.id : null;
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!focusBranch) return;
+    const hit = rows.find((r) => (r.refs ?? []).some((x) => x.name === focusBranch));
+    if (hit) {
+      scrollRef.current?.querySelector(`[data-sha="${hit.sha}"]`)?.scrollIntoView({ block: 'center' });
+      return;
+    }
+    if (commits.hasNextPage && !commits.isFetchingNextPage) {
+      void commits.fetchNextPage();
+    }
+  }, [focusBranch, rows, commits]);
+
   const maxLane = useMemo(() => {
     let m = 0;
     for (const r of rows) m = Math.max(m, r.lane ?? 0);
@@ -174,7 +190,7 @@ function CommitGraphSection({ path, params }: { path: string; params: WorkbenchP
   const laneWidth = LANE_X0 * 2 + (maxLane + 1) * LANE_W;
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto">
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
       {rows.map((c, i) => (
         <CommitRow key={c.sha} c={c} laneWidth={laneWidth} wires={wireMap.get(i - 1) ?? []} params={params} />
       ))}
@@ -203,7 +219,7 @@ function CommitRow({
   return (
     // 行高用固定 px（与 svg 的 ROW_H 同源）：根字号随视口 clamp 缩放，
     // rem 行高会与大屏下的 svg px 几何错位
-    <div className="flex items-stretch" style={{ height: ROW_H }}>
+    <div data-sha={c.sha} className="flex items-stretch" style={{ height: ROW_H }}>
       {/* 泳道列：本行 svg 画「上一节点中心 → 本节点中心」的连线段（Row = rowIndex-1）+ 本行节点。
           节点圆心在行高中点，线段纵向须跨 -ROW_H/2 ~ +ROW_H/2（上一行圆心到本行圆心），
           svg 设 overflow visible 允许向上越界绘制 */}
