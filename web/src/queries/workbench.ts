@@ -82,3 +82,49 @@ export function useWorkbenchFile(path: string, src: TreeSource, file: string) {
 export function saveWorkbenchFile(path: string, src: TreeSource, file: string, content: string) {
   return apiPut('/api/workbench/file', { path, ...sourceQuery(src), file }, { content });
 }
+
+export type DiffEntry = components['schemas']['DiffEntry'];
+export type DiffTreesResult = components['schemas']['DiffTreesResult'];
+export type FileDiffResult = components['schemas']['FileDiffResult'];
+export type Hunk = components['schemas']['Hunk'];
+
+export function useWorkbenchDiff(
+  path: string,
+  left: TreeSource,
+  right: TreeSource,
+  filters: { showIgnored: boolean; statusFilter: string; pathPrefix: string },
+) {
+  return useQuery({
+    queryKey: ['workbench', 'diff', path, left.type, left.id, right.type, right.id, filters],
+    queryFn: () =>
+      apiGet('/api/workbench/diff', {
+        path,
+        leftType: left.type,
+        leftId: left.id,
+        rightType: right.type,
+        rightId: right.id,
+        showIgnored: filters.showIgnored,
+        statusFilter: filters.statusFilter || undefined,
+        pathPrefix: filters.pathPrefix || undefined,
+      }),
+    enabled: path !== '' && left.id !== '' && right.id !== '',
+    staleTime: 0, // 对比结果实时算
+  });
+}
+
+export function useWorkbenchFileDiff(path: string, left: TreeSource, right: TreeSource, file: string) {
+  return useQuery({
+    queryKey: ['workbench', 'fileDiff', path, left.type, left.id, right.type, right.id, file],
+    queryFn: () =>
+      apiGet('/api/workbench/file-diff', {
+        path,
+        leftType: left.type,
+        leftId: left.id,
+        rightType: right.type,
+        rightId: right.id,
+        file,
+      }),
+    enabled: path !== '' && file !== '' && left.id !== '' && right.id !== '',
+    staleTime: 0,
+  });
+}

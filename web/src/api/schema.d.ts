@@ -208,6 +208,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/diff': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 双 TreeSource 目录级对比 */
+    get: operations['workbench.diff'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/file': {
     parameters: {
       query?: never;
@@ -219,6 +236,23 @@ export interface paths {
     get: operations['workbench.file'];
     /** 保存工作副本文件（唯一写路径） */
     put: operations['workbench.saveFile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/file-diff': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 双 TreeSource 单文件 diff */
+    get: operations['workbench.fileDiff'];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -317,6 +351,28 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Config'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputDiffTreesResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputDiffTreesResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['DiffTreesResult'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputFileDiffResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputFileDiffResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['FileDiffResult'];
       message: string;
       ok: boolean;
     };
@@ -519,6 +575,20 @@ export interface components {
       openers: components['schemas']['OpenerConfig'][] | null;
       project: components['schemas']['ProjectConfig'];
     };
+    DiffEntry: {
+      oldPath: string;
+      path: string;
+      status: string;
+    };
+    DiffLine: {
+      kind: string;
+      text: string;
+    };
+    DiffTreesResult: {
+      ignoredFilters: string[] | null;
+      list: components['schemas']['DiffEntry'][] | null;
+      mode: string;
+    };
     Entry: {
       /** Format: int64 */
       ahead: number;
@@ -580,11 +650,26 @@ export interface components {
        */
       type: string;
     };
+    FileDiffResult: {
+      binary: boolean;
+      hunks: components['schemas']['Hunk'][] | null;
+    };
     FileResult: {
       binary: boolean;
       content: string;
       /** Format: int64 */
       size: number;
+    };
+    Hunk: {
+      lines: components['schemas']['DiffLine'][] | null;
+      /** Format: int64 */
+      newCount: number;
+      /** Format: int64 */
+      newStart: number;
+      /** Format: int64 */
+      oldCount: number;
+      /** Format: int64 */
+      oldStart: number;
     };
     Info: {
       defaultBranch: string;
@@ -1100,6 +1185,45 @@ export interface operations {
       };
     };
   };
+  'workbench.diff': {
+    parameters: {
+      query: {
+        path: string;
+        leftType: string;
+        leftId: string;
+        rightType: string;
+        rightId: string;
+        showIgnored?: boolean;
+        showUntracked?: boolean;
+        statusFilter?: string;
+        pathPrefix?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputDiffTreesResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'workbench.file': {
     parameters: {
       query: {
@@ -1159,6 +1283,42 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputFileResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.fileDiff': {
+    parameters: {
+      query: {
+        path: string;
+        leftType: string;
+        leftId: string;
+        rightType: string;
+        rightId: string;
+        file: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputFileDiffResultBody'];
         };
       };
       /** @description Error */

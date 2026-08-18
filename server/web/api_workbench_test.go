@@ -259,3 +259,129 @@ func putJSON(t *testing.T, url string, body string) envelope {
 	}
 	return env
 }
+
+// --- 提案 1013：diff / file-diff ---
+
+func setupDiffRepo(t *testing.T, env *testEnv) (repo, head string) {
+	t.Helper()
+	repo = env.ws.Join("g1/proj1")
+	env.ws.WriteFile("g1/proj1/keep.txt", []byte("same"))
+	env.ws.WriteFile("g1/proj1/mod.txt", []byte("v1"))
+	env.ws.WriteFile("g1/proj1/del.txt", []byte("bye"))
+	env.ws.WriteFile("g1/proj1/ren-old.txt", []byte("ren"))
+	_ = exec.Command("git", "-C", repo, "add", "-A").Run()
+	if err := git.Commit(repo, "base"); err != nil {
+		t.Fatalf("提交 base 失败: %v", err)
+	}
+	head = gitHead(t, repo)
+
+	// 工作区改动：mod 改、del 删、new 增（untracked）、ignored.log 增（ignored）
+	env.ws.WriteFile("g1/proj1/mod.txt", []byte("v2 line1\nv2 line2\n"))
+	os.Remove(filepath.Join(repo, "del.txt"))
+	env.ws.WriteFile("g1/proj1/new.txt", []byte("new file"))
+	env.ws.WriteFile("g1/proj1/ignored.log", []byte("ignored"))
+	env.ws.WriteFile("g1/proj1/.gitignore", []byte("*.log\n"))
+	_ = exec.Command("git", "-C", repo, "add", ".gitignore").Run()
+	if err := git.Commit(repo, "ignore rules"); err != nil {
+		t.Fatalf("提交 ignore 失败: %v", err)
+	}
+	return repo, gitHead(t, repo)
+}
+
+func TestWorkbenchDiffGit(t *testing.T) {
+	env := newTestEnv(t)
+	repo, head := setupDiffRepo(t, env)
+
+	// worktree(工作区) vs commit(head)：fs 模式
+	var got struct {
+		Mode string `json:"mode"`
+		List []struct {
+			Path   string `json:"path"`
+			Status string `json:"status"`
+		} `json:"list"`
+	}
+	wt := urlQueryEscape(repo)
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt)), &got)
+	if got.Mode != "fs" {
+		t.Fatalf("含 worktree 源应为 fs 模式, got %q", got.Mode)
+	}
+	byPath := map[string]string{}
+	for _, e := range got.List {
+		byPath[e.Path+"/"+e.Status] = ""
+	}
+	for _, want := range []string{"mod.txt/modified", "del.txt/deleted", "new.txt/added"} {
+		if _, ok := byPath[want]; !ok {
+			t.Errorf("缺少 %s（got %v）", want, keysOf(byPath))
+		}
+	}
+	// ignored.log 默认被过滤
+	if _, ok := byPath["ignored.log/added"]; ok {
+		t.Error("ignored 文件默认不应出现")
+	}
+
+	// showIgnored=true：ignored.log 出现
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&showIgnored=true")), &got)
+	found := false
+	for _, e := range got.List {
+		if e.Path == "ignored.log" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("showIgnored=true 时 ignored.log 应出现")
+	}
+
+	// statusFilter 过滤
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&statusFilter=modified")), &got)
+	if len(got.List) != 1 || got.List[0].Path != "mod.txt" {
+		t.Errorf("statusFilter=modified 应只剩 mod.txt: %+v", got.List)
+	}
+}
+
+func TestWorkbenchFileDiff(t *testing.T) {
+	env := newTestEnv(t)
+	repo, head := setupDiffRepo(t, env)
+	wt := urlQueryEscape(repo)
+
+	var got struct {
+		Binary bool `json:"binary"`
+		Hunks  []struct {
+			OldStart int `json:"oldStart"`
+			NewStart int `json:"newStart"`
+			Lines    []struct {
+				Kind string `json:"kind"`
+				Text string `json:"text"`
+			} `json:"lines"`
+		} `json:"hunks"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&file=mod.txt")), &got)
+	if got.Binary || len(got.Hunks) == 0 {
+		t.Fatalf("mod.txt 应有 diff hunks: binary=%v hunks=%d", got.Binary, len(got.Hunks))
+	}
+	kinds := map[string]int{}
+	for _, h := range got.Hunks {
+		for _, l := range h.Lines {
+			kinds[l.Kind]++
+		}
+	}
+	if kinds["del"] == 0 || kinds["add"] == 0 {
+		t.Errorf("应同时含 del 与 add 行: %v", kinds)
+	}
+
+	// 相同文件 → 空 hunks
+	var same struct {
+		Hunks []struct{} `json:"hunks"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=commit&rightId="+head+"&file=keep.txt")), &same)
+	if len(same.Hunks) != 0 {
+		t.Errorf("相同文件应无 hunks: %d", len(same.Hunks))
+	}
+}
+
+func keysOf(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	return out
+}

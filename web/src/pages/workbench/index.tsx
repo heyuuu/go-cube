@@ -1,12 +1,11 @@
 import { Box } from 'lucide-react';
 import { useSearchParams } from 'react-router';
 
-import { Badge } from '@/components/ui/badge';
-
 import { CodeViewPanel } from './panels/code-view-panel';
+import { DiffViewPanel } from './panels/diff-view-panel';
 import { GitTreePanel } from './panels/git-tree-panel';
 import { ContentPanelPlaceholder, TerminalPanelPlaceholder } from './panels/placeholders';
-import { readWorkbenchParams, sourceLabel, writePathParam } from './params';
+import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
 
 // 工作台页面（提案 1010 基座 + 1011 选择交互）：以任意本机 git 目录为输入，
@@ -57,14 +56,7 @@ export function WorkbenchPage() {
         </aside>
         <main className="min-w-0 flex-1">
           {diffMode ? (
-            <ContentPanelPlaceholder
-              title={
-                <>
-                  对比 <Badge variant="secondary">{sourceLabel(params.left)}</Badge> ↔{' '}
-                  <Badge variant="secondary">{sourceLabel(params.right)}</Badge>
-                </>
-              }
-            />
+            <DiffViewPanel params={params} />
           ) : params.source ? (
             <CodeViewPanel params={params} />
           ) : (

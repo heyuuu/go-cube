@@ -30,6 +30,8 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	apiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
 	// 同 path 不同 method：显式 operationId 避免与 GET 的 workbench.file 重复
 	apiRegisterOp(api, http.MethodPut, "/api/workbench/file", "保存工作副本文件（唯一写路径）", "workbench.saveFile", h.saveFile)
+	apiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
+	apiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
 }
 
 func (h *WorkbenchHandler) info(input struct {
@@ -103,4 +105,46 @@ func (h *WorkbenchHandler) saveFile(input struct {
 		return nil, err
 	}
 	return h.workbenchService.SaveFile(input.Path, src, input.File, input.Body.Content)
+}
+
+func (h *WorkbenchHandler) diff(input struct {
+	Path          string `query:"path" required:"true"`
+	LeftType      string `query:"leftType" required:"true"`
+	LeftId        string `query:"leftId" required:"true"`
+	RightType     string `query:"rightType" required:"true"`
+	RightId       string `query:"rightId" required:"true"`
+	ShowIgnored   bool   `query:"showIgnored"`
+	ShowUntracked bool   `query:"showUntracked"`
+	StatusFilter  string `query:"statusFilter"`
+	PathPrefix    string `query:"pathPrefix"`
+}) (*workbench.DiffTreesResult, error) {
+	left, err := workbench.ParseTreeSource(input.LeftType, input.LeftId)
+	if err != nil {
+		return nil, err
+	}
+	right, err := workbench.ParseTreeSource(input.RightType, input.RightId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.DiffTrees(input.Path, left, right,
+		input.ShowIgnored, input.ShowUntracked, input.StatusFilter, input.PathPrefix)
+}
+
+func (h *WorkbenchHandler) fileDiff(input struct {
+	Path      string `query:"path" required:"true"`
+	LeftType  string `query:"leftType" required:"true"`
+	LeftId    string `query:"leftId" required:"true"`
+	RightType string `query:"rightType" required:"true"`
+	RightId   string `query:"rightId" required:"true"`
+	File      string `query:"file" required:"true"`
+}) (*workbench.FileDiffResult, error) {
+	left, err := workbench.ParseTreeSource(input.LeftType, input.LeftId)
+	if err != nil {
+		return nil, err
+	}
+	right, err := workbench.ParseTreeSource(input.RightType, input.RightId)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.ReadFileDiff(input.Path, left, right, input.File)
 }
