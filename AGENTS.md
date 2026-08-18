@@ -135,7 +135,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
 10. **优先复用 `util/` 下的辅助函数**，能力收敛在各 util 子包内，不在调用方就地重造：
-    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读写统一走 `util/git`（读：分支 / remote / tag / ahead-behind / dirty，见 `read.go`；写：push / clone / commit / `FindGitRoot`，见 `git.go`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
+    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读写统一走 `util/git`（读按主题分文件：`refs.go` 分支/remote/tag/ahead-behind、`status.go` 工作区状态、共享执行核 `run.go`；写：push / clone / commit / `FindGitRoot`，见 `git.go`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
     - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录；`git` 的 `runOut` 为子进程显式构造环境属于其执行职责，不算读环境）；其它 util 包（`git` 的纯解析函数 / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
     - 警惕功能重叠：例如「向上探测 `.git` 根」已有 `git.FindGitRoot(dir)`，调用方就不该再写一遍 `os.Stat(filepath.Join(..., ".git"))` 的循环。
 11. **注释只写「为什么」和「目的」，不要复述「执行过程」**。函数体内的步骤标号（`// 1. 先读 pid 文件 // 2. 再发信号`）、逐行翻译式注释（`// 遍历列表`、`// 返回结果`）属于过程复述——代码本身已经表达了执行过程，注释再写一遍只会制造**两个需要同步维护的事实源**，代码改了忘改注释就会两边对不上。应保留的是代码读不出来的信息：设计意图（如「端口冲突要报错，否则造孤儿」）、非显然的取舍（如「用 SIGKILL 兜底而不是无限等」）、外部约束（如「子进程 stdio 接 /dev/null，日志走 slog」）。判断标准：如果删掉这条注释，读者看代码能否理解「在做什么」——能，就删；读者看代码无法理解「为什么这么做」，就留。
@@ -144,6 +144,13 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 13. **Go struct 与其方法必须放在同一文件中**。同一 struct 的定义（`type Xxx struct { ... }`）和该 struct 的所有方法（`func (x *Xxx) Method()`）必须写在同一个 `.go` 文件里，不要分散到多个文件——方便审阅时一次看完一个类型的全部行为。
    - 允许拆分的是：与 struct 无关的纯函数/纯辅助工具（如解析函数、常量、独立类型定义），它们可以按职责分文件存放。
    - 示例：`workbench/service.go` 包含 `Service` struct 定义和全部 17 个方法；`workbench/diff.go` 仅保留 `DiffEntry` 类型、`DiffTreesResult` 类型和纯辅助函数。
+
+14. **git 子进程调用只允许出现在 `util/git` 包内**。包外（domain / cmd / web / app）不得 `exec.Command("git", ...)`、不得拼 git 子命令参数，一律调用 `util/git` 的**类型化函数**；缺什么就在包内新增类型化封装（含输出解析），**不对外暴露「调用方传 args 的通用执行口」**（历史上曾有 `RunRead`，已移除）。
+   - 原因：git 的参数拼装与输出解析天生平台/环境强相关（`core.quotePath` 对非 ASCII 路径的八进制转义、locale 随配置翻译 stderr、pager 挂起、`--no-optional-locks` 防抢 `index.lock`、`diff --no-index` 有差异时退出码为 1、`ls-files --directory` 对混合目录的折叠语义等），必须收敛在单点做兼容——换环境（如部署到 Linux 服务器）出问题时统一排查、统一修，而不是去改散落在各处的参数。这些兼容注入见 `runOut`（`util/git/run.go`）。
+   - 返回值解析也尽量放包内（返回类型化的 struct / 切片 / 集合，如 `[]DiffFile` / `*Ignored`），调用方只做业务语义映射；纯展示层 DTO 转换（如状态字母 → 前端语义词）留在出口层。
+   - 例外：测试代码（`internal/testfixture` 与各 `*_test.go` 建仓/对账）可直接 exec git——fixture 若反向调用被测包会循环依赖。
+
+15. **Web API 只用 GET / POST 两种 method**。GET = 查询（参数走 query），POST = 动作（参数走 body，平铺挂在 huma input 的 `Body` 子结构上，惯例同 `opener/open`）。不引入 PUT / DELETE / PATCH——保存、删除等语义放进 **API 名**（path / operationId，如 `workbench/file/save`、`xxx/delete`），不用 method 区分。前后端都不提供其他 method 的 helper（后端 `api.go` 仅 `apiGet` / `apiPost`，前端 `client.ts` 同；曾有的 `apiPut` / `apiDelete` / `apiRegisterOp` 已移除）。
 
 ## 文档
 

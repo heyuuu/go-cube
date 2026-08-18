@@ -33,8 +33,7 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	apiGet(api, "/api/workbench/status", "获取工作副本状态", h.worktreeStatus)
 	apiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
 	apiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
-	// 同 path 不同 method：显式 operationId 避免与 GET 的 workbench.file 重复
-	apiRegisterOp(api, http.MethodPut, "/api/workbench/file", "保存工作副本文件（唯一写路径）", "workbench.saveFile", h.saveFile)
+	apiPost(api, "/api/workbench/file/save", "保存工作副本文件（唯一写路径）", h.saveFile)
 	apiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
 	apiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
 	apiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
@@ -97,20 +96,22 @@ func (h *WorkbenchHandler) file(input struct {
 	return h.workbenchService.ReadFile(input.Path, src, input.File)
 }
 
+// saveFile 参数全部平铺在 body（POST 动作惯例，同 opener/open）；保存语义已在
+// 路径名 file/save 上体现，不用 method 区分读写。
 func (h *WorkbenchHandler) saveFile(input struct {
-	Path       string `query:"path" required:"true"`
-	SourceType string `query:"sourceType" required:"true"`
-	SourceId   string `query:"sourceId" required:"true"`
-	File       string `query:"file" required:"true"`
-	Body       struct {
-		Content string `json:"content"`
+	Body struct {
+		Path       string `json:"path"`
+		SourceType string `json:"sourceType"`
+		SourceId   string `json:"sourceId"`
+		File       string `json:"file"`
+		Content    string `json:"content"`
 	}
 }) (*workbench.FileResult, error) {
-	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	src, err := workbench.ParseTreeSource(input.Body.SourceType, input.Body.SourceId)
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.SaveFile(input.Path, src, input.File, input.Body.Content)
+	return h.workbenchService.SaveFile(input.Body.Path, src, input.Body.File, input.Body.Content)
 }
 
 func (h *WorkbenchHandler) diff(input struct {

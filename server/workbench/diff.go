@@ -1,12 +1,10 @@
 package workbench
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -30,30 +28,24 @@ type DiffTreesResult struct {
 	IgnoredFilters []string    `json:"ignoredFilters"` // 请求了但在该模式下无效的筛选项名
 }
 
-// DiffTrees 对比两个 TreeSource 的目录树。
-// 筛选项：statusFilter（逗号分隔 added,deleted,modified,renamed）、pathPrefix；
-// showIgnored / showUntracked 仅 fs 模式有效（git 模式下收进 IgnoredFilters）。
+// sourceFileMap 收集一个源的「相对路径 → blob sha」全量平铺。
 func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string]string, error) {
 	switch src.Type {
 	case SourceTypeWorktree:
 		return fsFileMap(src.Id, includeIgnored)
 	case SourceTypeCommit, SourceTypeRef:
-		return gitFileMap(root, src.Id)
+		return git.FileShasAtRef(root, src.Id)
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
 }
 
 // fsFileMap walk 工作副本目录，跳过 .git；忽略项默认排除（includeIgnored=true 时保留）。
-// 忽略判定：`ls-files --others --ignored --exclude-standard --directory` 给出的
-// 忽略文件/目录集合（目录级命中即其下全部忽略）。
+// 忽略判定：git.LoadIgnored 给出的忽略文件/目录集合（目录级命中即其下全部忽略）。
 func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
-	ignoredDirs, ignoredFiles, err := ignoredSets(wtDir)
-	if err != nil {
-		return nil, err
-	}
+	ig := loadIgnoredDegrade(wtDir, "")
 	result := map[string]string{}
-	err = filepath.WalkDir(wtDir, func(p string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(wtDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -68,7 +60,7 @@ func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
-		if !includeIgnored && (ignoredFiles[rel] || underAnyDir(rel, ignoredDirs)) {
+		if !includeIgnored && (ig.Files[rel] || underAnyDir(rel, ig.Dirs)) {
 			return nil
 		}
 		data, err := os.ReadFile(p)
@@ -84,48 +76,6 @@ func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
 	return result, nil
 }
 
-// gitFileMap `git ls-tree -r -z -l <ref>`：blob sha 现成，不用读内容。
-func gitFileMap(root string, ref string) (map[string]string, error) {
-	out, err := git.RunRead(root, "ls-tree", "-r", "-z", "--", ref)
-	if err != nil {
-		return nil, fmt.Errorf("git ls-tree -r 执行失败: %w", err)
-	}
-	result := map[string]string{}
-	for _, rec := range strings.Split(out, "\x00") {
-		tab := strings.IndexByte(rec, '\t')
-		if tab < 0 {
-			continue
-		}
-		fields := strings.Fields(rec[:tab])
-		if len(fields) < 3 || fields[1] != "blob" {
-			continue
-		}
-		result[rec[tab+1:]] = fields[2]
-	}
-	return result, nil
-}
-
-// ignoredSets 返回工作副本的忽略文件集合与忽略目录集合（相对路径）。
-func ignoredSets(wtDir string) (dirs map[string]bool, files map[string]bool, err error) {
-	dirs, files = map[string]bool{}, map[string]bool{}
-	out, err := git.RunRead(wtDir, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory")
-	if err != nil {
-		return dirs, files, nil // 判定失败降级为不过滤
-	}
-	for _, line := range strings.Split(out, "\n") {
-		line = strings.TrimRight(line, "\r")
-		if line == "" {
-			continue
-		}
-		if strings.HasSuffix(line, "/") {
-			dirs[strings.TrimSuffix(line, "/")] = true
-		} else {
-			files[line] = true
-		}
-	}
-	return dirs, files, nil
-}
-
 func underAnyDir(rel string, dirs map[string]bool) bool {
 	for d := range dirs {
 		if strings.HasPrefix(rel, d+"/") {
@@ -135,6 +85,8 @@ func underAnyDir(rel string, dirs map[string]bool) bool {
 	return false
 }
 
+// blobSha 计算 git blob 对象 sha（sha1("blob <len>\0" + 内容)），
+// 与 git ls-tree 给出的 sha 同算法，两侧可直比。
 func blobSha(data []byte) string {
 	h := sha1.New()
 	fmt.Fprintf(h, "blob %d\x00", len(data))
@@ -148,7 +100,7 @@ func letterToStatus(c byte) string {
 		return "added"
 	case 'D':
 		return "deleted"
-	case 'R':
+	case 'R', 'C': // copy 与 rename 同形（都有旧路径），前端词表里没有单独的 copied
 		return "renamed"
 	default:
 		return "modified"
@@ -205,10 +157,7 @@ type FileDiffResult struct {
 	Hunks  []Hunk `json:"hunks"`
 }
 
-// ReadFileDiff 对比两个源下同一相对路径的文件。
-// 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
-// 行级 diff 用 `git diff --no-index`（算法与展示语义和 git 完全一致），
-// 内容落临时文件后比较，结束清理。
+// readSide 取一个源下 file 的内容（worktree 走 fs，commit/ref 走 git show）。
 func readSide(root string, src TreeSource, file string) ([]byte, error) {
 	if src.Type == SourceTypeWorktree {
 		full, err := secureJoin(src.Id, file)
@@ -277,25 +226,5 @@ func parseHunkHeader(line string) (oldStart, newStart, oldCount, newCount int) {
 	return
 }
 
-// runDiffNoIndex 比较两个临时文件。git diff --no-index 在有差异时退出码为 1，
-// 输出仍然有效（runOut 会丢弃非零退出的 stdout），因此这里直接走 exec、只认「无输出」为失败。
-func runDiffNoIndex(a, b string) (string, error) {
-	cmd := exec.Command("git", "--no-optional-locks", "-c", "core.quotePath=false", "diff", "--no-index", "-U3", "--", a, b)
-	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_PAGER=cat")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil && stdout.Len() == 0 {
-		return "", fmt.Errorf("%w；stderr: %s", err, strings.TrimSpace(stderr.String()))
-	}
-	return stdout.String(), nil
-}
-
 // emptyTreeSha git 空树对象 sha（根提交没有父，与空树比即「全部为新增」）
 const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
-
-// Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：
-//   - commit / ref：与父提交（<id>^）比；
-//   - worktree：与该工作副本当前 HEAD 比（= 工作区变更，含 untracked）。
-//
-// 复用 DiffTrees：含 worktree 侧自动走 fs 模式。

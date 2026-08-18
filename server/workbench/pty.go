@@ -16,11 +16,7 @@ type ptyMessage struct {
 	Code int    `json:"code"`
 }
 
-// ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。
-// 退出路径（三方任一结束都触发整体清理）：
-//   - 客户端断开（read pump 出错）→ cancel → 杀进程
-//   - 子进程退出（ptmx Read io.EOF）→ 发 exit 帧 → 关连接
-//   - server 关闭（ctx cancel）→ 杀进程
+// mustJSON 序列化 PTY 帧，失败时兜底一个空 output 帧（不让单条编码失败中断泵）。
 func mustJSON(msg ptyMessage) []byte {
 	b, err := json.Marshal(msg)
 	if err != nil {
@@ -28,6 +24,3 @@ func mustJSON(msg ptyMessage) []byte {
 	}
 	return b
 }
-
-// StopPtySessions 向所有活跃 PTY 会话发取消（server 停机时调用），确保无孤儿 shell。
-// MVP 用 Service 上的轻量注册表；会话数 = 浏览器页面数，量级极小。

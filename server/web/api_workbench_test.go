@@ -211,12 +211,12 @@ func TestWorkbenchSaveFile(t *testing.T) {
 
 	// 虚拟源保存被拒
 	head := gitHead(t, repo)
-	if r := putJSON(t, env.url("/api/workbench/file?path="+repo+"&sourceType=commit&sourceId="+head+"&file=edit.txt"), `{"content":"x"}`); r.Ok {
+	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"sourceType":"commit","sourceId":%q,"file":"edit.txt","content":"x"}`, repo, head)); r.Ok {
 		t.Error("commit 源保存应被拒")
 	}
 
 	// worktree 源保存成功且落盘
-	if r := putJSON(t, env.url("/api/workbench/file?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo)+"&file=edit.txt"), `{"content":"new"}`); !r.Ok {
+	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"sourceType":"worktree","sourceId":%q,"file":"edit.txt","content":"new"}`, repo, repo)); !r.Ok {
 		t.Fatalf("worktree 保存应成功: %s", r.Message)
 	}
 	if got, _ := os.ReadFile(filepath.Join(repo, "edit.txt")); string(got) != "new" {
@@ -231,37 +231,37 @@ func TestWorkbenchSaveFile(t *testing.T) {
 
 func gitHead(t *testing.T, dir string) string {
 	t.Helper()
-	out, err := git.RunRead(dir, "rev-parse", "HEAD")
+	sha, err := git.HeadSha(dir)
 	if err != nil {
-		t.Fatalf("rev-parse HEAD 失败: %v", err)
+		t.Fatalf("读取 HEAD 失败: %v", err)
 	}
-	return strings.TrimSpace(out)
+	return sha
 }
 
 func urlQueryEscape(s string) string {
 	return strings.ReplaceAll(s, "/", "%2F")
 }
 
-// putJSON 打 PUT + JSON body 请求，断言 envelope 解码成功后返回 envelope。
-func putJSON(t *testing.T, url string, body string) envelope {
+// postJSON 打 POST + JSON body 请求，断言 envelope 解码成功后返回 envelope。
+func postJSON(t *testing.T, url string, body string) envelope {
 	t.Helper()
-	resp, err := http.NewRequest(http.MethodPut, url, strings.NewReader(body))
+	resp, err := http.NewRequest(http.MethodPost, url, strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("构造 PUT %s 失败: %v", url, err)
+		t.Fatalf("构造 POST %s 失败: %v", url, err)
 	}
 	resp.Header.Set("Content-Type", "application/json")
 	client := &http.Client{}
 	httpResp, err := client.Do(resp)
 	if err != nil {
-		t.Fatalf("PUT %s 失败: %v", url, err)
+		t.Fatalf("POST %s 失败: %v", url, err)
 	}
 	defer httpResp.Body.Close()
 	if httpResp.StatusCode != http.StatusOK {
-		t.Fatalf("PUT %s 应为 200, got %d", url, httpResp.StatusCode)
+		t.Fatalf("POST %s 应为 200, got %d", url, httpResp.StatusCode)
 	}
 	var env envelope
 	if err := json.NewDecoder(httpResp.Body).Decode(&env); err != nil {
-		t.Fatalf("PUT %s 响应不是合法 envelope: %v", url, err)
+		t.Fatalf("POST %s 响应不是合法 envelope: %v", url, err)
 	}
 	return env
 }

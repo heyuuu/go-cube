@@ -1,10 +1,7 @@
 package git
 
 import (
-	"bytes"
 	"fmt"
-	"os"
-	"os/exec"
 	"sort"
 	"strings"
 )
@@ -62,17 +59,45 @@ func parseLsTree(out string) []TreeEntry {
 	return entries
 }
 
+// FileShasAtRef 返回 ref 下全部文件的「相对路径 → blob sha」递归平铺映射。
+// 供目录级内容对比：两侧各取一份，按路径对齐、按 sha 比内容——两侧只要有一方
+// 是 worktree（sha 需现场算）也能对上，因为 blob sha = sha1("blob <len>\0" + 内容)。
+// ref 不存在时返回错误。
+func FileShasAtRef(dir string, ref string) (map[string]string, error) {
+	out, err := runOut(dir, "ls-tree", "-r", "-z", "--", ref)
+	if err != nil {
+		return nil, fmt.Errorf("git ls-tree -r 执行失败: %w", err)
+	}
+	return parseLsTreeBlobMap(out), nil
+}
+
+// parseLsTreeBlobMap 解析 `git ls-tree -r -z` 输出（无 -l）：`<mode> <type> <object>\t<name>\0`。
+// 只收 blob（文件），tree 项被 -r 展开为子路径后不再出现。
+func parseLsTreeBlobMap(out string) map[string]string {
+	result := map[string]string{}
+	for _, rec := range strings.Split(out, "\x00") {
+		if rec == "" {
+			continue
+		}
+		tab := strings.IndexByte(rec, '\t')
+		if tab < 0 {
+			continue
+		}
+		fields := strings.Fields(rec[:tab])
+		if len(fields) < 3 || fields[1] != "blob" {
+			continue
+		}
+		result[rec[tab+1:]] = fields[2]
+	}
+	return result
+}
+
 // ReadFileAtRef 读 ref 下 file（相对仓库根）的原始字节（二进制安全）。
 // 文件不存在时 git 报错原样返回（含 stderr 摘要）。
 func ReadFileAtRef(dir string, ref string, file string) ([]byte, error) {
-	cmd := exec.Command("git", "--no-optional-locks", "-c", "core.quotePath=false", "-C", dir, "show", ref+":"+file)
-	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_PAGER=cat")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	if err := cmd.Run(); err != nil {
-		msg := strings.TrimSpace(stderr.String())
-		return nil, fmt.Errorf("git show %s:%s 失败: %w: %s", ref, file, err, msg)
+	out, err := runOut(dir, "show", ref+":"+file)
+	if err != nil {
+		return nil, err
 	}
-	return stdout.Bytes(), nil
+	return []byte(out), nil
 }

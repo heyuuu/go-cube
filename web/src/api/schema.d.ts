@@ -251,8 +251,7 @@ export interface paths {
     };
     /** 读取 TreeSource 下的文件内容 */
     get: operations['workbench.file'];
-    /** 保存工作副本文件（唯一写路径） */
-    put: operations['workbench.saveFile'];
+    put?: never;
     post?: never;
     delete?: never;
     options?: never;
@@ -271,6 +270,23 @@ export interface paths {
     get: operations['workbench.fileDiff'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/file/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 保存工作副本文件（唯一写路径） */
+    post: operations['workbench.fileSave'];
     delete?: never;
     options?: never;
     head?: never;
@@ -672,6 +688,19 @@ export interface components {
       /** Format: int64 */
       size: number;
     };
+    FileSaveRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/FileSaveRequest.json
+       */
+      readonly $schema?: string;
+      content: string;
+      file: string;
+      path: string;
+      sourceId: string;
+      sourceType: string;
+    };
     GraphCommit: {
       author: string;
       /** Format: int64 */
@@ -806,15 +835,6 @@ export interface components {
       /** Format: int64 */
       untracked: number;
       upstream: string;
-    };
-    SaveFileRequest: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/SaveFileRequest.json
-       */
-      readonly $schema?: string;
-      content: string;
     };
     ScanRule: {
       group: string;
@@ -1327,44 +1347,6 @@ export interface operations {
       };
     };
   };
-  'workbench.saveFile': {
-    parameters: {
-      query: {
-        path: string;
-        sourceType: string;
-        sourceId: string;
-        file: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['SaveFileRequest'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputFileResultBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
   'workbench.fileDiff': {
     parameters: {
       query: {
@@ -1388,6 +1370,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputFileDiffResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.fileSave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['FileSaveRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputFileResultBody'];
         };
       };
       /** @description Error */

@@ -251,12 +251,17 @@ func collectEntry(path string) (*Entry, error) {
 	repoUrl, _ := git.RemoteUrl(path)
 	branches, currBranch, _ := git.Branches(path)
 	defaultBranch, _ := git.DefaultBranch(path)
-	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较
+	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较——
+	// 刻意不用 LoadRepoStatus 的 branch.ab：那是「当前检出分支 vs 其 upstream」，
+	// 在 feature 分支上时与列表页要的口径不同
 	var ahead, behind int
 	if defaultBranch != "" {
-		ahead, behind, _ = git.AheadBehind(path, defaultBranch, "origin/"+defaultBranch)
+		ahead, behind, _ = git.AheadBehindRemote(path, defaultBranch, "origin", defaultBranch)
 	}
-	dirty, _ := git.IsDirty(path)
+	st, err := git.LoadRepoStatus(path)
+	if err != nil {
+		return nil, err
+	}
 	worktreeMain := detectWorktreeMain(path)
 	return &Entry{
 		RepoUrl:       repoUrl,
@@ -265,7 +270,7 @@ func collectEntry(path string) (*Entry, error) {
 		Branches:      branches,
 		Ahead:         ahead,
 		Behind:        behind,
-		Dirty:         dirty,
+		Dirty:         st.Dirty,
 		WorktreeMain:  worktreeMain,
 		CollectedAt:   time.Now(),
 	}, nil

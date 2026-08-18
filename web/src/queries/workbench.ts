@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
-import { apiGet, apiPut } from '@/api/client';
+import { apiGet, apiPost } from '@/api/client';
 import type { components } from '@/api/schema';
 import type { TreeSource } from '@/pages/workbench/params';
 
@@ -89,7 +89,7 @@ export function useWorkbenchFile(path: string, src: TreeSource, file: string) {
 }
 
 export function saveWorkbenchFile(path: string, src: TreeSource, file: string, content: string) {
-  return apiPut('/api/workbench/file', { path, ...sourceQuery(src), file }, { content });
+  return apiPost('/api/workbench/file/save', { path, ...sourceQuery(src), file, content });
 }
 
 export type DiffEntry = components['schemas']['DiffEntry'];

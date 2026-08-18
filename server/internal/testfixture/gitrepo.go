@@ -86,8 +86,6 @@ func BuildGitRepo(t testing.TB, dir string, spec GitRepoSpec) {
 	}
 }
 
-// MakeGitRepo 极简便捷方法：在 ws 下建一个规范名子目录，构造一个带 1 个空 commit 的干净 git 仓库。
-// 返回仓库绝对路径。复杂场景用 BuildGitRepo + ws.Mkdir。
 func writeFile(t testing.TB, path string, content []byte) {
 	t.Helper()
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("cat > %q", path))

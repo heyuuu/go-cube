@@ -9,8 +9,15 @@ package git
 //     git 自身 index 缓存，大仓库 status 毫秒级；go-git 需全量读文件算 SHA。
 //
 // 分工：写操作（Clone / Push / Commit 等，stdio 透传给人看）在本文件；
-// 读操作（Branches / Remotes / StatusFiles 等，stdout 捕获解析）见 read.go，
-// 后者注入稳定环境（LC_ALL / core.quotePath 等）保证输出可解析、不受用户配置影响。
+// 读操作按主题分文件——refs.go（remote / 分支 / tag / ahead-behind）、status.go
+// （工作区状态与忽略集合）、tree.go（ls-tree 系）、diff.go（diff 系）、log.go
+// （commit 历史）、worktree.go（工作副本列表）——共享读执行核在 run.go，
+// 其环境注入（LC_ALL / core.quotePath 等）保证输出可解析、不受用户配置影响。
+//
+// 封装边界：包外一律调用本包的类型化函数（缺什么就在包内新增封装，含输出解析），
+// 不直接 exec git、不拼子命令参数，也不存在「调用方传 args 的通用执行口」。
+// git 参数与输出的平台/环境兼容（quotePath 转义 / locale / pager / 退出码语义）
+// 只允许收敛在本包单点处理，见 AGENTS.md 规则 14。
 //
 // 此外，与具体 git 实现无关的辅助能力也归在本包：FindGitRoot（按 .git 探测仓库根）、
 // ParseRepoUrl（解析 SSH/HTTPS 仓库地址）等，只与 git 的概念/约定相关。

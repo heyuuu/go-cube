@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// Commit commit 图的单条提交（提案 1011）。拓扑连线由前端根据 Parents 渲染，后端不预计算图。
+// CommitEntry commit 图的单条提交（提案 1011）。拓扑连线由前端根据 Parents 渲染，后端不预计算图。
 type CommitEntry struct {
 	Sha       string      `json:"sha"`       // 完整 sha
 	ShortSha  string      `json:"shortSha"`  // 短 sha

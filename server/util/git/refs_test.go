@@ -1,9 +1,8 @@
+// ref 查询与解析的测试（被测实现在 refs.go；directGit/directAddRemote 供同包测试共用）。
 package git
 
 import (
-	"os"
 	"os/exec"
-	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -124,29 +123,6 @@ func TestTags(t *testing.T) {
 	}
 }
 
-// TestIsDirty_CleanAndDirty dirty 标志正确。
-func TestIsDirty_CleanAndDirty(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	// clean 仓库
-	cleanDir := ws.MakeGitRepo("clean")
-	dirty, err := IsDirty(cleanDir)
-	if err != nil {
-		t.Fatalf("clean IsDirty 出错: %v", err)
-	}
-	if dirty {
-		t.Fatalf("clean 仓库 IsDirty 应为 false")
-	}
-	// dirty 仓库（MakeDirty=true 留未跟踪文件）
-	dirtyDir := ws.MakeGitRepoWith("dirty", testfixture.GitRepoSpec{MakeDirty: true})
-	dirty, err = IsDirty(dirtyDir)
-	if err != nil {
-		t.Fatalf("dirty IsDirty 出错: %v", err)
-	}
-	if !dirty {
-		t.Fatalf("dirty 仓库 IsDirty 应为 true")
-	}
-}
-
 // TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
 func TestDefaultBranch_OriginHEAD(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -234,11 +210,11 @@ func TestRemotes_SeparatePushUrl(t *testing.T) {
 	}
 }
 
-// TestAheadBehind_NoRemote 无 remote 时（origin/xxx ref 不存在）返回 (0,0,nil)。
-func TestAheadBehind_NoRemote(t *testing.T) {
+// TestAheadBehindRemote_NoRemote 无 remote 时（origin/xxx ref 不存在）返回 (0,0,nil)。
+func TestAheadBehindRemote_NoRemote(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
-	ahead, behind, err := AheadBehind(dir, "master", "origin/master")
+	ahead, behind, err := AheadBehindRemote(dir, "master", "origin", "master")
 	if err != nil {
 		t.Fatalf("无 remote AheadBehind 不应报错: %v", err)
 	}
@@ -364,189 +340,6 @@ func directAddRemote(t *testing.T, dir, name, url string) {
 	}
 }
 
-// TestStatusFiles_States 验证各文件状态映射为 git status --short 的 XY 码：
-// 未跟踪 / 暂存新增 / 暂存删除，以及按路径排序。
-// （工作区修改 " M" 场景由 TestStatusFiles_WorktreeModified 覆盖。）
-func TestStatusFiles_States(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
-
-	// 先提交一个已跟踪文件，再制造各类工作区状态
-	writeAbsFile := func(name, content string) {
-		t.Helper()
-		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
-			t.Fatalf("写文件失败: %v", err)
-		}
-	}
-	writeAbsFile("tracked.txt", "v1")
-	directGit(t, dir, "add", "tracked.txt")
-	directGit(t, dir, "commit", "-m", "init tracked")
-
-	writeAbsFile("tracked.txt", "v2")    // 工作区修改 → " M"
-	writeAbsFile("untracked.txt", "new") // 未跟踪 → "??"
-	writeAbsFile("added.txt", "added")   // 暂存新增 → "A "
-	directGit(t, dir, "add", "added.txt")
-	directGit(t, dir, "rm", "-f", "tracked.txt") // 暂存删除（含磁盘；文件有改动须 -f）→ "D "
-
-	files, err := StatusFiles(dir)
-	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
-	}
-
-	byPath := make(map[string]string, len(files))
-	for _, f := range files {
-		byPath[f.Path] = f.Code
-	}
-	for path, wantCode := range map[string]string{
-		"untracked.txt": "??",
-		"added.txt":     "A ",
-		"tracked.txt":   "D ",
-	} {
-		if code, ok := byPath[path]; !ok || code != wantCode {
-			t.Errorf("文件 %s 状态 = (%q, 存在=%v)，期望 %q（全部: %v）", path, code, ok, wantCode, byPath)
-		}
-	}
-
-	// 排序断言：按展示路径升序
-	for i := 1; i < len(files); i++ {
-		if files[i-1].Path > files[i].Path {
-			t.Errorf("StatusFiles 未按路径排序: %v", files)
-			break
-		}
-	}
-}
-
-// TestStatusFiles_Rename 已暂存改名（git mv）合并为单条 R 行，展示 "旧 -> 新"。
-func TestStatusFiles_Rename(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
-
-	if err := os.WriteFile(filepath.Join(dir, "old.txt"), []byte("v1"), 0644); err != nil {
-		t.Fatalf("写文件失败: %v", err)
-	}
-	directGit(t, dir, "add", "old.txt")
-	directGit(t, dir, "commit", "-m", "init")
-	directGit(t, dir, "mv", "old.txt", "new.txt")
-
-	files, err := StatusFiles(dir)
-	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
-	}
-	if len(files) != 1 || files[0].Code != "R " || files[0].Path != "old.txt -> new.txt" {
-		t.Fatalf("期望单条 [R  old.txt -> new.txt]，实际 %v", files)
-	}
-}
-
-// TestStatusFiles_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
-func TestStatusFiles_WorktreeModified(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
-
-	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("v1"), 0644); err != nil {
-		t.Fatalf("写文件失败: %v", err)
-	}
-	directGit(t, dir, "add", "tracked.txt")
-	directGit(t, dir, "commit", "-m", "init")
-	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("v2"), 0644); err != nil {
-		t.Fatalf("写文件失败: %v", err)
-	}
-
-	files, err := StatusFiles(dir)
-	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
-	}
-	if len(files) != 1 || files[0].Path != "tracked.txt" || files[0].Code != " M" {
-		t.Fatalf("期望单条 [tracked.txt \" M\"]，实际 %v", files)
-	}
-}
-
-// TestStatusFiles_CleanAndNonRepo 干净仓库与非仓库目录都返回空不报错（降级约定）。
-func TestStatusFiles_CleanAndNonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-
-	cleanDir := ws.MakeGitRepo("clean")
-	files, err := StatusFiles(cleanDir)
-	if err != nil || len(files) != 0 {
-		t.Fatalf("干净仓库应返回空，实际 (%v, %v)", files, err)
-	}
-
-	nonRepo := ws.Mkdir("empty")
-	files, err = StatusFiles(nonRepo)
-	if err != nil || len(files) != 0 {
-		t.Fatalf("非仓库目录应返回空不报错，实际 (%v, %v)", files, err)
-	}
-}
-
-// TestStatusFiles_GlobalIgnore 全局忽略规则生效：被 ~/.gitconfig 的
-// core.excludesFile 或 XDG 默认 ignore 匹配的文件不算 untracked、不算 dirty。
-// 原生 git 子进程继承测试进程环境，通过 HOME / XDG_CONFIG_HOME 指向测试目录
-// 隔离真实用户配置。
-func TestStatusFiles_GlobalIgnore(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
-
-	// --- 场景一：~/.gitconfig 显式配置 core.excludesFile ---
-	home := ws.Mkdir("home")
-	ws.WriteFile("home/.gitignore_global", []byte("*.log\n.DS_Store\n"))
-	ws.WriteFile("home/.gitconfig", []byte(
-		"[core]\n\texcludesFile = "+ws.Join("home", ".gitignore_global")+"\n"))
-
-	ws.WriteFile("repo/keep.txt", []byte("x"))  // 普通未跟踪 → 应出现
-	ws.WriteFile("repo/debug.log", []byte("x")) // 全局忽略 → 不应出现
-	ws.WriteFile("repo/.DS_Store", []byte("x")) // 全局忽略 → 不应出现
-
-	t.Setenv("HOME", home)
-	files, err := StatusFiles(dir)
-	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
-	}
-	if len(files) != 1 || files[0].Path != "keep.txt" {
-		t.Fatalf("全局忽略未生效，期望仅 [keep.txt]，实际 %v", files)
-	}
-
-	// 只有全局忽略文件的仓库不应误报 dirty
-	cleanDir := ws.MakeGitRepo("only-ignored")
-	ws.WriteFile("only-ignored/.DS_Store", []byte("x"))
-	ws.WriteFile("only-ignored/a.log", []byte("x"))
-	dirty, err := IsDirty(cleanDir)
-	if err != nil {
-		t.Fatalf("IsDirty 出错: %v", err)
-	}
-	if dirty {
-		t.Fatalf("只含全局忽略文件的仓库 IsDirty 应为 false")
-	}
-
-	// --- 场景二：无 .gitconfig 时走 XDG 默认（$XDG_CONFIG_HOME/git/ignore）---
-	// 空 HOME 下没有 excludesFile，*.log/.DS_Store 不再被忽略（正确的 git 语义），
-	// 本场景只验证 XDG 的 skip.txt 被过滤。
-	emptyHome := ws.Mkdir("empty-home")
-	xdg := ws.Mkdir("xdg")
-	ws.WriteFile("xdg/git/ignore", []byte("skip.txt\n"))
-
-	ws.WriteFile("repo/skip.txt", []byte("x")) // XDG 忽略 → 不应出现
-
-	t.Setenv("HOME", emptyHome)
-	t.Setenv("XDG_CONFIG_HOME", xdg)
-	files, err = StatusFiles(dir)
-	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
-	}
-	byPath := make(map[string]string, len(files))
-	for _, f := range files {
-		byPath[f.Path] = f.Code
-	}
-	if _, ok := byPath["skip.txt"]; ok {
-		t.Fatalf("XDG 默认 ignore 未生效，skip.txt 不应出现: %v", files)
-	}
-	for _, want := range []string{"keep.txt", "debug.log", ".DS_Store"} {
-		if _, ok := byPath[want]; !ok {
-			t.Fatalf("文件 %s 应出现（空 HOME 下无全局规则）: %v", want, files)
-		}
-	}
-}
-
-// --- 纯函数表驱动测试 ---
-
 // TestParseRemotesVerbose 解析 git remote -v 输出：fetch/push 合并、
 // 独立 pushurl、同名多行取第一条、无 TAB 的行跳过、按名排序。
 func TestParseRemotesVerbose(t *testing.T) {
@@ -594,27 +387,6 @@ func TestParseCountPair(t *testing.T) {
 	}
 }
 
-// TestParseStatusPorcelain 解析 status --porcelain -z 输出：
-// 普通行、rename/copy 双路径行、尾部 NUL、短记录跳过。
-func TestParseStatusPorcelain(t *testing.T) {
-	out := "?? a.txt\x00" + " M b.txt\x00" + "R  new.txt\x00old.txt\x00" + "C  c2.txt\x00c1.txt\x00" + "A  d.txt\x00"
-
-	got := parseStatusPorcelain(out)
-	want := []FileStatus{
-		{Code: "??", Path: "a.txt"},
-		{Code: " M", Path: "b.txt"},
-		{Code: "R ", Path: "old.txt -> new.txt"},
-		{Code: "C ", Path: "c1.txt -> c2.txt"},
-		{Code: "A ", Path: "d.txt"},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("parseStatusPorcelain = %v，期望 %v", got, want)
-	}
-	if parseStatusPorcelain("") != nil {
-		t.Fatalf("空输入应返回 nil")
-	}
-}
-
 // TestSplitRemoteBranchShortName 远程分支短名拆分。
 func TestSplitRemoteBranchShortName(t *testing.T) {
 	cases := []struct {
@@ -651,5 +423,45 @@ func TestFirstLine(t *testing.T) {
 		if got := firstLine(in); got != want {
 			t.Errorf("firstLine(%q) = %q，期望 %q", in, got, want)
 		}
+	}
+}
+
+// TestHeadSha 返回 HEAD 完整 sha；非仓库降级为空值。
+func TestHeadSha(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+
+	sha, err := HeadSha(dir)
+	if err != nil {
+		t.Fatalf("HeadSha 出错: %v", err)
+	}
+	if len(sha) != 40 {
+		t.Errorf("HEAD sha 长度 = %d，期望 40（%q）", len(sha), sha)
+	}
+
+	if sha, err := HeadSha(ws.Mkdir("not-a-repo")); err != nil || sha != "" {
+		t.Errorf("非仓库 HeadSha 应返回 (\"\",nil)，实际 (%q,%v)", sha, err)
+	}
+}
+
+// TestParentSha 父提交解析正确；根提交无父时报错（调用方决定降级）。
+func TestParentSha(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+
+	head, err := HeadSha(dir)
+	if err != nil {
+		t.Fatalf("HeadSha 出错: %v", err)
+	}
+	parent, err := ParentSha(dir, head)
+	if err != nil {
+		t.Fatalf("ParentSha 出错: %v", err)
+	}
+	if len(parent) != 40 || parent == head {
+		t.Errorf("父提交 sha 异常: %q", parent)
+	}
+	// EmptyCommitCount=2 时 parent 已是根提交：再取父应报错
+	if _, err := ParentSha(dir, parent); err == nil {
+		t.Error("根提交再取父应报错")
 	}
 }

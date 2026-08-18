@@ -54,7 +54,7 @@ func findRoot(cmd *cobra.Command) *cobra.Command {
 	return cmd
 }
 
-// collectCommands 遍历命令树中所有可用命令的信息。
+// iterCommands 遍历命令树中所有可用命令的信息。
 func iterCommands(cmd *cobra.Command, prefix string) iter.Seq[cmdEntry] {
 	return func(yield func(cmdEntry) bool) {
 		for _, c := range cmd.Commands() {

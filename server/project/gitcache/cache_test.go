@@ -84,7 +84,7 @@ func TestLoad_CorruptFile(t *testing.T) {
 	}
 }
 
-// TestCache_GetSetMutate 内存态 Get 命中/未命中。
+// TestCache_Get 内存态 Get 命中/未命中。
 func TestCache_Get(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	c, _ := Load(ws.Mkdir("cache"))

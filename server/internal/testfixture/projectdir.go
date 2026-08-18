@@ -21,7 +21,3 @@ func WithDirty() ProjectOption { return func(s *projectDirSpec) { s.dirty = true
 
 // WithoutGit 不放 .git（用于测非仓库目录的降级）。
 func WithoutGit() ProjectOption { return func(s *projectDirSpec) { s.noGit = true } }
-
-// MakeProjectDir 建一个「会被 cube 扫描识别为 project」的目录（默认含真实 git 仓库）。
-// 通过 opts 调整：WithGodot / WithWorktree / WithDirty / WithoutGit。
-// 返回 project 目录绝对路径。

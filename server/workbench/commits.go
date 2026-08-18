@@ -9,6 +9,3 @@ type CommitsPageResult struct {
 	NextCursor int           `json:"nextCursor"` // 下一页 skip 偏移；HasMore=false 时无意义
 	HasMore    bool          `json:"hasMore"`    // 本页拉满 limit 即认为还有更多
 }
-
-// Commits 拉取 commit 图一页。scope=all 走全部分支（--all，首屏拓扑全景），
-// scope=ref 时按 ref 单线历史（大仓库首屏降级路径）。

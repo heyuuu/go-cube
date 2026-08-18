@@ -1,9 +1,6 @@
 package git
 
 import (
-	"os"
-	"os/exec"
-	"path/filepath"
 	"testing"
 
 	"cube/internal/testfixture"
@@ -57,35 +54,5 @@ func TestCommitsPage(t *testing.T) {
 	}
 	if len(all[0].Refs) == 0 || all[0].Refs[0].Name != "main" || all[0].Refs[0].Kind != "local" {
 		t.Errorf("首条应带 main(local) 装饰: %v", all[0].Refs)
-	}
-}
-
-func TestLoadRepoStatus(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main", EmptyCommitCount: 2})
-
-	st, err := LoadRepoStatus(repo)
-	if err != nil {
-		t.Fatalf("LoadRepoStatus 报错: %v", err)
-	}
-	if st.Branch != "main" || st.Sha == "" || st.Dirty {
-		t.Errorf("干净仓库字段不符: %+v", st)
-	}
-
-	// untracked + staged + unstaged 三类各一个
-	os.WriteFile(filepath.Join(repo, "new.txt"), []byte("x"), 0o644)     // untracked
-	os.WriteFile(filepath.Join(repo, "tracked.txt"), []byte("a"), 0o644) // 将变 staged
-	_ = exec.Command("git", "-C", repo, "add", "tracked.txt").Run()
-	os.WriteFile(filepath.Join(repo, "tracked.txt"), []byte("ab"), 0o644) // 又变 unstaged
-
-	st2, _ := LoadRepoStatus(repo)
-	if st2.Staged != 1 || st2.Unstaged != 1 || st2.Untracked != 1 || !st2.Dirty {
-		t.Errorf("三类变更计数不符: %+v", st2)
-	}
-
-	// 非 git 目录：零值 + nil
-	st3, err := LoadRepoStatus(ws.Join("plain"))
-	if err != nil || st3.Dirty {
-		t.Errorf("非 git 目录应返回零值+nil: %+v, err=%v", st3, err)
 	}
 }

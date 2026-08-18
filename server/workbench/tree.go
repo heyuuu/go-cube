@@ -2,6 +2,7 @@ package workbench
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,7 +10,7 @@ import (
 	"cube/util/git"
 )
 
-// TreeEntryResult 目录树接口的一层子项（worktree 走文件系统，commit/ref 走 ls-tree）。
+// TreeEntry 目录树接口的一层子项（worktree 走文件系统，commit/ref 走 ls-tree）。
 type TreeEntry struct {
 	Name    string `json:"name"`
 	Dir     bool   `json:"dir"`
@@ -20,26 +21,15 @@ type TreeEntry struct {
 // maxFileBytes 单文件读取上限（提案 1012：超大文件拒绝）
 const maxFileBytes = 2 * 1024 * 1024
 
-// Tree 列某 TreeSource 下 subDir（相对该源根，空 = 根）的一层子项。
-// showIgnored 仅对 worktree 源生效：false（默认）时忽略项不返回；true 时返回并标记。
-func ignoredUnder(wtDir string, subDir string) (map[string]bool, error) {
-	args := []string{"ls-files", "--others", "--ignored", "--exclude-standard", "--directory"}
-	if subDir != "" {
-		args = append(args, "--", subDir)
-	}
-	cmdOut, err := git.RunRead(wtDir, args...)
+// loadIgnoredDegrade 加载工作副本的忽略集合；判定失败不致命，降级为空集合
+// （宁可多显示，不可误隐藏）。treeFs 与目录对比（fsFileMap）共用此降级策略。
+func loadIgnoredDegrade(wtDir string, subDir string) *git.Ignored {
+	ig, err := git.LoadIgnored(wtDir, subDir)
 	if err != nil {
-		// 忽略判定失败不致命：降级为不过滤（宁可多显示，不可误隐藏）
-		return map[string]bool{}, nil
+		slog.Debug("忽略判定失败，降级为不过滤", "dir", wtDir, "err", err)
+		return &git.Ignored{Dirs: map[string]bool{}, Files: map[string]bool{}}
 	}
-	set := map[string]bool{}
-	for _, line := range strings.Split(cmdOut, "\n") {
-		line = strings.TrimSuffix(strings.TrimRight(line, "\r"), "/")
-		if line != "" {
-			set[line] = true
-		}
-	}
-	return set, nil
+	return ig
 }
 
 // FileResult 文件内容读取结果。
@@ -49,7 +39,7 @@ type FileResult struct {
 	Size    int64  `json:"size"`
 }
 
-// File 读某 TreeSource 下 file 的内容。二进制检测：前 8KB 含 NUL 判为二进制。
+// secureJoin 把 rel 拼进 base 并校验不逃逸（防 file 参数越出目标目录读任意文件）。
 func secureJoin(base string, rel string) (string, error) {
 	clean := filepath.Clean("/" + rel) // 归一化，消灭 ../ 与开头 /
 	full := filepath.Join(base, clean)

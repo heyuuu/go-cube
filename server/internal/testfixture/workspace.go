@@ -121,6 +121,9 @@ func (w *Workspace) Cleanup() {
 	_ = os.RemoveAll(w.Dir)
 }
 
+// MakeProjectDir 建一个「会被 cube 扫描识别为 project」的目录（默认含真实 git 仓库）。
+// 通过 opts 调整：WithGodot / WithWorktree / WithDirty / WithoutGit。
+// 返回 project 目录绝对路径。
 func (w *Workspace) MakeProjectDir(relPath string, opts ...ProjectOption) string {
 	w.Helper()
 	spec := &projectDirSpec{}
@@ -164,6 +167,9 @@ func (w *Workspace) AssertFileNotExists(relPath string) {
 		w.Fatalf("期望文件不存在但存在: %s", full)
 	}
 }
+
+// MakeGitRepo 极简便捷方法：在 ws 下建一个规范名子目录，构造一个带 1 个空 commit 的干净 git 仓库。
+// 返回仓库绝对路径。复杂场景用 BuildGitRepo + ws.Mkdir。
 func (w *Workspace) MakeGitRepo(name string) string {
 	w.Helper()
 	dir := w.Mkdir(name)

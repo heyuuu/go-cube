@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/exec"
 	"sort"
-	"strings"
 	"sync"
 	"time"
 
@@ -35,6 +34,7 @@ func NewService() *Service {
 	return &Service{ptyCancels: map[int]context.CancelFunc{}}
 }
 
+// Info 读工作台项目信息：入口目录向上探测仓库根、现场发现全部工作副本、默认分支。
 func (s *Service) Info(path string) (*Info, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -71,6 +71,9 @@ func (s *Service) Refs(path string) (*Refs, error) {
 		Tags:    tags,
 	}, nil
 }
+
+// Commits 拉取 commit 图一页。scope=all 走全部分支（--all，首屏拓扑全景），
+// scope=ref 时按 ref 单线历史（大仓库首屏降级路径）。
 func (s *Service) Commits(path string, scope string, ref string, cursor int, limit int) (*CommitsPageResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -141,6 +144,12 @@ func (s *Service) WorktreeStatus(path string, dir string) (*git.RepoStatus, erro
 	}
 	return st, nil
 }
+
+// ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。
+// 退出路径（三方任一结束都触发整体清理）：
+//   - 客户端断开（read pump 出错）→ cancel → 杀进程
+//   - 子进程退出（ptmx Read io.EOF）→ 发 exit 帧 → 关连接
+//   - server 关闭（ctx cancel）→ 杀进程
 func (s *Service) ServePty(ctx context.Context, conn *websocket.Conn, dir string, cols, rows int) error {
 	if cols <= 0 {
 		cols = 80
@@ -251,6 +260,9 @@ func (s *Service) ServePty(ctx context.Context, conn *websocket.Conn, dir string
 		return nil
 	}
 }
+
+// StopPtySessions 向所有活跃 PTY 会话发取消（server 停机时调用），确保无孤儿 shell。
+// MVP 用 Service 上的轻量注册表；会话数 = 浏览器页面数，量级极小。
 func (s *Service) StopPtySessions() {
 	s.ptyMu.Lock()
 	defer s.ptyMu.Unlock()
@@ -259,6 +271,8 @@ func (s *Service) StopPtySessions() {
 	}
 	s.ptyCancels = map[int]context.CancelFunc{}
 }
+
+// trackPty 把会话 cancel 登记进注册表，返回的 untrack 供会话结束时 defer 注销。
 func (s *Service) trackPty(cancel context.CancelFunc) (untrack func()) {
 	s.ptyMu.Lock()
 	s.ptySeq++
@@ -276,6 +290,9 @@ func (s *Service) trackPty(cancel context.CancelFunc) (untrack func()) {
 func (s *Service) OnServerStop() {
 	s.StopPtySessions()
 }
+
+// Tree 列某 TreeSource 下 subDir（相对该源根，空 = 根）的一层子项。
+// showIgnored 仅对 worktree 源生效：false（默认）时忽略项不返回；true 时返回并标记。
 func (s *Service) Tree(path string, src TreeSource, subDir string, showIgnored bool) ([]TreeEntry, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -295,9 +312,7 @@ func (s *Service) Tree(path string, src TreeSource, subDir string, showIgnored b
 	}
 }
 
-// treeFs 读工作副本目录的真实文件树：fs 遍历 + git 忽略规则过滤。
-// 忽略判定用 `git ls-files --others --ignored --exclude-standard --directory`：
-// 它列出的正是「被忽略且不在索引中」的路径，与 git status 的忽略口径一致。
+// treeFs 读工作副本目录的真实文件树：fs 遍历 + git 忽略规则过滤（git.LoadIgnored）。
 func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeEntry, error) {
 	base, err := secureJoin(wtDir, subDir)
 	if err != nil {
@@ -308,10 +323,7 @@ func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeE
 		return nil, fmt.Errorf("读取目录失败: dir=%s: %w", base, err)
 	}
 
-	ignoredSet, err := ignoredUnder(wtDir, subDir)
-	if err != nil {
-		return nil, err
-	}
+	ig := loadIgnoredDegrade(wtDir, subDir)
 
 	var entries []TreeEntry
 	for _, item := range items {
@@ -322,10 +334,8 @@ func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeE
 		if subDir != "" {
 			rel = subDir + "/" + item.Name()
 		}
-		if ignoredSet[rel] {
-			if !showIgnored {
-				continue
-			}
+		if ig.Has(rel) && !showIgnored {
+			continue
 		}
 		size := int64(0)
 		if !item.IsDir() {
@@ -337,7 +347,7 @@ func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeE
 			Name:    item.Name(),
 			Dir:     item.IsDir(),
 			Size:    size,
-			Ignored: ignoredSet[rel],
+			Ignored: ig.Has(rel),
 		})
 	}
 	// 排序与虚拟树（ls-tree）一致：目录在前，目录/文件各自按字典序
@@ -350,7 +360,7 @@ func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeE
 	return entries, nil
 }
 
-// ignoredUnder 返回 wtDir 下 subDir 内被 git 忽略的条目相对路径集合。
+// ReadFile 读某 TreeSource 下 file 的内容。二进制检测：前 8KB 含 NUL 判为二进制。
 func (s *Service) ReadFile(path string, src TreeSource, file string) (*FileResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -421,7 +431,9 @@ func (s *Service) SaveFile(path string, src TreeSource, file string, content str
 	return &FileResult{Size: int64(len(data))}, nil
 }
 
-// secureJoin 把 rel 拼进 base 并校验不逃逸（防 file 参数越出目标目录读任意文件）。
+// DiffTrees 对比两个 TreeSource 的目录树。
+// 筛选项：statusFilter（逗号分隔 added,deleted,modified,renamed）、pathPrefix；
+// showIgnored / showUntracked 仅 fs 模式有效（git 模式下收进 IgnoredFilters）。
 func (s *Service) DiffTrees(
 	path string, left TreeSource, right TreeSource,
 	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
@@ -444,34 +456,17 @@ func (s *Service) DiffTrees(
 	return result, nil
 }
 
-// diffTreesGit 两侧都是 tree-ish：`git diff --name-status -z -M`。
+// diffTreesGit 两侧都是 tree-ish：走 git.DiffFiles（name-status + rename 检测），
+// 状态字母映射为前端语义词。
 func (s *Service) diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	// 注意不能用 `--` 分隔：那会把两个 ref 当成 pathspec；ref 形如 sha 时需显式 disambiguate
-	out, err := git.RunRead(root, "diff", "--name-status", "-z", "-M", left.Id, right.Id, "--")
+	files, err := git.DiffFiles(root, left.Id, right.Id)
 	if err != nil {
-		return nil, fmt.Errorf("git diff 执行失败: %w", err)
+		return nil, err
 	}
-	var list []DiffEntry
-	parts := strings.Split(out, "\x00")
-	for i := 0; i < len(parts); i++ {
-		status := parts[i]
-		if status == "" {
-			continue
-		}
-		if strings.HasPrefix(status, "R") || strings.HasPrefix(status, "C") {
-			// rename/copy：status\0旧路径\0新路径
-			if i+2 < len(parts) {
-				list = append(list, DiffEntry{Path: parts[i+2], OldPath: parts[i+1], Status: "renamed"})
-				i += 2
-				continue
-			}
-		}
-		if i+1 < len(parts) {
-			list = append(list, DiffEntry{Path: parts[i+1], Status: letterToStatus(status[0])})
-			i++
-		}
+	list := make([]DiffEntry, len(files))
+	for i, f := range files {
+		list[i] = DiffEntry{Path: f.Path, OldPath: f.OldPath, Status: letterToStatus(f.Code[0])}
 	}
-	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
 	return &DiffTreesResult{Mode: "git", List: list}, nil
 }
 
@@ -518,7 +513,10 @@ func (s *Service) diffTreesFs(
 	return result, nil
 }
 
-// sourceFileMap 收集一个源的「相对路径 → blob sha」全量平铺。
+// ReadFileDiff 对比两个源下同一相对路径的文件。
+// 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
+// 行级 diff 用 git.DiffNoIndex（算法与展示语义和 git 完全一致），
+// 内容落临时文件后比较，结束清理。
 func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -558,12 +556,18 @@ func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, f
 	tmpA.Close()
 	tmpB.Close()
 
-	out, err := runDiffNoIndex(tmpA.Name(), tmpB.Name())
+	out, err := git.DiffNoIndex(tmpA.Name(), tmpB.Name())
 	if err != nil {
-		return nil, fmt.Errorf("git diff --no-index 执行失败: %w", err)
+		return nil, err
 	}
 	return &FileDiffResult{Hunks: parseUnifiedDiff(out)}, nil
 }
+
+// Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：
+//   - commit / ref：与父提交（<id>^）比；
+//   - worktree：与该工作副本当前 HEAD 比（= 工作区变更，含 untracked）。
+//
+// 复用 DiffTrees：含 worktree 侧自动走 fs 模式。
 func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
@@ -572,18 +576,18 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 	var base string
 	switch src.Type {
 	case SourceTypeWorktree:
-		out, err := git.RunRead(src.Id, "rev-parse", "HEAD")
+		head, err := git.HeadSha(src.Id)
 		if err != nil {
 			return nil, fmt.Errorf("读取工作副本 HEAD 失败: dir=%s: %w", src.Id, err)
 		}
-		base = strings.TrimSpace(out)
+		base = head
 	case SourceTypeCommit, SourceTypeRef:
-		out, err := git.RunRead(root, "rev-parse", src.Id+"^")
+		parent, err := git.ParentSha(root, src.Id)
 		if err != nil {
 			// 根提交没有父：与空树比
 			base = emptyTreeSha
 		} else {
-			base = strings.TrimSpace(out)
+			base = parent
 		}
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
