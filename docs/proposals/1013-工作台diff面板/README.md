@@ -1,6 +1,6 @@
 # 工作台 diff 面板：双 TreeSource 目录/文件对比（Beyond Compare 级）
 
-> **状态**：📋 待办（方案已定稿，可直接实施）
+> **状态**：✅ 已实现（2026-08-18）
 >
 > **所属**：[`1008-workspace工作台` 总纲](../1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
 > **依赖**：[`1010-workbench基座`](../1010-workbench基座/README.md)（diff/file-diff API 契约）、[`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md)（文件树组件、CodeMirror 只读渲染底座）。
