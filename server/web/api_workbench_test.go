@@ -73,3 +73,61 @@ func TestWorkbenchSourceParse(t *testing.T) {
 		t.Errorf("合法输入解析不符: %+v, err=%v", src, err)
 	}
 }
+
+func TestWorkbenchCommits(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+
+	var p1 struct {
+		List    []map[string]any `json:"list"`
+		HasMore bool             `json:"hasMore"`
+		NextCur int              `json:"nextCursor"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/commits?path="+repo+"&limit=1")), &p1)
+	if len(p1.List) != 1 || !p1.HasMore || p1.NextCur != 1 {
+		t.Fatalf("第一页不符: len=%d hasMore=%v next=%d", len(p1.List), p1.HasMore, p1.NextCur)
+	}
+	if _, ok := p1.List[0]["parents"].([]any); !ok {
+		t.Errorf("parents 应为数组: %v", p1.List[0]["parents"])
+	}
+
+	var p2 struct {
+		List    []map[string]any `json:"list"`
+		HasMore bool             `json:"hasMore"`
+	}
+	// fixture 仓库仅 1 个 commit：第二页应为空且无更多
+	decodeData(t, getJSON(t, env.url("/api/workbench/commits?path="+repo+"&limit=1&cursor=1")), &p2)
+	if len(p2.List) != 0 || p2.HasMore {
+		t.Fatalf("第二页应为空: len=%d hasMore=%v", len(p2.List), p2.HasMore)
+	}
+
+	if r := getJSON(t, env.url("/api/workbench/commits?path="+repo+"&scope=bogus")); r.Ok {
+		t.Error("非法 scope 应报错")
+	}
+}
+
+func TestWorkbenchStatus(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+
+	var got struct {
+		Branch string `json:"branch"`
+		Sha    string `json:"sha"`
+		Dirty  bool   `json:"dirty"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/status?path="+repo)), &got)
+	if got.Branch == "" || got.Sha == "" || got.Dirty {
+		t.Errorf("干净仓库状态不符: %+v", got)
+	}
+
+	// 未提交改动 → dirty
+	env.ws.WriteFile("g1/proj1/dirty.txt", []byte("x"))
+	var dirty struct {
+		Dirty     bool `json:"dirty"`
+		Untracked int  `json:"untracked"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/status?path="+repo)), &dirty)
+	if !dirty.Dirty || dirty.Untracked != 1 {
+		t.Errorf("dirty 状态不符: %+v", dirty)
+	}
+}

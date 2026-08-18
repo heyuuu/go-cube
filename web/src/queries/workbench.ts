@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet } from '@/api/client';
 import type { components } from '@/api/schema';
@@ -24,5 +24,32 @@ export function useWorkbenchRefs(path: string) {
     queryFn: () => apiGet('/api/workbench/refs', { path }),
     enabled: path !== '',
     staleTime: 30_000,
+  });
+}
+
+export type CommitEntry = components['schemas']['CommitEntry'];
+
+// commit 图分页：useInfiniteQuery，cursor 为 skip 偏移；翻页边界按 sha 去重兜底
+export function useWorkbenchCommits(path: string) {
+  return useInfiniteQuery({
+    queryKey: ['workbench', 'commits', path],
+    initialPageParam: 0,
+    queryFn: ({ pageParam }) => apiGet('/api/workbench/commits', { path, limit: 50, cursor: pageParam }),
+    getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
+    staleTime: 30_000,
+    enabled: path !== '',
+  });
+}
+
+export type RepoStatus = components['schemas']['RepoStatus'];
+
+// 工作副本状态：实时性要求高，不走 gitcache、后端直读；staleTime 短 + 窗口聚焦重取
+export function useWorkbenchStatus(path: string, dir: string) {
+  return useQuery({
+    queryKey: ['workbench', 'status', path, dir],
+    queryFn: () => apiGet('/api/workbench/status', { path, dir }),
+    enabled: path !== '' && dir !== '',
+    staleTime: 15_000,
+    refetchOnWindowFocus: true,
   });
 }

@@ -191,6 +191,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/commits': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 拉取工作台 commit 图（分页） */
+    get: operations['workbench.commits'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/info': {
     parameters: {
       query?: never;
@@ -225,10 +242,38 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取工作副本状态 */
+    get: operations['workbench.status'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    ApiOutputCommitsPageResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputCommitsPageResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['CommitsPageResult'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputConfigBody: {
       /**
        * Format: uri
@@ -363,6 +408,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputRepoStatusBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputRepoStatusBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['RepoStatus'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputWhoamiResponseBody: {
       /**
        * Format: uri
@@ -383,6 +439,22 @@ export interface components {
       localPath: string;
       repoHost: string;
       repoPrefix: string;
+    };
+    CommitEntry: {
+      author: string;
+      parents: string[] | null;
+      refs: string[] | null;
+      sha: string;
+      shortSha: string;
+      subject: string;
+      /** Format: int64 */
+      timestamp: number;
+    };
+    CommitsPageResult: {
+      hasMore: boolean;
+      list: components['schemas']['CommitEntry'][] | null;
+      /** Format: int64 */
+      nextCursor: number;
     };
     Config: {
       dataDir: string;
@@ -533,6 +605,23 @@ export interface components {
     RemoteBranch: {
       Branch: string;
       Remote: string;
+    };
+    RepoStatus: {
+      /** Format: int64 */
+      ahead: number;
+      /** Format: int64 */
+      behind: number;
+      branch: string;
+      detached: boolean;
+      dirty: boolean;
+      sha: string;
+      /** Format: int64 */
+      staged: number;
+      /** Format: int64 */
+      unstaged: number;
+      /** Format: int64 */
+      untracked: number;
+      upstream: string;
     };
     ScanRule: {
       group: string;
@@ -897,6 +986,41 @@ export interface operations {
       };
     };
   };
+  'workbench.commits': {
+    parameters: {
+      query: {
+        path: string;
+        scope?: string;
+        ref?: string;
+        cursor?: number;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputCommitsPageResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'workbench.info': {
     parameters: {
       query: {
@@ -946,6 +1070,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputRefsBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.status': {
+    parameters: {
+      query: {
+        path: string;
+        dir?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputRepoStatusBody'];
         };
       };
       /** @description Error */
