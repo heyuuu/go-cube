@@ -97,6 +97,11 @@ func parseDecorations(d string) []CommitRef {
 		} else if strings.Contains(name, "/") {
 			kind = "remote"
 		}
+		// 远端 HEAD（origin/HEAD 等）是「远端默认分支」的符号指针，不是真实分支，
+		// 徽标里纯冗余（它指向的分支本身已在装饰里），跳过
+		if kind == "remote" && strings.HasSuffix(name, "/HEAD") {
+			continue
+		}
 		if name != "" {
 			refs = append(refs, CommitRef{Name: name, Kind: kind})
 		}
