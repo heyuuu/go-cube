@@ -6,15 +6,10 @@ import { useSearchParams } from 'react-router';
 import { CodeEditor } from '@/components/code-editor';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
-import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  saveWorkbenchFile,
-  useWorkbenchChanges,
-  useWorkbenchFile,
-  useWorkbenchRefs,
-} from '@/queries/workbench';
+import { cn } from '@/lib/utils';
+import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs } from '@/queries/workbench';
 
 import { selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
 
@@ -51,8 +46,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const fileContent = content.data?.content ?? '';
 
   const currentKey = `${source?.type}:${source?.id}:${file}`;
-  const diffFilter =
-    treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
+  const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
   const editing = editState !== null && editState.key === currentKey;
   const draft = editing ? editState.draft : '';
   const dirty = editing && editState.draft !== fileContent;

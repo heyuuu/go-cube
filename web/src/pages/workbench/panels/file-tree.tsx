@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
 import { cn } from '@/lib/utils';
 import { useWorkbenchTree } from '@/queries/workbench';
@@ -22,9 +22,34 @@ export function FileTree({
   onPick: (file: string) => void;
   filter: Set<string> | null;
 }) {
+  // 展开状态提升到树级统一管理（按目录相对路径），子节点无状态渲染。
+  // 之前各 DirNode 自持 useState，实测出现「点一个目录全部联动开/关」的异常，
+  // 提升后状态与节点实例生命周期解耦，也天然在数据刷新后保持。
+  const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(() => new Set(['']));
+  const toggle = useCallback((dir: string) => {
+    setExpandedSet((prev) => {
+      const next = new Set(prev);
+      if (next.has(dir)) {
+        next.delete(dir);
+      } else {
+        next.add(dir);
+      }
+      return next;
+    });
+  }, []);
   return (
     <div className="flex h-full flex-col overflow-y-auto p-1 text-xs">
-      <DirNode path={path} source={source} dir="" depth={0} selectedFile={selectedFile} onPick={onPick} filter={filter} />
+      <DirNode
+        path={path}
+        source={source}
+        dir=""
+        depth={0}
+        selectedFile={selectedFile}
+        onPick={onPick}
+        filter={filter}
+        expandedSet={expandedSet}
+        onToggle={toggle}
+      />
     </div>
   );
 }
@@ -37,6 +62,8 @@ function DirNode({
   selectedFile,
   onPick,
   filter,
+  expandedSet,
+  onToggle,
 }: {
   path: string;
   source: TreeSource;
@@ -45,8 +72,9 @@ function DirNode({
   selectedFile: string;
   onPick: (file: string) => void;
   filter: Set<string> | null;
+  expandedSet: ReadonlySet<string>;
+  onToggle: (dir: string) => void;
 }) {
-  const [expanded, setExpanded] = useState(depth === 0);
   const tree = useWorkbenchTree(path, source, dir);
 
   if (tree.isPending) {
@@ -75,19 +103,27 @@ function DirNode({
       {entries.map((e) => {
         const rel = dir ? `${dir}/${e.name}` : e.name;
         if (e.dir) {
+          // 行内必须查「子目录自己」的展开状态（rel），不能用本节点的 expanded——
+          // 之前就是这里错位：父级的 expanded 控制了所有子行的 chevron 与挂载，
+          // 表现为「点一个目录全部联动开/关」
+          const childExpanded = expandedSet.has(rel);
           return (
             <div key={rel}>
               <button
                 type="button"
                 className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent"
                 style={{ paddingLeft: depth * 12 + 4 }}
-                onClick={() => setExpanded((v) => !v)}
+                onClick={() => onToggle(rel)}
               >
-                {expanded ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
+                {childExpanded ? (
+                  <ChevronDown className="size-3 shrink-0" />
+                ) : (
+                  <ChevronRight className="size-3 shrink-0" />
+                )}
                 <Folder className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{e.name}</span>
               </button>
-              {expanded ? (
+              {childExpanded ? (
                 <DirNode
                   path={path}
                   source={source}
@@ -96,6 +132,8 @@ function DirNode({
                   selectedFile={selectedFile}
                   onPick={onPick}
                   filter={filter}
+                  expandedSet={expandedSet}
+                  onToggle={onToggle}
                 />
               ) : null}
             </div>
