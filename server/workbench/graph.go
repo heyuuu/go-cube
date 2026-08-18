@@ -138,7 +138,11 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 				continue
 			}
 			isParent := parentSet[entry.sha]
-			incoming := i == 0 || func() bool {
+			// 上方是否有来线：条目由更早的行放置（首行上方无快照，必为 false）
+			incoming := func() bool {
+				if i == 0 {
+					return false
+				}
 				for _, l := range snapshots[i-1] {
 					if l.sha == entry.sha {
 						return true
