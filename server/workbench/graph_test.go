@@ -175,12 +175,13 @@ func TestComputeGraphLaneStability(t *testing.T) {
 			t.Errorf("节点 %s lane=%d, want %d", n.Sha, n.Lane, wantLanes[n.Sha])
 		}
 	}
-	// band0 有 M→lane1 分叉曲线；band2 有支线并回主线曲线（1→0）；band1/3 无拐弯
+	// band0 有 M→lane1 分叉曲线；band2 有 f1 让位后并回主线的曲线（1→0）；band1/3 无拐弯
+	hasFork, hasMergeBack := false, false
 	for _, w := range wires {
 		switch w.Row {
 		case 0:
 			if w.From == 0 && w.To == 1 {
-				// fork curve ✓
+				hasFork = true
 			}
 		case 1, 3:
 			if w.From != w.To {
@@ -188,8 +189,14 @@ func TestComputeGraphLaneStability(t *testing.T) {
 			}
 		case 2:
 			if w.From == 1 && w.To == 0 {
-				// 支线并回主线的曲线 ✓
+				hasMergeBack = true
 			}
 		}
+	}
+	if !hasFork {
+		t.Error("band0 缺 M→lane1 分叉曲线")
+	}
+	if !hasMergeBack {
+		t.Error("band2 缺支线让位后并回主线的曲线（1→0）")
 	}
 }

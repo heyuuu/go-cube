@@ -138,6 +138,9 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 	//           泳道压缩时 to 落在新位置，表现为折线。
 	// 两类可并存（同一父被多条支线共享时，节点出线 + 穿越线同时存在）；
 	// 首父接管原泳道时二者重合，只发一条。
+	// 让位节点的出线：首父由更靠左的兄弟泳道认领时，父不在本行快照里，
+	// 直接发出线拐向兄弟泳道（兄弟认领后垂直延续、随其落到共同父节点）。
+	// 例：dev 从 merge 节点分出、但 dev 首提交晚于主线下一提交时，dev 节点让位。
 	for i := 0; i+1 < len(commits); i++ {
 		next := commits[i+1]
 		parentSet := make(map[string]bool, len(commits[i].Parents))
@@ -155,6 +158,10 @@ func computeGraph(commits []git.CommitEntry) (nodes []GraphCommit, wires []Graph
 			}
 			return -1
 		}
+		if to, ok := deferred[i]; ok {
+			wires = append(wires, GraphWire{Row: i, From: nodes[i].Lane, To: to, Color: nodes[i].Color})
+		}
+
 		for pos, entry := range snapshots[i] {
 			if entry.sha == "" {
 				continue // 空洞

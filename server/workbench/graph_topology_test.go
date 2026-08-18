@@ -91,6 +91,15 @@ var graphCases = []graphCase{
 		commitEmpty(t, repo, "m1")
 		runGit(t, repo, "merge", "--no-ff", "outer", "-m", "merge outer")
 	}},
+	{"晚切支线", func(t *testing.T, repo string) {
+		// dev 从 base 分出，但 dev 首提交晚于主线 m1：dev 节点须让位给主线，
+		// 出线拐进主线泳道并随其落到共同父（回归：让位出线曾漏发导致支线断裂）
+		runGit(t, repo, "checkout", "-b", "dev")
+		commitEmpty(t, repo, "d1")
+		runGit(t, repo, "checkout", "main")
+		commitEmpty(t, repo, "m1")
+		runGit(t, repo, "merge", "--no-ff", "dev", "-m", "merge dev")
+	}},
 	{"tag 装饰不影响布局", func(t *testing.T, repo string) {
 		commitEmpty(t, repo, "c2")
 		runGit(t, repo, "tag", "v1.0")
