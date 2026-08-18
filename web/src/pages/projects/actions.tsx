@@ -1,5 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, SquareTerminal } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,16 @@ export function ProjectActions({
             {q.icon}
           </Button>
         ))}
+      {/* 工作台入口（非 opener）：新窗口打开 /workbench，与快捷图标平齐 */}
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title="在工作台打开"
+        aria-label={`在工作台打开（${p.name}）`}
+        onClick={() => window.open(`/workbench?path=${encodeURIComponent(p.path)}`, '_blank')}
+      >
+        <SquareTerminal className="size-3.5" />
+      </Button>
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <ChevronDown className="size-3.5" />
