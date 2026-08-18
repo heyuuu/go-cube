@@ -1,4 +1,5 @@
-import { Box, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
+import { Box, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
+import { Fragment, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 
 import {
@@ -27,6 +28,8 @@ export function WorkbenchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const params = readWorkbenchParams(searchParams);
   const layout = useWorkbenchLayout();
+  const slotsRef = useRef<HTMLDivElement>(null);
+  const dragFrom = useRef<number | null>(null);
 
   const submitPath = (value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -124,31 +127,81 @@ export function WorkbenchPage() {
           </button>
         </div>
       </header>
-      <div className="flex min-h-0 flex-1">
-        {layout.slots.map((id) => {
+      <div ref={slotsRef} className="flex min-h-0 flex-1">
+        {layout.slots.map((id, i) => {
           const item = PANEL_REGISTRY[id];
           return (
-            <section key={id} className="flex min-w-0 flex-1 flex-col border-r border-border last:border-r-0">
-              <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border bg-muted/30 px-2 text-[11px] text-muted-foreground">
-                <item.icon className="size-3.5" />
-                {item.label}
-                {id === 'auto' && !diffMode && params.source ? <span className="text-[10px]">· 代码</span> : null}
-                {id === 'auto' && diffMode ? <span className="text-[10px]">· diff</span> : null}
-                <button
-                  type="button"
-                  title="移除面板"
-                  className="ml-auto rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
-                  onClick={() => layout.removePanel(id)}
+            <Fragment key={id}>
+              <section className="flex min-w-48 flex-col" style={{ flexGrow: layout.sizes[i] ?? 1, flexBasis: 0 }}>
+                <div
+                  draggable
+                  onDragStart={() => {
+                    dragFrom.current = i;
+                  }}
+                  onDragOver={(e) => {
+                    if (dragFrom.current === null || dragFrom.current === i) return;
+                    e.preventDefault();
+                    layout.reorderPanel(dragFrom.current, i);
+                    dragFrom.current = i;
+                  }}
+                  className="flex h-7 shrink-0 cursor-grab items-center gap-1.5 border-b border-border bg-muted/30 px-2 text-[11px] text-muted-foreground active:cursor-grabbing"
+                  title="拖拽调整面板顺序"
                 >
-                  <X className="size-3" />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 overflow-hidden">{renderPanel(id)}</div>
-            </section>
+                  <GripVertical className="size-3 shrink-0 opacity-50" />
+                  <item.icon className="size-3.5" />
+                  {item.label}
+                  {id === 'auto' && !diffMode && params.source ? <span className="text-[10px]">· 代码</span> : null}
+                  {id === 'auto' && diffMode ? <span className="text-[10px]">· diff</span> : null}
+                  <button
+                    type="button"
+                    title="移除面板"
+                    className="ml-auto rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
+                    onClick={() => layout.removePanel(id)}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+                <div className="min-h-0 flex-1 overflow-hidden">{renderPanel(id)}</div>
+              </section>
+              {i < layout.slots.length - 1 ? (
+                <PanelSplitter
+                  onDelta={(dx) => {
+                    // 像素位移换算为 flexGrow 比例：总宽 / 总比例 = 单位比例的像素数
+                    const pxPerGrow = (slotsRef.current?.clientWidth ?? 0) / layout.sizes.reduce((a, b) => a + b, 0);
+                    if (pxPerGrow > 0) layout.resizePanels(i, dx / pxPerGrow);
+                  }}
+                />
+              ) : null}
+            </Fragment>
           );
         })}
       </div>
       <TerminalPanel path={params.path} />
     </div>
+  );
+}
+
+// 面板分隔条：pointer 事件拖拽调宽（setPointerCapture 保证移出元素仍持续跟踪）
+function PanelSplitter({ onDelta }: { onDelta: (dx: number) => void }) {
+  const lastX = useRef(0);
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    lastX.current = e.clientX;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!(e.buttons & 1)) return;
+    const dx = e.clientX - lastX.current;
+    lastX.current = e.clientX;
+    if (dx !== 0) onDelta(dx);
+  };
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      className="w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/50"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+    />
   );
 }
