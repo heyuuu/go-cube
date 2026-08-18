@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Ellipsis, Folder, FileText } from 'lucide-react';
-import { useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Markdown from 'react-markdown';
 import { useSearchParams } from 'react-router';
 import remarkGfm from 'remark-gfm';
@@ -143,6 +143,7 @@ function MdTreeRow({
   openerList,
   open,
   onOpenNode,
+  rowRef,
 }: {
   row: FileTreeRow;
   selected: string | null;
@@ -152,11 +153,13 @@ function MdTreeRow({
   openerList: Opener[];
   open: ReturnType<typeof useOpenerOpen>;
   onOpenNode: (path: string, app: string) => void;
+  rowRef?: React.Ref<HTMLDivElement>;
 }) {
   const n = row.node;
   const isDir = n.kind === 'dir';
   return (
     <div
+      ref={rowRef}
       className={cn(
         'group flex cursor-pointer items-center gap-1 rounded-md py-1 pr-1 text-xs hover:bg-primary/15 dark:hover:bg-primary/25',
         isDir ? 'text-muted-foreground' : 'text-foreground',
@@ -456,18 +459,35 @@ export function MdPage() {
 
   // expandTo 展开目标路径的全部祖先目录节点（含自身；单链折叠节点的 path 是
   // 最深层目录，逐级前缀里必含它，多余的前缀键是无害的空操作）
-  function expandTo(target: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      const segs = target.slice(path.length).replace(/^\/+/, '').split('/');
-      let cur = path;
-      for (const seg of segs) {
-        cur = `${cur}/${seg}`;
-        next.add(cur);
-      }
-      return next;
+  const expandTo = useCallback(
+    (target: string) => {
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        const segs = target.slice(path.length).replace(/^\/+/, '').split('/');
+        let cur = path;
+        for (const seg of segs) {
+          cur = `${cur}/${seg}`;
+          next.add(cur);
+        }
+        return next;
+      });
+    },
+    [path],
+  );
+
+  // 选中文件变化时（含刷新/直链进入）：展开其祖先目录并滚动定位到该行。
+  // block:'nearest' 保证已在视野内时不跳动；用户手动折叠不受影响（再点击会重新展开）。
+  const selectedRowRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!dirMode || !selected) return;
+    // setState 放进 rAF 异步执行（React Compiler 禁止 effect 内同步 setState
+    // 触发级联渲染）；双 rAF 等展开后的行渲染完成再滚动定位
+    const raf = requestAnimationFrame(() => {
+      expandTo(selected);
+      requestAnimationFrame(() => selectedRowRef.current?.scrollIntoView({ block: 'nearest' }));
     });
-  }
+    return () => cancelAnimationFrame(raf);
+  }, [dirMode, selected, expandTo]);
 
   // 文内链接导航：根内 md 文件 → 选中并聚焦树节点；根内目录 → 展开 + 聚焦并
   // 显示其 README（与初始根语义一致）；根外或未识别目标 → 新 Tab 打开
