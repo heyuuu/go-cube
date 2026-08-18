@@ -570,6 +570,10 @@ export interface components {
       repoHost: string;
       repoPrefix: string;
     };
+    CommitRef: {
+      kind: string;
+      name: string;
+    };
     CommitsPageResult: {
       hasMore: boolean;
       list: components['schemas']['GraphCommit'][] | null;
@@ -675,7 +679,7 @@ export interface components {
       /** Format: int64 */
       lane: number;
       parents: string[] | null;
-      refs: string[] | null;
+      refs: components['schemas']['CommitRef'][] | null;
       sha: string;
       shortSha: string;
       subject: string;

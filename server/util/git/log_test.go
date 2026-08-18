@@ -24,8 +24,8 @@ func TestParseLogFields(t *testing.T) {
 	if len(c1.Parents) != 2 || c1.Parents[0] != "bbb111" || c1.Parents[1] != "ccc111" {
 		t.Errorf("c1 parents 不符: %v", c1.Parents)
 	}
-	// HEAD -> main, tag: v1 → [main, v1]
-	if len(c1.Refs) != 2 || c1.Refs[0] != "main" || c1.Refs[1] != "v1" {
+	// HEAD -> main → local；tag: v1 → tag
+	if len(c1.Refs) != 2 || c1.Refs[0] != (CommitRef{"main", "local"}) || c1.Refs[1] != (CommitRef{"v1", "tag"}) {
 		t.Errorf("c1 refs 不符: %v", c1.Refs)
 	}
 	if len(commits[1].Parents) != 0 {
@@ -55,8 +55,8 @@ func TestCommitsPage(t *testing.T) {
 	if all[0].Parents[0] != all[1].Sha {
 		t.Errorf("链式 parents 不符: %v -> %v", all[0].Parents, all[1].Sha)
 	}
-	if len(all[0].Refs) == 0 || all[0].Refs[0] != "main" {
-		t.Errorf("首条应带 main 装饰: %v", all[0].Refs)
+	if len(all[0].Refs) == 0 || all[0].Refs[0].Name != "main" || all[0].Refs[0].Kind != "local" {
+		t.Errorf("首条应带 main(local) 装饰: %v", all[0].Refs)
 	}
 }
 

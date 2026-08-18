@@ -239,16 +239,20 @@ function CommitRow({
         time={c.timestamp}
         laneColor={nodeColor}
         fixedRow
-        badges={
+        // 标签挪到 message 前；样式按 ref 类型分组（本地/远程/tag/head），
+        // 不跟泳道色——泳道色属于「分支线」，标签属于「引用」两个维度
+        prefixBadges={
           <>
-            {(c.refs ?? []).slice(0, 3).map((r: string) => (
+            {(c.refs ?? []).slice(0, 3).map((r) => (
               <Badge
-                key={r}
-                variant="secondary"
-                className="max-w-24 truncate border"
-                style={{ borderColor: nodeColor, color: nodeColor }}
+                key={r.kind + r.name}
+                variant="outline"
+                className={cn(
+                  'max-w-24 shrink-0 truncate border px-1 py-0 text-[10px]',
+                  REF_BADGE_STYLE[r.kind as keyof typeof REF_BADGE_STYLE] ?? REF_BADGE_STYLE.local,
+                )}
               >
-                {r}
+                {r.name}
               </Badge>
             ))}
           </>
@@ -257,6 +261,14 @@ function CommitRow({
     </div>
   );
 }
+
+// ref 徽标按类型分组配色（与泳道色无关）：本地分支蓝、远程灰、tag 琥珀、HEAD 紫
+const REF_BADGE_STYLE = {
+  local: 'border-blue-500/40 text-blue-600 dark:text-blue-400',
+  remote: 'border-muted-foreground/30 text-muted-foreground',
+  tag: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
+  head: 'border-violet-500/40 text-violet-600 dark:text-violet-400',
+} as const;
 
 // 泳道几何：列宽/行高/左边距；调色板与后端 color 索引对应（循环取色）
 const LANE_W = 12;
@@ -274,6 +286,7 @@ type SelectableRowProps = {
   mono?: string;
   badge?: string;
   badges?: React.ReactNode;
+  prefixBadges?: React.ReactNode; // 显示在 label 前（commit 行的 ref 标签）
   time?: number;
   laneColor?: string; // 泳道色：选中行以分支色描边
   fixedRow?: boolean; // commit 图行：固定 px 高度（外层行 div 已定高），不用 rem 行高
@@ -287,6 +300,7 @@ function SelectableRow({
   mono,
   badge,
   badges,
+  prefixBadges,
   time,
   laneColor,
   fixedRow,
@@ -327,6 +341,7 @@ function SelectableRow({
       style={laneColor && (isSource || isLeft || isRight) ? { boxShadow: `inset 2px 0 0 ${laneColor}` } : undefined}
     >
       {mono ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{mono}</span> : null}
+      {prefixBadges}
       <span className={cn('truncate', isSource || isLeft || isRight ? 'font-medium' : undefined)}>{label}</span>
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
       {badges}
