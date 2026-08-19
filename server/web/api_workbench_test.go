@@ -85,8 +85,9 @@ func TestWorkbenchCommits(t *testing.T) {
 		HasMore bool             `json:"hasMore"`
 		NextCur int              `json:"nextCursor"`
 	}
+	// fixture 仓库恰 1 个 commit，limit=1：整倍边界应精确判定无更多（曾误报 true）
 	decodeData(t, getJSON(t, env.url("/api/workbench/commits?path="+repo+"&limit=1")), &p1)
-	if len(p1.List) != 1 || !p1.HasMore || p1.NextCur != 1 {
+	if len(p1.List) != 1 || p1.HasMore || p1.NextCur != 1 {
 		t.Fatalf("第一页不符: len=%d hasMore=%v next=%d", len(p1.List), p1.HasMore, p1.NextCur)
 	}
 	if _, ok := p1.List[0]["parents"].([]any); !ok {
@@ -146,25 +147,38 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	}
 	head := gitHead(t, repo)
 
-	// worktree 源：真实文件树，ignored.log 被 .gitignore 过滤（fixture 项目自身配置忽略 *.log 时才成立，
-	// 这里不依赖 fixture 的 ignore 配置，直接验证 commit 源与 worktree 源的一致性）
-	var wtTree []struct {
-		Name string `json:"name"`
-		Dir  bool   `json:"dir"`
+	// worktree 源：全量扁平路径。写一个未跟踪文件与一个被忽略文件验证口径——
+	// git 管理的（tracked + 未跟踪未忽略）进清单，被忽略的不进
+	env.ws.WriteFile("g1/proj1/untracked-new.txt", []byte("x"))
+	env.ws.WriteFile("g1/proj1/ignored-new.log", []byte("x"))
+	env.ws.WriteFile("g1/proj1/.gitignore", []byte("*.log\n"))
+	var wtTree struct {
+		List []string `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &wtTree)
-	if len(wtTree) == 0 {
-		t.Fatal("worktree 树不应为空")
+	set := map[string]bool{}
+	for _, f := range wtTree.List {
+		set[f] = true
+	}
+	if !set["a.txt"] || !set["untracked-new.txt"] {
+		t.Fatalf("清单应含 tracked 与未跟踪未忽略文件: %v", wtTree.List)
+	}
+	if set["ignored-new.log"] {
+		t.Fatalf("被忽略文件不应出现在清单: %v", wtTree.List)
 	}
 
-	// commit 源：ls-tree 根层
-	var cTree []struct {
-		Name string `json:"name"`
-		Dir  bool   `json:"dir"`
+	// commit 源：该提交树的全量文件（扁平路径）
+	var cTree struct {
+		List []string `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=commit&sourceId="+head)), &cTree)
-	if len(cTree) < 2 {
-		t.Fatalf("commit 树应含 a.txt 与 sub: %+v", cTree)
+	if len(cTree.List) == 0 {
+		t.Fatalf("commit 源清单不应为空")
+	}
+	for _, f := range cTree.List {
+		if f != "a.txt" && f != "sub/b.txt" && f != ".gitignore" && f != "ignored.log" {
+			t.Fatalf("commit 源清单含意外条目 %q: %v", f, cTree.List)
+		}
 	}
 
 	// commit 源读文件
@@ -447,25 +461,19 @@ func TestWorkbenchTreeSort(t *testing.T) {
 	env.ws.Mkdir("g1/proj1/zdir")
 	env.ws.WriteFile("g1/proj1/zdir/x.txt", []byte("x"))
 	env.ws.WriteFile("g1/proj1/afile.txt", []byte("a"))
-	env.ws.WriteFile("g1/proj1/bdir-nofile", []byte("b"))
+	env.ws.WriteFile("g1/proj1/bdir/x.txt", []byte("b"))
 
-	var got []struct {
-		Name string `json:"name"`
-		Dir  bool   `json:"dir"`
+	var got struct {
+		List []string `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &got)
-	var names []string
-	for _, e := range got {
-		names = append(names, fmt.Sprintf("%v:%s", e.Dir, e.Name))
+	set := map[string]bool{}
+	for _, f := range got.List {
+		set[f] = true
 	}
-	want := []string{"true:zdir", "false:afile.txt", "false:bdir-nofile"}
-	if len(names) != len(want) {
-		t.Fatalf("条目数不符: %v", names)
-	}
-	for i := range want {
-		if names[i] != want[i] {
-			t.Errorf("排序不符: got %v, want %v", names, want)
-			break
+	for _, want := range []string{"afile.txt", "bdir/x.txt"} {
+		if !set[want] {
+			t.Fatalf("全量清单应含 %q: %v", want, got.List)
 		}
 	}
 }

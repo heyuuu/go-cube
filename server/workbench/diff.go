@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -38,6 +39,17 @@ func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
+}
+
+// loadIgnoredDegrade 加载工作副本的忽略集合；判定失败不致命，降级为空集合
+// （宁可多显示，不可误隐藏）。treeFs 与目录对比（fsFileMap）共用此降级策略。
+func loadIgnoredDegrade(wtDir string, subDir string) *git.Ignored {
+	ig, err := git.LoadIgnored(wtDir, subDir)
+	if err != nil {
+		slog.Debug("忽略判定失败，降级为不过滤", "dir", wtDir, "err", err)
+		return &git.Ignored{Dirs: map[string]bool{}, Files: map[string]bool{}}
+	}
+	return ig
 }
 
 // fsFileMap walk 工作副本目录，跳过 .git；忽略项默认排除（includeIgnored=true 时保留）。

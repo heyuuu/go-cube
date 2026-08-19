@@ -66,17 +66,15 @@ func (h *WorkbenchHandler) worktrees(input struct {
 
 // 注意：huma 不展开嵌入 struct 的 query tag，参数一律平铺声明。
 func (h *WorkbenchHandler) tree(input struct {
-	Path        string `query:"path" required:"true"`
-	SourceType  string `query:"sourceType" required:"true"`
-	SourceId    string `query:"sourceId" required:"true"`
-	Dir         string `query:"dir"`         // 相对该源根的子目录，空 = 根
-	ShowIgnored bool   `query:"showIgnored"` // 仅 worktree 源生效
-}) ([]workbench.TreeEntry, error) {
+	Path       string `query:"path" required:"true"`
+	SourceType string `query:"sourceType" required:"true"`
+	SourceId   string `query:"sourceId" required:"true"`
+}) (*workbench.TreeListResult, error) {
 	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.Tree(input.Path, src, input.Dir, input.ShowIgnored)
+	return h.workbenchService.Tree(input.Path, src)
 }
 
 func (h *WorkbenchHandler) file(input struct {

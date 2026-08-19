@@ -57,7 +57,6 @@ export function useWorkbenchWorktrees(path: string) {
   });
 }
 
-export type TreeEntryDTO = components['schemas']['TreeEntry'];
 export type FileResult = components['schemas']['FileResult'];
 
 // 源参数统一从 TreeSource 派生（面板铁律：query key 自包含、从 URL 参数派生）
@@ -65,18 +64,11 @@ function sourceQuery(src: TreeSource) {
   return { sourceType: src.type, sourceId: src.id };
 }
 
-export function treeQueryKey(path: string, src: TreeSource, dir: string, showIgnored: boolean) {
-  return ['workbench', 'tree', path, src.type, src.id, dir, showIgnored] as const;
-}
-
-export function fetchWorkbenchTree(path: string, src: TreeSource, dir: string, showIgnored: boolean) {
-  return apiGet('/api/workbench/tree', { path, ...sourceQuery(src), dir, showIgnored });
-}
-
-export function useWorkbenchTree(path: string, src: TreeSource, dir: string, showIgnored = false) {
+// 文件清单全量一次拉取（扁平相对路径，git 管理的文件），前端用 lib/tree 组树
+export function useWorkbenchTree(path: string, src: TreeSource) {
   return useQuery({
-    queryKey: treeQueryKey(path, src, dir, showIgnored),
-    queryFn: () => fetchWorkbenchTree(path, src, dir, showIgnored),
+    queryKey: ['workbench', 'tree', path, src.type, src.id],
+    queryFn: () => apiGet('/api/workbench/tree', { path, ...sourceQuery(src) }),
     enabled: path !== '' && !!src,
   });
 }

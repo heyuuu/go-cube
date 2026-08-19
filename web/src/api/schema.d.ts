@@ -464,17 +464,6 @@ export interface components {
       message: string;
       ok: boolean;
     };
-    ApiOutputListTreeEntryBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputListTreeEntryBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['TreeEntry'][] | null;
-      message: string;
-      ok: boolean;
-    };
     ApiOutputListWorktreeStatusBody: {
       /**
        * Format: uri
@@ -562,6 +551,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Refs'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputTreeListResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputTreeListResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['TreeListResult'];
       message: string;
       ok: boolean;
     };
@@ -815,12 +815,8 @@ export interface components {
       maxDepth: number;
       path: string;
     };
-    TreeEntry: {
-      dir: boolean;
-      ignored: boolean;
-      name: string;
-      /** Format: int64 */
-      size: number;
+    TreeListResult: {
+      list: string[] | null;
     };
     WhoamiResponse: {
       app: string;
@@ -1460,8 +1456,6 @@ export interface operations {
         path: string;
         sourceType: string;
         sourceId: string;
-        dir?: string;
-        showIgnored?: boolean;
       };
       header?: never;
       path?: never;
@@ -1475,7 +1469,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ApiOutputListTreeEntryBody'];
+          'application/json': components['schemas']['ApiOutputTreeListResultBody'];
         };
       };
       /** @description Error */

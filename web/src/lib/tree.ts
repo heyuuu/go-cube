@@ -80,7 +80,7 @@ export function buildProjectTree(projects: Project[]): TreeNode | null {
       const isLast = i === segs.length - 1;
       let child = cur.children.get(seg);
       if (!child) {
-        const childPath = cur.path === '/' ? `/${seg}` : `${cur.path}/${seg}`;
+        const childPath = cur.path === '/' ? `/${seg}` : cur.path === '' ? seg : `${cur.path}/${seg}`;
         child = isLast
           ? { name: seg, path: childPath, kind: 'project', children: new Map(), project: p }
           : { name: seg, path: childPath, kind: 'dir', children: new Map() };
@@ -180,7 +180,7 @@ export function buildFileTree(root: string, files: string[]): FileTreeNode {
       const isLast = i === segs.length - 1;
       let child = cur.children.get(seg);
       if (!child) {
-        const childPath = cur.path === '/' ? `/${seg}` : `${cur.path}/${seg}`;
+        const childPath = cur.path === '/' ? `/${seg}` : cur.path === '' ? seg : `${cur.path}/${seg}`;
         child = { name: seg, path: childPath, kind: isLast ? 'file' : 'dir', children: new Map() };
         cur.children.set(seg, child);
       }

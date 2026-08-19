@@ -2,61 +2,29 @@ package git
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
-// TreeEntry 某个 ref/commit 下的一层目录项（提案 1012 虚拟文件树）。
-type TreeEntry struct {
-	Name string `json:"name"`
-	Dir  bool   `json:"dir"`
-	Size int64  `json:"size"` // blob 字节数（tree 为 0）
-}
-
-// ListTreeAtRef 列 ref（分支/tag/commit）下 dir（相对仓库根，空 = 根）的一层子项，按名字排序。
-// dir 不存在时返回错误（git ls-tree 会静默输出空，因此先探测 ref:dir）。
-func ListTreeAtRef(dir string, ref string, subDir string) ([]TreeEntry, error) {
-	target := ref
-	if subDir != "" {
-		target = ref + ":" + subDir
+// ListFiles 返回 path 工作副本中 git 管理的全部文件路径（相对副本根，字典序）：
+// tracked（index，含已暂存未提交的）+ 未跟踪且未被忽略的（--others --exclude-standard，
+// git 原生扫工作区并应用忽略链）。被 .gitignore/全局忽略的文件不出现。
+// 已从工作区删除但未暂存删除的文件仍在 index 中，会保留为条目（git status 视角它仍受管）。
+// 非仓库目录返回 (nil, nil)，不视为错误。
+func ListFiles(path string) ([]string, error) {
+	if !isGitRepo(path) {
+		return nil, nil
 	}
-	out, err := runOut(dir, "ls-tree", "-z", "-l", "--", target)
+	out, err := runOut(path, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
 	if err != nil {
-		return nil, fmt.Errorf("git ls-tree 执行失败: %w", err)
+		return nil, fmt.Errorf("git ls-files 执行失败: %w", err)
 	}
-	return parseLsTree(out), nil
-}
-
-// parseLsTree 解析 `git ls-tree -z -l` 输出：`<mode> <type> <object> <size>\t<name>\0`。
-// -z 时名字中的特殊字符不转义，size 字段 tree 项为 "-"。
-func parseLsTree(out string) []TreeEntry {
-	var entries []TreeEntry
-	for _, rec := range strings.Split(out, "\x00") {
-		if rec == "" {
-			continue
+	var files []string
+	for _, f := range strings.Split(out, "\x00") {
+		if f != "" {
+			files = append(files, f)
 		}
-		tab := strings.IndexByte(rec, '\t')
-		if tab < 0 {
-			continue
-		}
-		meta, name := rec[:tab], rec[tab+1:]
-		fields := strings.Fields(meta)
-		if len(fields) < 4 {
-			continue
-		}
-		size := int64(0)
-		if fields[3] != "-" {
-			fmt.Sscanf(fields[3], "%d", &size)
-		}
-		entries = append(entries, TreeEntry{Name: name, Dir: fields[1] == "tree", Size: size})
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Dir != entries[j].Dir {
-			return entries[i].Dir
-		}
-		return entries[i].Name < entries[j].Name
-	})
-	return entries
+	return files, nil
 }
 
 // FileShasAtRef 返回 ref 下全部文件的「相对路径 → blob sha」递归平铺映射。

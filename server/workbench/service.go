@@ -7,7 +7,6 @@ package workbench
 import (
 	"bytes"
 	"context"
-	"cube/util/git"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,6 +16,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"cube/util/git"
 
 	"github.com/coder/websocket"
 	"github.com/creack/pty"
@@ -33,6 +34,8 @@ type Service struct {
 func NewService() *Service {
 	return &Service{ptyCancels: map[int]context.CancelFunc{}}
 }
+
+// --- git 面板（info / 分支与 tag / commit 日志 / 工作副本快照）---
 
 // Info 读工作台项目信息：入口目录向上探测仓库根、默认分支。
 func (s *Service) Info(path string) (*Info, error) {
@@ -77,18 +80,22 @@ func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResul
 		cursor = 0
 	}
 
-	list, err := git.CommitsPage(root, cursor, limit)
+	// 多取 1 条探测：恰好读到总数为 limit 整数倍时，len==limit 不代表还有更多
+	list, err := git.CommitsPage(root, cursor, limit+1)
 	if err != nil {
 		return nil, err
+	}
+	hasMore := len(list) > limit
+	if hasMore {
+		list = list[:limit]
 	}
 	return &CommitsPageResult{
 		List:       list,
 		NextCursor: cursor + limit,
-		HasMore:    len(list) == limit,
+		HasMore:    hasMore,
 	}, nil
 }
 
-// WorktreeStatus 单个工作副本的状态（提案 1011 状态区）。dir 为该工作副本目录
 // WorktreeStatuses 返回全部工作副本的状态快照。工作副本徽标与 commit 图
 // 虚拟节点（前端构造）共用这一份数据——status 只在这里拉，不再分散到各接口。
 func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
@@ -121,219 +128,37 @@ func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
 	return result, nil
 }
 
-// ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。
-// 退出路径（三方任一结束都触发整体清理）：
-//   - 客户端断开（read pump 出错）→ cancel → 杀进程
-//   - 子进程退出（ptmx Read io.EOF）→ 发 exit 帧 → 关连接
-//   - server 关闭（ctx cancel）→ 杀进程
-func (s *Service) ServePty(ctx context.Context, conn *websocket.Conn, dir string, cols, rows int) error {
-	if cols <= 0 {
-		cols = 80
-	}
-	if rows <= 0 {
-		rows = 24
-	}
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/zsh"
-	}
-	if _, err := os.Stat(dir); err != nil {
-		return fmt.Errorf("path 目录不可用: path=%s: %w", dir, err)
-	}
+// --- 文件树 / 文件读写 / diff（代码阅读面板与 diff 面板）---
 
-	cmd := exec.Command(shell)
-	cmd.Dir = dir
-	cmd.Env = os.Environ()
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
-	if err != nil {
-		return fmt.Errorf("启动 shell 失败: %w", err)
-	}
-	defer func() {
-		// 兜底 SIGKILL：正常退出路径已 wait，这里只处理异常残留；不留孤儿进程是硬要求
-		_ = ptmx.Close()
-		_ = cmd.Process.Kill()
-		_, _ = cmd.Process.Wait()
-	}()
-
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	defer s.trackPty(cancel)()
-
-	// 子进程退出信号（wait 只能调一次，由独立 goroutine 持有）
-	procDone := make(chan error, 1)
-	go func() { procDone <- cmd.Wait() }()
-
-	// pty → 客户端 输出泵
-	outputErr := make(chan error, 1)
-	go func() {
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := ptmx.Read(buf)
-			if n > 0 {
-				wctx, wcancel := context.WithTimeout(ctx, 5*time.Second)
-				werr := conn.Write(wctx, websocket.MessageText,
-					mustJSON(ptyMessage{Type: "output", Data: string(buf[:n])}))
-				wcancel()
-				if werr != nil {
-					outputErr <- werr
-					return
-				}
-			}
-			if err != nil {
-				outputErr <- err
-				return
-			}
-		}
-	}()
-
-	// 客户端 → pty 输入泵（在调用方 goroutine 内同步读）
-	readErr := make(chan error, 1)
-	go func() {
-		for {
-			mt, data, err := conn.Read(ctx)
-			if err != nil {
-				readErr <- err
-				return
-			}
-			if mt != websocket.MessageText {
-				continue
-			}
-			var msg ptyMessage
-			if err := json.Unmarshal(data, &msg); err != nil {
-				continue
-			}
-			switch msg.Type {
-			case "input":
-				_, _ = ptmx.Write([]byte(msg.Data))
-			case "resize":
-				_ = pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(msg.Cols), Rows: uint16(msg.Rows)})
-			}
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-readErr:
-		// 客户端断开（含页面关闭）：杀进程退出
-		slog.Debug("pty 客户端断开", "dir", dir, "err", err)
-		return nil
-	case err := <-outputErr:
-		// pty 输出结束 = 子进程退出：发 exit 帧后收尾
-		var exitCode int
-		if waitErr := <-procDone; waitErr != nil {
-			var exitErr *exec.ExitError
-			if errors.As(waitErr, &exitErr) {
-				exitCode = exitErr.ExitCode()
-			}
-		}
-		wctx, wcancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_ = conn.Write(wctx, websocket.MessageText,
-			mustJSON(ptyMessage{Type: "exit", Code: exitCode}))
-		wcancel()
-		_ = conn.Close(websocket.StatusNormalClosure, "process exited")
-		_ = err
-		return nil
-	}
-}
-
-// StopPtySessions 向所有活跃 PTY 会话发取消（server 停机时调用），确保无孤儿 shell。
-// MVP 用 Service 上的轻量注册表；会话数 = 浏览器页面数，量级极小。
-func (s *Service) StopPtySessions() {
-	s.ptyMu.Lock()
-	defer s.ptyMu.Unlock()
-	for _, cancel := range s.ptyCancels {
-		cancel()
-	}
-	s.ptyCancels = map[int]context.CancelFunc{}
-}
-
-// trackPty 把会话 cancel 登记进注册表，返回的 untrack 供会话结束时 defer 注销。
-func (s *Service) trackPty(cancel context.CancelFunc) (untrack func()) {
-	s.ptyMu.Lock()
-	s.ptySeq++
-	id := s.ptySeq
-	s.ptyCancels[id] = cancel
-	s.ptyMu.Unlock()
-	return func() {
-		s.ptyMu.Lock()
-		delete(s.ptyCancels, id)
-		s.ptyMu.Unlock()
-	}
-}
-
-// OnServerStop 实现 app 的 serverStopHook：server 停机时杀掉全部 PTY 子进程。
-func (s *Service) OnServerStop() {
-	s.StopPtySessions()
-}
-
-// Tree 列某 TreeSource 下 subDir（相对该源根，空 = 根）的一层子项。
-// showIgnored 仅对 worktree 源生效：false（默认）时忽略项不返回；true 时返回并标记。
-func (s *Service) Tree(path string, src TreeSource, subDir string, showIgnored bool) ([]TreeEntry, error) {
+// Tree 全量列出 TreeSource 下 git 管理的文件（扁平相对路径，前端组树，不再逐层请求）。
+// 统一口径：worktree 源 = tracked + 未跟踪未忽略（ls-files，含已暂存未提交）；
+// commit/ref 源 = 该提交树内的全部文件（ls-tree -r）。被忽略文件在两种源下都不返回。
+func (s *Service) Tree(path string, src TreeSource) (*TreeListResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
 	switch src.Type {
 	case SourceTypeWorktree:
-		return s.treeFs(src.Id, subDir, showIgnored)
-	case SourceTypeCommit, SourceTypeRef:
-		entries, err := git.ListTreeAtRef(root, src.Id, subDir)
+		files, err := git.ListFiles(src.Id)
 		if err != nil {
-			return nil, fmt.Errorf("读取 %s 下的树失败: dir=%s: %w", src.Id, subDir, err)
+			return nil, fmt.Errorf("读取工作副本文件清单失败: dir=%s: %w", src.Id, err)
 		}
-		return toTreeEntries(entries), nil
+		return &TreeListResult{List: files}, nil
+	case SourceTypeCommit, SourceTypeRef:
+		m, err := git.FileShasAtRef(root, src.Id)
+		if err != nil {
+			return nil, fmt.Errorf("读取 %s 下的树失败: %w", src.Id, err)
+		}
+		list := make([]string, 0, len(m))
+		for p := range m {
+			list = append(list, p)
+		}
+		sort.Strings(list)
+		return &TreeListResult{List: list}, nil
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
-}
-
-// treeFs 读工作副本目录的真实文件树：fs 遍历 + git 忽略规则过滤（git.LoadIgnored）。
-func (s *Service) treeFs(wtDir string, subDir string, showIgnored bool) ([]TreeEntry, error) {
-	base, err := secureJoin(wtDir, subDir)
-	if err != nil {
-		return nil, err
-	}
-	items, err := os.ReadDir(base)
-	if err != nil {
-		return nil, fmt.Errorf("读取目录失败: dir=%s: %w", base, err)
-	}
-
-	ig := loadIgnoredDegrade(wtDir, subDir)
-
-	var entries []TreeEntry
-	for _, item := range items {
-		if item.Name() == ".git" {
-			continue
-		}
-		rel := item.Name()
-		if subDir != "" {
-			rel = subDir + "/" + item.Name()
-		}
-		if ig.Has(rel) && !showIgnored {
-			continue
-		}
-		size := int64(0)
-		if !item.IsDir() {
-			if info, err := item.Info(); err == nil {
-				size = info.Size()
-			}
-		}
-		entries = append(entries, TreeEntry{
-			Name:    item.Name(),
-			Dir:     item.IsDir(),
-			Size:    size,
-			Ignored: ig.Has(rel),
-		})
-	}
-	// 排序与虚拟树（ls-tree）一致：目录在前，目录/文件各自按字典序
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Dir != entries[j].Dir {
-			return entries[i].Dir
-		}
-		return entries[i].Name < entries[j].Name
-	})
-	return entries, nil
 }
 
 // ReadFile 读某 TreeSource 下 file 的内容。二进制检测：前 8KB 含 NUL 判为二进制。
@@ -569,4 +394,152 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
 	return s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
+}
+
+// --- PTY 会话（提案 1014，server 停机时由 OnServerStop 收尾）---
+
+// ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。
+// 退出路径（三方任一结束都触发整体清理）：
+//   - 客户端断开（read pump 出错）→ cancel → 杀进程
+//   - 子进程退出（ptmx Read io.EOF）→ 发 exit 帧 → 关连接
+//   - server 关闭（ctx cancel）→ 杀进程
+func (s *Service) ServePty(ctx context.Context, conn *websocket.Conn, dir string, cols, rows int) error {
+	if cols <= 0 {
+		cols = 80
+	}
+	if rows <= 0 {
+		rows = 24
+	}
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "/bin/zsh"
+	}
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("path 目录不可用: path=%s: %w", dir, err)
+	}
+
+	cmd := exec.Command(shell)
+	cmd.Dir = dir
+	cmd.Env = os.Environ()
+	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
+	if err != nil {
+		return fmt.Errorf("启动 shell 失败: %w", err)
+	}
+	defer func() {
+		// 兜底 SIGKILL：正常退出路径已 wait，这里只处理异常残留；不留孤儿进程是硬要求
+		_ = ptmx.Close()
+		_ = cmd.Process.Kill()
+		_, _ = cmd.Process.Wait()
+	}()
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	defer s.trackPty(cancel)()
+
+	// 子进程退出信号（wait 只能调一次，由独立 goroutine 持有）
+	procDone := make(chan error, 1)
+	go func() { procDone <- cmd.Wait() }()
+
+	// pty → 客户端 输出泵
+	outputErr := make(chan error, 1)
+	go func() {
+		buf := make([]byte, 32*1024)
+		for {
+			n, err := ptmx.Read(buf)
+			if n > 0 {
+				wctx, wcancel := context.WithTimeout(ctx, 5*time.Second)
+				werr := conn.Write(wctx, websocket.MessageText,
+					mustJSON(ptyMessage{Type: "output", Data: string(buf[:n])}))
+				wcancel()
+				if werr != nil {
+					outputErr <- werr
+					return
+				}
+			}
+			if err != nil {
+				outputErr <- err
+				return
+			}
+		}
+	}()
+
+	// 客户端 → pty 输入泵（在调用方 goroutine 内同步读）
+	readErr := make(chan error, 1)
+	go func() {
+		for {
+			mt, data, err := conn.Read(ctx)
+			if err != nil {
+				readErr <- err
+				return
+			}
+			if mt != websocket.MessageText {
+				continue
+			}
+			var msg ptyMessage
+			if err := json.Unmarshal(data, &msg); err != nil {
+				continue
+			}
+			switch msg.Type {
+			case "input":
+				_, _ = ptmx.Write([]byte(msg.Data))
+			case "resize":
+				_ = pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(msg.Cols), Rows: uint16(msg.Rows)})
+			}
+		}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case err := <-readErr:
+		// 客户端断开（含页面关闭）：杀进程退出
+		slog.Debug("pty 客户端断开", "dir", dir, "err", err)
+		return nil
+	case err := <-outputErr:
+		// pty 输出结束 = 子进程退出：发 exit 帧后收尾
+		var exitCode int
+		if waitErr := <-procDone; waitErr != nil {
+			var exitErr *exec.ExitError
+			if errors.As(waitErr, &exitErr) {
+				exitCode = exitErr.ExitCode()
+			}
+		}
+		wctx, wcancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_ = conn.Write(wctx, websocket.MessageText,
+			mustJSON(ptyMessage{Type: "exit", Code: exitCode}))
+		wcancel()
+		_ = conn.Close(websocket.StatusNormalClosure, "process exited")
+		_ = err
+		return nil
+	}
+}
+
+// StopPtySessions 向所有活跃 PTY 会话发取消（server 停机时调用），确保无孤儿 shell。
+// MVP 用 Service 上的轻量注册表；会话数 = 浏览器页面数，量级极小。
+func (s *Service) StopPtySessions() {
+	s.ptyMu.Lock()
+	defer s.ptyMu.Unlock()
+	for _, cancel := range s.ptyCancels {
+		cancel()
+	}
+	s.ptyCancels = map[int]context.CancelFunc{}
+}
+
+// trackPty 把会话 cancel 登记进注册表，返回的 untrack 供会话结束时 defer 注销。
+func (s *Service) trackPty(cancel context.CancelFunc) (untrack func()) {
+	s.ptyMu.Lock()
+	s.ptySeq++
+	id := s.ptySeq
+	s.ptyCancels[id] = cancel
+	s.ptyMu.Unlock()
+	return func() {
+		s.ptyMu.Lock()
+		delete(s.ptyCancels, id)
+		s.ptyMu.Unlock()
+	}
+}
+
+// OnServerStop 实现 app 的 serverStopHook：server 停机时杀掉全部 PTY 子进程。
+func (s *Service) OnServerStop() {
+	s.StopPtySessions()
 }

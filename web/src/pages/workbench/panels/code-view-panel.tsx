@@ -118,7 +118,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           selectedFile={file}
           onPick={pickFile}
           filter={diffFilter}
-          enableIgnoredToggle={source.type === 'worktree'}
         />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
