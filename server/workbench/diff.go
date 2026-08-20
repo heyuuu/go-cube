@@ -1,12 +1,14 @@
 package workbench
 
 import (
+	"bytes"
 	"crypto/sha1"
 	"fmt"
 	"io/fs"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -240,3 +242,106 @@ func parseHunkHeader(line string) (oldStart, newStart, oldCount, newCount int) {
 
 // emptyTreeSha git 空树对象 sha（根提交没有父，与空树比即「全部为新增」）
 const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
+
+// diffTreesGit 两侧都是 tree-ish：走 git.DiffFiles（name-status + rename 检测），
+// 状态字母映射为前端语义词。
+func diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
+	files, err := git.DiffFiles(root, left.Id, right.Id)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]DiffEntry, len(files))
+	for i, f := range files {
+		list[i] = DiffEntry{Path: f.Path, OldPath: f.OldPath, Status: letterToStatus(f.Code[0])}
+	}
+	return &DiffTreesResult{Mode: "git", List: list}, nil
+}
+
+// diffTreesFs 文件系统层扫描对比（Beyond Compare 模式）：
+// 两侧各收集「路径 → 内容指纹（git blob sha1）」，按路径对齐。
+// worktree 侧走 fs walk；commit/ref 侧走 ls-tree -r（blob sha 现成）。
+// 两个 sha 算法一致（blob sha = sha1("blob <len>\0" + content)），可直接比较。
+func diffTreesFs(
+	root string, left TreeSource, right TreeSource,
+	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
+) (*DiffTreesResult, error) {
+	leftMap, err := sourceFileMap(root, left, showIgnored)
+	if err != nil {
+		return nil, fmt.Errorf("扫描左侧失败: %w", err)
+	}
+	rightMap, err := sourceFileMap(root, right, showIgnored)
+	if err != nil {
+		return nil, fmt.Errorf("扫描右侧失败: %w", err)
+	}
+
+	var list []DiffEntry
+	for p, h := range leftMap {
+		rh, ok := rightMap[p]
+		switch {
+		case !ok:
+			list = append(list, DiffEntry{Path: p, Status: "deleted"})
+		case rh != h:
+			list = append(list, DiffEntry{Path: p, Status: "modified"})
+		}
+	}
+	for p := range rightMap {
+		if _, ok := leftMap[p]; !ok {
+			list = append(list, DiffEntry{Path: p, Status: "added"})
+		}
+	}
+	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
+	result := &DiffTreesResult{Mode: "fs", List: list}
+	if !showUntracked {
+		// fs 模式只过滤 untracked 时按两侧 worktree 的 index 判定成本高，MVP 不做减法，
+		// 返回全集（untracked 也是「工作区状态」的一部分）；显式告知前端该筛选未生效
+		result.IgnoredFilters = append(result.IgnoredFilters, "showUntracked=false（fs 模式下恒包含 untracked）")
+	}
+	applyDiffFilters(&result.List, statusFilter, pathPrefix)
+	return result, nil
+}
+
+// readFileDiff 对比两个源下同一相对路径的文件。
+// 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
+// 行级 diff 用 git.DiffNoIndex（算法与展示语义和 git 完全一致），
+// 内容落临时文件后比较，结束清理。
+func readFileDiff(root string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
+	leftData, err := readSide(root, left, file)
+	if err != nil {
+		return nil, fmt.Errorf("读取左侧文件失败: %w", err)
+	}
+	rightData, err := readSide(root, right, file)
+	if err != nil {
+		return nil, fmt.Errorf("读取右侧文件失败: %w", err)
+	}
+	if bytes.Equal(leftData, rightData) {
+		return &FileDiffResult{}, nil
+	}
+	if isBinary(leftData) || isBinary(rightData) {
+		return &FileDiffResult{Binary: true}, nil
+	}
+
+	tmpA, err := os.CreateTemp("", "cube-diff-a-*")
+	if err != nil {
+		return nil, fmt.Errorf("创建临时文件失败: %w", err)
+	}
+	defer os.Remove(tmpA.Name())
+	tmpB, err := os.CreateTemp("", "cube-diff-b-*")
+	if err != nil {
+		return nil, fmt.Errorf("创建临时文件失败: %w", err)
+	}
+	defer os.Remove(tmpB.Name())
+	if _, err := tmpA.Write(leftData); err != nil {
+		return nil, err
+	}
+	if _, err := tmpB.Write(rightData); err != nil {
+		return nil, err
+	}
+	tmpA.Close()
+	tmpB.Close()
+
+	out, err := git.DiffNoIndex(tmpA.Name(), tmpB.Name())
+	if err != nil {
+		return nil, err
+	}
+	return &FileDiffResult{Hunks: parseUnifiedDiff(out)}, nil
+}

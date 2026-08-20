@@ -5,22 +5,16 @@
 package workbench
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
-	"os/exec"
 	"sort"
 	"sync"
-	"time"
 
 	"cube/util/git"
 
 	"github.com/coder/websocket"
-	"github.com/creack/pty"
 )
 
 // Service 工作台领域服务。git 读路径无状态（每次调用直接调 git）；
@@ -161,78 +155,21 @@ func (s *Service) Tree(path string, src TreeSource) (*TreeListResult, error) {
 	}
 }
 
-// ReadFile 读某 TreeSource 下 file 的内容。二进制检测：前 8KB 含 NUL 判为二进制。
+// ReadFile 读某 TreeSource 下 file 的内容。实现在 file.go（二进制检测：前 8KB 含 NUL）。
 func (s *Service) ReadFile(path string, src TreeSource, file string) (*FileResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	var data []byte
-	switch src.Type {
-	case SourceTypeWorktree:
-		full, err := secureJoin(src.Id, file)
-		if err != nil {
-			return nil, err
-		}
-		info, err := os.Stat(full)
-		if err != nil {
-			return nil, fmt.Errorf("读取文件失败: file=%s: %w", file, err)
-		}
-		if info.IsDir() {
-			return nil, fmt.Errorf("目标是目录而非文件: file=%s", file)
-		}
-		if info.Size() > maxFileBytes {
-			return nil, fmt.Errorf("文件过大（超过 2MB）: file=%s", file)
-		}
-		data, err = os.ReadFile(full)
-		if err != nil {
-			return nil, fmt.Errorf("读取文件失败: file=%s: %w", file, err)
-		}
-	case SourceTypeCommit, SourceTypeRef:
-		var err error
-		data, err = git.ReadFileAtRef(root, src.Id, file)
-		if err != nil {
-			return nil, err
-		}
-		if int64(len(data)) > maxFileBytes {
-			return nil, fmt.Errorf("文件过大（超过 2MB）: file=%s", file)
-		}
-	default:
-		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
-	}
-
-	binary := isBinary(data)
-	content := ""
-	if !binary {
-		content = string(data)
-	}
-	return &FileResult{Content: content, Binary: binary, Size: int64(len(data))}, nil
+	return readFile(root, src, file)
 }
 
-// SaveFile 写工作副本文件（提案 1012 唯一落盘写路径）：只允许 worktree 源，
-// 不做任何 git 操作；内容未变化时跳过写。
+// SaveFile 写工作副本文件（提案 1012 唯一落盘写路径）。实现在 file.go。
 func (s *Service) SaveFile(path string, src TreeSource, file string, content string) (*FileResult, error) {
-	if src.Type != SourceTypeWorktree {
-		return nil, errors.New("只有 worktree 源（真实文件树）可以编辑保存")
-	}
-	if _, ok := git.FindGitRoot(path); !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
-	}
-	full, err := secureJoin(src.Id, file)
-	if err != nil {
-		return nil, err
-	}
-	data := []byte(content)
-	if old, err := os.ReadFile(full); err == nil && bytesEqual(old, data) {
-		return &FileResult{Size: int64(len(data))}, nil
-	}
-	if err := os.WriteFile(full, data, 0o644); err != nil {
-		return nil, fmt.Errorf("写文件失败: file=%s: %w", file, err)
-	}
-	return &FileResult{Size: int64(len(data))}, nil
+	return saveFile(path, src, file, content)
 }
 
-// DiffTrees 对比两个 TreeSource 的目录树。
+// DiffTrees 对比两个 TreeSource 的目录树。实现在 diff.go（git 模式 / fs 扫描模式）。
 // 筛选项：statusFilter（逗号分隔 added,deleted,modified,renamed）、pathPrefix；
 // showIgnored / showUntracked 仅 fs 模式有效（git 模式下收进 IgnoredFilters）。
 func (s *Service) DiffTrees(
@@ -244,9 +181,9 @@ func (s *Service) DiffTrees(
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
 	if left.Type == SourceTypeWorktree || right.Type == SourceTypeWorktree {
-		return s.diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
+		return diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
 	}
-	result, err := s.diffTreesGit(root, left, right)
+	result, err := diffTreesGit(root, left, right)
 	if err != nil {
 		return nil, err
 	}
@@ -257,111 +194,13 @@ func (s *Service) DiffTrees(
 	return result, nil
 }
 
-// diffTreesGit 两侧都是 tree-ish：走 git.DiffFiles（name-status + rename 检测），
-// 状态字母映射为前端语义词。
-func (s *Service) diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	files, err := git.DiffFiles(root, left.Id, right.Id)
-	if err != nil {
-		return nil, err
-	}
-	list := make([]DiffEntry, len(files))
-	for i, f := range files {
-		list[i] = DiffEntry{Path: f.Path, OldPath: f.OldPath, Status: letterToStatus(f.Code[0])}
-	}
-	return &DiffTreesResult{Mode: "git", List: list}, nil
-}
-
-// diffTreesFs 文件系统层扫描对比（Beyond Compare 模式）：
-// 两侧各收集「路径 → 内容指纹（git blob sha1）」，按路径对齐。
-// worktree 侧走 fs walk；commit/ref 侧走 ls-tree -r（blob sha 现成）。
-// 两个 sha 算法一致（blob sha = sha1("blob <len>\0" + content)），可直接比较。
-func (s *Service) diffTreesFs(
-	root string, left TreeSource, right TreeSource,
-	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
-) (*DiffTreesResult, error) {
-	leftMap, err := sourceFileMap(root, left, showIgnored)
-	if err != nil {
-		return nil, fmt.Errorf("扫描左侧失败: %w", err)
-	}
-	rightMap, err := sourceFileMap(root, right, showIgnored)
-	if err != nil {
-		return nil, fmt.Errorf("扫描右侧失败: %w", err)
-	}
-
-	var list []DiffEntry
-	for p, h := range leftMap {
-		rh, ok := rightMap[p]
-		switch {
-		case !ok:
-			list = append(list, DiffEntry{Path: p, Status: "deleted"})
-		case rh != h:
-			list = append(list, DiffEntry{Path: p, Status: "modified"})
-		}
-	}
-	for p := range rightMap {
-		if _, ok := leftMap[p]; !ok {
-			list = append(list, DiffEntry{Path: p, Status: "added"})
-		}
-	}
-	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
-	result := &DiffTreesResult{Mode: "fs", List: list}
-	if !showUntracked {
-		// fs 模式只过滤 untracked 时按两侧 worktree 的 index 判定成本高，MVP 不做减法，
-		// 返回全集（untracked 也是「工作区状态」的一部分）；显式告知前端该筛选未生效
-		result.IgnoredFilters = append(result.IgnoredFilters, "showUntracked=false（fs 模式下恒包含 untracked）")
-	}
-	applyDiffFilters(&result.List, statusFilter, pathPrefix)
-	return result, nil
-}
-
-// ReadFileDiff 对比两个源下同一相对路径的文件。
-// 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
-// 行级 diff 用 git.DiffNoIndex（算法与展示语义和 git 完全一致），
-// 内容落临时文件后比较，结束清理。
+// ReadFileDiff 对比两个源下同一相对路径的文件。实现在 diff.go。
 func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	leftData, err := readSide(root, left, file)
-	if err != nil {
-		return nil, fmt.Errorf("读取左侧文件失败: %w", err)
-	}
-	rightData, err := readSide(root, right, file)
-	if err != nil {
-		return nil, fmt.Errorf("读取右侧文件失败: %w", err)
-	}
-	if bytes.Equal(leftData, rightData) {
-		return &FileDiffResult{}, nil
-	}
-	if isBinary(leftData) || isBinary(rightData) {
-		return &FileDiffResult{Binary: true}, nil
-	}
-
-	tmpA, err := os.CreateTemp("", "cube-diff-a-*")
-	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer os.Remove(tmpA.Name())
-	tmpB, err := os.CreateTemp("", "cube-diff-b-*")
-	if err != nil {
-		return nil, fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer os.Remove(tmpB.Name())
-	if _, err := tmpA.Write(leftData); err != nil {
-		return nil, err
-	}
-	if _, err := tmpB.Write(rightData); err != nil {
-		return nil, err
-	}
-	tmpA.Close()
-	tmpB.Close()
-
-	out, err := git.DiffNoIndex(tmpA.Name(), tmpB.Name())
-	if err != nil {
-		return nil, err
-	}
-	return &FileDiffResult{Hunks: parseUnifiedDiff(out)}, nil
+	return readFileDiff(root, left, right, file)
 }
 
 // Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：
@@ -398,120 +237,16 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 
 // --- PTY 会话（提案 1014，server 停机时由 OnServerStop 收尾）---
 
-// ServePty 处理一个 PTY WebSocket 连接：升级 → 起子进程 → 双向泵 → 任一端结束后清理。
-// 退出路径（三方任一结束都触发整体清理）：
-//   - 客户端断开（read pump 出错）→ cancel → 杀进程
-//   - 子进程退出（ptmx Read io.EOF）→ 发 exit 帧 → 关连接
-//   - server 关闭（ctx cancel）→ 杀进程
+// ServePty 处理一个 PTY WebSocket 连接。会话机制在 pty.go（servePtySession）；
+// 这里负责入参校验与把 cancel 登记进注册表（server 停机时 StopPtySessions 广播）。
 func (s *Service) ServePty(ctx context.Context, conn *websocket.Conn, dir string, cols, rows int) error {
-	if cols <= 0 {
-		cols = 80
-	}
-	if rows <= 0 {
-		rows = 24
-	}
-	shell := os.Getenv("SHELL")
-	if shell == "" {
-		shell = "/bin/zsh"
-	}
 	if _, err := os.Stat(dir); err != nil {
 		return fmt.Errorf("path 目录不可用: path=%s: %w", dir, err)
 	}
-
-	cmd := exec.Command(shell)
-	cmd.Dir = dir
-	cmd.Env = os.Environ()
-	ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Cols: uint16(cols), Rows: uint16(rows)})
-	if err != nil {
-		return fmt.Errorf("启动 shell 失败: %w", err)
-	}
-	defer func() {
-		// 兜底 SIGKILL：正常退出路径已 wait，这里只处理异常残留；不留孤儿进程是硬要求
-		_ = ptmx.Close()
-		_ = cmd.Process.Kill()
-		_, _ = cmd.Process.Wait()
-	}()
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	defer s.trackPty(cancel)()
-
-	// 子进程退出信号（wait 只能调一次，由独立 goroutine 持有）
-	procDone := make(chan error, 1)
-	go func() { procDone <- cmd.Wait() }()
-
-	// pty → 客户端 输出泵
-	outputErr := make(chan error, 1)
-	go func() {
-		buf := make([]byte, 32*1024)
-		for {
-			n, err := ptmx.Read(buf)
-			if n > 0 {
-				wctx, wcancel := context.WithTimeout(ctx, 5*time.Second)
-				werr := conn.Write(wctx, websocket.MessageText,
-					mustJSON(ptyMessage{Type: "output", Data: string(buf[:n])}))
-				wcancel()
-				if werr != nil {
-					outputErr <- werr
-					return
-				}
-			}
-			if err != nil {
-				outputErr <- err
-				return
-			}
-		}
-	}()
-
-	// 客户端 → pty 输入泵（在调用方 goroutine 内同步读）
-	readErr := make(chan error, 1)
-	go func() {
-		for {
-			mt, data, err := conn.Read(ctx)
-			if err != nil {
-				readErr <- err
-				return
-			}
-			if mt != websocket.MessageText {
-				continue
-			}
-			var msg ptyMessage
-			if err := json.Unmarshal(data, &msg); err != nil {
-				continue
-			}
-			switch msg.Type {
-			case "input":
-				_, _ = ptmx.Write([]byte(msg.Data))
-			case "resize":
-				_ = pty.Setsize(ptmx, &pty.Winsize{Cols: uint16(msg.Cols), Rows: uint16(msg.Rows)})
-			}
-		}
-	}()
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case err := <-readErr:
-		// 客户端断开（含页面关闭）：杀进程退出
-		slog.Debug("pty 客户端断开", "dir", dir, "err", err)
-		return nil
-	case err := <-outputErr:
-		// pty 输出结束 = 子进程退出：发 exit 帧后收尾
-		var exitCode int
-		if waitErr := <-procDone; waitErr != nil {
-			var exitErr *exec.ExitError
-			if errors.As(waitErr, &exitErr) {
-				exitCode = exitErr.ExitCode()
-			}
-		}
-		wctx, wcancel := context.WithTimeout(context.Background(), 2*time.Second)
-		_ = conn.Write(wctx, websocket.MessageText,
-			mustJSON(ptyMessage{Type: "exit", Code: exitCode}))
-		wcancel()
-		_ = conn.Close(websocket.StatusNormalClosure, "process exited")
-		_ = err
-		return nil
-	}
+	return servePtySession(ctx, conn, dir, cols, rows)
 }
 
 // StopPtySessions 向所有活跃 PTY 会话发取消（server 停机时调用），确保无孤儿 shell。

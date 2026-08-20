@@ -151,6 +151,12 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - 例外：测试代码（`internal/testfixture` 与各 `*_test.go` 建仓/对账）可直接 exec git——fixture 若反向调用被测包会循环依赖。
 
 15. **Web API 只用 GET / POST 两种 method**。GET = 查询（参数走 query），POST = 动作（参数走 body，平铺挂在 huma input 的 `Body` 子结构上，惯例同 `opener/open`）。不引入 PUT / DELETE / PATCH——保存、删除等语义放进 **API 名**（path / operationId，如 `workbench/file/save`、`xxx/delete`），不用 method 区分。前后端都不提供其他 method 的 helper（后端 `api.go` 仅 `apiGet` / `apiPost`，前端 `client.ts` 同；曾有的 `apiPut` / `apiDelete` / `apiRegisterOp` 已移除）。
+16. **Service 包的代码布局**（workbench / project / opener / history 等 service 形态的包）：
+    - **入口统一在 service.go**：所有依赖 Service 的对外能力都是 `Service` 的公开方法，全部集中在 service.go（与规则 13 呼应）。方法体保持薄——参数校验与分支编排之外的具体逻辑一律外调；10 行以内、不值得单开主题的简单逻辑可直接写在方法里。
+    - **复杂逻辑内聚到主题文件**：需要独立输出类型、含复杂算法、或多个方法共享辅助函数的主题（如 diff.go / pty.go）单独成文件，以**包级函数**暴露功能（可含该主题私有的类型与常量），service.go 只留一行委托。判断标准：这组逻辑是否值得脱离 Service 单独阅读与测试。
+    - **types.go 放跨主题复用的类型**：struct / 常量，及其构建、解析函数（newXxx / parseXxx 等）；仅单主题使用的类型跟随主题文件。
+    - **helpers.go 放跨主题复用的内部函数**：与具体主题无关的通用小工具。
+
 
 ## 文档
 

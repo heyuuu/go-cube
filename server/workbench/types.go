@@ -83,18 +83,8 @@ func ParseTreeSource(typeStr, id string) (TreeSource, error) {
 	return TreeSource{Type: SourceType(typeStr), Id: id}, nil
 }
 
-// maxFileBytes 单文件读取上限（提案 1012：超大文件拒绝）
-const maxFileBytes = 2 * 1024 * 1024
-
 // TreeListResult 全量文件清单：扁平相对路径（前端用 lib/tree 组树）。
 // 统一只含 git 管理的文件——worktree 源含未跟踪未忽略项，被忽略项在两种源下都不返回。
 type TreeListResult struct {
 	List []string `json:"list"`
-}
-
-// FileResult 文件内容读取结果。
-type FileResult struct {
-	Content string `json:"content"` // 文本内容（binary=true 时为空）
-	Binary  bool   `json:"binary"`  // 是否二进制
-	Size    int64  `json:"size"`
 }
