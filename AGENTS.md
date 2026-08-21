@@ -135,7 +135,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
 10. **优先复用 `util/` 下的辅助函数**，能力收敛在各 util 子包内，不在调用方就地重造：
-    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读写统一走 `util/git`（读按主题分文件：`refs.go` 分支/remote/tag/ahead-behind、`status.go` 工作区状态、共享执行核 `run.go`；写：push / clone / commit / `FindGitRoot`，见 `git.go`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
+    - 动手前先 grep 对应 util 包；缺什么就**在该 util 包里加新函数**，而不是在 `cmd/` / domain 里实现。例：git 读写统一走 `util/git`（读按主题分文件：`refs.go` 分支/tag/ahead-behind、`remote.go` 远端配置、`status.go` 工作区状态、共享执行核 `run.go`；写：push / clone / commit / `FindGitRoot`，见 `git.go`）；路径处理走 `util/pathkit`；切片运算走 `util/slicekit`。
     - util 包内的函数必须**足够内聚且无副作用**：只依赖入参做纯运算，不读进程状态、不读环境。与环境强相关的副作用（`os.Getwd()` / `os.Getenv()` / 读 `~` / 当前时间等）只允许出现在**职责就是处理环境的 util 包**（如 `pathkit` 展开 `~`、`config` 读配置目录；`git` 的 `runOut` 为子进程显式构造环境属于其执行职责，不算读环境）；其它 util 包（`git` 的纯解析函数 / `slicekit` 等）一律不得调用这类函数。参数处理、cwd 解析、交互编排属于 `cmd` 层职责，不沉淀进 util 包。
     - 警惕功能重叠：例如「向上探测 `.git` 根」已有 `git.FindGitRoot(dir)`，调用方就不该再写一遍 `os.Stat(filepath.Join(..., ".git"))` 的循环。
 11. **注释只写「为什么」和「目的」，不要复述「执行过程」**。函数体内的步骤标号（`// 1. 先读 pid 文件 // 2. 再发信号`）、逐行翻译式注释（`// 遍历列表`、`// 返回结果`）属于过程复述——代码本身已经表达了执行过程，注释再写一遍只会制造**两个需要同步维护的事实源**，代码改了忘改注释就会两边对不上。应保留的是代码读不出来的信息：设计意图（如「端口冲突要报错，否则造孤儿」）、非显然的取舍（如「用 SIGKILL 兜底而不是无限等」）、外部约束（如「子进程 stdio 接 /dev/null，日志走 slog」）。判断标准：如果删掉这条注释，读者看代码能否理解「在做什么」——能，就删；读者看代码无法理解「为什么这么做」，就留。
