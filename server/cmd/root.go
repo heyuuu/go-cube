@@ -62,6 +62,8 @@ func newRootCmd(a *app.App) *cobra.Command {
 	cmd.AddCommand(alfred.NewCmd(a))
 	cmd.AddCommand(dev.NewCmd(a))
 
+	cmd.AddCommand(newDoctorCmd(a)) // 环境体检
+
 	// 待整理命令
 	cmd.AddCommand(newCheckCmd(a))
 

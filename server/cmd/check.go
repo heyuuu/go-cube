@@ -23,7 +23,7 @@ var allCheckItems = []string{checkItemCloneRules, checkItemGitDirty}
 func newCheckCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "check [options...]",
-		Short: "检查项目(目前 options 有: clone-rules)，不传会检查所有项目",
+		Short: "检查项目状态（正常业务状态：开发中/未推送等；异常损坏类检查见 cube doctor）",
 		Long: `对已收录的项目做批量体检，找出需要关注的项目。
 
 目前支持的检查项：
