@@ -16,7 +16,7 @@ import {
 
 import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
 
-import { sameSource, selectDiffSide, selectSource, type TreeSource, type WorkbenchParams } from '../params';
+import { refShortName, sameSource, selectDiffSide, selectSource, type TreeSource, type WorkbenchParams } from '../params';
 
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
@@ -77,7 +77,7 @@ function WorktreeSection({
         {(refs.data?.locals ?? []).map((b) => (
           <SelectableRow
             key={b}
-            label={b}
+            label={refShortName(b)}
             source={{ type: 'ref', id: b }}
             params={params}
             badge={b === refs.data?.current ? '当前' : undefined}
@@ -187,7 +187,8 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
 
   // 点击分支定位：选中的是 ref 时，把 commit 图滚到该分支 tip（refs 装饰所在的行）。
   // tip 未加载时自动翻页寻找（无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
-  const focusBranch = params.source?.type === 'ref' ? params.source.id : null;
+  // decorate 徽标是短名，选中态（规范全名）先剥前缀再比对。
+  const focusBranch = params.source?.type === 'ref' ? refShortName(params.source.id) : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!focusBranch) return;

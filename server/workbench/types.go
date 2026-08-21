@@ -3,6 +3,7 @@ package workbench
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"cube/util/git"
 )
@@ -16,12 +17,14 @@ type Info struct {
 	DefaultBranch string `json:"defaultBranch"` // 远端默认分支（无 remote 时为空，可接受空值）
 }
 
-// Refs 分支与 tag 信息
+// Refs 分支与 tag 信息，全部为规范全名（refs/heads/*、refs/remotes/*、refs/tags/*）。
+// 全名是写方契约：前端选中 ref 时直接整串作为 TreeSource 的 ref id 写入，零拼装；
+// 展示层剥前缀（见前端 refShortName）。
 type Refs struct {
-	Locals  []string           `json:"locals"`  // 本地分支名
-	Current string             `json:"current"` // 当前检出分支（无检出为空）
-	Remotes []git.RemoteBranch `json:"remotes"` // 远程分支（所有 remote）
-	Tags    []string           `json:"tags"`    // 全部 tag 名
+	Locals  []string `json:"locals"`  // 本地分支（refs/heads/*）
+	Current string   `json:"current"` // 当前检出分支全名（无检出为空）
+	Remotes []string `json:"remotes"` // 远程分支（refs/remotes/*，不含各 remote 的 HEAD）
+	Tags    []string `json:"tags"`    // 全部 tag（refs/tags/*）
 }
 
 // CommitsPageResult commit 日志一页数据（纯列表，泳道布局由前端对已持有数据计算）。
@@ -60,27 +63,80 @@ const (
 	SourceTypeWorktree SourceType = "worktree"
 )
 
-// TreeSource 工作台统一的目标抽象：
+// TreeSource 工作台统一的目标抽象，序列化（URL 参数 / API 参数）统一为 "type://id" 形态（见 String）：
 //   - commit:   Id = commit sha
-//   - ref:      Id = 分支名 / tag 等 ref 名
+//   - ref:      Id = 规范全名（refs/heads/master，写方契约）或短名（master、HEAD，人类手输兜底）
 //   - worktree: Id = 工作副本目录绝对路径（含未提交改动的当前状态）
 type TreeSource struct {
 	Type SourceType `json:"type"`
 	Id   string     `json:"id"`
 }
 
-// ParseTreeSource HTTP query 传参用扁平的 sourceType/sourceId（双源场景 leftType/leftId、rightType/rightId），
-// ParseTreeSource 负责解析与校验。
-func ParseTreeSource(typeStr, id string) (TreeSource, error) {
-	switch SourceType(typeStr) {
-	case SourceTypeCommit, SourceTypeRef, SourceTypeWorktree:
-	default:
-		return TreeSource{}, fmt.Errorf("未知的 sourceType: %q（合法值 commit/ref/worktree）", typeStr)
+// String 序列化为 "type://id"，与 ParseTreeSource 成对；URL 参数、API 参数、前端 query key 共用此格式。
+func (t TreeSource) String() string { return string(t.Type) + "://" + t.Id }
+
+// ParseTreeSource 解析 "scheme://id" 形态的 TreeSource。只做 envelope 层校验：
+// 已知 scheme 精确前缀匹配、余部原样取出——不做通用 URI 解析（不认 host、不 percent-decode，
+// 编码只发生在 HTTP 层），worktree 路径里出现 "://" 也不歧义（scheme 在第一个 "://" 前已确定）。
+// ref 是否存在等语义校验推迟到物化树时。
+func ParseTreeSource(s string) (TreeSource, error) {
+	scheme, id, ok := strings.Cut(s, "://")
+	if !ok {
+		return TreeSource{}, fmt.Errorf("TreeSource 缺少 scheme:// 前缀: %q（合法值 commit/ref/worktree）", s)
 	}
 	if id == "" {
-		return TreeSource{}, errors.New("sourceId 不能为空")
+		return TreeSource{}, errors.New("scheme 后的 id 不能为空")
 	}
-	return TreeSource{Type: SourceType(typeStr), Id: id}, nil
+	var typ SourceType
+	switch scheme {
+	case string(SourceTypeCommit):
+		typ = SourceTypeCommit
+		if !isCommitSha(id) {
+			return TreeSource{}, fmt.Errorf("commit id 必须是 40/64 位十六进制: %q", id)
+		}
+	case string(SourceTypeRef):
+		typ = SourceTypeRef
+		// refs/ 开头视为规范全名原样放行（含 refs/pull/* 等开放子树）；短名按 refname 规则校验
+		if !strings.HasPrefix(id, "refs/") && !isRefShortName(id) {
+			return TreeSource{}, fmt.Errorf("ref 名不合法: %q（不接受 HEAD~2、@{u} 等 rev 表达式）", id)
+		}
+	case string(SourceTypeWorktree):
+		typ = SourceTypeWorktree
+	default:
+		return TreeSource{}, fmt.Errorf("未知的 scheme: %q（合法值 commit/ref/worktree）", scheme)
+	}
+	return TreeSource{Type: typ, Id: id}, nil
+}
+
+// isCommitSha 校验完整 commit sha（sha1 40 位 / sha256 64 位，大小写均可）。
+func isCommitSha(s string) bool {
+	if len(s) != 40 && len(s) != 64 {
+		return false
+	}
+	for _, c := range s {
+		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+			return false
+		}
+	}
+	return true
+}
+
+// isRefShortName 按 git check-ref-format 的核心字符规则校验 ref 短名
+// （master、HEAD、origin/dev、heads/master 等各级形态）。目的是挡住 rev 表达式
+// （HEAD~2、@{u}、v1.0-2-gabc）——它们是寻址语法而非 ref 名，作为选中目标
+// 会随仓库演进含义漂移；完整规则由物化时的 rev-parse 兜底。
+func isRefShortName(s string) bool {
+	if s == "" || strings.HasPrefix(s, "/") || strings.HasPrefix(s, ".") ||
+		strings.HasSuffix(s, "/") || strings.HasSuffix(s, ".") || strings.HasSuffix(s, ".lock") ||
+		strings.Contains(s, "..") || strings.Contains(s, "//") || strings.Contains(s, "@{") {
+		return false
+	}
+	for _, r := range s {
+		if r <= 0x20 || r == 0x7f || strings.ContainsRune("~^:?*[\\", r) {
+			return false
+		}
+	}
+	return true
 }
 
 // TreeListResult 全量文件清单：扁平相对路径（前端用 lib/tree 组树）。

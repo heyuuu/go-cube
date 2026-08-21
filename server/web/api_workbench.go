@@ -65,12 +65,12 @@ func (h *WorkbenchHandler) worktrees(input struct {
 }
 
 // 注意：huma 不展开嵌入 struct 的 query tag，参数一律平铺声明。
+// source/left/right 均为 "type://id" 形态（workbench.ParseTreeSource 定义文法）。
 func (h *WorkbenchHandler) tree(input struct {
-	Path       string `query:"path" required:"true"`
-	SourceType string `query:"sourceType" required:"true"`
-	SourceId   string `query:"sourceId" required:"true"`
+	Path   string `query:"path" required:"true"`
+	Source string `query:"source" required:"true"`
 }) (*workbench.TreeListResult, error) {
-	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	src, err := workbench.ParseTreeSource(input.Source)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +78,11 @@ func (h *WorkbenchHandler) tree(input struct {
 }
 
 func (h *WorkbenchHandler) file(input struct {
-	Path       string `query:"path" required:"true"`
-	SourceType string `query:"sourceType" required:"true"`
-	SourceId   string `query:"sourceId" required:"true"`
-	File       string `query:"file" required:"true"`
+	Path   string `query:"path" required:"true"`
+	Source string `query:"source" required:"true"`
+	File   string `query:"file" required:"true"`
 }) (*workbench.FileResult, error) {
-	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	src, err := workbench.ParseTreeSource(input.Source)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +93,13 @@ func (h *WorkbenchHandler) file(input struct {
 // 路径名 file/save 上体现，不用 method 区分读写。
 func (h *WorkbenchHandler) saveFile(input struct {
 	Body struct {
-		Path       string `json:"path"`
-		SourceType string `json:"sourceType"`
-		SourceId   string `json:"sourceId"`
-		File       string `json:"file"`
-		Content    string `json:"content"`
+		Path    string `json:"path"`
+		Source  string `json:"source"`
+		File    string `json:"file"`
+		Content string `json:"content"`
 	}
 }) (*workbench.FileResult, error) {
-	src, err := workbench.ParseTreeSource(input.Body.SourceType, input.Body.SourceId)
+	src, err := workbench.ParseTreeSource(input.Body.Source)
 	if err != nil {
 		return nil, err
 	}
@@ -110,20 +108,18 @@ func (h *WorkbenchHandler) saveFile(input struct {
 
 func (h *WorkbenchHandler) diff(input struct {
 	Path          string `query:"path" required:"true"`
-	LeftType      string `query:"leftType" required:"true"`
-	LeftId        string `query:"leftId" required:"true"`
-	RightType     string `query:"rightType" required:"true"`
-	RightId       string `query:"rightId" required:"true"`
+	Left          string `query:"left" required:"true"`
+	Right         string `query:"right" required:"true"`
 	ShowIgnored   bool   `query:"showIgnored"`
 	ShowUntracked bool   `query:"showUntracked"`
 	StatusFilter  string `query:"statusFilter"`
 	PathPrefix    string `query:"pathPrefix"`
 }) (*workbench.DiffTreesResult, error) {
-	left, err := workbench.ParseTreeSource(input.LeftType, input.LeftId)
+	left, err := workbench.ParseTreeSource(input.Left)
 	if err != nil {
 		return nil, err
 	}
-	right, err := workbench.ParseTreeSource(input.RightType, input.RightId)
+	right, err := workbench.ParseTreeSource(input.Right)
 	if err != nil {
 		return nil, err
 	}
@@ -132,18 +128,16 @@ func (h *WorkbenchHandler) diff(input struct {
 }
 
 func (h *WorkbenchHandler) fileDiff(input struct {
-	Path      string `query:"path" required:"true"`
-	LeftType  string `query:"leftType" required:"true"`
-	LeftId    string `query:"leftId" required:"true"`
-	RightType string `query:"rightType" required:"true"`
-	RightId   string `query:"rightId" required:"true"`
-	File      string `query:"file" required:"true"`
+	Path  string `query:"path" required:"true"`
+	Left  string `query:"left" required:"true"`
+	Right string `query:"right" required:"true"`
+	File  string `query:"file" required:"true"`
 }) (*workbench.FileDiffResult, error) {
-	left, err := workbench.ParseTreeSource(input.LeftType, input.LeftId)
+	left, err := workbench.ParseTreeSource(input.Left)
 	if err != nil {
 		return nil, err
 	}
-	right, err := workbench.ParseTreeSource(input.RightType, input.RightId)
+	right, err := workbench.ParseTreeSource(input.Right)
 	if err != nil {
 		return nil, err
 	}
@@ -172,11 +166,10 @@ func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *WorkbenchHandler) changes(input struct {
-	Path       string `query:"path" required:"true"`
-	SourceType string `query:"sourceType" required:"true"`
-	SourceId   string `query:"sourceId" required:"true"`
+	Path   string `query:"path" required:"true"`
+	Source string `query:"source" required:"true"`
 }) (*workbench.DiffTreesResult, error) {
-	src, err := workbench.ParseTreeSource(input.SourceType, input.SourceId)
+	src, err := workbench.ParseTreeSource(input.Source)
 	if err != nil {
 		return nil, err
 	}

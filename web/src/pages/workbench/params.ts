@@ -1,6 +1,7 @@
 // 工作台 URL 状态总线（提案 1010 定）：URL search params 是面板间唯一通信渠道，
 // 所有面板读写选中态都必须经过本模块，不得自行 useSearchParams 拼参数。
-// 命名与后端 API query 参数保持一致：sourceType/sourceId、leftType/leftId、rightType/rightId。
+// 选中目标统一序列化为 "type://id"（commit://<sha>、ref://refs/heads/master、worktree://<目录>），
+// 参数名与后端 API 一致：source / left / right（文法见后端 workbench.ParseTreeSource）。
 
 export type SourceType = 'commit' | 'ref' | 'worktree';
 
@@ -16,22 +17,38 @@ export type WorkbenchParams = {
   right: TreeSource | null;
 };
 
-function readSource(params: URLSearchParams, prefix: string): TreeSource | null {
-  const type = params.get(`${prefix}Type`);
-  const id = params.get(`${prefix}Id`);
-  if (!type || !id) return null;
-  if (type !== 'commit' && type !== 'ref' && type !== 'worktree') return null;
-  return { type, id };
+// 解析 "type://id"：已知 scheme 精确前缀匹配，余部原样取出（与后端解析同构）。
+// 不做通用 URL 解析——worktree 路径自身含 "://" 也不歧义（scheme 在第一个 "://" 前已确定）。
+export function parseSource(s: string | null): TreeSource | null {
+  for (const type of ['commit', 'ref', 'worktree'] as const) {
+    if (s?.startsWith(type + '://')) {
+      const id = s.slice(type.length + 3);
+      return id === '' ? null : { type, id };
+    }
+  }
+  return null;
 }
 
-function writeSource(params: URLSearchParams, prefix: string, src: TreeSource | null) {
-  if (src) {
-    params.set(`${prefix}Type`, src.type);
-    params.set(`${prefix}Id`, src.id);
-  } else {
-    params.delete(`${prefix}Type`);
-    params.delete(`${prefix}Id`);
+export function toUri(src: TreeSource): string {
+  return `${src.type}://${src.id}`;
+}
+
+// 剥规范全名前缀得短名（refs/heads/master → master）；非全名形态（HEAD、短名手输）原样返回。
+// 展示与 commit 图 decorate 徽标（短名）的比对共用。
+export function refShortName(id: string): string {
+  for (const p of ['refs/heads/', 'refs/tags/', 'refs/remotes/']) {
+    if (id.startsWith(p)) return id.slice(p.length);
   }
+  return id;
+}
+
+function readSource(params: URLSearchParams, key: 'source' | 'left' | 'right'): TreeSource | null {
+  return parseSource(params.get(key));
+}
+
+function writeSource(params: URLSearchParams, key: 'source' | 'left' | 'right', src: TreeSource | null) {
+  if (src) params.set(key, toUri(src));
+  else params.delete(key);
 }
 
 export function readWorkbenchParams(params: URLSearchParams): WorkbenchParams {
@@ -58,8 +75,7 @@ export function selectSource(params: URLSearchParams, src: TreeSource) {
 // 两边都满则重开一轮（新目标为 left）
 export function selectDiffSide(params: URLSearchParams, src: TreeSource) {
   const cur = readWorkbenchParams(params);
-  params.delete('sourceType');
-  params.delete('sourceId');
+  params.delete('source');
   if (!cur.left || (cur.left && cur.right)) {
     writeSource(params, 'left', src);
     writeSource(params, 'right', null);
@@ -76,12 +92,12 @@ export function clearSelection(params: URLSearchParams) {
 }
 
 export function sameSource(a: TreeSource | null, b: TreeSource | null): boolean {
-  return !!a && !!b && a.type === b.type && a.id === b.id;
+  return !!a && !!b && toUri(a) === toUri(b);
 }
 
 export function sourceLabel(src: TreeSource | null): string {
   if (!src) return '';
-  if (src.type === 'commit') return `${src.id.slice(0, 7)}`;
-  if (src.type === 'ref') return src.id;
+  if (src.type === 'commit') return src.id.slice(0, 7);
+  if (src.type === 'ref') return refShortName(src.id);
   return src.id.split('/').pop() || src.id;
 }

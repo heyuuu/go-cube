@@ -123,6 +123,95 @@ func TestTags(t *testing.T) {
 	}
 }
 
+// TestRefs 全量 ref 清单：三类 namespace 的规范全名 + 远端 HEAD 符号指针剔除。
+// current 属 HEAD 状态，由 TestHeadRef 单独覆盖。
+func TestRefs(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+		Branch: "develop",
+		Tags:   []string{"v1.0"},
+	})
+	directGit(t, dir, "update-ref", "refs/remotes/origin/master", "refs/heads/develop")
+	directGit(t, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/master")
+
+	refs, err := Refs(dir)
+	if err != nil {
+		t.Fatalf("Refs 出错: %v", err)
+	}
+	if !containsStr(refs.Locals, "refs/heads/develop") {
+		t.Fatalf("locals %v 不含 refs/heads/develop", refs.Locals)
+	}
+	if !reflect.DeepEqual(refs.Remotes, []string{"refs/remotes/origin/master"}) {
+		t.Fatalf("remotes = %v（origin/HEAD 符号指针应被剔除）", refs.Remotes)
+	}
+	if !reflect.DeepEqual(refs.Tags, []string{"refs/tags/v1.0"}) {
+		t.Fatalf("tags = %v", refs.Tags)
+	}
+	// 全名/短名成对不变量：ShortX[i] 是 X[i] 剥 namespace 前缀
+	if len(refs.ShortLocals) != len(refs.Locals) || !containsStr(refs.ShortLocals, "develop") {
+		t.Fatalf("shortLocals 与 locals 不成对: %v vs %v", refs.ShortLocals, refs.Locals)
+	}
+	if !reflect.DeepEqual(refs.ShortRemotes, []string{"origin/master"}) {
+		t.Fatalf("shortRemotes = %v", refs.ShortRemotes)
+	}
+	if !reflect.DeepEqual(refs.ShortTags, []string{"v1.0"}) {
+		t.Fatalf("shortTags = %v", refs.ShortTags)
+	}
+}
+
+// TestRefs_NonRepo 非仓库目录返回零值不报错（降级约定）。
+func TestRefs_NonRepo(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	refs, err := Refs(ws.Mkdir("empty"))
+	if err != nil {
+		t.Fatalf("非仓库 Refs 不应报错: %v", err)
+	}
+	if refs.Locals != nil || refs.Remotes != nil || refs.Tags != nil {
+		t.Fatalf("非仓库应返回零值: %+v", refs)
+	}
+}
+
+// TestHeadRef attached → refs/heads 全名；detached / 非仓库 → 空串。
+func TestHeadRef(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
+	if got := HeadRef(dir); got != "refs/heads/develop" {
+		t.Fatalf("HeadRef = %q，期望 refs/heads/develop", got)
+	}
+	directGit(t, dir, "checkout", "--detach")
+	if got := HeadRef(dir); got != "" {
+		t.Fatalf("detached 时 HeadRef 应为空，实际 %q", got)
+	}
+	if got := HeadRef(ws.Mkdir("empty")); got != "" {
+		t.Fatalf("非仓库 HeadRef 应为空，实际 %q", got)
+	}
+}
+
+// TestBranches_HeadOnTag HEAD 被 symbolic-ref 挂到 heads 外（tag）时 current 为空，
+// 不得把 refs/tags/* 整串误当分支名（git branch --show-current 同口径输出空）。
+func TestBranches_HeadOnTag(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+	directGit(t, dir, "symbolic-ref", "HEAD", "refs/tags/v1.0")
+
+	_, current, err := Branches(dir)
+	if err != nil {
+		t.Fatalf("Branches 出错: %v", err)
+	}
+	if current != "" {
+		t.Fatalf("HEAD 挂在 refs/tags/* 时 current 应为空，实际 %q", current)
+	}
+}
+
+func containsStr(list []string, s string) bool {
+	for _, x := range list {
+		if x == s {
+			return true
+		}
+	}
+	return false
+}
+
 // TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
 func TestDefaultBranch_OriginHEAD(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)

@@ -173,7 +173,7 @@ func pickRefs(branches []string, tags []string, currentBranch string, flagRefs [
 		items = append(items, refItem{label: "branch: " + b, ref: b})
 	}
 	for _, t := range tags {
-		items = append(items, refItem{label: "tag:    " + t, ref: "refs/tags/" + t})
+		items = append(items, refItem{label: "tag:    " + t, ref: git.RefTagsPrefix + t})
 	}
 	if len(items) == 0 {
 		return nil, errors.New("仓库无任何本地分支或 tag")

@@ -41,24 +41,18 @@ func (s *Service) Info(path string) (*Info, error) {
 	return &Info{Root: root, DefaultBranch: defaultBranch}, nil
 }
 
-// Refs 分支与 tag 列表，作为 git 树面板 / 双选交互的候选目标。
+// Refs 分支与 tag 列表（规范全名，见 Refs 注释）+ 当前检出分支，作为 git 树面板 /
+// 双选交互的候选目标。当前分支是 HEAD 状态而非 ref 枚举的一部分，单独取（HeadRef）。
 func (s *Service) Refs(path string) (*Refs, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	locals, current, err := git.Branches(root)
+	refs, err := git.Refs(root)
 	if err != nil {
 		return nil, err
 	}
-	remotes, _ := git.RemoteBranches(root) // 无远程分支返回空，可接受
-	tags, _ := git.Tags(root)              // 无 tag 返回空，可接受
-	return &Refs{
-		Locals:  locals,
-		Current: current,
-		Remotes: remotes,
-		Tags:    tags,
-	}, nil
+	return &Refs{Locals: refs.Locals, Current: git.HeadRef(root), Remotes: refs.Remotes, Tags: refs.Tags}, nil
 }
 
 // Commits 拉取 commit 日志一页（--all 全分支；纯列表，泳道布局由前端对已持有数据计算）。

@@ -51,10 +51,17 @@ func TestWorkbenchRefs(t *testing.T) {
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/refs?path="+repo)), &got)
 	if len(got.Locals) == 0 {
-		t.Error("本地分支不应为空")
+		t.Fatal("本地分支不应为空")
 	}
 	if got.Current == "" {
-		t.Error("当前分支不应为空")
+		t.Fatal("当前分支不应为空")
+	}
+	// 列表是写方契约：前端选中 ref 时整串作为 TreeSource id，必须是规范全名
+	if !strings.HasPrefix(got.Locals[0], "refs/heads/") {
+		t.Errorf("locals 应为规范全名: %v", got.Locals)
+	}
+	if !strings.HasPrefix(got.Current, "refs/heads/") {
+		t.Errorf("current 应为规范全名: %q", got.Current)
 	}
 	// 无 remote/tag 的 fixture：remotes/tags 是 nil 切片，envelope 应序列化为 []
 	if got.Remotes == nil || got.Tags == nil {
@@ -63,16 +70,60 @@ func TestWorkbenchRefs(t *testing.T) {
 }
 
 // TestWorkbenchSourceParse 校验 TreeSource 解析纯函数（HTTP 契约的一部分）。
+// 合法用例同时断言 String() 往返一致（写方序列化与解析成对）。
 func TestWorkbenchSourceParse(t *testing.T) {
-	if _, err := workbench.ParseTreeSource("branch", "main"); err == nil {
-		t.Error("未知 type 应报错")
+	sha40 := strings.Repeat("a1", 20)
+	sha64 := strings.Repeat("b2", 32)
+	cases := []struct {
+		name    string
+		in      string
+		want    workbench.TreeSource
+		wantErr bool
+	}{
+		{"commit 40 位 sha", "commit://" + sha40, workbench.TreeSource{Type: workbench.SourceTypeCommit, Id: sha40}, false},
+		{"commit 64 位 sha（sha256 仓库）", "commit://" + sha64, workbench.TreeSource{Type: workbench.SourceTypeCommit, Id: sha64}, false},
+		{"ref 全名-分支", "ref://refs/heads/master", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "refs/heads/master"}, false},
+		{"ref 全名-tag", "ref://refs/tags/v1.0", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "refs/tags/v1.0"}, false},
+		{"ref 全名-远程跟踪", "ref://refs/remotes/origin/dev", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "refs/remotes/origin/dev"}, false},
+		{"ref 全名-开放子树", "ref://refs/pull/123/head", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "refs/pull/123/head"}, false},
+		{"ref 相对路径短名", "ref://heads/master", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "heads/master"}, false},
+		{"ref 短名-HEAD", "ref://HEAD", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "HEAD"}, false},
+		{"ref 短名-远程叶名", "ref://origin/dev", workbench.TreeSource{Type: workbench.SourceTypeRef, Id: "origin/dev"}, false},
+		{"worktree 绝对路径", "worktree:///tmp/x", workbench.TreeSource{Type: workbench.SourceTypeWorktree, Id: "/tmp/x"}, false},
+		{"worktree 路径含冒号不歧义", "worktree:///tmp/a://b", workbench.TreeSource{Type: workbench.SourceTypeWorktree, Id: "/tmp/a://b"}, false},
+		{"缺 scheme", "master", workbench.TreeSource{}, true},
+		{"未知 scheme", "branch://main", workbench.TreeSource{}, true},
+		{"空 id", "ref://", workbench.TreeSource{}, true},
+		{"commit 非 hex", "commit://" + strings.Repeat("z", 40), workbench.TreeSource{}, true},
+		{"commit 长度不符", "commit://abc123", workbench.TreeSource{}, true},
+		{"rev 表达式-波浪号", "ref://HEAD~2", workbench.TreeSource{}, true},
+		{"rev 表达式-upstream", "ref://@{u}", workbench.TreeSource{}, true},
+		{"rev 表达式-插入符", "ref://master^", workbench.TreeSource{}, true},
+		{"ref 短名含空格", "ref://a b", workbench.TreeSource{}, true},
+		{"ref 短名含冒号", "ref://a:b", workbench.TreeSource{}, true},
+		{"ref 短名连续点", "ref://master..dev", workbench.TreeSource{}, true},
+		{"ref 短名 lock 结尾", "ref://x.lock", workbench.TreeSource{}, true},
+		{"ref 短名前导点", "ref://.hidden", workbench.TreeSource{}, true},
 	}
-	if _, err := workbench.ParseTreeSource("commit", ""); err == nil {
-		t.Error("空 id 应报错")
-	}
-	src, err := workbench.ParseTreeSource("worktree", "/tmp/x")
-	if err != nil || src.Type != workbench.SourceTypeWorktree || src.Id != "/tmp/x" {
-		t.Errorf("合法输入解析不符: %+v, err=%v", src, err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := workbench.ParseTreeSource(tc.in)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("应报错: %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("不应报错: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("解析不符: got %+v, want %+v", got, tc.want)
+			}
+			if got.String() != tc.in {
+				t.Errorf("String 往返不一致: got %q, want %q", got.String(), tc.in)
+			}
+		})
 	}
 }
 
@@ -155,7 +206,7 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	var wtTree struct {
 		List []string `json:"list"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &wtTree)
+	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&source="+urlQueryEscape("worktree://"+repo))), &wtTree)
 	set := map[string]bool{}
 	for _, f := range wtTree.List {
 		set[f] = true
@@ -171,7 +222,7 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	var cTree struct {
 		List []string `json:"list"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=commit&sourceId="+head)), &cTree)
+	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&source=commit://"+head)), &cTree)
 	if len(cTree.List) == 0 {
 		t.Fatalf("commit 源清单不应为空")
 	}
@@ -185,7 +236,7 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	var cFile struct {
 		Content string `json:"content"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file?path="+repo+"&sourceType=commit&sourceId="+head+"&file=a.txt")), &cFile)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file?path="+repo+"&source=commit://"+head+"&file=a.txt")), &cFile)
 	if cFile.Content != "hello" {
 		t.Errorf("commit 读文件不符: %q", cFile.Content)
 	}
@@ -194,13 +245,13 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	var wFile struct {
 		Content string `json:"content"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo)+"&file=sub/b.txt")), &wFile)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file?path="+repo+"&source="+urlQueryEscape("worktree://"+repo)+"&file=sub/b.txt")), &wFile)
 	if wFile.Content != "sub" {
 		t.Errorf("worktree 读文件不符: %q", wFile.Content)
 	}
 
 	// 路径逃逸被拒
-	if r := getJSON(t, env.url("/api/workbench/file?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo)+"&file=../../etc/hosts")); r.Ok {
+	if r := getJSON(t, env.url("/api/workbench/file?path="+repo+"&source="+urlQueryEscape("worktree://"+repo)+"&file=../../etc/hosts")); r.Ok {
 		t.Error("路径逃逸应报错")
 	}
 }
@@ -212,12 +263,12 @@ func TestWorkbenchSaveFile(t *testing.T) {
 
 	// 虚拟源保存被拒
 	head := gitHead(t, repo)
-	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"sourceType":"commit","sourceId":%q,"file":"edit.txt","content":"x"}`, repo, head)); r.Ok {
+	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"source":"commit://%s","file":"edit.txt","content":"x"}`, repo, head)); r.Ok {
 		t.Error("commit 源保存应被拒")
 	}
 
 	// worktree 源保存成功且落盘
-	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"sourceType":"worktree","sourceId":%q,"file":"edit.txt","content":"new"}`, repo, repo)); !r.Ok {
+	if r := postJSON(t, env.url("/api/workbench/file/save"), fmt.Sprintf(`{"path":%q,"source":"worktree://%s","file":"edit.txt","content":"new"}`, repo, repo)); !r.Ok {
 		t.Fatalf("worktree 保存应成功: %s", r.Message)
 	}
 	if got, _ := os.ReadFile(filepath.Join(repo, "edit.txt")); string(got) != "new" {
@@ -307,8 +358,8 @@ func TestWorkbenchDiffGit(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"list"`
 	}
-	wt := urlQueryEscape(repo)
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt)), &got)
+	wt := urlQueryEscape("worktree://" + repo)
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt)), &got)
 	if got.Mode != "fs" {
 		t.Fatalf("含 worktree 源应为 fs 模式, got %q", got.Mode)
 	}
@@ -327,7 +378,7 @@ func TestWorkbenchDiffGit(t *testing.T) {
 	}
 
 	// showIgnored=true：ignored.log 出现
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&showIgnored=true")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&showIgnored=true")), &got)
 	found := false
 	for _, e := range got.List {
 		if e.Path == "ignored.log" {
@@ -339,7 +390,7 @@ func TestWorkbenchDiffGit(t *testing.T) {
 	}
 
 	// statusFilter 过滤
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&statusFilter=modified")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&statusFilter=modified")), &got)
 	if len(got.List) != 1 || got.List[0].Path != "mod.txt" {
 		t.Errorf("statusFilter=modified 应只剩 mod.txt: %+v", got.List)
 	}
@@ -348,7 +399,7 @@ func TestWorkbenchDiffGit(t *testing.T) {
 func TestWorkbenchFileDiff(t *testing.T) {
 	env := newTestEnv(t)
 	repo, head := setupDiffRepo(t, env)
-	wt := urlQueryEscape(repo)
+	wt := urlQueryEscape("worktree://" + repo)
 
 	var got struct {
 		Binary bool `json:"binary"`
@@ -361,7 +412,7 @@ func TestWorkbenchFileDiff(t *testing.T) {
 			} `json:"lines"`
 		} `json:"hunks"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=worktree&rightId="+wt+"&file=mod.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=mod.txt")), &got)
 	if got.Binary || len(got.Hunks) == 0 {
 		t.Fatalf("mod.txt 应有 diff hunks: binary=%v hunks=%d", got.Binary, len(got.Hunks))
 	}
@@ -379,7 +430,7 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	var same struct {
 		Hunks []struct{} `json:"hunks"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&leftType=commit&leftId="+head+"&rightType=commit&rightId="+head+"&file=keep.txt")), &same)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right=commit://"+head+"&file=keep.txt")), &same)
 	if len(same.Hunks) != 0 {
 		t.Errorf("相同文件应无 hunks: %d", len(same.Hunks))
 	}
@@ -466,7 +517,7 @@ func TestWorkbenchTreeSort(t *testing.T) {
 	var got struct {
 		List []string `json:"list"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/tree?path="+repo+"&source="+urlQueryEscape("worktree://"+repo))), &got)
 	set := map[string]bool{}
 	for _, f := range got.List {
 		set[f] = true
@@ -497,7 +548,7 @@ func TestWorkbenchChanges(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"list"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&sourceType=worktree&sourceId="+urlQueryEscape(repo))), &wt)
+	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&source="+urlQueryEscape("worktree://"+repo))), &wt)
 	byPath := map[string]string{}
 	for _, e := range wt.List {
 		byPath[e.Path] = e.Status
@@ -516,7 +567,7 @@ func TestWorkbenchChanges(t *testing.T) {
 			Status string `json:"status"`
 		} `json:"list"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&sourceType=commit&sourceId="+head)), &c)
+	decodeData(t, getJSON(t, env.url("/api/workbench/changes?path="+repo+"&source=commit://"+head)), &c)
 	if len(c.List) != 2 {
 		t.Errorf("commit 差异应含 2 个文件: %+v", c.List)
 	}

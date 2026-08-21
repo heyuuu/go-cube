@@ -43,7 +43,7 @@ func parseWorktreePorcelain(out string) []Worktree {
 		case strings.HasPrefix(line, "HEAD "):
 			cur.Head = strings.TrimPrefix(line, "HEAD ")
 		case strings.HasPrefix(line, "branch "):
-			cur.Branch = strings.TrimPrefix(strings.TrimPrefix(line, "branch "), "refs/heads/")
+			cur.Branch = strings.TrimPrefix(strings.TrimPrefix(line, "branch "), RefHeadsPrefix)
 		case line == "detached":
 			cur.Detached = true
 		case line == "bare":

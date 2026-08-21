@@ -707,8 +707,7 @@ export interface components {
       content: string;
       file: string;
       path: string;
-      sourceId: string;
-      sourceType: string;
+      source: string;
     };
     Hunk: {
       lines: components['schemas']['DiffLine'][] | null;
@@ -796,12 +795,8 @@ export interface components {
     Refs: {
       current: string;
       locals: string[] | null;
-      remotes: components['schemas']['RemoteBranch'][] | null;
+      remotes: string[] | null;
       tags: string[] | null;
-    };
-    RemoteBranch: {
-      Branch: string;
-      Remote: string;
     };
     ScanRule: {
       group: string;
@@ -1184,8 +1179,7 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        sourceType: string;
-        sourceId: string;
+        source: string;
       };
       header?: never;
       path?: never;
@@ -1250,10 +1244,8 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        leftType: string;
-        leftId: string;
-        rightType: string;
-        rightId: string;
+        left: string;
+        right: string;
         showIgnored?: boolean;
         showUntracked?: boolean;
         statusFilter?: string;
@@ -1289,8 +1281,7 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        sourceType: string;
-        sourceId: string;
+        source: string;
         file: string;
       };
       header?: never;
@@ -1323,10 +1314,8 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        leftType: string;
-        leftId: string;
-        rightType: string;
-        rightId: string;
+        left: string;
+        right: string;
         file: string;
       };
       header?: never;
@@ -1454,8 +1443,7 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        sourceType: string;
-        sourceId: string;
+        source: string;
       };
       header?: never;
       path?: never;

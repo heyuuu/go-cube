@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs } from '@/queries/workbench';
 
-import { selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
+import { refShortName, selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
 
 import { FileTree } from './file-tree';
 
@@ -275,7 +275,7 @@ function SourceSwitcher({
       <option value="">切换分支…</option>
       {locals.map((b) => (
         <option key={b} value={b}>
-          {b}
+          {refShortName(b)}
         </option>
       ))}
     </select>

@@ -2,7 +2,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiPost } from '@/api/client';
 import type { components } from '@/api/schema';
-import type { TreeSource } from '@/pages/workbench/params';
+import { toUri, type TreeSource } from '@/pages/workbench/params';
 
 export type WorkbenchInfo = components['schemas']['Info'];
 export type WorkbenchRefs = components['schemas']['Refs'];
@@ -59,15 +59,16 @@ export function useWorkbenchWorktrees(path: string) {
 
 export type FileResult = components['schemas']['FileResult'];
 
-// 源参数统一从 TreeSource 派生（面板铁律：query key 自包含、从 URL 参数派生）
+// 源参数统一从 TreeSource 派生（面板铁律：query key 自包含、从 URL 参数派生），
+// 传输形态为 "type://id"（后端 ParseTreeSource 的文法）
 function sourceQuery(src: TreeSource) {
-  return { sourceType: src.type, sourceId: src.id };
+  return { source: toUri(src) };
 }
 
 // 文件清单全量一次拉取（扁平相对路径，git 管理的文件），前端用 lib/tree 组树
 export function useWorkbenchTree(path: string, src: TreeSource) {
   return useQuery({
-    queryKey: ['workbench', 'tree', path, src.type, src.id],
+    queryKey: ['workbench', 'tree', path, toUri(src)],
     queryFn: () => apiGet('/api/workbench/tree', { path, ...sourceQuery(src) }),
     enabled: path !== '' && !!src,
   });
@@ -75,7 +76,7 @@ export function useWorkbenchTree(path: string, src: TreeSource) {
 
 export function useWorkbenchFile(path: string, src: TreeSource, file: string) {
   return useQuery({
-    queryKey: ['workbench', 'file', path, src.type, src.id, file],
+    queryKey: ['workbench', 'file', path, toUri(src), file],
     queryFn: () => apiGet('/api/workbench/file', { path, ...sourceQuery(src), file }),
     enabled: path !== '' && !!src && file !== '',
   });
@@ -97,14 +98,12 @@ export function useWorkbenchDiff(
   filters: { showIgnored: boolean; statusFilter: string; pathPrefix: string },
 ) {
   return useQuery({
-    queryKey: ['workbench', 'diff', path, left.type, left.id, right.type, right.id, filters],
+    queryKey: ['workbench', 'diff', path, toUri(left), toUri(right), filters],
     queryFn: () =>
       apiGet('/api/workbench/diff', {
         path,
-        leftType: left.type,
-        leftId: left.id,
-        rightType: right.type,
-        rightId: right.id,
+        left: toUri(left),
+        right: toUri(right),
         showIgnored: filters.showIgnored,
         statusFilter: filters.statusFilter || undefined,
         pathPrefix: filters.pathPrefix || undefined,
@@ -116,14 +115,12 @@ export function useWorkbenchDiff(
 
 export function useWorkbenchFileDiff(path: string, left: TreeSource, right: TreeSource, file: string) {
   return useQuery({
-    queryKey: ['workbench', 'fileDiff', path, left.type, left.id, right.type, right.id, file],
+    queryKey: ['workbench', 'fileDiff', path, toUri(left), toUri(right), file],
     queryFn: () =>
       apiGet('/api/workbench/file-diff', {
         path,
-        leftType: left.type,
-        leftId: left.id,
-        rightType: right.type,
-        rightId: right.id,
+        left: toUri(left),
+        right: toUri(right),
         file,
       }),
     enabled: path !== '' && file !== '' && left.id !== '' && right.id !== '',
@@ -134,7 +131,7 @@ export function useWorkbenchFileDiff(path: string, left: TreeSource, right: Tree
 // 差异模式：源相对上一版本的变更文件（commit/ref vs 父提交；worktree vs HEAD）
 export function useWorkbenchChanges(path: string, src: TreeSource, enabled: boolean) {
   return useQuery({
-    queryKey: ['workbench', 'changes', path, src.type, src.id],
+    queryKey: ['workbench', 'changes', path, toUri(src)],
     queryFn: () => apiGet('/api/workbench/changes', { path, ...sourceQuery(src) }),
     enabled: enabled && path !== '' && !!src,
     staleTime: 0,
