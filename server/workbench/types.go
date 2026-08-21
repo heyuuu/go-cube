@@ -87,21 +87,19 @@ func ParseTreeSource(s string) (TreeSource, error) {
 	if id == "" {
 		return TreeSource{}, errors.New("scheme 后的 id 不能为空")
 	}
-	var typ SourceType
-	switch scheme {
-	case string(SourceTypeCommit):
-		typ = SourceTypeCommit
+
+	typ := SourceType(scheme)
+	switch typ {
+	case SourceTypeCommit:
 		if !isCommitSha(id) {
 			return TreeSource{}, fmt.Errorf("commit id 必须是 40/64 位十六进制: %q", id)
 		}
-	case string(SourceTypeRef):
-		typ = SourceTypeRef
+	case SourceTypeRef:
 		// refs/ 开头视为规范全名原样放行（含 refs/pull/* 等开放子树）；短名按 refname 规则校验
 		if !strings.HasPrefix(id, "refs/") && !isRefShortName(id) {
 			return TreeSource{}, fmt.Errorf("ref 名不合法: %q（不接受 HEAD~2、@{u} 等 rev 表达式）", id)
 		}
-	case string(SourceTypeWorktree):
-		typ = SourceTypeWorktree
+	case SourceTypeWorktree:
 	default:
 		return TreeSource{}, fmt.Errorf("未知的 scheme: %q（合法值 commit/ref/worktree）", scheme)
 	}
