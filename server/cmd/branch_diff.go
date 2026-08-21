@@ -26,14 +26,6 @@ func buildRemoteBranchMap(refs *git.RefsResult) map[string]map[string]bool {
 	return m
 }
 
-func buildRemoteBranchSet(refs *git.RefsResult) map[string]bool {
-	m := make(map[string]bool)
-	for _, ref := range refs.Remotes {
-		m[ref.Branch] = true
-	}
-	return m
-}
-
 // pickSharedBranches 取「本地分支 ∩ 任一 remote 同名分支」的并集，结果按名排序。
 // 本地有但所有 remote 都没有的分支被排除（无对比对象）。
 func pickSharedBranches(refs *git.RefsResult, remoteHasBranch map[string]map[string]bool) []string {

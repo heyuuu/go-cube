@@ -78,7 +78,8 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 			}
 
 			// 4. 候选分支：与该 remote 同名的本地分支及各自领先/落后数
-			candidates, currentBranch, err := pullCandidates(repoPath, chosenRemote.Name)
+			currentBranch := git.CurrentBranch(repoPath)
+			candidates, err := pullCandidates(repoPath, chosenRemote.Name)
 			if err != nil {
 				return err
 			}
@@ -131,12 +132,11 @@ type branchDiff struct {
 
 // pullCandidates 计算与 remoteName 同名的本地分支列表及各自 ahead/behind。
 // 数据基于本地记录的 remote 跟踪分支（不联网），实际拉取时以远端最新状态为准。
-func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, error) {
+func pullCandidates(repoPath string, remoteName string) ([]branchDiff, error) {
 	repoRefs, err := git.Refs(repoPath)
 	if err != nil {
-		return nil, "", fmt.Errorf("读取 ref 列表失败: %w", err)
+		return nil, fmt.Errorf("读取 ref 列表失败: %w", err)
 	}
-	currentBranch := git.CurrentBranch(repoPath)
 
 	// 候选 = 与指定 remote 同名的本地分支（其它 remote 的同名分支不参与）
 	remoteHasBranch := buildRemoteBranchMap(repoRefs)
@@ -149,7 +149,7 @@ func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, e
 		ahead, behind, _ := git.AheadBehindRemote(repoPath, b, remoteName, b)
 		diffs = append(diffs, branchDiff{Branch: b, Ahead: ahead, Behind: behind})
 	}
-	return diffs, currentBranch, nil
+	return diffs, nil
 }
 
 // pickPullRemote 决定拉取来源 remote：flag 指定优先；仅 1 个自动选中；
