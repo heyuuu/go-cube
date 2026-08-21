@@ -6,32 +6,41 @@ package cmd
 // 即上次 fetch 时的远端状态。
 
 import (
-	"cube/util/git"
 	"fmt"
 	"sort"
 	"strings"
+
+	"cube/util/git"
 )
 
 // buildRemoteBranchMap 把远程分支列表组织成 map[branch]set[remote]，便于 O(1) 查询
 // 「某 remote 是否有某分支」。
-func buildRemoteBranchMap(remoteBranches []git.RemoteBranch) map[string]map[string]bool {
+func buildRemoteBranchMap(refs *git.RefsResult) map[string]map[string]bool {
 	m := make(map[string]map[string]bool)
-	for _, rb := range remoteBranches {
-		if m[rb.Branch] == nil {
-			m[rb.Branch] = make(map[string]bool)
+	for _, ref := range refs.Remotes {
+		if m[ref.Branch] == nil {
+			m[ref.Branch] = make(map[string]bool)
 		}
-		m[rb.Branch][rb.Remote] = true
+		m[ref.Branch][ref.Remote] = true
+	}
+	return m
+}
+
+func buildRemoteBranchSet(refs *git.RefsResult) map[string]bool {
+	m := make(map[string]bool)
+	for _, ref := range refs.Remotes {
+		m[ref.Branch] = true
 	}
 	return m
 }
 
 // pickSharedBranches 取「本地分支 ∩ 任一 remote 同名分支」的并集，结果按名排序。
 // 本地有但所有 remote 都没有的分支被排除（无对比对象）。
-func pickSharedBranches(localBranches []string, remoteHasBranch map[string]map[string]bool) []string {
+func pickSharedBranches(refs *git.RefsResult, remoteHasBranch map[string]map[string]bool) []string {
 	var shared []string
-	for _, b := range localBranches {
-		if len(remoteHasBranch[b]) > 0 {
-			shared = append(shared, b)
+	for _, ref := range refs.Locals {
+		if len(remoteHasBranch[ref.Branch]) > 0 {
+			shared = append(shared, ref.Branch)
 		}
 	}
 	sort.Strings(shared)

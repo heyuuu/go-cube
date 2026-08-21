@@ -4,6 +4,7 @@ package git
 // remote 配置查询（remote -v）在 remote.go。执行核与错误约定见 run.go。
 
 import (
+	"errors"
 	"strconv"
 	"strings"
 )
@@ -16,31 +17,86 @@ const (
 	RefTagsPrefix    = "refs/tags/"
 )
 
-// HeadRef 返回 HEAD 指向的 ref 全名。正常为 refs/heads/*；git 只强制 HEAD 在
-// refs/ 内，病态挂载（symbolic-ref 指向 tag 等）时原样返回、不做 heads 假设。
-// detached HEAD、非仓库返回空串——这是业务空值而非错误（Branches 的 current
-// 短名与 workbench 的当前分支全名都源于此，只差在是否剥前缀）。
-func HeadRef(path string) string {
-	if !isGitRepo(path) {
-		return ""
+type Ref struct {
+	Name      string `json:"name"`      // Ref Name，refs/{heads,remotes,tags}/xxx
+	ShortName string `json:"shortName"` // Short Name，省略 refs/xxx/ 前缀；注意 remote 的 ShortName 含 remote 名
+	Remote    string `json:"remote"`    // Remote，仅 refs/remotes/* 有效，远端 remote 名 (例如 origin)
+	Branch    string `json:"branch"`    // 分支名，在 refs/heads/* 及 refs/remotes/* 时有效，分支名 (例如 master)
+}
+
+func (r Ref) IsLocal() bool {
+	return r.Remote == "" && r.Branch != ""
+}
+
+func (r Ref) IsRemote() bool {
+	return r.Remote != "" && r.Branch != ""
+}
+
+func (r Ref) IsTag() bool {
+	return r.Branch == ""
+}
+
+// BuildRef 构建 Ref 实例
+func BuildRef(refName string) (Ref, error) {
+	refName = strings.TrimSpace(refName)
+	switch {
+	case strings.HasPrefix(refName, RefHeadsPrefix):
+		shortName := strings.TrimPrefix(refName, RefHeadsPrefix)
+		return Ref{Name: refName, ShortName: shortName, Branch: shortName}, nil
+	case strings.HasPrefix(refName, RefTagsPrefix):
+		shortName := strings.TrimPrefix(refName, RefTagsPrefix)
+		return Ref{Name: refName, ShortName: shortName}, nil
+	case strings.HasPrefix(refName, RefRemotesPrefix):
+		shortName := strings.TrimPrefix(refName, RefRemotesPrefix)
+
+		// 拆分 remote 名 和 branch 名
+		idx := strings.Index(shortName, "/")
+		if idx <= 0 {
+			break
+		}
+		remote, branch := shortName[:idx], shortName[idx+1:]
+
+		// refs/remotes/<remote>/HEAD 是远端默认分支的符号指针而非真实分支，跳过
+		if branch == "HEAD" {
+			break
+		}
+
+		return Ref{
+			Name:      refName,
+			ShortName: shortName,
+			Remote:    remote,
+			Branch:    branch,
+		}, nil
 	}
-	// symbolic-ref 失败（非 0 退出）= detached HEAD，降级空串
-	out, err := runOut(path, "symbolic-ref", "HEAD")
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(out)
+
+	// 没匹配上的情况
+	return Ref{}, errors.New("暂不支持的 ref 值: " + refName)
 }
 
 // RefsResult 全量 ref 清单（规范全名，按 namespace 分组）。
 type RefsResult struct {
-	Locals  []string // refs/heads/*
-	Remotes []string // refs/remotes/*（不含各 remote 的 HEAD 符号指针）
-	Tags    []string // refs/tags/*
+	Locals  []Ref `json:"locals"`
+	Remotes []Ref `json:"remotes"`
+	Tags    []Ref `json:"tags"`
+}
 
-	ShortLocals  []string // Locals，但是不带 refs/heads/ 前缀
-	ShortRemotes []string // Remotes，但是不带 refs/remotes/ 前缀
-	ShortTags    []string // Tags，但是不带 refs/tags/ 前缀
+// BuildRefs 构建 Refs 结果，暴露以供构造测试数据
+func BuildRefs(refNames []string) *RefsResult {
+	result := &RefsResult{}
+	for _, refName := range refNames {
+		ref, err := BuildRef(refName)
+		if err != nil {
+			continue
+		}
+		if ref.IsLocal() {
+			result.Locals = append(result.Locals, ref)
+		} else if ref.IsRemote() {
+			result.Remotes = append(result.Remotes, ref)
+		} else if ref.IsTag() {
+			result.Tags = append(result.Tags, ref)
+		}
+	}
+	return result
 }
 
 // Refs 一次 for-each-ref 拉全 refs/ 树，按 namespace 前缀分组返回规范全名。
@@ -52,27 +108,13 @@ func Refs(path string) (*RefsResult, error) {
 	if !isGitRepo(path) {
 		return &RefsResult{}, nil
 	}
+
 	out, err := runOut(path, "for-each-ref", "--format=%(refname)")
 	if err != nil {
 		return nil, err
 	}
-	result := &RefsResult{}
-	for _, ref := range strings.Split(strings.TrimSpace(out), "\n") {
-		switch {
-		case strings.HasPrefix(ref, RefHeadsPrefix):
-			result.Locals = append(result.Locals, ref)
-			result.ShortLocals = append(result.ShortLocals, strings.TrimPrefix(ref, RefHeadsPrefix))
-		case strings.HasPrefix(ref, RefRemotesPrefix):
-			// refs/remotes/<remote>/HEAD 是远端默认分支的符号指针而非真实分支，跳过
-			if !strings.HasSuffix(ref, "/HEAD") {
-				result.Remotes = append(result.Remotes, ref)
-				result.ShortRemotes = append(result.ShortRemotes, strings.TrimPrefix(ref, RefRemotesPrefix))
-			}
-		case strings.HasPrefix(ref, RefTagsPrefix):
-			result.Tags = append(result.Tags, ref)
-			result.ShortTags = append(result.ShortTags, strings.TrimPrefix(ref, RefTagsPrefix))
-		}
-	}
+
+	result := BuildRefs(strings.Split(strings.TrimSpace(out), "\n"))
 	return result, nil
 }
 
@@ -86,14 +128,15 @@ func Branches(path string) (branches []string, current string, err error) {
 	// 当前分支短名 = HEAD 目标 ref 剥 refs/heads/ 前缀。HEAD 不在 heads 上
 	// （detached，或被 symbolic-ref 病态挂到 tag 等其他子树）时为空——
 	// 与 git branch --show-current 口径一致（git 只强制 HEAD 在 refs/ 内，不强制在 heads 下）
-	if head := HeadRef(path); strings.HasPrefix(head, RefHeadsPrefix) {
-		current = strings.TrimPrefix(head, RefHeadsPrefix)
-	}
+	current = CurrentBranch(path)
 	refs, err := Refs(path)
 	if err != nil {
 		return nil, current, err
 	}
-	return refs.ShortLocals, current, nil
+	for _, ref := range refs.Locals {
+		branches = append(branches, ref.Branch)
+	}
+	return branches, current, nil
 }
 
 // RemoteBranch 描述一个远程分支：所属 remote 名 + 分支名（不含 remote 前缀）。
@@ -112,25 +155,10 @@ func RemoteBranches(path string) ([]RemoteBranch, error) {
 		return nil, err
 	}
 	var result []RemoteBranch
-	for _, ref := range refs.ShortRemotes {
-		remote, branch, ok := splitRemoteBranchShortName(ref)
-		if !ok {
-			continue
-		}
-		result = append(result, RemoteBranch{Remote: remote, Branch: branch})
+	for _, ref := range refs.Remotes {
+		result = append(result, RemoteBranch{Remote: ref.Remote, Branch: ref.Branch})
 	}
 	return result, nil
-}
-
-// splitRemoteBranchShortName 把 "origin/master" 这种远程分支短名拆成 (remote, branch)。
-// 支持分支名含 /（如 "origin/feature/x" → ("origin", "feature/x")）。
-// 无 remote 前缀时返回 ok=false。
-func splitRemoteBranchShortName(shortName string) (remote, branch string, ok bool) {
-	idx := strings.Index(shortName, "/")
-	if idx <= 0 {
-		return "", "", false
-	}
-	return shortName[:idx], shortName[idx+1:], true
 }
 
 // Tags 返回 path 处仓库的全部 tag 名（按名字升序，含轻量 tag 与 annotated tag）。
@@ -140,7 +168,35 @@ func Tags(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return refs.ShortTags, nil
+	var tags []string
+	for _, ref := range refs.Tags {
+		tags = append(tags, ref.ShortName)
+	}
+	return tags, nil
+}
+
+// HeadRef 返回 HEAD 指向的 ref 全名。正常为 refs/heads/*；git 只强制 HEAD 在
+// refs/ 内，病态挂载（symbolic-ref 指向 tag 等）时原样返回、不做 heads 假设。
+// detached HEAD、非仓库返回空串——这是业务空值而非错误（Branches 的 current
+// 短名与 workbench 的当前分支全名都源于此，只差在是否剥前缀）。
+func HeadRef(path string) string {
+	if !isGitRepo(path) {
+		return ""
+	}
+	// symbolic-ref 失败（非 0 退出）= detached HEAD，降级空串
+	out, err := runOut(path, "symbolic-ref", "HEAD")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out)
+}
+
+func CurrentBranch(path string) string {
+	ref := HeadRef(path)
+	if strings.HasPrefix(ref, RefHeadsPrefix) {
+		return strings.TrimPrefix(ref, RefHeadsPrefix)
+	}
+	return ""
 }
 
 // DefaultBranch 返回 path 处仓库的默认分支短名（"master" / "main" 等）。
@@ -155,10 +211,11 @@ func DefaultBranch(path string) (string, error) {
 	if !isGitRepo(path) {
 		return "", nil
 	}
-	// origin/HEAD 未设置时 symbolic-ref 报错（非 0 退出），走 fallback
-	if out, err := runOut(path, "symbolic-ref", "--short", RefRemotesPrefix+"origin/HEAD"); err == nil {
-		if _, branch, ok := splitRemoteBranchShortName(strings.TrimSpace(out)); ok && branch != "HEAD" {
-			return branch, nil
+	// origin/HEAD 未设置时 symbolic-ref 报错（非 0 退出），走 fallback。
+	// 不带 --short 取全名（形如 refs/remotes/origin/master），BuildRef 才能拆出分支名
+	if out, err := runOut(path, "symbolic-ref", RefRemotesPrefix+"origin/HEAD"); err == nil {
+		if ref, err := BuildRef(strings.TrimSpace(out)); err == nil {
+			return ref.Branch, nil
 		}
 	}
 	for _, candidate := range []string{"master", "main"} {

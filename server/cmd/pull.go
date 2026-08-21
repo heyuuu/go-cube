@@ -132,17 +132,17 @@ type branchDiff struct {
 // pullCandidates 计算与 remoteName 同名的本地分支列表及各自 ahead/behind。
 // 数据基于本地记录的 remote 跟踪分支（不联网），实际拉取时以远端最新状态为准。
 func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, error) {
+	repoRefs, err := git.Refs(repoPath)
+	if err != nil {
+		return nil, "", fmt.Errorf("读取 ref 列表失败: %w", err)
+	}
 	localBranches, currentBranch, err := git.Branches(repoPath)
 	if err != nil {
 		return nil, "", fmt.Errorf("读取分支列表失败: %w", err)
 	}
-	remoteBranches, err := git.RemoteBranches(repoPath)
-	if err != nil {
-		return nil, "", fmt.Errorf("读取远程分支失败: %w", err)
-	}
 
 	// 候选 = 与指定 remote 同名的本地分支（其它 remote 的同名分支不参与）
-	remoteHasBranch := buildRemoteBranchMap(remoteBranches)
+	remoteHasBranch := buildRemoteBranchMap(repoRefs)
 	var diffs []branchDiff
 	for _, b := range localBranches {
 		if !remoteHasBranch[b][remoteName] {

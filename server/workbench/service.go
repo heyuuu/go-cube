@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"cube/util/git"
+	"cube/util/slicekit"
 
 	"github.com/coder/websocket"
 )
@@ -48,11 +49,20 @@ func (s *Service) Refs(path string) (*Refs, error) {
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
+
+	current := git.HeadRef(root) // 全名：前端「当前」徽标与全名 locals 比对（CurrentBranch 是短名口径，勿混用）
 	refs, err := git.Refs(root)
 	if err != nil {
 		return nil, err
 	}
-	return &Refs{Locals: refs.Locals, Current: git.HeadRef(root), Remotes: refs.Remotes, Tags: refs.Tags}, nil
+
+	getName := func(r git.Ref) string { return r.Name }
+	return &Refs{
+		Current: current,
+		Locals:  slicekit.Map(refs.Locals, getName),
+		Remotes: slicekit.Map(refs.Remotes, getName),
+		Tags:    slicekit.Map(refs.Tags, getName),
+	}, nil
 }
 
 // Commits 拉取 commit 日志一页（--all 全分支；纯列表，泳道布局由前端对已持有数据计算）。

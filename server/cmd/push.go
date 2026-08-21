@@ -61,13 +61,10 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return errors.New("仓库未配置任何 remote，无可推送目标")
 			}
 
-			branches, currentBranch, err := git.Branches(repoPath)
+			headRef := git.HeadRef(repoPath)
+			repoRefs, err := git.Refs(repoPath)
 			if err != nil {
-				return fmt.Errorf("读取分支列表失败: %w", err)
-			}
-			tags, err := git.Tags(repoPath)
-			if err != nil {
-				return fmt.Errorf("读取 tag 列表失败: %w", err)
+				return fmt.Errorf("读取 ref 列表失败: %w", err)
 			}
 
 			// 3. 选择 remote（flag 优先，否则 TUI 多选，默认全选）
@@ -83,7 +80,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 			}
 
 			// 4. 选择 ref（flag 优先，否则 TUI 多选，默认当前分支）
-			chosenRefs, err := pickRefs(branches, tags, currentBranch, refs)
+			chosenRefs, err := pickRefs(repoRefs, headRef, refs)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
 					return nil
@@ -156,7 +153,7 @@ func resolveRemotesByName(all []git.Remote, names []string) ([]git.Remote, error
 // pickRefs 决定要推送的 ref 集合：flag 显式指定优先，否则 TUI 多选（默认当前分支）。
 //   - 候选 = 本地分支 + tag（前缀区分：分支裸名，tag 加 refs/tags/ 前缀推送更稳）。
 //   - 默认勾选当前分支（若存在）。
-func pickRefs(branches []string, tags []string, currentBranch string, flagRefs []string) ([]string, error) {
+func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string, error) {
 	if len(flagRefs) > 0 {
 		return flagRefs, nil
 	}
@@ -169,11 +166,11 @@ func pickRefs(branches []string, tags []string, currentBranch string, flagRefs [
 		ref   string
 	}
 	var items []refItem
-	for _, b := range branches {
-		items = append(items, refItem{label: "branch: " + b, ref: b})
+	for _, ref := range refs.Locals {
+		items = append(items, refItem{label: "branch: " + ref.ShortName, ref: ref.Name})
 	}
-	for _, t := range tags {
-		items = append(items, refItem{label: "tag:    " + t, ref: git.RefTagsPrefix + t})
+	for _, ref := range refs.Tags {
+		items = append(items, refItem{label: "tag:    " + ref.ShortName, ref: ref.Name})
 	}
 	if len(items) == 0 {
 		return nil, errors.New("仓库无任何本地分支或 tag")
@@ -181,9 +178,9 @@ func pickRefs(branches []string, tags []string, currentBranch string, flagRefs [
 
 	// 默认勾选当前分支（匹配 ref == currentBranch）
 	var defaults []refItem
-	if currentBranch != "" {
+	if headRef != "" {
 		for _, it := range items {
-			if it.ref == currentBranch {
+			if it.ref == headRef {
 				defaults = append(defaults, it)
 				break
 			}

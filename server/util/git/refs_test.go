@@ -89,6 +89,61 @@ func TestTags(t *testing.T) {
 
 // TestRefs 全量 ref 清单：三类 namespace 的规范全名 + 远端 HEAD 符号指针剔除。
 // current 属 HEAD 状态，由 TestHeadRef 单独覆盖。
+// TestBuildRef 规范全名 → Ref 值对象：三棵子树解析、谓词判定、
+// 符号指针与未知形态报错（BuildRefs 依赖该错误口径做跳过）。
+func TestBuildRef(t *testing.T) {
+	cases := []struct {
+		name    string
+		in      string
+		want    Ref
+		kind    string // local / remote / tag，断言谓词与字段一致
+		wantErr bool
+	}{
+		{"本地分支", "refs/heads/develop",
+			Ref{Name: "refs/heads/develop", ShortName: "develop", Branch: "develop"}, "local", false},
+		{"带斜杠的本地分支", "refs/heads/feature/x",
+			Ref{Name: "refs/heads/feature/x", ShortName: "feature/x", Branch: "feature/x"}, "local", false},
+		{"tag", "refs/tags/v1.0",
+			Ref{Name: "refs/tags/v1.0", ShortName: "v1.0"}, "tag", false},
+		{"远程跟踪分支", "refs/remotes/origin/master",
+			Ref{Name: "refs/remotes/origin/master", ShortName: "origin/master", Remote: "origin", Branch: "master"}, "remote", false},
+		{"带斜杠的远程分支", "refs/remotes/origin/feature/x",
+			Ref{Name: "refs/remotes/origin/feature/x", ShortName: "origin/feature/x", Remote: "origin", Branch: "feature/x"}, "remote", false},
+		{"远端 HEAD 符号指针", "refs/remotes/origin/HEAD", Ref{}, "", true},
+		{"只有 remote 无分支", "refs/remotes/origin", Ref{}, "", true},
+		{"未知子树", "refs/stash", Ref{}, "", true},
+		{"短名不被接受", "origin/master", Ref{}, "", true},
+		{"空串", "", Ref{}, "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := BuildRef(tc.in)
+			if tc.wantErr {
+				if err == nil {
+					t.Fatalf("应报错: %+v", got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("不应报错: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("BuildRef = %+v，期望 %+v", got, tc.want)
+			}
+			switch {
+			case tc.kind == "local" && !got.IsLocal():
+				t.Errorf("%+v 应判定为 local", got)
+			case tc.kind == "remote" && !got.IsRemote():
+				t.Errorf("%+v 应判定为 remote", got)
+			case tc.kind == "tag" && !got.IsTag():
+				t.Errorf("%+v 应判定为 tag", got)
+			}
+		})
+	}
+}
+
+// TestRefs 全量 ref 清单：三类 namespace 的 Ref 值对象 + 远端 HEAD 符号指针剔除。
+// current 属 HEAD 状态，由 TestHeadRef 单独覆盖。
 func TestRefs(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
@@ -102,24 +157,20 @@ func TestRefs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Refs 出错: %v", err)
 	}
-	if !containsStr(refs.Locals, "refs/heads/develop") {
-		t.Fatalf("locals %v 不含 refs/heads/develop", refs.Locals)
+	if !reflect.DeepEqual(refs.Locals, []Ref{
+		{Name: "refs/heads/develop", ShortName: "develop", Branch: "develop"},
+	}) {
+		t.Fatalf("locals = %+v", refs.Locals)
 	}
-	if !reflect.DeepEqual(refs.Remotes, []string{"refs/remotes/origin/master"}) {
-		t.Fatalf("remotes = %v（origin/HEAD 符号指针应被剔除）", refs.Remotes)
+	if !reflect.DeepEqual(refs.Remotes, []Ref{
+		{Name: "refs/remotes/origin/master", ShortName: "origin/master", Remote: "origin", Branch: "master"},
+	}) {
+		t.Fatalf("remotes = %+v（origin/HEAD 符号指针应被剔除）", refs.Remotes)
 	}
-	if !reflect.DeepEqual(refs.Tags, []string{"refs/tags/v1.0"}) {
-		t.Fatalf("tags = %v", refs.Tags)
-	}
-	// 全名/短名成对不变量：ShortX[i] 是 X[i] 剥 namespace 前缀
-	if len(refs.ShortLocals) != len(refs.Locals) || !containsStr(refs.ShortLocals, "develop") {
-		t.Fatalf("shortLocals 与 locals 不成对: %v vs %v", refs.ShortLocals, refs.Locals)
-	}
-	if !reflect.DeepEqual(refs.ShortRemotes, []string{"origin/master"}) {
-		t.Fatalf("shortRemotes = %v", refs.ShortRemotes)
-	}
-	if !reflect.DeepEqual(refs.ShortTags, []string{"v1.0"}) {
-		t.Fatalf("shortTags = %v", refs.ShortTags)
+	if !reflect.DeepEqual(refs.Tags, []Ref{
+		{Name: "refs/tags/v1.0", ShortName: "v1.0"},
+	}) {
+		t.Fatalf("tags = %+v", refs.Tags)
 	}
 }
 
@@ -165,15 +216,6 @@ func TestBranches_HeadOnTag(t *testing.T) {
 	if current != "" {
 		t.Fatalf("HEAD 挂在 refs/tags/* 时 current 应为空，实际 %q", current)
 	}
-}
-
-func containsStr(list []string, s string) bool {
-	for _, x := range list {
-		if x == s {
-			return true
-		}
-	}
-	return false
 }
 
 // TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
@@ -365,30 +407,6 @@ func TestParseCountPair(t *testing.T) {
 		if ok != c.ok || ahead != c.ahead || behind != c.behind {
 			t.Errorf("parseCountPair(%q) = (%d,%d,%v)，期望 (%d,%d,%v)",
 				c.in, ahead, behind, ok, c.ahead, c.behind, c.ok)
-		}
-	}
-}
-
-// TestSplitRemoteBranchShortName 远程分支短名拆分。
-func TestSplitRemoteBranchShortName(t *testing.T) {
-	cases := []struct {
-		in         string
-		wantRemote string
-		wantBranch string
-		wantOK     bool
-	}{
-		{"origin/master", "origin", "master", true},
-		{"origin/feature/x", "origin", "feature/x", true},
-		{"upstream/main", "upstream", "main", true},
-		{"master", "", "", false}, // 无 remote 前缀
-		{"", "", "", false},       // 空
-		{"/foo", "", "", false},   // remote 名为空（idx<=0）
-	}
-	for _, c := range cases {
-		remote, branch, ok := splitRemoteBranchShortName(c.in)
-		if ok != c.wantOK || remote != c.wantRemote || branch != c.wantBranch {
-			t.Errorf("splitRemoteBranchShortName(%q) = (%q,%q,%v)，期望 (%q,%q,%v)",
-				c.in, remote, branch, ok, c.wantRemote, c.wantBranch, c.wantOK)
 		}
 	}
 }

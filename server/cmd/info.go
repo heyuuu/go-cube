@@ -193,21 +193,17 @@ func printInfoVerbose(repoPath string) {
 		tui.Print("仓库未配置任何 remote\n")
 		return
 	}
-	localBranches, currentBranch, err := git.Branches(repoPath)
+
+	currentBranch := git.CurrentBranch(repoPath)
+	repoRefs, err := git.Refs(repoPath)
 	if err != nil {
 		printInfoSection("分支同步状态")
-		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取分支列表失败: %v", err)) + "\n")
-		return
-	}
-	remoteBranches, err := git.RemoteBranches(repoPath)
-	if err != nil {
-		printInfoSection("分支同步状态")
-		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取远程分支失败: %v", err)) + "\n")
+		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取 ref 列表失败: %v", err)) + "\n")
 		return
 	}
 
-	remoteHasBranch := buildRemoteBranchMap(remoteBranches)
-	branches := pickSharedBranches(localBranches, remoteHasBranch)
+	remoteHasBranch := buildRemoteBranchMap(repoRefs)
+	branches := pickSharedBranches(repoRefs, remoteHasBranch)
 	diffs := collectBranchRemoteDiffs(repoPath, branches, remotes, remoteHasBranch)
 
 	printInfoSection("分支同步状态")
