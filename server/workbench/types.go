@@ -21,7 +21,7 @@ type Info struct {
 // 全名是写方契约：前端选中 ref 时直接整串作为 TreeSource 的 ref id 写入，零拼装；
 // 展示层剥前缀（见前端 refShortName）。
 type Refs struct {
-	Current string   `json:"current"` // 当前检出分支全名（无检出为空）
+	Head    string   `json:"head"`    // HEAD 指向的 ref 全名（detached 时为空）
 	Locals  []string `json:"locals"`  // 本地分支（refs/heads/*）
 	Remotes []string `json:"remotes"` // 远程分支（refs/remotes/*，不含各 remote 的 HEAD）
 	Tags    []string `json:"tags"`    // 全部 tag（refs/tags/*）

@@ -45,7 +45,7 @@ func TestWorkbenchRefs(t *testing.T) {
 
 	var got struct {
 		Locals  []string `json:"locals"`
-		Current string   `json:"current"`
+		Head    string   `json:"head"`
 		Remotes []any    `json:"remotes"`
 		Tags    []string `json:"tags"`
 	}
@@ -53,15 +53,15 @@ func TestWorkbenchRefs(t *testing.T) {
 	if len(got.Locals) == 0 {
 		t.Fatal("本地分支不应为空")
 	}
-	if got.Current == "" {
+	if got.Head == "" {
 		t.Fatal("当前分支不应为空")
 	}
 	// 列表是写方契约：前端选中 ref 时整串作为 TreeSource id，必须是规范全名
 	if !strings.HasPrefix(got.Locals[0], "refs/heads/") {
 		t.Errorf("locals 应为规范全名: %v", got.Locals)
 	}
-	if !strings.HasPrefix(got.Current, "refs/heads/") {
-		t.Errorf("current 应为规范全名: %q", got.Current)
+	if !strings.HasPrefix(got.Head, "refs/heads/") {
+		t.Errorf("head 应为规范全名: %q", got.Head)
 	}
 	// 无 remote/tag 的 fixture：remotes/tags 是 nil 切片，envelope 应序列化为 []
 	if got.Remotes == nil || got.Tags == nil {

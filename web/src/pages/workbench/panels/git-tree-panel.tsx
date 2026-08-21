@@ -80,7 +80,7 @@ function WorktreeSection({
             label={refShortName(b)}
             source={{ type: 'ref', id: b }}
             params={params}
-            badge={b === refs.data?.current ? '当前' : undefined}
+            badge={b === refs.data?.head ? '当前' : undefined}
             afterSelect={onBranchPicked}
           />
         ))}

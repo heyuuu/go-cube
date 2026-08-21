@@ -50,7 +50,7 @@ func (s *Service) Refs(path string) (*Refs, error) {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
 
-	current := git.HeadRef(root) // 全名：前端「当前」徽标与全名 locals 比对（CurrentBranch 是短名口径，勿混用）
+	head := git.HeadRef(root)
 	refs, err := git.Refs(root)
 	if err != nil {
 		return nil, err
@@ -58,7 +58,7 @@ func (s *Service) Refs(path string) (*Refs, error) {
 
 	getName := func(r git.Ref) string { return r.Name }
 	return &Refs{
-		Current: current,
+		Head:    head,
 		Locals:  slicekit.Map(refs.Locals, getName),
 		Remotes: slicekit.Map(refs.Remotes, getName),
 		Tags:    slicekit.Map(refs.Tags, getName),
