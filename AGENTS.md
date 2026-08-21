@@ -83,7 +83,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 ### 测试策略（什么测、什么不测）
 
 - **纯函数**（解析、计算、字符串处理）：普通表驱动测试。`fuzzy`/`pathkit`/`git/url`/`git 读输出解析`/`slicekit`/`easycache`/`opener 解析`。
-- **依赖外部进程/库的 IO**（git 二进制读/写仓库）：**用 testfixture 建真实临时仓库测**，不 mock。`git` 的 `Branches/Remotes/Tags/IsDirty/StatusFiles`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
+- **依赖外部进程/库的 IO**（git 二进制读/写仓库）：**用 testfixture 建真实临时仓库测**，不 mock。`git` 的 `Branches/Remotes/Tags/IsDirty/LoadRepoStatus`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
 - **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
 - **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
 - **opener 执行类**：通过 `Executor` 接口注入 fake，不真的启动编辑器。见 `opener/opener_test.go`。

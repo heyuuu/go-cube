@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useState, type SubmitEvent } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 // 工作台入口引导：输入本机 git 目录路径（不要求在 project scan 管理范围内）
 export function PathEntry({ initial, onSubmit }: { initial: string; onSubmit: (path: string) => void }) {
   const [value, setValue] = useState(initial);
-  const submit = (e: FormEvent) => {
+  const submit = (e: SubmitEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (trimmed) onSubmit(trimmed);

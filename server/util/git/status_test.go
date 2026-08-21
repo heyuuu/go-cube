@@ -68,10 +68,10 @@ func TestLoadRepoStatus(t *testing.T) {
 	}
 }
 
-// TestStatusFiles_States 验证各文件状态映射为 git status --short 的 XY 码：
+// TestLoadRepoStatus_Files_States 验证各文件状态映射为 git status --short 的 XY 码：
 // 未跟踪 / 暂存新增 / 暂存删除，以及按路径排序。
-// （工作区修改 " M" 场景由 TestStatusFiles_WorktreeModified 覆盖。）
-func TestStatusFiles_States(t *testing.T) {
+// （工作区修改 " M" 场景由 TestLoadRepoStatus_Files_WorktreeModified 覆盖。）
+func TestLoadRepoStatus_Files_States(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
@@ -92,10 +92,11 @@ func TestStatusFiles_States(t *testing.T) {
 	directGit(t, dir, "add", "added.txt")
 	directGit(t, dir, "rm", "-f", "tracked.txt") // 暂存删除（含磁盘；文件有改动须 -f）→ "D "
 
-	files, err := StatusFiles(dir)
+	st, err := LoadRepoStatus(dir)
 	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
+		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
+	files := st.Files
 
 	byPath := make(map[string]string, len(files))
 	for _, f := range files {
@@ -114,14 +115,14 @@ func TestStatusFiles_States(t *testing.T) {
 	// 排序断言：按展示路径升序
 	for i := 1; i < len(files); i++ {
 		if files[i-1].Path > files[i].Path {
-			t.Errorf("StatusFiles 未按路径排序: %v", files)
+			t.Errorf("Files 未按路径排序: %v", files)
 			break
 		}
 	}
 }
 
-// TestStatusFiles_Rename 已暂存改名（git mv）合并为单条 R 行，展示 "旧 -> 新"。
-func TestStatusFiles_Rename(t *testing.T) {
+// TestLoadRepoStatus_Files_Rename 已暂存改名（git mv）合并为单条 R 行，展示 "旧 -> 新"。
+func TestLoadRepoStatus_Files_Rename(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
@@ -132,17 +133,18 @@ func TestStatusFiles_Rename(t *testing.T) {
 	directGit(t, dir, "commit", "-m", "init")
 	directGit(t, dir, "mv", "old.txt", "new.txt")
 
-	files, err := StatusFiles(dir)
+	st, err := LoadRepoStatus(dir)
 	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
+		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
+	files := st.Files
 	if len(files) != 1 || files[0].Code != "R " || files[0].Path != "old.txt -> new.txt" {
 		t.Fatalf("期望单条 [R  old.txt -> new.txt]，实际 %v", files)
 	}
 }
 
-// TestStatusFiles_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
-func TestStatusFiles_WorktreeModified(t *testing.T) {
+// TestLoadRepoStatus_Files_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
+func TestLoadRepoStatus_Files_WorktreeModified(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
@@ -155,37 +157,38 @@ func TestStatusFiles_WorktreeModified(t *testing.T) {
 		t.Fatalf("写文件失败: %v", err)
 	}
 
-	files, err := StatusFiles(dir)
+	st, err := LoadRepoStatus(dir)
 	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
+		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
+	files := st.Files
 	if len(files) != 1 || files[0].Path != "tracked.txt" || files[0].Code != " M" {
 		t.Fatalf("期望单条 [tracked.txt \" M\"]，实际 %v", files)
 	}
 }
 
-// TestStatusFiles_CleanAndNonRepo 干净仓库与非仓库目录都返回空不报错（降级约定）。
-func TestStatusFiles_CleanAndNonRepo(t *testing.T) {
+// TestLoadRepoStatus_Files_CleanAndNonRepo 干净仓库与非仓库目录都返回空不报错（降级约定）。
+func TestLoadRepoStatus_Files_CleanAndNonRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 
 	cleanDir := ws.MakeGitRepo("clean")
-	files, err := StatusFiles(cleanDir)
-	if err != nil || len(files) != 0 {
-		t.Fatalf("干净仓库应返回空，实际 (%v, %v)", files, err)
+	st, err := LoadRepoStatus(cleanDir)
+	if err != nil || len(st.Files) != 0 {
+		t.Fatalf("干净仓库应返回空，实际 (%v, %v)", st.Files, err)
 	}
 
 	nonRepo := ws.Mkdir("empty")
-	files, err = StatusFiles(nonRepo)
-	if err != nil || len(files) != 0 {
-		t.Fatalf("非仓库目录应返回空不报错，实际 (%v, %v)", files, err)
+	st, err = LoadRepoStatus(nonRepo)
+	if err != nil || len(st.Files) != 0 {
+		t.Fatalf("非仓库目录应返回空不报错，实际 (%v, %v)", st.Files, err)
 	}
 }
 
-// TestStatusFiles_GlobalIgnore 全局忽略规则生效：被 ~/.gitconfig 的
+// TestLoadRepoStatus_Files_GlobalIgnore 全局忽略规则生效：被 ~/.gitconfig 的
 // core.excludesFile 或 XDG 默认 ignore 匹配的文件不算 untracked、不算 dirty。
 // 原生 git 子进程继承测试进程环境，通过 HOME / XDG_CONFIG_HOME 指向测试目录
 // 隔离真实用户配置。
-func TestStatusFiles_GlobalIgnore(t *testing.T) {
+func TestLoadRepoStatus_Files_GlobalIgnore(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
@@ -200,10 +203,11 @@ func TestStatusFiles_GlobalIgnore(t *testing.T) {
 	ws.WriteFile("repo/.DS_Store", []byte("x")) // 全局忽略 → 不应出现
 
 	t.Setenv("HOME", home)
-	files, err := StatusFiles(dir)
+	st, err := LoadRepoStatus(dir)
 	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
+		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
+	files := st.Files
 	if len(files) != 1 || files[0].Path != "keep.txt" {
 		t.Fatalf("全局忽略未生效，期望仅 [keep.txt]，实际 %v", files)
 	}
@@ -212,7 +216,7 @@ func TestStatusFiles_GlobalIgnore(t *testing.T) {
 	cleanDir := ws.MakeGitRepo("only-ignored")
 	ws.WriteFile("only-ignored/.DS_Store", []byte("x"))
 	ws.WriteFile("only-ignored/a.log", []byte("x"))
-	st, err := LoadRepoStatus(cleanDir)
+	st, err = LoadRepoStatus(cleanDir)
 	if err != nil {
 		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
@@ -231,10 +235,11 @@ func TestStatusFiles_GlobalIgnore(t *testing.T) {
 
 	t.Setenv("HOME", emptyHome)
 	t.Setenv("XDG_CONFIG_HOME", xdg)
-	files, err = StatusFiles(dir)
+	st, err = LoadRepoStatus(dir)
 	if err != nil {
-		t.Fatalf("StatusFiles 出错: %v", err)
+		t.Fatalf("LoadRepoStatus 出错: %v", err)
 	}
+	files = st.Files
 	byPath := make(map[string]string, len(files))
 	for _, f := range files {
 		byPath[f.Path] = f.Code
@@ -251,28 +256,33 @@ func TestStatusFiles_GlobalIgnore(t *testing.T) {
 
 // --- 纯函数表驱动测试 ---
 
-// TestParseStatusPorcelain 解析 status --porcelain -z 输出：
-// 普通行、rename/copy 双路径行、尾部 NUL、短记录跳过。
-func TestParseStatusPorcelain(t *testing.T) {
-	out := "?? a.txt\x00" + " M b.txt\x00" + "R  new.txt\x00old.txt\x00" + "C  c2.txt\x00c1.txt\x00" + "A  d.txt\x00"
+// TestParseStatusV2_Files 解析 porcelain v2 输出的逐文件明细：
+// 普通行（路径含空格）、rename/copy 双路径行、untracked、'.' 归一为空格。
+func TestParseStatusV2_Files(t *testing.T) {
+	out := "# branch.head develop\n" +
+		"? a.txt\n" +
+		"1 .M N... 100644 100644 100644 h1 h2 b file.txt\n" +
+		"1 A. N... 000000 100644 100644 000000 h3 d.txt\n" +
+		"2 R. N... 100644 100644 100644 h1 h2 R100 new.txt\told.txt\n" +
+		"2 C. N... 100644 100644 100644 h1 h2 C99 c2.txt\tc1.txt\n"
 
-	got := parseStatusPorcelain(out)
+	got := parseStatusV2(out).Files
 	want := []FileStatus{
 		{Code: "??", Path: "a.txt"},
-		{Code: " M", Path: "b.txt"},
+		{Code: " M", Path: "b file.txt"},
+		{Code: "A ", Path: "d.txt"},
 		{Code: "R ", Path: "old.txt -> new.txt"},
 		{Code: "C ", Path: "c1.txt -> c2.txt"},
-		{Code: "A ", Path: "d.txt"},
 	}
 	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("parseStatusPorcelain = %v，期望 %v", got, want)
+		t.Fatalf("parseStatusV2 Files = %v，期望 %v", got, want)
 	}
-	if parseStatusPorcelain("") != nil {
+	if files := parseStatusV2("").Files; files != nil {
 		t.Fatalf("空输入应返回 nil")
 	}
 }
 
-// TestLoadIgnored 忽略目录与文件分开收集，路径相对仓库根（subDir 收窄时仍带前缀）。
+// TestLoadIgnored 忽略目录与文件分开收集，路径相对仓库根。
 func TestLoadIgnored(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
@@ -293,7 +303,7 @@ func TestLoadIgnored(t *testing.T) {
 	writeAbsFile("sub/inner.log", "x")
 	writeAbsFile("sub/keep.txt", "x")
 
-	ig, err := LoadIgnored(dir, "")
+	ig, err := LoadIgnored(dir)
 	if err != nil {
 		t.Fatalf("LoadIgnored 出错: %v", err)
 	}
@@ -309,21 +319,12 @@ func TestLoadIgnored(t *testing.T) {
 	if !ig.Has("node_modules") {
 		t.Error("node_modules 应命中（目录级）")
 	}
-
-	// subDir 收窄：返回路径仍相对仓库根（与 treeFs 的拼接语义一致）
-	igSub, err := LoadIgnored(dir, "sub")
-	if err != nil {
-		t.Fatalf("LoadIgnored(sub) 出错: %v", err)
-	}
-	if !igSub.Files["sub/inner.log"] || igSub.Has("sub/keep.txt") {
-		t.Errorf("subDir 收窄结果不符（Files=%v）", igSub.Files)
-	}
 }
 
 // TestLoadIgnored_NonRepo 非仓库目录返回空集合不报错（降级约定）。
 func TestLoadIgnored_NonRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	ig, err := LoadIgnored(ws.Mkdir("not-a-repo"), "")
+	ig, err := LoadIgnored(ws.Mkdir("not-a-repo"))
 	if err != nil || len(ig.Dirs) != 0 || len(ig.Files) != 0 {
 		t.Fatalf("非仓库应返回空集合，实际 (%v, %v)", ig, err)
 	}

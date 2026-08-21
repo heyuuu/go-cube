@@ -45,8 +45,8 @@ func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string
 
 // loadIgnoredDegrade 加载工作副本的忽略集合；判定失败不致命，降级为空集合
 // （宁可多显示，不可误隐藏）。treeFs 与目录对比（fsFileMap）共用此降级策略。
-func loadIgnoredDegrade(wtDir string, subDir string) *git.Ignored {
-	ig, err := git.LoadIgnored(wtDir, subDir)
+func loadIgnoredDegrade(wtDir string) *git.Ignored {
+	ig, err := git.LoadIgnored(wtDir)
 	if err != nil {
 		slog.Debug("忽略判定失败，降级为不过滤", "dir", wtDir, "err", err)
 		return &git.Ignored{Dirs: map[string]bool{}, Files: map[string]bool{}}
@@ -57,7 +57,7 @@ func loadIgnoredDegrade(wtDir string, subDir string) *git.Ignored {
 // fsFileMap walk 工作副本目录，跳过 .git；忽略项默认排除（includeIgnored=true 时保留）。
 // 忽略判定：git.LoadIgnored 给出的忽略文件/目录集合（目录级命中即其下全部忽略）。
 func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
-	ig := loadIgnoredDegrade(wtDir, "")
+	ig := loadIgnoredDegrade(wtDir)
 	result := map[string]string{}
 	err := filepath.WalkDir(wtDir, func(p string, d fs.DirEntry, err error) error {
 		if err != nil {

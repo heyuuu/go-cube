@@ -175,13 +175,13 @@ func formatInfoSnapshot(t time.Time) string {
 // 读失败按 info 的容错基调降级为警告行，不中断整体输出。
 func printInfoVerbose(repoPath string) {
 	// ── 未提交改动：工作区干净时整段不显示 ──
-	files, err := git.StatusFiles(repoPath)
+	st, err := git.LoadRepoStatus(repoPath)
 	if err != nil {
 		printInfoSection("未提交改动")
 		tui.Print(infoWarnStyle.Render(fmt.Sprintf("读取工作区状态失败: %v", err)) + "\n")
-	} else if len(files) > 0 {
+	} else if len(st.Files) > 0 {
 		printInfoSection("未提交改动")
-		for _, f := range files {
+		for _, f := range st.Files {
 			tui.Print(formatInfoFileLine(f) + "\n")
 		}
 	}
