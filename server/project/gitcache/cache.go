@@ -254,7 +254,7 @@ func collectEntry(path string) (*Entry, error) {
 	for _, ref := range refs.Locals {
 		branches = append(branches, ref.ShortName)
 	}
-	currBranch := git.CurrentBranch(path)
+	currentBranch := git.CurrentBranch(path)
 	defaultBranch, _ := git.DefaultBranch(path)
 	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较——
 	// 刻意不用 LoadRepoStatus 的 branch.ab：那是「当前检出分支 vs 其 upstream」，
@@ -270,7 +270,7 @@ func collectEntry(path string) (*Entry, error) {
 	worktreeMain := detectWorktreeMain(path)
 	return &Entry{
 		RepoUrl:       repoUrl,
-		CurrentBranch: currBranch,
+		CurrentBranch: currentBranch,
 		DefaultBranch: defaultBranch,
 		Branches:      branches,
 		Ahead:         ahead,
