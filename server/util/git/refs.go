@@ -118,63 +118,6 @@ func Refs(path string) (*RefsResult, error) {
 	return result, nil
 }
 
-// Branches 返回 path 处仓库的全部本地分支列表（仅 refs/heads/*，不含远程分支）
-// 以及当前分支名。当前分支为 HEAD 指向的短名，detached 时为空串。
-// 非仓库返回 (nil, "", nil)，不视为错误。
-func Branches(path string) (branches []string, current string, err error) {
-	if !isGitRepo(path) {
-		return nil, "", nil
-	}
-	// 当前分支短名 = HEAD 目标 ref 剥 refs/heads/ 前缀。HEAD 不在 heads 上
-	// （detached，或被 symbolic-ref 病态挂到 tag 等其他子树）时为空——
-	// 与 git branch --show-current 口径一致（git 只强制 HEAD 在 refs/ 内，不强制在 heads 下）
-	current = CurrentBranch(path)
-	refs, err := Refs(path)
-	if err != nil {
-		return nil, current, err
-	}
-	for _, ref := range refs.Locals {
-		branches = append(branches, ref.Branch)
-	}
-	return branches, current, nil
-}
-
-// RemoteBranch 描述一个远程分支：所属 remote 名 + 分支名（不含 remote 前缀）。
-// 例 origin/master → {Remote:"origin", Branch:"master"}。
-type RemoteBranch struct {
-	Remote string
-	Branch string
-}
-
-// RemoteBranches 返回 path 处仓库的全部远程分支（所有 remote 的 refs/remotes/*）。
-// 自动跳过各 remote 的 HEAD（refs/remotes/{remote}/HEAD，它是 symbolic ref 而非真实分支）。
-// 非仓库目录或无任何远程分支时返回 (nil, nil)，不视为错误。
-func RemoteBranches(path string) ([]RemoteBranch, error) {
-	refs, err := Refs(path)
-	if err != nil {
-		return nil, err
-	}
-	var result []RemoteBranch
-	for _, ref := range refs.Remotes {
-		result = append(result, RemoteBranch{Remote: ref.Remote, Branch: ref.Branch})
-	}
-	return result, nil
-}
-
-// Tags 返回 path 处仓库的全部 tag 名（按名字升序，含轻量 tag 与 annotated tag）。
-// 非仓库目录或无 tag 时返回 (nil, nil)，不视为错误。
-func Tags(path string) ([]string, error) {
-	refs, err := Refs(path)
-	if err != nil {
-		return nil, err
-	}
-	var tags []string
-	for _, ref := range refs.Tags {
-		tags = append(tags, ref.ShortName)
-	}
-	return tags, nil
-}
-
 // HeadRef 返回 HEAD 指向的 ref 全名。正常为 refs/heads/*；git 只强制 HEAD 在
 // refs/ 内，病态挂载（symbolic-ref 指向 tag 等）时原样返回、不做 heads 假设。
 // detached HEAD、非仓库返回空串——这是业务空值而非错误（Branches 的 current
@@ -191,6 +134,9 @@ func HeadRef(path string) string {
 	return strings.TrimSpace(out)
 }
 
+// CurrentBranch 当前检出分支短名（HEAD 目标 ref 剥 refs/heads/ 前缀）。
+// detached、病态挂载到 heads 外、非仓库均返回空——与 git branch --show-current
+// 口径一致（git 只强制 HEAD 在 refs/ 内，不强制在 heads 下）。
 func CurrentBranch(path string) string {
 	ref := HeadRef(path)
 	if strings.HasPrefix(ref, RefHeadsPrefix) {

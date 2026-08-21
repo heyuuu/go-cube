@@ -249,7 +249,12 @@ func collectEntries(paths []string) map[string]*Entry {
 // 依赖 util/git 包的错误约定：业务空值场景返回零值+nil，所以这里基本不会拿到 error。
 func collectEntry(path string) (*Entry, error) {
 	repoUrl, _ := git.RemoteUrl(path)
-	branches, currBranch, _ := git.Branches(path)
+	refs, _ := git.Refs(path)
+	branches := make([]string, 0, len(refs.Locals))
+	for _, ref := range refs.Locals {
+		branches = append(branches, ref.ShortName)
+	}
+	currBranch := git.CurrentBranch(path)
 	defaultBranch, _ := git.DefaultBranch(path)
 	// ahead/behind 用仓库的默认分支（master/main/...）做本地 vs 远程比较——
 	// 刻意不用 LoadRepoStatus 的 branch.ab：那是「当前检出分支 vs 其 upstream」，

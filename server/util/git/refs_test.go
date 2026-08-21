@@ -9,86 +9,33 @@ import (
 	"cube/internal/testfixture"
 )
 
-// TestBranches_CleanRepo 干净仓库返回当前分支。
-func TestBranches_CleanRepo(t *testing.T) {
+// TestCurrentBranch 当前检出分支短名：attached 剥前缀返回；detached、非仓库为空。
+func TestCurrentBranch(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
-
-	branches, current, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("Branches 出错: %v", err)
+	if got := CurrentBranch(dir); got != "develop" {
+		t.Fatalf("CurrentBranch = %q，期望 develop", got)
 	}
-	if current != "develop" {
-		t.Fatalf("当前分支 = %q，期望 develop", current)
-	}
-	found := false
-	for _, b := range branches {
-		if b == "develop" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("分支列表 %v 不含 develop", branches)
-	}
-}
-
-// TestBranches_DetachedHead detached HEAD 时当前分支为空串（symbolic-ref 失败降级）。
-func TestBranches_DetachedHead(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepo("repo")
 	directGit(t, dir, "checkout", "--detach")
-
-	_, current, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("Branches 出错: %v", err)
+	if got := CurrentBranch(dir); got != "" {
+		t.Fatalf("detached 时 CurrentBranch 应为空，实际 %q", got)
 	}
-	if current != "" {
-		t.Fatalf("detached HEAD 时 current 应为空，实际 %q", current)
+	if got := CurrentBranch(ws.Mkdir("empty")); got != "" {
+		t.Fatalf("非仓库 CurrentBranch 应为空，实际 %q", got)
 	}
 }
 
-// TestBranches_NonRepo 非仓库目录返回空不报错。
-func TestBranches_NonRepo(t *testing.T) {
+// TestCurrentBranch_HeadOnTag HEAD 被 symbolic-ref 挂到 heads 外（tag）时为空，
+// 不得把 refs/tags/* 整串误当分支名（git branch --show-current 同口径输出空）。
+func TestCurrentBranch_HeadOnTag(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	dir := ws.Mkdir("empty")
-	branches, current, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("非仓库 Branches 不应报错: %v", err)
-	}
-	if branches != nil {
-		t.Fatalf("非仓库 branches 应为 nil，实际 %v", branches)
-	}
-	if current != "" {
-		t.Fatalf("非仓库 current 应为空，实际 %q", current)
+	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+	directGit(t, dir, "symbolic-ref", "HEAD", "refs/tags/v1.0")
+	if got := CurrentBranch(dir); got != "" {
+		t.Fatalf("HEAD 挂在 refs/tags/* 时应为空，实际 %q", got)
 	}
 }
 
-// TestTags 仓库含指定 tag。
-func TestTags(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
-		Tags: []string{"v1.0", "v2.0"},
-	})
-	tags, err := Tags(dir)
-	if err != nil {
-		t.Fatalf("Tags 出错: %v", err)
-	}
-	if len(tags) != 2 {
-		t.Fatalf("Tags 数量 = %d，期望 2：%v", len(tags), tags)
-	}
-	// tag 顺序由 git 决定，用 map 校验存在性
-	got := map[string]bool{}
-	for _, tg := range tags {
-		got[tg] = true
-	}
-	if !got["v1.0"] || !got["v2.0"] {
-		t.Fatalf("Tags 不全：%v", tags)
-	}
-}
-
-// TestRefs 全量 ref 清单：三类 namespace 的规范全名 + 远端 HEAD 符号指针剔除。
-// current 属 HEAD 状态，由 TestHeadRef 单独覆盖。
 // TestBuildRef 规范全名 → Ref 值对象：三棵子树解析、谓词判定、
 // 符号指针与未知形态报错（BuildRefs 依赖该错误口径做跳过）。
 func TestBuildRef(t *testing.T) {
@@ -202,22 +149,6 @@ func TestHeadRef(t *testing.T) {
 	}
 }
 
-// TestBranches_HeadOnTag HEAD 被 symbolic-ref 挂到 heads 外（tag）时 current 为空，
-// 不得把 refs/tags/* 整串误当分支名（git branch --show-current 同口径输出空）。
-func TestBranches_HeadOnTag(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
-	directGit(t, dir, "symbolic-ref", "HEAD", "refs/tags/v1.0")
-
-	_, current, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("Branches 出错: %v", err)
-	}
-	if current != "" {
-		t.Fatalf("HEAD 挂在 refs/tags/* 时 current 应为空，实际 %q", current)
-	}
-}
-
 // TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
 func TestDefaultBranch_OriginHEAD(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
@@ -293,38 +224,6 @@ func TestAheadBehindRemote_Diverged(t *testing.T) {
 	}
 }
 
-// TestBranches_OnlyLocalRefs 带斜杠的本地分支（feature/fix-bug）必须返回，
-// 远程跟踪引用（refs/remotes/origin/*）不得混入（push 依赖此约定选本地分支）。
-func TestBranches_OnlyLocalRefs(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{RemoteUrl: "/tmp/some-remote.git"})
-
-	_, current, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("Branches 出错: %v", err)
-	}
-	// 建带斜杠的本地分支 + 造一个远程跟踪引用（比 fetch 轻，refs 层面等价）
-	directGit(t, dir, "branch", "feature/fix-bug")
-	directGit(t, dir, "update-ref", "refs/remotes/origin/"+current, "refs/heads/"+current)
-
-	branches, _, err := Branches(dir)
-	if err != nil {
-		t.Fatalf("Branches 出错: %v", err)
-	}
-	hasSlashBranch := false
-	for _, b := range branches {
-		if b == "origin/"+current {
-			t.Fatalf("分支列表 %v 混入了远程跟踪分支 origin/%s", branches, current)
-		}
-		if b == "feature/fix-bug" {
-			hasSlashBranch = true
-		}
-	}
-	if !hasSlashBranch {
-		t.Fatalf("分支列表 %v 不含带斜杠的本地分支 feature/fix-bug", branches)
-	}
-}
-
 // TestAheadBehindRemote_SlashBranch 斜杠分支（feature/fix-bug）端到端：
 // 本地领先 remote 2 个 commit；同时验证 RemoteBranches 对斜杠远程分支的解析
 // （info -v 分支同步宽表按短名交集 + 每格调 AheadBehindRemote，依赖这两个行为）。
@@ -347,19 +246,19 @@ func TestAheadBehindRemote_SlashBranch(t *testing.T) {
 		t.Fatalf("ahead/behind = %d/%d，期望 2/0", ahead, behind)
 	}
 
-	// RemoteBranches 解析：refs/remotes/origin/feature/fix-bug → {origin, feature/fix-bug}
-	remoteBranches, err := RemoteBranches(dir)
+	// Refs 解析：refs/remotes/origin/feature/fix-bug → Remote/Branch 拆分
+	repoRefs, err := Refs(dir)
 	if err != nil {
-		t.Fatalf("RemoteBranches 出错: %v", err)
+		t.Fatalf("Refs 出错: %v", err)
 	}
 	found := false
-	for _, rb := range remoteBranches {
-		if rb.Remote == "origin" && rb.Branch == "feature/fix-bug" {
+	for _, ref := range repoRefs.Remotes {
+		if ref.Remote == "origin" && ref.Branch == "feature/fix-bug" {
 			found = true
 		}
 	}
 	if !found {
-		t.Fatalf("RemoteBranches %v 不含 {origin, feature/fix-bug}", remoteBranches)
+		t.Fatalf("Refs.Remotes %v 不含 {origin, feature/fix-bug}", repoRefs.Remotes)
 	}
 }
 

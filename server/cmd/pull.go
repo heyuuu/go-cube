@@ -136,15 +136,13 @@ func pullCandidates(repoPath string, remoteName string) ([]branchDiff, string, e
 	if err != nil {
 		return nil, "", fmt.Errorf("读取 ref 列表失败: %w", err)
 	}
-	localBranches, currentBranch, err := git.Branches(repoPath)
-	if err != nil {
-		return nil, "", fmt.Errorf("读取分支列表失败: %w", err)
-	}
+	currentBranch := git.CurrentBranch(repoPath)
 
 	// 候选 = 与指定 remote 同名的本地分支（其它 remote 的同名分支不参与）
 	remoteHasBranch := buildRemoteBranchMap(repoRefs)
 	var diffs []branchDiff
-	for _, b := range localBranches {
+	for _, ref := range repoRefs.Locals {
+		b := ref.Branch
 		if !remoteHasBranch[b][remoteName] {
 			continue
 		}
