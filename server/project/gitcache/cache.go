@@ -246,10 +246,14 @@ func collectEntries(paths []string) map[string]*Entry {
 }
 
 // collectEntry 采集单个项目的 git 信息。
-// 依赖 util/git 包的错误约定：业务空值场景返回零值+nil，所以这里基本不会拿到 error。
+// 依赖 util/git 包的错误约定：业务空值场景返回零值+nil；但 git 子进程执行失败
+// （如指向已删主仓库的 worktree 残骸）会返回 nil+err，必须上抛跳过，否则解引用 nil panic。
 func collectEntry(path string) (*Entry, error) {
 	repoUrl, _ := git.RemoteUrl(path)
-	refs, _ := git.Refs(path)
+	refs, err := git.Refs(path)
+	if err != nil {
+		return nil, err
+	}
 	branches := make([]string, 0, len(refs.Locals))
 	for _, ref := range refs.Locals {
 		branches = append(branches, ref.ShortName)
