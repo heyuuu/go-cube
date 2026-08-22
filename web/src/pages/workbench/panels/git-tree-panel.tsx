@@ -1,9 +1,19 @@
-import { GitBranch, Monitor } from 'lucide-react';
+import { ChevronDown, Copy, GitBranch, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import {
   useWorkbenchCommits,
@@ -13,6 +23,9 @@ import {
   type CommitEntry,
   type WorktreeStatus,
 } from '@/queries/workbench';
+import { useOpenerList, useOpenerOpen } from '@/queries/project';
+
+import { quickOpens } from '@/pages/projects/shared';
 
 import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
 
@@ -102,14 +115,16 @@ function WorktreeRow({
   const name = wt.path.split('/').pop() || wt.path;
 
   return (
-    <SelectableRow
-      label={name}
-      source={src}
-      params={params}
-      title={wt.path}
-      afterSelect={afterSelect}
-      badges={
-        <>
+    <div className="flex items-center">
+      <SelectableRow
+        label={name}
+        source={src}
+        params={params}
+        title={wt.path}
+        afterSelect={afterSelect}
+        badges={
+          <>
+            {wt.branch ? <Badge variant="secondary">{wt.branch}</Badge> : null}
           {wt.bare ? <Badge variant="outline">bare</Badge> : null}
           {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
           {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
@@ -119,9 +134,63 @@ function WorktreeRow({
             </Badge>
           ) : null}
           {wt.detached ? <Badge variant="outline">detached</Badge> : null}
-        </>
-      }
-    />
+          </>
+        }
+      />
+      <WorktreeOpenActions path={wt.path} name={name} />
+    </div>
+  );
+}
+
+// 副本行尾的 opener 动作（与 projects 页行内动作同构）：已配置的快捷图标 + 全量下拉。
+// 须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
+function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
+  const openers = useOpenerList();
+  const open = useOpenerOpen();
+  const openerList = openers.data?.list ?? [];
+  const openerNames = new Set(openerList.map((op) => op.name));
+  const onOpen = (app: string) => open.mutate({ path, app });
+
+  return (
+    <div className="flex shrink-0 items-center gap-0.5">
+      {quickOpens
+        .filter((q) => openerNames.has(q.opener))
+        .map((q) => (
+          <Button
+            key={q.opener}
+            variant="ghost"
+            size="icon-sm"
+            title={q.title}
+            aria-label={`${q.title}（${name}）`}
+            disabled={open.isPending && open.variables?.app === q.opener}
+            onClick={() => onOpen(q.opener)}
+          >
+            {q.icon}
+          </Button>
+        ))}
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${name}`} />}>
+          <ChevronDown className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-32">
+          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(path)}>
+            <Copy className="mr-1 size-3" />
+            复制绝对路径
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
+            {openerList.map((op) => (
+              <DropdownMenuItem key={op.name} onClick={() => onOpen(op.name)}>
+                {op.name}
+              </DropdownMenuItem>
+            ))}
+            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 
@@ -174,7 +243,7 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
       if (wt.dirty) {
         virtual.push({
           sha: `worktree:${wt.path}`,
-          shortSha: '',
+          shortSha: '-------', // 占位对齐：与真实 commit 的短 sha 同列，列表更整齐
           parents: [wt.head],
           author: '',
           timestamp: now,

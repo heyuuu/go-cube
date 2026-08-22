@@ -9,7 +9,7 @@ import { PANEL_ORDER, type PanelId } from './panels/registry';
 // 兼容旧存储格式（纯 PanelId 数组）：无 sizes 时按等比归一。
 
 const LAYOUT_KEY = 'cube.workbench.layout';
-const DEFAULT_SLOTS: PanelId[] = ['auto'];
+const DEFAULT_SLOTS: PanelId[] = ['git-tree', 'auto'];
 const MAX_SLOTS = 4; // 单实例约束下最多即全部四种
 
 export type WorkbenchLayoutState = {
