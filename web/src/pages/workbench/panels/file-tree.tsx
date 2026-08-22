@@ -38,6 +38,7 @@ export function FileTree({
   onPick,
   filter,
   stats,
+  statsPending,
   viewMode,
   onViewMode,
   scope,
@@ -50,6 +51,7 @@ export function FileTree({
   onPick: (file: string) => void;
   filter: Set<string> | null;
   stats: Map<string, FileStat> | null; // 差异文件的行级统计（差异模式），行尾显示 +N -N
+  statsPending: boolean; // 统计/清单未就绪时不渲染行——避免先闪全量再过滤/着色
   viewMode: 'tree' | 'flat';
   onViewMode: (m: 'tree' | 'flat') => void;
   scope: 'all' | 'diff';
@@ -218,7 +220,7 @@ export function FileTree({
         }
       />
       <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-1 text-xs">
-        {tree.isPending ? (
+        {tree.isPending || statsPending ? (
           <div className="py-1 pl-3 text-muted-foreground">加载中…</div>
         ) : tree.isError ? (
           <div className="py-1 pl-3 text-destructive">{tree.error.message}</div>

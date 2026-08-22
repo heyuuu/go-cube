@@ -155,6 +155,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           onPick={pickFile}
           filter={diffFilter}
           stats={diffStats}
+          statsPending={changes.isPending}
           viewMode={treeView}
           onViewMode={setTreeView}
           scope={treeMode}
