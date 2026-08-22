@@ -41,12 +41,37 @@ type DiffTreesResult struct {
 func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string]string, error) {
 	switch src.Type {
 	case SourceTypeWorktree:
-		return fsFileMap(src.Id, includeIgnored)
+		if includeIgnored {
+			return fsFileMap(src.Id, true)
+		}
+		return lsFilesFileMap(src.Id)
 	case SourceTypeCommit, SourceTypeRef:
 		return git.FileShasAtRef(root, src.Id)
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
+}
+
+// lsFilesFileMap 用 ls-files --cached --others --exclude-standard 圈定非忽略文件全集
+// （tracked + 未跟踪未忽略，忽略链由 git 自带判定），再逐文件算 blob sha。
+// 与 fsFileMap 的产物等价，但免去 status --ignored + 目录树 walk——忽略目录
+// （如 node_modules）的存在会让那条路走到秒级，而 ls-files 对文件数是线性的。
+// 磁盘上已不存在的 tracked 文件读失败跳过（与 fsFileMap 的 walk 语义一致：不在
+// 磁盘上就不出现在工作区侧，diff 表现为 deleted）。
+func lsFilesFileMap(wtDir string) (map[string]string, error) {
+	files, err := git.ListFiles(wtDir)
+	if err != nil {
+		return nil, fmt.Errorf("读取工作副本文件清单失败: dir=%s: %w", wtDir, err)
+	}
+	result := make(map[string]string, len(files))
+	for _, f := range files {
+		data, err := os.ReadFile(filepath.Join(wtDir, f))
+		if err != nil {
+			continue // 权限等单点失败跳过，不阻断整体对比
+		}
+		result[f] = blobSha(data)
+	}
+	return result, nil
 }
 
 // loadIgnoredDegrade 加载工作副本的忽略集合；判定失败不致命，降级为空集合
@@ -71,6 +96,11 @@ func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
 		}
 		if d.IsDir() {
 			if d.Name() == ".git" {
+				return filepath.SkipDir
+			}
+			// 忽略目录整棵剪枝（node_modules 等）：不剪的话几万条目录项逐个做忽略判定，
+			// 大仓库的目录级对比会拖到秒级
+			if rel, relErr := filepath.Rel(wtDir, p); relErr == nil && ig.Dirs[filepath.ToSlash(rel)] {
 				return filepath.SkipDir
 			}
 			return nil
