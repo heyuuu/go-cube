@@ -15,6 +15,7 @@ const MAX_SLOTS = 4; // 单实例约束下最多即全部四种
 export type WorkbenchLayoutState = {
   slots: PanelId[];
   sizes: number[];
+  slim: PanelId[]; // 收窄为细条的面板（点标题栏按钮切换；sizes 不动，展开即恢复原宽）
 };
 
 function normalizeSizes(slots: PanelId[], sizes: unknown): number[] {
@@ -30,6 +31,7 @@ function loadLayout(): WorkbenchLayoutState {
   const fallback = (): WorkbenchLayoutState => ({
     slots: DEFAULT_SLOTS,
     sizes: normalizeSizes(DEFAULT_SLOTS, null),
+    slim: [],
   });
   try {
     const raw = localStorage.getItem(LAYOUT_KEY);
@@ -41,7 +43,9 @@ function loadLayout(): WorkbenchLayoutState {
     if (valid.length === 0) return fallback();
     const slots = [...new Set(valid)];
     const sizes = Array.isArray(parsed) ? null : (parsed as { sizes?: unknown }).sizes;
-    return { slots, sizes: normalizeSizes(slots, sizes) };
+    const slimRaw = Array.isArray(parsed) ? [] : ((parsed as { slim?: unknown }).slim ?? []);
+    const slim = slots.filter((p) => Array.isArray(slimRaw) && slimRaw.includes(p));
+    return { slots, sizes: normalizeSizes(slots, sizes), slim };
   } catch {
     return fallback();
   }
@@ -69,8 +73,17 @@ export function useWorkbenchLayout() {
       return {
         slots: cur.slots.filter((p) => p !== id),
         sizes: cur.sizes.filter((_, i) => i !== idx),
+        slim: cur.slim.filter((p) => p !== id),
       };
     });
+  }, []);
+
+  // 收窄/展开切换：不动 sizes——展开后按原比例恢复宽度
+  const toggleSlim = useCallback((id: PanelId) => {
+    setState((cur) => ({
+      ...cur,
+      slim: cur.slim.includes(id) ? cur.slim.filter((p) => p !== id) : [...cur.slim, id],
+    }));
   }, []);
 
   // 拖拽排序：把 from 槽移动到 to 槽的位置
@@ -103,9 +116,9 @@ export function useWorkbenchLayout() {
   }, []);
 
   const resetLayout = useCallback(
-    () => setState({ slots: DEFAULT_SLOTS, sizes: normalizeSizes(DEFAULT_SLOTS, null) }),
+    () => setState({ slots: DEFAULT_SLOTS, sizes: normalizeSizes(DEFAULT_SLOTS, null), slim: [] }),
     [],
   );
 
-  return { ...state, addPanel, removePanel, reorderPanel, resizePanels, resetLayout };
+  return { ...state, addPanel, removePanel, reorderPanel, resizePanels, toggleSlim, resetLayout };
 }

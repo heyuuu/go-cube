@@ -1,4 +1,4 @@
-import { Box, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
+import { Box, ChevronsLeft, ChevronsRight, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
 import { Fragment, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -131,39 +131,64 @@ export function WorkbenchPage() {
       <div ref={slotsRef} className="flex min-h-0 flex-1">
         {layout.slots.map((id, i) => {
           const item = PANEL_REGISTRY[id];
+          const slim = layout.slim.includes(id);
           return (
             <Fragment key={id}>
-              <section className="flex min-w-48 flex-col" style={{ flexGrow: layout.sizes[i] ?? 1, flexBasis: 0 }}>
-                <div
-                  draggable
-                  onDragStart={() => {
-                    dragFrom.current = i;
-                  }}
-                  onDragOver={(e) => {
-                    if (dragFrom.current === null || dragFrom.current === i) return;
-                    e.preventDefault();
-                    layout.reorderPanel(dragFrom.current, i);
-                    dragFrom.current = i;
-                  }}
-                  className="flex h-7 shrink-0 cursor-grab items-center gap-1.5 border-b border-border bg-muted/30 px-2 text-[11px] text-muted-foreground active:cursor-grabbing"
-                  title="拖拽调整面板顺序"
-                >
-                  <GripVertical className="size-3 shrink-0 opacity-50" />
-                  <item.icon className="size-3.5" />
-                  {item.label}
-                  {id === 'auto' && !diffMode && params.source ? <span className="text-[10px]">· 代码</span> : null}
-                  {id === 'auto' && diffMode ? <span className="text-[10px]">· diff</span> : null}
+              {slim ? (
+                // 收窄态：细条整条都是展开按钮（竖排标签保持可辨识），宽度固定不参与 flexGrow
+                <section className="flex w-10 shrink-0 flex-col items-center border-r border-border bg-muted/30">
                   <button
                     type="button"
-                    title="移除面板"
-                    className="ml-auto rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
-                    onClick={() => layout.removePanel(id)}
+                    title={`${item.label}：展开`}
+                    aria-label={`${item.label}：展开`}
+                    className="flex h-full w-full flex-col items-center gap-2 py-2 text-muted-foreground hover:text-accent-foreground"
+                    onClick={() => layout.toggleSlim(id)}
                   >
-                    <X className="size-3" />
+                    <ChevronsRight className="size-3.5" />
+                    <span className="text-[11px] [writing-mode:vertical-rl]">{item.label}</span>
                   </button>
-                </div>
-                <div className="min-h-0 flex-1 overflow-hidden">{renderPanel(id)}</div>
-              </section>
+                </section>
+              ) : (
+                <section className="flex min-w-48 flex-col" style={{ flexGrow: layout.sizes[i] ?? 1, flexBasis: 0 }}>
+                  <div
+                    draggable
+                    onDragStart={() => {
+                      dragFrom.current = i;
+                    }}
+                    onDragOver={(e) => {
+                      if (dragFrom.current === null || dragFrom.current === i) return;
+                      e.preventDefault();
+                      layout.reorderPanel(dragFrom.current, i);
+                      dragFrom.current = i;
+                    }}
+                    className="flex h-7 shrink-0 cursor-grab items-center gap-1.5 border-b border-border bg-muted/30 px-2 text-[11px] text-muted-foreground active:cursor-grabbing"
+                    title="拖拽调整面板顺序"
+                  >
+                    <GripVertical className="size-3 shrink-0 opacity-50" />
+                    <item.icon className="size-3.5" />
+                    {item.label}
+                    {id === 'auto' && !diffMode && params.source ? <span className="text-[10px]">· 代码</span> : null}
+                    {id === 'auto' && diffMode ? <span className="text-[10px]">· diff</span> : null}
+                    <button
+                      type="button"
+                      title="收窄面板（再点展开）"
+                      className="rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => layout.toggleSlim(id)}
+                    >
+                      <ChevronsLeft className="size-3" />
+                    </button>
+                    <button
+                      type="button"
+                      title="移除面板"
+                      className="rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
+                      onClick={() => layout.removePanel(id)}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-hidden">{renderPanel(id)}</div>
+                </section>
+              )}
               {i < layout.slots.length - 1 ? (
                 <PanelSplitter
                   onDelta={(dx) => {
