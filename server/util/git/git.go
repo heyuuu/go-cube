@@ -96,6 +96,18 @@ func Push(dir string, remote string, ref string, force bool) error {
 	return Run(dir, args...)
 }
 
+// PushAllTags 把全部本地 tag 推送到 remote（git push --tags remote）。
+// --tags 只增不删：远程已有的同名 tag 指向不同 commit 时会被拒绝（force 才覆盖），
+// 远程独有、本地没有的 tag 不受影响。
+func PushAllTags(dir string, remote string, force bool) error {
+	args := []string{"push"}
+	if force {
+		args = append(args, "--force-with-lease")
+	}
+	args = append(args, "--tags", remote)
+	return Run(dir, args...)
+}
+
 // Pull 快进合并 remote 的指定分支到当前分支（git pull --ff-only remote ref）。
 // 仅快进：本地与远端分叉时 git 报错退出，不产生 merge commit、不动工作区。
 func Pull(dir string, remote string, ref string) error {

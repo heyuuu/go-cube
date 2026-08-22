@@ -110,7 +110,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 		},
 	}
 	cmd.Flags().StringArrayVarP(&remotes, "remote", "r", nil, "目标 remote（可多次指定，默认交互多选）")
-	cmd.Flags().StringArrayVarP(&refs, "ref", "b", nil, "待推送的 ref：分支名/tag 名（可多次指定，默认交互多选）")
+	cmd.Flags().StringArrayVarP(&refs, "ref", "b", nil, "待推送的 ref：分支名/tag 名（可多次指定；传 --tags 表示全部 tag；默认交互多选）")
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "强制推送（使用 --force-with-lease）")
 	cmd.Flags().BoolVarP(&yes, "yes", "y", false, "跳过最终确认，直接推送")
 	return cmd
@@ -150,8 +150,12 @@ func resolveRemotesByName(all []git.Remote, names []string) ([]git.Remote, error
 	return result, nil
 }
 
+// refAllTags 候选哨兵值：代表一次性推送全部本地 tag（git push --tags），非真实 git ref。
+const refAllTags = "--tags"
+
 // pickRefs 决定要推送的 ref 集合：flag 显式指定优先，否则 TUI 多选（默认当前分支）。
-//   - 候选 = 本地分支 + tag（前缀区分：分支裸名，tag 加 refs/tags/ 前缀推送更稳）。
+//   - 候选 = 本地分支 + 一条「全部 tags」合并项（tag 数量随时间线性增长，逐条列出
+//     只会让候选列表越来越长，故合并成 refAllTags 一项整体推送）。
 //   - 默认勾选当前分支（若存在）。
 func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string, error) {
 	if len(flagRefs) > 0 {
@@ -169,8 +173,11 @@ func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string
 	for _, ref := range refs.Locals {
 		items = append(items, refItem{label: "branch: " + ref.ShortName, ref: ref.Name})
 	}
-	for _, ref := range refs.Tags {
-		items = append(items, refItem{label: "tag:    " + ref.ShortName, ref: ref.Name})
+	if len(refs.Tags) > 0 {
+		items = append(items, refItem{
+			label: fmt.Sprintf("tags:   全部 %d 个", len(refs.Tags)),
+			ref:   refAllTags,
+		})
 	}
 	if len(items) == 0 {
 		return nil, errors.New("仓库无任何本地分支或 tag")
@@ -219,12 +226,20 @@ func confirmPlan(repoPath string, remotes []git.Remote, refs []string, force boo
 	return tui.ConfirmInline(fmt.Sprintf("确认推送到以上 %d 个 remote × %d 个 ref？", len(remotes), len(refs)))
 }
 
+// refDisplayName 返回 ref 在计划表中的展示名；哨兵 refAllTags 展示为更友好的说明。
+func refDisplayName(ref string) string {
+	if ref == refAllTags {
+		return "全部本地 tag (--tags)"
+	}
+	return ref
+}
+
 // buildPlanRows 展开成 (remote × ref) 行用于表格展示。
 func buildPlanRows(remotes []git.Remote, refs []string) [][]string {
 	var rows [][]string
 	for _, r := range remotes {
 		for _, ref := range refs {
-			rows = append(rows, []string{r.Name, r.Push, ref})
+			rows = append(rows, []string{r.Name, r.Push, refDisplayName(ref)})
 		}
 	}
 	return rows
@@ -241,8 +256,14 @@ func runPush(repoPath string, remotes []git.Remote, refs []string, force bool) e
 	for _, r := range remotes {
 		for _, ref := range refs {
 			i++
-			fmt.Printf("\n[%d/%d] git push %s %s%s\n", i, total, r.Name, ref, forceFlagSuffix(force))
-			if err := git.Push(repoPath, r.Name, ref, force); err != nil {
+			fmt.Printf("\n[%d/%d] git push %s %s%s\n", i, total, r.Name, refDisplayName(ref), forceFlagSuffix(force))
+			var err error
+			if ref == refAllTags {
+				err = git.PushAllTags(repoPath, r.Name, force)
+			} else {
+				err = git.Push(repoPath, r.Name, ref, force)
+			}
+			if err != nil {
 				failed++
 				fmt.Printf("  ✗ 失败: %v\n", err)
 			}
