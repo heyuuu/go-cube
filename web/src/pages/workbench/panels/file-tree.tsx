@@ -124,19 +124,21 @@ export function FileTree({
       <TreeToolbar
         onExpandAll={expandAll}
         onCollapseAll={collapseAll}
+        leading={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-muted-foreground"
+            disabled={!selectedFile}
+            onClick={locateCurrent}
+            title="定位当前文件"
+            aria-label="定位当前文件"
+          >
+            <Crosshair className="size-3.5" />
+          </Button>
+        }
         extra={
           <>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="text-muted-foreground"
-              disabled={!selectedFile}
-              onClick={locateCurrent}
-              title="定位当前文件"
-              aria-label="定位当前文件"
-            >
-              <Crosshair className="size-3.5" />
-            </Button>
             <div className="ml-auto flex items-center gap-1.5">
               <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
                 {(

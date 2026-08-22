@@ -62,16 +62,16 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const content = useWorkbenchFile(path, source!, file);
   const refs = useWorkbenchRefs(path);
-  const changes = useWorkbenchChanges(path, source!, treeMode === 'diff');
+  // changes 全量模式也拉：行级统计（+N -N/琥珀色）在两种模式下都展示
+  const changes = useWorkbenchChanges(path, source!, true);
   const fileContent = content.data?.content ?? '';
 
   const currentKey = `${source?.type}:${source?.id}:${file}`;
   const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
   // 差异文件的行级增删（后端 Changes 注入），键为文件相对路径
-  const diffStats =
-    treeMode === 'diff' && changes.data
-      ? new Map((changes.data.list ?? []).map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary }]))
-      : null;
+  const diffStats = changes.data
+    ? new Map((changes.data.list ?? []).map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary }]))
+    : null;
   const editing = editState !== null && editState.key === currentKey;
   const draft = editing ? editState.draft : '';
   const dirty = editing && editState.draft !== fileContent;

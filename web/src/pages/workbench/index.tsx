@@ -172,7 +172,7 @@ export function WorkbenchPage() {
                     <button
                       type="button"
                       title="收窄面板（再点展开）"
-                      className="rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
+                      className="ml-auto rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
                       onClick={() => layout.toggleSlim(id)}
                     >
                       <ChevronsLeft className="size-3" />

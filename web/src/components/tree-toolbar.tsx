@@ -10,15 +10,18 @@ export function TreeToolbar({
   onExpandAll,
   onCollapseAll,
   busy = false,
+  leading,
   extra,
 }: {
   onExpandAll: () => void;
   onCollapseAll: () => void;
   busy?: boolean; // 异步逐层加载中（展开全部可能较慢）
+  leading?: React.ReactNode; // 前置按钮（渲染在展开/折叠之前）
   extra?: React.ReactNode;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1 border-b border-border px-1 py-1">
+      {leading}
       <Button
         variant="ghost"
         size="icon-sm"
