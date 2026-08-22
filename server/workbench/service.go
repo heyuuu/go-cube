@@ -5,10 +5,12 @@
 package workbench
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 
@@ -236,7 +238,59 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 	default:
 		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
 	}
-	return s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
+	res, err := s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
+	if err != nil {
+		return nil, err
+	}
+	annotateChangeStats(res, root, src, base)
+	return res, nil
+}
+
+// annotateChangeStats 为 Changes 的变更清单注入行级增删统计（git.Numstat）：
+//   - worktree 源：numstat 与工作区比（不含 untracked），未命中的 added 即 untracked，按文件行数计 adds；
+//   - commit/ref 源：numstat 与父提交比，全部命中。
+//
+// 统计失败只降级（adds/dels 留零值），不阻断变更清单——文件列表本身仍可用。
+func annotateChangeStats(res *DiffTreesResult, root string, src TreeSource, base string) {
+	var stats map[string]git.NumstatEntry
+	var err error
+	if src.Type == SourceTypeWorktree {
+		stats, err = git.Numstat(src.Id, base, "")
+	} else {
+		stats, err = git.Numstat(root, base, src.Id)
+	}
+	if err != nil {
+		slog.Debug("变更行数统计失败，降级为零值", "err", err)
+		return
+	}
+	for i := range res.List {
+		e := &res.List[i]
+		if st, ok := stats[e.Path]; ok {
+			e.Adds, e.Dels, e.Binary = st.Adds, st.Dels, st.Binary
+			continue
+		}
+		// 未命中 numstat 的新增 = untracked 文件：按文件行数计 adds（二进制探测 NUL 字节）
+		if src.Type == SourceTypeWorktree && e.Status == "added" {
+			adds, binary := countFileLines(filepath.Join(src.Id, e.Path))
+			e.Adds, e.Binary = adds, binary
+		}
+	}
+}
+
+// countFileLines 统计文件行数；读不了（已删除等）或疑似二进制（前 8KB 含 NUL）返回 0。
+func countFileLines(absPath string) (lines int, binary bool) {
+	data, err := os.ReadFile(absPath)
+	if err != nil {
+		return 0, false
+	}
+	probe := data
+	if len(probe) > 8192 {
+		probe = probe[:8192]
+	}
+	if bytes.IndexByte(probe, 0) >= 0 {
+		return 0, true
+	}
+	return bytes.Count(data, []byte{'\n'}), false
 }
 
 // --- PTY 会话（提案 1014，server 停机时由 OnServerStop 收尾）---

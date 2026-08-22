@@ -20,6 +20,12 @@ type DiffEntry struct {
 	Path    string `json:"path"`    // 新侧相对路径（rename 为新路径）
 	OldPath string `json:"oldPath"` // rename 时的旧路径，其余为空
 	Status  string `json:"status"`  // added / deleted / modified / renamed
+
+	// 行级增删统计（仅 Changes 注入；DiffTrees 双树对比不填）。
+	// untracked 新增按文件行数计 adds；二进制文件不统计
+	Adds   int  `json:"adds"`
+	Dels   int  `json:"dels"`
+	Binary bool `json:"binary"`
 }
 
 // DiffTreesResult 目录级对比结果。Mode 显式返回实际使用的模式，前端不猜：

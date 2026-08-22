@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -55,6 +56,69 @@ func parseDiffNameStatus(out string) []DiffFile {
 	}
 	sort.Slice(files, func(i, j int) bool { return files[i].Path < files[j].Path })
 	return files
+}
+
+// NumstatEntry 单文件的行级增删统计。
+type NumstatEntry struct {
+	Adds   int
+	Dels   int
+	Path   string
+	Binary bool // 二进制文件（numstat 输出 "-"，增删不可统计）
+}
+
+// Numstat 两个 tree-ish 之间的行级增删统计，返回「新侧路径 → 统计」map。
+// right 为空 = 与工作区比（含已暂存 + 未暂存，不含 untracked）。
+// 带 -M 启用 rename 检测，rename 条目的新路径入 map（旧路径的附加字段跳过）。
+func Numstat(dir string, left string, right string) (map[string]NumstatEntry, error) {
+	args := []string{"diff", "--numstat", "-z", "-M", left}
+	if right != "" {
+		args = append(args, right)
+	}
+	args = append(args, "--")
+	out, err := runOut(dir, args...)
+	if err != nil {
+		return nil, fmt.Errorf("git diff --numstat 执行失败: %w", err)
+	}
+	return parseNumstat(out), nil
+}
+
+// parseNumstat 解析 `git diff --numstat -z` 输出：NUL 分隔，条目为 "adds\tdels\tpath"。
+// binary 文件 adds/dels 为 "-"。rename 条目为三段："adds\tdels\t"（路径空）、
+// 新路径、旧路径——新路径入 map，旧路径字段跳过。
+func parseNumstat(out string) map[string]NumstatEntry {
+	m := map[string]NumstatEntry{}
+	fields := strings.Split(out, "\x00")
+	for i := 0; i < len(fields); i++ {
+		field := fields[i]
+		p1 := strings.IndexByte(field, '\t')
+		if p1 < 0 {
+			continue // rename 的旧路径附加字段（无制表符）或结尾空串
+		}
+		p2 := strings.IndexByte(field[p1+1:], '\t')
+		if p2 < 0 {
+			continue
+		}
+		adds, dels := field[:p1], field[p1+1:p1+1+p2]
+		path := field[p1+p2+2:]
+		if path == "" {
+			// rename：本字段路径为空，随后的两个字段是 旧路径、新路径（实测 -z 输出顺序）；
+			// map 键取新侧路径（与 DiffFiles/DiffEntry 的 Path 口径一致）
+			if i+2 >= len(fields) || fields[i+1] == "" || fields[i+2] == "" {
+				continue
+			}
+			path = fields[i+2]
+			i += 2
+		}
+		e := NumstatEntry{Path: path}
+		if adds != "-" && dels != "-" {
+			e.Adds, _ = strconv.Atoi(adds)
+			e.Dels, _ = strconv.Atoi(dels)
+		} else {
+			e.Binary = true
+		}
+		m[path] = e
+	}
+	return m
 }
 
 // DiffNoIndex 比较两个文件（无需仓库上下文），返回 unified diff 文本（-U3）。

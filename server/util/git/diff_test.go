@@ -109,3 +109,52 @@ func TestDiffNoIndex(t *testing.T) {
 		t.Error("路径不存在时应返回错误")
 	}
 }
+
+// TestNumstat 覆盖 modified 增删计数、rename 新路径入 map、二进制标记、工作区模式。
+func TestNumstat(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.MakeGitRepo("repo")
+
+	writeAbsFile := func(name, content string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(content), 0644); err != nil {
+			t.Fatalf("写文件失败: %v", err)
+		}
+	}
+	writeAbsFile("a.txt", "l1\nl2\n")
+	writeAbsFile("old.txt", "x\n")
+	directGit(t, dir, "add", "-A")
+	directGit(t, dir, "commit", "-m", "c1")
+
+	writeAbsFile("a.txt", "l1\nl2\nl3\nl4\n") // +2 -0
+	directGit(t, dir, "mv", "old.txt", "new.txt")
+	if err := os.WriteFile(filepath.Join(dir, "bin.dat"), []byte{'a', 0, 'b'}, 0644); err != nil {
+		t.Fatal(err)
+	}
+	directGit(t, dir, "add", "-A")
+	directGit(t, dir, "commit", "-m", "c2")
+
+	stats, err := Numstat(dir, "HEAD~1", "HEAD")
+	if err != nil {
+		t.Fatalf("Numstat 出错: %v", err)
+	}
+	if got := stats["a.txt"]; got.Adds != 2 || got.Dels != 0 {
+		t.Errorf("a.txt 期望 +2/-0，实际 +%d/-%d", got.Adds, got.Dels)
+	}
+	if _, ok := stats["new.txt"]; !ok {
+		t.Errorf("rename 应以新路径入 map: %v", stats)
+	}
+	if got := stats["bin.dat"]; !got.Binary {
+		t.Errorf("二进制文件应标记 Binary: %+v", got)
+	}
+
+	// 工作区模式（right 为空）：改 a.txt 不提交
+	writeAbsFile("a.txt", "l1\n")
+	wt, err := Numstat(dir, "HEAD", "")
+	if err != nil {
+		t.Fatalf("Numstat 工作区模式出错: %v", err)
+	}
+	if got := wt["a.txt"]; got.Adds != 0 || got.Dels != 3 {
+		t.Errorf("a.txt 工作区期望 +0/-3，实际 +%d/-%d", got.Adds, got.Dels)
+	}
+}
