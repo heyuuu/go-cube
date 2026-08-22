@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, Crosshair, FileText, Folder } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
@@ -30,6 +30,22 @@ const STATUS_COLOR: Record<string, { icon: string; text: string }> = {
   deleted: { icon: 'text-red-500', text: 'text-red-600 dark:text-red-400' },
   renamed: { icon: 'text-violet-500', text: 'text-violet-600 dark:text-violet-400' },
 };
+
+// 展开偏好：只记「上一次点的全部展开/全部折叠」，不逐目录记——
+// 刷新后整棵树按上次的 bulk 动作恢复（个人偏好，localStorage）
+const TREE_EXPAND_KEY = 'cube.workbench.codetree.expand';
+
+function allDirPaths(root: FileTreeNode): Set<string> {
+  const next = new Set<string>();
+  const walk = (n: FileTreeNode) => {
+    if (n.children.length > 0) {
+      next.add(n.path);
+      n.children.forEach(walk);
+    }
+  };
+  root.children.forEach(walk);
+  return next;
+}
 
 export function FileTree({
   path,
@@ -93,18 +109,24 @@ export function FileTree({
 
   const expandAll = useCallback(() => {
     if (!root) return;
-    const next = new Set<string>();
-    const walk = (n: FileTreeNode) => {
-      if (n.children.length > 0) {
-        next.add(n.path);
-        n.children.forEach(walk);
-      }
-    };
-    root.children.forEach(walk);
-    setExpandedSet(next);
+    setExpandedSet(allDirPaths(root));
+    localStorage.setItem(TREE_EXPAND_KEY, 'all');
   }, [root]);
 
-  const collapseAll = useCallback(() => setExpandedSet(new Set([''])), []);
+  const collapseAll = useCallback(() => {
+    setExpandedSet(new Set(['']));
+    localStorage.setItem(TREE_EXPAND_KEY, 'none');
+  }, []);
+
+  // 首次拿到树数据时按上次的 bulk 动作恢复（仅一次；之后的手动展开/折叠不记忆）
+  const bulkInitRef = useRef(false);
+  useEffect(() => {
+    if (bulkInitRef.current || !root) return;
+    bulkInitRef.current = true;
+    const saved = localStorage.getItem(TREE_EXPAND_KEY);
+    if (saved === 'all') setExpandedSet(allDirPaths(root));
+    else if (saved === 'none') setExpandedSet(new Set(['']));
+  }, [root]);
 
   const listRef = useRef<HTMLDivElement>(null);
   // 定位当前文件：展开其祖先目录 → 滚动到该行 → 闪烁高亮（class 命令式添加，同 git 树定位）
