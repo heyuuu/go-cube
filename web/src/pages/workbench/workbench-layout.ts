@@ -62,7 +62,7 @@ export function useWorkbenchLayout() {
   const addPanel = useCallback((id: PanelId) => {
     setState((cur) => {
       if (cur.slots.includes(id) || cur.slots.length >= MAX_SLOTS) return cur;
-      return { slots: [...cur.slots, id], sizes: [...cur.sizes, 1] };
+      return { slots: [...cur.slots, id], sizes: [...cur.sizes, 1], slim: cur.slim };
     });
   }, []);
 
@@ -96,7 +96,7 @@ export function useWorkbenchLayout() {
       const [size] = sizes.splice(from, 1);
       slots.splice(to, 0, slot);
       sizes.splice(to, 0, size);
-      return { slots, sizes };
+      return { slots, sizes, slim: cur.slim };
     });
   }, []);
 
@@ -111,7 +111,7 @@ export function useWorkbenchLayout() {
       const sizes = [...cur.sizes];
       sizes[index] = next;
       sizes[index + 1] = other;
-      return { slots: cur.slots, sizes };
+      return { slots: cur.slots, sizes, slim: cur.slim };
     });
   }, []);
 

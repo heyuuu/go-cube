@@ -613,6 +613,11 @@ export interface components {
       project: components['schemas']['ProjectConfig'];
     };
     DiffEntry: {
+      /** Format: int64 */
+      adds: number;
+      binary: boolean;
+      /** Format: int64 */
+      dels: number;
       oldPath: string;
       path: string;
       status: string;
@@ -793,7 +798,7 @@ export interface components {
       scanUpdatedAt: string;
     };
     Refs: {
-      current: string;
+      head: string;
       locals: string[] | null;
       remotes: string[] | null;
       tags: string[] | null;

@@ -267,7 +267,8 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
     const virtualLaneEnd = new Map<number, number>();
     for (const n of nodes) {
       if (!('worktree' in n && n.worktree)) continue;
-      const headRow = n.parents[0] != null ? (nodesOf.get(n.parents[0]) ?? nodes.length) : 0;
+      const head = n.parents?.[0];
+      const headRow = head != null ? (nodesOf.get(head) ?? nodes.length) : 0;
       virtualLaneEnd.set(n.lane, headRow);
     }
     return { rows: nodes, wireMap: map, virtualLaneEnd };
