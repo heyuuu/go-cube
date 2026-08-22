@@ -67,6 +67,11 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const currentKey = `${source?.type}:${source?.id}:${file}`;
   const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
+  // 差异文件的行级增删（后端 Changes 注入），键为文件相对路径
+  const diffStats =
+    treeMode === 'diff' && changes.data
+      ? new Map((changes.data.list ?? []).map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary }]))
+      : null;
   const editing = editState !== null && editState.key === currentKey;
   const draft = editing ? editState.draft : '';
   const dirty = editing && editState.draft !== fileContent;
@@ -138,6 +143,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           selectedFile={file}
           onPick={pickFile}
           filter={diffFilter}
+          stats={diffStats}
           viewMode={treeView}
           onViewMode={setTreeView}
           scope={treeMode}

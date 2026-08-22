@@ -1,4 +1,4 @@
-import { ListCollapse, ListTree } from 'lucide-react';
+import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 
@@ -28,7 +28,7 @@ export function TreeToolbar({
         title="展开全部目录"
         aria-label="展开全部目录"
       >
-        <ListTree className="size-3.5" />
+        <ChevronsUpDown className="size-3.5" />
       </Button>
       <Button
         variant="ghost"
@@ -38,7 +38,7 @@ export function TreeToolbar({
         title="折叠全部目录（保留顶层）"
         aria-label="折叠全部目录（保留顶层）"
       >
-        <ListCollapse className="size-3.5" />
+        <ChevronsDownUp className="size-3.5" />
       </Button>
       {extra}
     </div>

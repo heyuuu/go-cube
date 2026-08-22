@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronRight, FileText, Folder, List, ListTree } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { ChevronDown, ChevronRight, Crosshair, FileText, Folder } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
@@ -15,12 +15,15 @@ import type { TreeSource } from '../params';
 // filter 生效时只显示集合内文件（及其祖先目录）——差异模式用。
 // viewMode：树形（目录可展开）/ 平摊（每行一个文件，显示相对根目录的完整路径），
 // scope（全量/差异文件）与模式切换按钮渲染在树工具条（extra），状态由调用方持有。
+export type FileStat = { adds: number; dels: number; binary?: boolean };
+
 export function FileTree({
   path,
   source,
   selectedFile,
   onPick,
   filter,
+  stats,
   viewMode,
   onViewMode,
   scope,
@@ -32,6 +35,7 @@ export function FileTree({
   selectedFile: string;
   onPick: (file: string) => void;
   filter: Set<string> | null;
+  stats: Map<string, FileStat> | null; // 差异文件的行级统计（差异模式），行尾显示 +N -N
   viewMode: 'tree' | 'flat';
   onViewMode: (m: 'tree' | 'flat') => void;
   scope: 'all' | 'diff';
@@ -74,6 +78,28 @@ export function FileTree({
 
   const collapseAll = useCallback(() => setExpandedSet(new Set([''])), []);
 
+  const listRef = useRef<HTMLDivElement>(null);
+  // 定位当前文件：展开其祖先目录 → 滚动到该行 → 闪烁高亮（class 命令式添加，同 git 树定位）
+  const locateCurrent = useCallback(() => {
+    if (!selectedFile) return;
+    setExpandedSet((prev) => {
+      const next = new Set(prev);
+      const parts = selectedFile.split('/');
+      for (let i = 1; i < parts.length; i++) next.add(parts.slice(0, i).join('/'));
+      return next;
+    });
+    // rAF 等展开后的 DOM 提交再滚动定位
+    requestAnimationFrame(() => {
+      const el = listRef.current?.querySelector(`[data-path="${selectedFile}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'center' });
+      el.classList.remove('row-flash');
+      void (el as HTMLElement).offsetWidth; // 重启动画
+      el.classList.add('row-flash');
+      window.setTimeout(() => el.classList.remove('row-flash'), 2500);
+    });
+  }, [selectedFile]);
+
   // 可见行：树形 = flatten 后按差异过滤（文件须在集合内，目录须有集合内文件位于其下）；
   // 平摊 = 直接用接口的扁平路径清单（排序对齐树形的字典序），无目录行。
   // 根行（isRoot）不渲染，面板标题已提供上下文
@@ -104,38 +130,66 @@ export function FileTree({
               variant="ghost"
               size="icon-sm"
               className="text-muted-foreground"
-              onClick={() => onViewMode(flat ? 'tree' : 'flat')}
-              title={flat ? '切换为树形目录' : '切换为平摊列表（显示完整路径）'}
-              aria-label={flat ? '切换为树形目录' : '切换为平摊列表'}
+              disabled={!selectedFile}
+              onClick={locateCurrent}
+              title="定位当前文件"
+              aria-label="定位当前文件"
             >
-              {flat ? <ListTree className="size-3.5" /> : <List className="size-3.5" />}
+              <Crosshair className="size-3.5" />
             </Button>
-            <div className="ml-auto flex overflow-hidden rounded-md border border-border text-[10px]">
-              {(
-                [
-                  ['all', '全量'],
-                  ['diff', '差异'],
-                ] as const
-              ).map(([m, label]) => (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={scope === 'diff' && scopePending}
-                  className={cn(
-                    'px-1.5 py-0.5 transition-colors',
-                    scope === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
-                  )}
-                  onClick={() => onScope(m)}
-                  title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="ml-auto flex items-center gap-1.5">
+              <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
+                {(
+                  [
+                    ['tree', '树形'],
+                    ['flat', '平摊'],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={cn(
+                      'px-1.5 py-0.5 transition-colors',
+                      viewMode === m
+                        ? 'bg-primary/15 font-medium text-primary'
+                        : 'text-muted-foreground hover:bg-accent',
+                    )}
+                    onClick={() => onViewMode(m)}
+                    title={m === 'flat' ? '平摊列表（显示完整路径）' : '树形目录'}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
+                {(
+                  [
+                    ['all', '全量'],
+                    ['diff', '差异'],
+                  ] as const
+                ).map(([m, label]) => (
+                  <button
+                    key={m}
+                    type="button"
+                    disabled={scope === 'diff' && scopePending}
+                    className={cn(
+                      'px-1.5 py-0.5 transition-colors',
+                      scope === m
+                        ? 'bg-primary/15 font-medium text-primary'
+                        : 'text-muted-foreground hover:bg-accent',
+                    )}
+                    onClick={() => onScope(m)}
+                    title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
             </div>
           </>
         }
       />
-      <div className="min-h-0 flex-1 overflow-y-auto p-1 text-xs">
+      <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto p-1 text-xs">
         {tree.isPending ? (
           <div className="py-1 pl-3 text-muted-foreground">加载中…</div>
         ) : tree.isError ? (
@@ -148,6 +202,7 @@ export function FileTree({
               <button
                 key={node.path}
                 type="button"
+                data-path={node.path}
                 className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent"
                 style={{ paddingLeft: depth * 12 + 4 }}
                 onClick={() => toggle(node.path)}
@@ -164,6 +219,7 @@ export function FileTree({
               <button
                 key={node.path}
                 type="button"
+                data-path={node.path}
                 title={node.path}
                 className={cn(
                   'flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent',
@@ -172,8 +228,21 @@ export function FileTree({
                 style={{ paddingLeft: flat ? 6 : depth * 12 + 16 }}
                 onClick={() => onPick(node.path)}
               >
-                <FileText className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{flat ? node.path : node.name}</span>
+                <FileText
+                  className={cn(
+                    'size-3.5 shrink-0',
+                    stats?.has(node.path) ? 'text-amber-500' : 'text-muted-foreground',
+                  )}
+                />
+                <span
+                  className={cn(
+                    'truncate',
+                    stats?.has(node.path) ? 'text-amber-600 dark:text-amber-400' : undefined,
+                  )}
+                >
+                  {flat ? node.path : node.name}
+                </span>
+                {statLine(stats?.get(node.path))}
               </button>
             ),
           )
@@ -189,4 +258,22 @@ function hasFileUnder(filter: Set<string>, dir: string): boolean {
     if (f.startsWith(prefix)) return true;
   }
   return false;
+}
+
+// 差异行的行数统计（+N 绿 / -N 红，右对齐）；二进制显示 bin
+function statLine(stat?: FileStat) {
+  if (!stat) return null;
+  return (
+    <span className="ml-auto shrink-0 font-mono text-[10px]">
+      {stat.binary ? (
+        <span className="text-muted-foreground">bin</span>
+      ) : (
+        <>
+          {stat.adds > 0 ? <span className="text-emerald-600 dark:text-emerald-400">+{stat.adds}</span> : null}
+          {stat.adds > 0 && stat.dels > 0 ? ' ' : null}
+          {stat.dels > 0 ? <span className="text-red-600 dark:text-red-400">-{stat.dels}</span> : null}
+        </>
+      )}
+    </span>
+  );
 }
