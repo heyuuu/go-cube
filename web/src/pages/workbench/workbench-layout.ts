@@ -120,5 +120,14 @@ export function useWorkbenchLayout() {
     [],
   );
 
-  return { ...state, addPanel, removePanel, reorderPanel, resizePanels, toggleSlim, resetLayout };
+  return {
+    ...state,
+    slim: state.slim ?? [], // HMR 会保留旧形状的 state（无 slim），归一免疫形状变更
+    addPanel,
+    removePanel,
+    reorderPanel,
+    resizePanels,
+    toggleSlim,
+    resetLayout,
+  };
 }
