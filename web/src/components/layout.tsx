@@ -1,12 +1,15 @@
-import { Box, ExternalLink, Settings } from 'lucide-react';
+import { Box, ExternalLink, Moon, Settings, Sun } from 'lucide-react';
 import { NavLink, Outlet } from 'react-router';
 
+import { toggleTheme, useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
 // 导航只放当前可用页面；新增页面在此追加（终态地图见 docs/archived/260811-前端栈迁移）
 const navItems = [{ to: '/projects', label: 'Projects' }];
 
 export function Layout() {
+  const theme = useTheme();
+
   return (
     <div className="flex h-dvh">
       <aside className="flex w-52 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground">
@@ -53,6 +56,15 @@ export function Layout() {
             API Docs
             <ExternalLink className="size-3" />
           </a>
+          <button
+            type="button"
+            onClick={toggleTheme}
+            title="切换主题 (⌘D)"
+            className="flex items-center gap-2 rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground"
+          >
+            {theme === 'dark' ? <Sun className="size-3" /> : <Moon className="size-3" />}
+            {theme === 'dark' ? '亮色模式' : '暗黑模式'}
+          </button>
         </div>
       </aside>
       <main className="min-w-0 flex-1 overflow-y-auto">

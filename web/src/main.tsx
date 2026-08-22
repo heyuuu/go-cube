@@ -5,9 +5,12 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 
 import App from './App.tsx';
+import { applyThemeEarly } from './hooks/use-theme.ts';
 import { queryClient } from './lib/query.ts';
 
 import './index.css';
+
+applyThemeEarly();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

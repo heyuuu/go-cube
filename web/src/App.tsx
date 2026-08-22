@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router';
 
 import { Layout } from './components/layout';
+import { useTheme } from './hooks/use-theme';
 import { ConfigPage } from './pages/config';
 import { NotFoundPage } from './pages/errors/not-found';
 import { MdPage } from './pages/md';
@@ -8,6 +9,9 @@ import { ProjectsPage } from './pages/projects';
 import { WorkbenchPage } from './pages/workbench';
 
 function App() {
+  // 挂在 App 根上（而非 Layout），保证 /workbench、/md 独立路由也有 Cmd+D 切主题
+  useTheme();
+
   return (
     <Routes>
       {/* md 渲染页独立于主应用 Layout：文档查看器，不带业务侧栏 */}
