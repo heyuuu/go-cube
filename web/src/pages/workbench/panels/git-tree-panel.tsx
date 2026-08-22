@@ -70,7 +70,7 @@ function WorktreeSection({
     <>
       <Section title="工作副本" icon={<Monitor className="size-3.5" />}>
         {(worktrees.data ?? []).map((wt) => (
-          <WorktreeRow key={wt.path} wt={wt} params={params} />
+          <WorktreeRow key={wt.path} wt={wt} params={params} afterSelect={onBranchPicked} />
         ))}
       </Section>
       <Section title="分支" icon={<GitBranch className="size-3.5" />}>
@@ -89,7 +89,15 @@ function WorktreeSection({
   );
 }
 
-function WorktreeRow({ wt, params }: { wt: WorktreeStatus; params: WorkbenchParams }) {
+function WorktreeRow({
+  wt,
+  params,
+  afterSelect,
+}: {
+  wt: WorktreeStatus;
+  params: WorkbenchParams;
+  afterSelect?: () => void;
+}) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
 
@@ -99,6 +107,7 @@ function WorktreeRow({ wt, params }: { wt: WorktreeStatus; params: WorkbenchPara
       source={src}
       params={params}
       title={wt.path}
+      afterSelect={afterSelect}
       badges={
         <>
           {wt.bare ? <Badge variant="outline">bare</Badge> : null}
@@ -143,7 +152,7 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
   const worktrees = useWorkbenchWorktrees(path);
   // 页拼接去重（skip 分页在仓库有新提交时可能边界重复）→ 注入 worktree 虚拟节点/装饰
   // → 本地算泳道布局。布局永远从「当前持有数据」推导，不存在跨快照拼接错位。
-  const { rows, wireMap } = useMemo(() => {
+  const { rows, wireMap, virtualLaneEnd } = useMemo(() => {
     const seen = new Set<string>();
     const list: CommitEntry[] = [];
     for (const page of commits.data?.pages ?? []) {
@@ -182,32 +191,58 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
     const { nodes, wires } = computeGraph([...virtual, ...decorated]);
     const map = new Map<number, GraphWire[]>();
     for (const w of wires) map.set(w.row, [...(map.get(w.row) ?? []), w]);
-    return { rows: nodes, wireMap: map };
+    // 虚拟节点（未提交改动）独用灰色：与已提交节点一眼区分。
+    // 置灰范围只到「虚拟节点 → 其 HEAD」为止：HEAD 之下同泳道的线属于真实历史，
+    // 记 lane → HEAD 行号，灰线段判 row < headRow（HEAD 未加载则整段可见线全灰）
+    const nodesOf = new Map(nodes.map((n, i) => [n.sha, i]));
+    const virtualLaneEnd = new Map<number, number>();
+    for (const n of nodes) {
+      if (!('worktree' in n && n.worktree)) continue;
+      const headRow = n.parents[0] != null ? (nodesOf.get(n.parents[0]) ?? nodes.length) : 0;
+      virtualLaneEnd.set(n.lane, headRow);
+    }
+    return { rows: nodes, wireMap: map, virtualLaneEnd };
   }, [commits.data, worktrees.data]);
 
-  // 点击分支定位：选中的是 ref 时，把 commit 图滚到该分支 tip（refs 装饰所在的行）。
-  // tip 未加载时自动翻页寻找（无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
-  // decorate 徽标是短名，选中态（规范全名）先剥前缀再比对。
-  const focusBranch = params.source?.type === 'ref' ? refShortName(params.source.id) : null;
+  // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
+  // / clean 的 HEAD 行；commit → 自身。选中态高亮不能只比对 source（ref/worktree 与
+  // 行上的 commit source 永不相等），定位与高亮共用 focusSha 才能对准同一行。
+  const focusSha = useMemo(() => {
+    const src = params.source;
+    if (!src) return null;
+    if (src.type === 'ref') {
+      const short = refShortName(src.id);
+      return rows.find((r) => (r.refs ?? []).some((x) => x.name === short))?.sha ?? null;
+    }
+    if (src.type === 'worktree') {
+      const wt = (worktrees.data ?? []).find((w) => w.path === src.id);
+      if (!wt) return null;
+      return wt.dirty ? `worktree:${wt.path}` : wt.head;
+    }
+    return src.id;
+  }, [params.source, rows, worktrees.data]);
+
+  // 点击定位：滚到 focusSha 行；目标行未加载时自动翻页寻找
+  // （无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
+  // focusSha 为 null 有两种含义：无选中（source 也空，直接返回）；
+  // 或 ref 的 tip 行尚未加载（memo 在 rows 里找不到）——后者要继续翻页。
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!focusBranch) return;
-    const hit = rows.find((r) => (r.refs ?? []).some((x) => x.name === focusBranch));
-    if (hit) {
-      const el = scrollRef.current?.querySelector(`[data-sha="${hit.sha}"]`);
-      if (!el) return;
+    if (!focusSha && !params.source) return;
+    const el = scrollRef.current?.querySelector(`[data-sha="${focusSha}"]`);
+    if (el) {
       el.scrollIntoView({ block: 'center' });
       // 定位闪烁：短暂高亮目标行（class 由命令式添加，React 渲染不冲突，超时移除）
       el.classList.remove('row-flash');
       void (el as HTMLElement).offsetWidth; // 重启动画
       el.classList.add('row-flash');
-      window.setTimeout(() => el.classList.remove('row-flash'), 2000);
+      window.setTimeout(() => el.classList.remove('row-flash'), 2500);
       return;
     }
     if (commits.hasNextPage && !commits.isFetchingNextPage) {
       void commits.fetchNextPage();
     }
-  }, [focusBranch, focusTick, rows, commits]);
+  }, [params.source, focusSha, focusTick, rows, commits]);
 
   const maxLane = useMemo(() => {
     let m = 0;
@@ -229,7 +264,15 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
   return (
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
       {rows.map((c, i) => (
-        <CommitRow key={c.sha} c={c} laneWidth={laneWidth} wires={wireMap.get(i - 1) ?? []} params={params} />
+        <CommitRow
+          key={c.sha}
+          c={c}
+          laneWidth={laneWidth}
+          wires={wireMap.get(i - 1) ?? []}
+          virtualLaneEnd={virtualLaneEnd}
+          params={params}
+          active={c.sha === focusSha}
+        />
       ))}
       <div ref={sentinelRef} className="h-8" />
       {commits.isFetchingNextPage ? (
@@ -245,14 +288,19 @@ function CommitRow({
   c,
   laneWidth,
   wires,
+  virtualLaneEnd,
   params,
+  active,
 }: {
   c: RowCommit;
   laneWidth: number;
   wires: GraphWire[];
+  virtualLaneEnd: Map<number, number>;
   params: WorkbenchParams;
+  active?: boolean; // 选中的是 ref/worktree 时，其 tip/HEAD 所在行
 }) {
-  const nodeColor = LANE_PALETTE[(c.color ?? 0) % LANE_PALETTE.length];
+  const isVirtual = 'worktree' in c && !!c.worktree;
+  const nodeColor = isVirtual ? VIRTUAL_COLOR : LANE_PALETTE[(c.color ?? 0) % LANE_PALETTE.length];
   return (
     // 行高用固定 px（与 svg 的 ROW_H 同源）：根字号随视口 clamp 缩放，
     // rem 行高会与大屏下的 svg px 几何错位
@@ -270,7 +318,10 @@ function CommitRow({
         {wires.map((w, wi) => {
           const x1 = LANE_X0 + w.from * LANE_W;
           const x2 = LANE_X0 + w.to * LANE_W;
-          const color = LANE_PALETTE[w.color % LANE_PALETTE.length];
+          // 虚拟节点的连线段（起点在其泳道、且尚未到其 HEAD 行）置灰
+          const end = virtualLaneEnd.get(w.from);
+          const color =
+            end !== undefined && w.row < end ? VIRTUAL_COLOR : LANE_PALETTE[w.color % LANE_PALETTE.length];
           // 同泳道 = 竖线；切入/切出行 = 单条斜线（无曲线、无折线），其余位置恒竖线
           return <line key={wi} x1={x1} y1={-ROW_H / 2} x2={x2} y2={ROW_H / 2} stroke={color} strokeWidth={1.5} />;
         })}
@@ -298,6 +349,7 @@ function CommitRow({
         time={c.timestamp}
         laneColor={nodeColor}
         fixedRow
+        active={active}
         badges={
           'worktree' in c && c.worktree ? (
             <Badge variant="destructive" className="px-1">
@@ -342,6 +394,10 @@ const LANE_W = 12;
 const ROW_H = 28;
 const LANE_X0 = 8;
 const LANE_PALETTE = ['#3b82f6', '#f97316', '#10b981', '#ec4899', '#8b5cf6', '#eab308', '#14b8a6', '#ef4444'];
+// 未提交虚拟节点与其连线：灰色，与已提交节点区分。
+// 须用具体色值——SVG 的 fill/stroke 属性不解析 CSS 变量（hsl(var(--...)) 会失效，
+// fill 落回黑、stroke 落回 none），选明暗主题下都可辨的中灰
+const VIRTUAL_COLOR = '#9ca3af';
 
 // --- 通用可选中行 ---
 
@@ -357,6 +413,7 @@ type SelectableRowProps = {
   time?: number;
   laneColor?: string; // 泳道色：选中行以分支色描边
   fixedRow?: boolean; // commit 图行：固定 px 高度（外层行 div 已定高），不用 rem 行高
+  active?: boolean; // 选中态外部判定（选中的是 ref/worktree 时，其 tip/HEAD 所在行）
   afterSelect?: () => void; // 单击选中后回调（分支行用于触发重新定位）
 };
 
@@ -372,6 +429,7 @@ function SelectableRow({
   time,
   laneColor,
   fixedRow,
+  active,
   afterSelect,
 }: SelectableRowProps) {
   const [, setSearchParams] = useSearchParams();
@@ -397,6 +455,7 @@ function SelectableRow({
   const isSource = sameSource(params.source, source);
   const isLeft = sameSource(params.left, source);
   const isRight = sameSource(params.right, source);
+  const selected = active || isSource || isLeft || isRight;
 
   return (
     <button
@@ -406,13 +465,13 @@ function SelectableRow({
       className={cn(
         'min-w-0 flex-1 flex items-center gap-1.5 px-2 text-left text-xs transition-colors hover:bg-accent',
         fixedRow ? 'h-full' : 'leading-7',
-        (isSource || isLeft || isRight) && 'bg-primary/15',
+        selected && 'bg-primary/15',
       )}
-      style={laneColor && (isSource || isLeft || isRight) ? { boxShadow: `inset 2px 0 0 ${laneColor}` } : undefined}
+      style={laneColor && selected ? { boxShadow: `inset 2px 0 0 ${laneColor}` } : undefined}
     >
       {mono ? <span className="shrink-0 font-mono text-[10px] text-muted-foreground">{mono}</span> : null}
       {prefixBadges}
-      <span className={cn('truncate', isSource || isLeft || isRight ? 'font-medium' : undefined)}>{label}</span>
+      <span className={cn('truncate', selected ? 'font-medium' : undefined)}>{label}</span>
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
       {badges}
       {isLeft ? <Badge className="ml-auto shrink-0">左</Badge> : null}
