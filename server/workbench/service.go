@@ -263,6 +263,7 @@ func annotateChangeStats(res *DiffTreesResult, root string, src TreeSource, base
 		slog.Debug("变更行数统计失败，降级为零值", "err", err)
 		return
 	}
+	mergeChangeRenames(res, stats)
 	for i := range res.List {
 		e := &res.List[i]
 		if st, ok := stats[e.Path]; ok {
@@ -275,6 +276,38 @@ func annotateChangeStats(res *DiffTreesResult, root string, src TreeSource, base
 			e.Adds, e.Binary = adds, binary
 		}
 	}
+}
+
+// mergeChangeRenames 用 numstat 的 rename 检测（-M）把 fs 对比拆出的
+// added+deleted 两条合并为 renamed 一条（fs 模式按路径对齐 blob sha，天然无 rename 概念）。
+// git 模式的 DiffFiles 本就带 rename，无 added/deleted 对可合并，此函数自然为空操作。
+func mergeChangeRenames(res *DiffTreesResult, stats map[string]git.NumstatEntry) {
+	oldToNew := make(map[string]string)
+	newToOld := make(map[string]string)
+	for _, st := range stats {
+		if st.OldPath != "" {
+			oldToNew[st.OldPath] = st.Path
+			newToOld[st.Path] = st.OldPath
+		}
+	}
+	if len(oldToNew) == 0 {
+		return
+	}
+	merged := make([]DiffEntry, 0, len(res.List))
+	for _, e := range res.List {
+		if e.Status == "deleted" {
+			if _, ok := oldToNew[e.Path]; ok {
+				continue // 旧路径由 renamed 条目吸收
+			}
+		}
+		if e.Status == "added" {
+			if old, ok := newToOld[e.Path]; ok {
+				e.Status, e.OldPath = "renamed", old
+			}
+		}
+		merged = append(merged, e)
+	}
+	res.List = merged
 }
 
 // countFileLines 统计文件行数；读不了（已删除等）或疑似二进制（前 8KB 含 NUL）返回 0。

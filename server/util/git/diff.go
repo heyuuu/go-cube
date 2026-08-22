@@ -60,10 +60,11 @@ func parseDiffNameStatus(out string) []DiffFile {
 
 // NumstatEntry 单文件的行级增删统计。
 type NumstatEntry struct {
-	Adds   int
-	Dels   int
-	Path   string
-	Binary bool // 二进制文件（numstat 输出 "-"，增删不可统计）
+	Adds    int
+	Dels    int
+	Path    string
+	OldPath string // rename 的旧路径，其余为空
+	Binary  bool   // 二进制文件（numstat 输出 "-"，增删不可统计）
 }
 
 // Numstat 两个 tree-ish 之间的行级增删统计，返回「新侧路径 → 统计」map。
@@ -100,16 +101,17 @@ func parseNumstat(out string) map[string]NumstatEntry {
 		}
 		adds, dels := field[:p1], field[p1+1:p1+1+p2]
 		path := field[p1+p2+2:]
+		var oldPath string
 		if path == "" {
-			// rename：本字段路径为空，随后的两个字段是 旧路径、新路径（实测 -z 输出顺序）；
-			// map 键取新侧路径（与 DiffFiles/DiffEntry 的 Path 口径一致）
+			// rename：本字段路径为空，随后的两个字段是 旧路径、新路径（实测 -z 输出顺序）
 			if i+2 >= len(fields) || fields[i+1] == "" || fields[i+2] == "" {
 				continue
 			}
+			oldPath = fields[i+1]
 			path = fields[i+2]
 			i += 2
 		}
-		e := NumstatEntry{Path: path}
+		e := NumstatEntry{Path: path, OldPath: oldPath}
 		if adds != "-" && dels != "-" {
 			e.Adds, _ = strconv.Atoi(adds)
 			e.Dels, _ = strconv.Atoi(dels)

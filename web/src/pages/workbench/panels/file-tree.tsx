@@ -15,7 +15,21 @@ import type { TreeSource } from '../params';
 // filter 生效时只显示集合内文件（及其祖先目录）——差异模式用。
 // viewMode：树形（目录可展开）/ 平摊（每行一个文件，显示相对根目录的完整路径），
 // scope（全量/差异文件）与模式切换按钮渲染在树工具条（extra），状态由调用方持有。
-export type FileStat = { adds: number; dels: number; binary?: boolean };
+export type FileStat = {
+  adds: number;
+  dels: number;
+  binary?: boolean;
+  status: string; // added / modified / deleted / renamed（后端 DiffEntry）
+  oldPath?: string; // rename 的旧路径
+};
+
+// 状态配色：新增绿（与 +N 同色系）/ 修改琥珀 / 删除红（与 -N 同色系）/ 重命名紫
+const STATUS_COLOR: Record<string, { icon: string; text: string }> = {
+  added: { icon: 'text-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' },
+  modified: { icon: 'text-amber-500', text: 'text-amber-600 dark:text-amber-400' },
+  deleted: { icon: 'text-red-500', text: 'text-red-600 dark:text-red-400' },
+  renamed: { icon: 'text-violet-500', text: 'text-violet-600 dark:text-violet-400' },
+};
 
 export function FileTree({
   path,
@@ -46,10 +60,22 @@ export function FileTree({
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(() => new Set(['']));
   const tree = useWorkbenchTree(path, source);
 
-  const root = useMemo(
-    () => (tree.data?.list?.length ? buildFileTree('', tree.data.list) : null),
-    [tree.data],
-  );
+  // worktree 源时把「已删除」文件并进组树输入：它们不在 ls-files 清单里，
+  // 不并入就不会出现在树中（差异模式只能树底追加、全量模式完全不可见）。
+  // commit/ref 源不并——树语义是该提交的内容，父提交有而本提交没有的文件不该出现
+  const root = useMemo(() => {
+    const list = tree.data?.list ?? [];
+    if (!list.length) return null;
+    let files = list as string[];
+    if (stats && source.type === 'worktree') {
+      const inList = new Set(list);
+      const deleted = [...stats.entries()]
+        .filter(([p, s]) => s.status === 'deleted' && !inList.has(p))
+        .map(([p]) => p);
+      if (deleted.length) files = [...list, ...deleted];
+    }
+    return buildFileTree('', files);
+  }, [tree.data, stats, source.type]);
 
   const toggle = useCallback((dir: string) => {
     setExpandedSet((prev) => {
@@ -217,6 +243,21 @@ export function FileTree({
                 <Folder className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{node.name}</span>
               </button>
+            ) : stats?.get(node.path)?.status === 'deleted' ? (
+              // 删除文件：磁盘与 index 均无，不可选不可读；并入树后与其他差异行对齐
+              <div
+                key={node.path}
+                data-path={node.path}
+                title={node.path}
+                className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left"
+                style={{ paddingLeft: flat ? 6 : depth * 12 + 16 }}
+              >
+                <FileText className="size-3.5 shrink-0 text-red-500" />
+                <span className="truncate text-red-600 line-through dark:text-red-400">
+                  {flat ? node.path : node.name}
+                </span>
+                {statLine(stats.get(node.path))}
+              </div>
             ) : (
               <button
                 key={node.path}
@@ -230,21 +271,24 @@ export function FileTree({
                 style={{ paddingLeft: flat ? 6 : depth * 12 + 16 }}
                 onClick={() => onPick(node.path)}
               >
-                <FileText
-                  className={cn(
-                    'size-3.5 shrink-0',
-                    stats?.has(node.path) ? 'text-amber-500' : 'text-muted-foreground',
-                  )}
-                />
-                <span
-                  className={cn(
-                    'truncate',
-                    stats?.has(node.path) ? 'text-amber-600 dark:text-amber-400' : undefined,
-                  )}
-                >
-                  {flat ? node.path : node.name}
-                </span>
-                {statLine(stats?.get(node.path))}
+                {(() => {
+                  const stat = stats?.get(node.path);
+                  const color = stat ? STATUS_COLOR[stat.status] : undefined;
+                  // rename 行括号附注旧名：树形用旧 basename，平摊用旧完整路径
+                  const oldNote =
+                    stat?.status === 'renamed' && stat.oldPath ? `（${flat ? stat.oldPath : stat.oldPath.split('/').pop()}）` : '';
+                  return (
+                    <>
+                      <FileText
+                        className={cn('size-3.5 shrink-0', color ? color.icon : 'text-muted-foreground')}
+                      />
+                      <span className={cn('truncate', color && color.text)}>
+                        {(flat ? node.path : node.name) + oldNote}
+                      </span>
+                      {statLine(stat)}
+                    </>
+                  );
+                })()}
               </button>
             ),
           )

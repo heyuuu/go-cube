@@ -26,8 +26,9 @@ import { FileTree } from './file-tree';
 
 type EditState = { key: string; draft: string };
 
-// 文件树偏好（视图模式/宽度）的 localStorage 键
+// 文件树偏好（视图模式/差异范围/宽度）的 localStorage 键
 const TREE_VIEW_KEY = 'cube.workbench.codetree.view';
+const TREE_SCOPE_KEY = 'cube.workbench.codetree.scope';
 const TREE_WIDTH_KEY = 'cube.workbench.codetree.width';
 
 export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
@@ -37,7 +38,9 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const file = searchParams.get('file') ?? '';
 
   const [editState, setEditState] = useState<EditState | null>(null);
-  const [treeMode, setTreeMode] = useState<'all' | 'diff'>('all');
+  const [treeMode, setTreeMode] = useState<'all' | 'diff'>(() =>
+    localStorage.getItem(TREE_SCOPE_KEY) === 'diff' ? 'diff' : 'all',
+  );
   const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
     localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
   );
@@ -50,6 +53,9 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   useEffect(() => {
     localStorage.setItem(TREE_VIEW_KEY, treeView);
   }, [treeView]);
+  useEffect(() => {
+    localStorage.setItem(TREE_SCOPE_KEY, treeMode);
+  }, [treeMode]);
   useEffect(() => {
     localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
   }, [treeWidth]);
@@ -68,9 +74,14 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const currentKey = `${source?.type}:${source?.id}:${file}`;
   const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
-  // 差异文件的行级增删（后端 Changes 注入），键为文件相对路径
+  // 差异文件的行级增删与状态（后端 Changes 注入），键为文件相对路径
   const diffStats = changes.data
-    ? new Map((changes.data.list ?? []).map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary }]))
+    ? new Map(
+        (changes.data.list ?? []).map((e) => [
+          e.path,
+          { adds: e.adds, dels: e.dels, binary: e.binary, status: e.status, oldPath: e.oldPath || undefined },
+        ]),
+      )
     : null;
   const editing = editState !== null && editState.key === currentKey;
   const draft = editing ? editState.draft : '';
