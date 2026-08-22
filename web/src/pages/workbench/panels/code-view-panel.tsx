@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { Pencil, RotateCcw } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { CodeEditor } from '@/components/code-editor';
@@ -8,10 +8,10 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs } from '@/queries/workbench';
 
 import { refShortName, selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
+import { PanelSplitter } from '../splitter';
 
 import { FileTree } from './file-tree';
 
@@ -26,6 +26,10 @@ import { FileTree } from './file-tree';
 
 type EditState = { key: string; draft: string };
 
+// 文件树偏好（视图模式/宽度）的 localStorage 键
+const TREE_VIEW_KEY = 'cube.workbench.codetree.view';
+const TREE_WIDTH_KEY = 'cube.workbench.codetree.width';
+
 export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const { path, source } = params;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,6 +38,22 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const [editState, setEditState] = useState<EditState | null>(null);
   const [treeMode, setTreeMode] = useState<'all' | 'diff'>('all');
+  const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
+    localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
+  );
+  // 文件树宽度：个人偏好，存 localStorage（同面板布局），拖拽范围 160~640
+  const [treeWidth, setTreeWidth] = useState(() => {
+    const v = Number(localStorage.getItem(TREE_WIDTH_KEY));
+    return Number.isFinite(v) && v >= 160 && v <= 640 ? v : 240;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(TREE_VIEW_KEY, treeView);
+  }, [treeView]);
+  useEffect(() => {
+    localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
+  }, [treeWidth]);
+
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
@@ -111,15 +131,21 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="w-60 shrink-0 overflow-y-auto border-r border-border">
+      <div className="shrink-0 overflow-y-auto border-r border-border" style={{ width: treeWidth }}>
         <FileTree
           path={path}
           source={source}
           selectedFile={file}
           onPick={pickFile}
           filter={diffFilter}
+          viewMode={treeView}
+          onViewMode={setTreeView}
+          scope={treeMode}
+          onScope={setTreeMode}
+          scopePending={changes.isPending}
         />
       </div>
+      <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(160, w + dx)))} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
           <span className="truncate text-xs font-medium">{file || '未选择文件'}</span>
@@ -127,28 +153,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
           {dirty ? <Badge variant="destructive">未保存</Badge> : null}
           <div className="ml-auto flex items-center gap-1.5">
-            <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
-              {(
-                [
-                  ['all', '全量'],
-                  ['diff', '差异'],
-                ] as const
-              ).map(([m, label]) => (
-                <button
-                  key={m}
-                  type="button"
-                  disabled={treeMode === 'diff' && changes.isPending}
-                  className={cn(
-                    'px-1.5 py-0.5 transition-colors',
-                    treeMode === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
-                  )}
-                  onClick={() => setTreeMode(m)}
-                  title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
             <SourceSwitcher
               locals={refs.data?.locals ?? []}
               current={source.type === 'ref' ? source.id : ''}

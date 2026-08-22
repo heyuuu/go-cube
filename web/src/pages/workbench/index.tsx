@@ -17,6 +17,7 @@ import { PANEL_REGISTRY, PANEL_ORDER, type PanelId } from './panels/registry';
 import { TerminalPanel } from './panels/terminal-panel';
 import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
+import { PanelSplitter } from './splitter';
 import { useWorkbenchLayout } from './workbench-layout';
 
 // 工作台页面（1010 基座 → 1011 选择 → 1015 面板组装）：以任意本机 git 目录为输入，
@@ -178,30 +179,5 @@ export function WorkbenchPage() {
       </div>
       <TerminalPanel path={params.path} />
     </div>
-  );
-}
-
-// 面板分隔条：pointer 事件拖拽调宽（setPointerCapture 保证移出元素仍持续跟踪）
-function PanelSplitter({ onDelta }: { onDelta: (dx: number) => void }) {
-  const lastX = useRef(0);
-  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    lastX.current = e.clientX;
-    e.currentTarget.setPointerCapture(e.pointerId);
-  };
-  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!(e.buttons & 1)) return;
-    const dx = e.clientX - lastX.current;
-    lastX.current = e.clientX;
-    if (dx !== 0) onDelta(dx);
-  };
-  return (
-    <div
-      role="separator"
-      aria-orientation="vertical"
-      className="w-1 shrink-0 cursor-col-resize bg-border transition-colors hover:bg-primary/50"
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-    />
   );
 }
