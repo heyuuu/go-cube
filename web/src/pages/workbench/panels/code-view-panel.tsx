@@ -8,7 +8,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs } from '@/queries/workbench';
+import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs, useWorkbenchTree } from '@/queries/workbench';
 
 import { refShortName, selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
 import { PanelSplitter } from '../splitter';
@@ -66,13 +66,22 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const [saveError, setSaveError] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const content = useWorkbenchFile(path, source!, file);
+  // 与 FileTree 同 key 的树数据（react-query 去重复用，无额外请求）：
+  // 用于回退判定——切换 commit/分支后 file 参数可能指向新源里不存在的文件
+  const tree = useWorkbenchTree(path, source!);
+  const treeList = tree.data?.list ?? null;
+  // 回退策略：file 不在当前源中 → 根目录 README.md → 都没有则空并提示。
+  // 只做显示层回退不改写 URL——file 参数指向用户最后的选择，源切换是临时浏览上下文
+  const fileMissing = !!treeList && !!file && !treeList.includes(file);
+  const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
+
+  const content = useWorkbenchFile(path, source!, activeFile);
   const refs = useWorkbenchRefs(path);
   // changes 全量模式也拉：行级统计（+N -N/琥珀色）在两种模式下都展示
   const changes = useWorkbenchChanges(path, source!, true);
   const fileContent = content.data?.content ?? '';
 
-  const currentKey = `${source?.type}:${source?.id}:${file}`;
+  const currentKey = `${source?.type}:${source?.id}:${activeFile}`;
   const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
   // 差异文件的行级增删与状态（后端 Changes 注入），键为文件相对路径
   const diffStats = changes.data
@@ -131,7 +140,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
     setSaving(true);
     setSaveError('');
     try {
-      await saveWorkbenchFile(path, source!, file, draft);
+      await saveWorkbenchFile(path, source!, activeFile, draft);
       setEditState(null);
       await queryClient.invalidateQueries({ queryKey: ['workbench', 'file', path] });
       await queryClient.invalidateQueries({ queryKey: ['workbench', 'status', path] });
@@ -151,7 +160,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
         <FileTree
           path={path}
           source={source}
-          selectedFile={file}
+          selectedFile={activeFile}
           onPick={pickFile}
           filter={diffFilter}
           stats={diffStats}
@@ -166,8 +175,13 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
       <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(160, w + dx)))} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
-          <span className="truncate text-xs font-medium">{file || '未选择文件'}</span>
+          <span className="truncate text-xs font-medium">{activeFile || '未选择文件'}</span>
           <Badge variant="secondary">{sourceLabel(source)}</Badge>
+          {fileMissing ? (
+            <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
+              {activeFile ? '原文件不存在，已回退 README.md' : '原文件在此目标中不存在'}
+            </Badge>
+          ) : null}
           {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
           {dirty ? <Badge variant="destructive">未保存</Badge> : null}
           <div className="ml-auto flex items-center gap-1.5">
@@ -181,7 +195,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={!file || content.data?.binary}
+                disabled={!activeFile || content.data?.binary}
                 onClick={() => setConfirmEdit(true)}
               >
                 <Pencil className="mr-1 size-3" />
@@ -212,7 +226,11 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
         {content.isError ? <ErrorBanner message={content.error.message} /> : null}
         {saveError ? <ErrorBanner message={saveError} /> : null}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {!file ? (
+          {fileMissing && !activeFile ? (
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+              当前文件在所选目标中不存在（无 README.md 可回退）
+            </div>
+          ) : !activeFile ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               在左侧选择一个文件
             </div>
@@ -224,9 +242,9 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
             </div>
           ) : (
             <CodeEditor
-              key={file}
+              key={activeFile}
               value={editing ? draft : fileContent}
-              file={file}
+              file={activeFile}
               readOnly={!editing}
               onChange={(next) => {
                 setEditState((s) => (s ? { ...s, draft: next } : s));
