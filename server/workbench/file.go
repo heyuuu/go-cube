@@ -50,6 +50,10 @@ func readFile(root string, src TreeSource, file string) (*FileResult, error) {
 			return nil, fmt.Errorf("读取文件失败: file=%s: %w", file, err)
 		}
 	case SourceTypeCommit, SourceTypeRef:
+		// 该提交里被删除的文件（差异树的删除行）：返回标记而非错误
+		if !git.ExistsAtRef(root, src.Id, file) {
+			return &FileResult{Deleted: true}, nil
+		}
 		var err error
 		data, err = git.ReadFileAtRef(root, src.Id, file)
 		if err != nil {
