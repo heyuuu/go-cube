@@ -69,9 +69,11 @@ tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0
 # -------
 
 # 起动前清掉 6001 上的残留监听：air 被异常退出后孤儿 server 会一直占着端口，
-# 之后 air 每次热重载的新进程都因端口冲突起不来，表现为「改了代码不生效」
+# 之后 air 每次热重载的新进程都因端口冲突起不来，表现为「改了代码不生效」。
+# 注意必须 -sTCP:LISTEN 只杀监听进程——不带过滤会把连着 6001 的客户端
+# （vite 代理、浏览器连接等）一起杀掉
 dev-server:
-	-@lsof -ti :6001 | xargs kill 2>/dev/null || true
+	-@lsof -ti :6001 -sTCP:LISTEN | xargs kill 2>/dev/null || true
 	cd server && air
 
 dev-web:
