@@ -1,5 +1,4 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { Pencil, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -8,6 +7,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import {
   saveWorkbenchFile,
   useWorkbenchChanges,
@@ -15,6 +15,7 @@ import {
   useWorkbenchTree,
 } from '@/queries/workbench';
 
+import { cn } from '@/lib/utils';
 import { sourceLabel, type WorkbenchParams } from '../params';
 import { PanelSplitter } from '../splitter';
 
@@ -176,41 +177,35 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
           {dirty ? <Badge variant="destructive">未保存</Badge> : null}
           <div className="ml-auto flex items-center gap-1.5">
+            {canEdit ? (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground" title="预览 / 编辑切换">
+                <span className={cn(!editing && 'font-medium text-foreground')}>预览</span>
+                <Switch
+                  checked={editing}
+                  disabled={!activeFile || !!content.data?.binary}
+                  aria-label="切换预览/编辑"
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setConfirmEdit(true);
+                    } else {
+                      // 关编辑 = 旧「取消」：有未保存改动走丢弃确认，否则直接退出
+                      guardSwitch(() => setEditState(null));
+                    }
+                  }}
+                />
+                <span className={cn(editing && 'font-medium text-foreground')}>编辑</span>
+              </div>
+            ) : null}
             <Badge variant="secondary" className="max-w-48" title={source.id}>
               <span className="text-[10px] text-muted-foreground">
                 {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
               </span>
               <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
             </Badge>
-            {canEdit && !editing ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!activeFile || content.data?.binary}
-                onClick={() => setConfirmEdit(true)}
-              >
-                <Pencil className="mr-1 size-3" />
-                编辑
-              </Button>
-            ) : null}
             {editing ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    guardSwitch(() => {
-                      setEditState(null);
-                    })
-                  }
-                >
-                  <RotateCcw className="mr-1 size-3" />
-                  取消
-                </Button>
-                <Button size="sm" disabled={!dirty || saving} onClick={() => setConfirmSave(true)}>
-                  保存
-                </Button>
-              </>
+              <Button size="sm" disabled={!dirty || saving} onClick={() => setConfirmSave(true)}>
+                保存
+              </Button>
             ) : null}
           </div>
         </div>
