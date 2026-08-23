@@ -208,13 +208,22 @@ type FileDiffResult struct {
 }
 
 // readSide 取一个源下 file 的内容（worktree 走 fs，commit/ref 走 git show）。
+// readSide 读取一侧文件内容；文件在该侧不存在时返回空内容而非错误——
+// 新增/删除文件的对比天然是「一侧全文、一侧空白」，由行级 diff 自然呈现整体增删。
 func readSide(root string, src TreeSource, file string) ([]byte, error) {
 	if src.Type == SourceTypeWorktree {
 		full, err := secureJoin(src.Id, file)
 		if err != nil {
 			return nil, err
 		}
-		return os.ReadFile(full)
+		data, err := os.ReadFile(full)
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return data, err
+	}
+	if !git.ExistsAtRef(root, src.Id, file) {
+		return nil, nil
 	}
 	return git.ReadFileAtRef(root, src.Id, file)
 }
@@ -244,11 +253,10 @@ func parseUnifiedDiff(out string) []Hunk {
 			continue // "\ No newline at end of file"
 		default:
 			if line == "" {
-				// 末尾空行可能是上下文空行
-				cur.Lines = append(cur.Lines, DiffLine{Kind: "ctx", Text: ""})
-			} else {
-				cur.Lines = append(cur.Lines, DiffLine{Kind: "ctx", Text: line[1:]})
+				// strings.Split 的行尾空串：真实空上下文行在 diff 输出中带前导空格（走 line[1:] 分支）
+				continue
 			}
+			cur.Lines = append(cur.Lines, DiffLine{Kind: "ctx", Text: line[1:]})
 		}
 	}
 	return hunks

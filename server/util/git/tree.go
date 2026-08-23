@@ -107,3 +107,10 @@ func ReadFileAtRef(dir string, ref string, file string) ([]byte, error) {
 	}
 	return []byte(out), nil
 }
+
+// ExistsAtRef 判断 ref 下是否存在路径 file（git show 对缺失路径会以 exit 128 报错，
+// cat-file -e 缺失时 exit 1 且无输出，适合做存在性探测）。
+func ExistsAtRef(dir string, ref string, file string) bool {
+	_, err := runOut(dir, "cat-file", "-e", ref+":"+file)
+	return err == nil
+}

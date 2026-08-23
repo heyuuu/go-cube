@@ -406,6 +406,7 @@ func TestWorkbenchFileDiff(t *testing.T) {
 		Hunks  []struct {
 			OldStart int `json:"oldStart"`
 			NewStart int `json:"newStart"`
+			OldCount int `json:"oldCount"`
 			Lines    []struct {
 				Kind string `json:"kind"`
 				Text string `json:"text"`
@@ -443,6 +444,26 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=mod.txt")), &got)
 	if len(noLeft.Hunks) != len(got.Hunks) {
 		t.Errorf("left 缺省应与显式 left=HEAD 等价: %d vs %d", len(noLeft.Hunks), len(got.Hunks))
+	}
+
+	// 单侧缺失的文件（新增 new.txt 只在右侧）：一侧空白一侧全文，全为 add 行，不报错
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=new.txt")), &got)
+	if got.Binary || len(got.Hunks) == 0 {
+		t.Fatalf("new.txt 应呈现整体新增的 hunks: binary=%v hunks=%d", got.Binary, len(got.Hunks))
+	}
+	onlyAdd := true
+	for _, h := range got.Hunks {
+		for _, l := range h.Lines {
+			if l.Kind != "add" {
+				onlyAdd = false
+			}
+		}
+	}
+	if !onlyAdd {
+		t.Error("新增文件的行应全为 add")
+	}
+	if got.Hunks[0].OldCount != 0 {
+		t.Errorf("左侧空白 oldCount 应为 0: %d", got.Hunks[0].OldCount)
 	}
 }
 
