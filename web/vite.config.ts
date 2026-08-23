@@ -3,7 +3,56 @@ import path from 'node:path';
 import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
+
+// 把浏览器端的 console.error / 未捕获异常转发到 dev server 终端。
+// vite 只负责转译和 HMR，浏览器里的报错终端天然看不到，排查时得开 devtools；
+// 这里在页面注入一小段脚本，通过 /__dev/console 回传并打印到 stdout。
+function browserConsoleToTerminal(): Plugin {
+  const endpoint = '/__dev/console';
+  return {
+    name: 'browser-console-to-terminal',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use(endpoint, (req, res) => {
+        let body = '';
+        req.on('data', (chunk) => (body += chunk));
+        req.on('end', () => {
+          try {
+            const { level, args } = JSON.parse(body) as { level: string; args: unknown[] };
+            const line = args.map((a) => (typeof a === 'string' ? a : JSON.stringify(a))).join(' ');
+            const tag = level === 'error' ? '\x1b[31m[browser error]\x1b[0m' : '[browser warn]';
+            console.warn(`${tag} ${line}`);
+          } catch {
+            // 转发失败不影响页面
+          }
+          res.statusCode = 204;
+          res.end();
+        });
+      });
+    },
+    transformIndexHtml() {
+      return [
+        {
+          tag: 'script',
+          attrs: { type: 'module' },
+          children: `
+const send = (level, args) => {
+  try { fetch('${endpoint}', { method: 'POST', body: JSON.stringify({ level, args }) }); } catch {}
+};
+const fmt = (a) => a instanceof Error ? (a.stack ?? a.message) : a;
+const origError = console.error.bind(console);
+console.error = (...args) => { send('error', args.map(fmt)); origError(...args); };
+const origWarn = console.warn.bind(console);
+console.warn = (...args) => { send('warn', args.map(fmt)); origWarn(...args); };
+window.addEventListener('error', (e) => send('error', [e.error ?? e.message]));
+window.addEventListener('unhandledrejection', (e) => send('error', ['Unhandled rejection:', e.reason]));
+`,
+        },
+      ];
+    },
+  };
+}
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,7 +62,7 @@ export default defineConfig(({ mode }) => {
   const apiTarget = env.CUBE_API_TARGET ?? 'http://localhost:6001';
 
   return {
-    plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss()],
+    plugins: [react(), babel({ presets: [reactCompilerPreset()] }), tailwindcss(), browserConsoleToTerminal()],
     resolve: {
       alias: {
         '@': path.resolve(import.meta.dirname, './src'),
