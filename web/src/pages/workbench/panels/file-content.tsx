@@ -266,7 +266,7 @@ function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) 
     return <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">两侧内容一致</div>;
   }
   return (
-    <div className="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-5">
+    <div className="h-full min-h-0 overflow-auto font-mono text-[12px] leading-5">
       {hunks.map((h, i) => (
         <div key={i}>
           <div className="bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
