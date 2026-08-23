@@ -699,6 +699,7 @@ export interface components {
     FileResult: {
       binary: boolean;
       content: string;
+      deleted: boolean;
       /** Format: int64 */
       size: number;
     };

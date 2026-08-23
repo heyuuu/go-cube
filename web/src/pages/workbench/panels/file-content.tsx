@@ -156,6 +156,11 @@ export function FileContentArea({
             原文件不存在，已回退
           </Badge>
         ) : null}
+        {mode === 'file' && contentQuery.data?.deleted ? (
+          <Badge variant="outline" className="shrink-0 text-red-600 dark:text-red-400">
+            已删除
+          </Badge>
+        ) : null}
         {mode === 'file' && contentQuery.data?.binary ? (
           <Badge variant="outline">二进制 {contentQuery.data.size}B</Badge>
         ) : null}
@@ -187,7 +192,7 @@ export function FileContentArea({
               <span className={cn(!isEditing && 'font-medium text-foreground')}>预览</span>
               <Switch
                 checked={isEditing}
-                disabled={!file || !!contentQuery.data?.binary}
+                disabled={!file || !!contentQuery.data?.binary || !!contentQuery.data?.deleted}
                 aria-label="切换预览/编辑"
                 onCheckedChange={(checked) => editing.requestEdit(checked)}
               />
@@ -215,6 +220,10 @@ export function FileContentArea({
             </div>
           ) : contentQuery.isPending ? (
             <div className="p-3 text-xs text-muted-foreground">读取中…</div>
+          ) : contentQuery.data?.deleted ? (
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+              该文件已从工作区删除（diff 模式可查看删除前的内容）
+            </div>
           ) : contentQuery.data?.binary ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               二进制文件不支持预览（{contentQuery.data.size} 字节）

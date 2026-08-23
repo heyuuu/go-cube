@@ -284,20 +284,26 @@ export function FileTree({
                 );
               })()
             ) : stats?.get(node.path)?.status === 'deleted' ? (
-              // 删除文件：磁盘与 index 均无，不可选不可读；并入树后与其他差异行对齐
-              <div
+              // 删除文件：磁盘与 index 均无，可选中——单文件模式显示已删除话术、
+              // diff 模式呈现「之前内容 vs 空白」
+              <button
                 key={node.path}
+                type="button"
                 data-path={node.path}
-                title={node.path}
-                className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left"
+                title={`${node.path}（已删除）`}
+                className={cn(
+                  'flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent',
+                  selectedFile === node.path && 'bg-primary/15',
+                )}
                 style={{ paddingLeft: flat ? 6 : depth * 12 + 16 }}
+                onClick={() => onPick(node.path)}
               >
                 <FileText className="size-3.5 shrink-0 text-red-500" />
                 <span className="truncate text-red-600 line-through dark:text-red-400">
                   {flat ? node.path : node.name}
                 </span>
                 {statLine(stats.get(node.path))}
-              </div>
+              </button>
             ) : (
               <button
                 key={node.path}

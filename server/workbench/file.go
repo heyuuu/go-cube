@@ -19,6 +19,7 @@ type FileResult struct {
 	Content string `json:"content"` // 文本内容（binary=true 时为空）
 	Binary  bool   `json:"binary"`  // 是否二进制
 	Size    int64  `json:"size"`
+	Deleted bool   `json:"deleted"` // 文件在该源中已删除（差异树的删除行可选中，内容区显示话术而非报错）
 }
 
 // readFile 读某 TreeSource 下 file 的内容。二进制检测：前 8KB 含 NUL 判为二进制。
@@ -32,6 +33,10 @@ func readFile(root string, src TreeSource, file string) (*FileResult, error) {
 		}
 		info, err := os.Stat(full)
 		if err != nil {
+			if os.IsNotExist(err) {
+				// 差异树里的删除行可选中：文件已不在工作区，返回标记而非错误
+				return &FileResult{Deleted: true}, nil
+			}
 			return nil, fmt.Errorf("读取文件失败: file=%s: %w", file, err)
 		}
 		if info.IsDir() {

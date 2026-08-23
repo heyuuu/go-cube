@@ -52,11 +52,6 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   // URL——file 参数指向用户最后的选择，源切换是临时浏览上下文
   const tree = useWorkbenchTree(path, src);
   const treeList = tree.data?.list ?? null;
-  const fileMissing = !!treeList && !!file && !treeList.includes(file);
-  const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
-
-  const content = useWorkbenchFile(path, src, activeFile);
-  const fileDiff = useWorkbenchFileDiff(path, viewBase, src, activeFile, mode === 'diff');
 
   // 差异范围的变更清单：base 空 = 相对基准（changes，含 untracked 与行级统计）；
   // base 有 = 两源对比（diff）。两者同构，行级统计后端均已注入
@@ -64,6 +59,16 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const diff = useWorkbenchDiff(path, viewBase ?? EMPTY_SOURCE, src); // 空 base 时 enabled=false（left.id 为空）
   const changeList = viewBase ? (diff.data?.list ?? []) : (changes.data?.list ?? []);
   const listPending = viewBase ? diff.isPending : changes.isPending;
+
+  // 回退判定：file 不在当前源中 → 根目录 README.md → 都没有则空并提示。
+  // 删除文件不在 ls-files 清单里但可选中（树里由变更集并入），不算 missing。
+  // 只做显示层回退不改写 URL——file 参数指向用户最后的选择，源切换是临时浏览上下文
+  const deletedPaths = new Set(changeList.filter((e) => e.status === 'deleted').map((e) => e.path));
+  const fileMissing = !!treeList && !!file && !treeList.includes(file) && !deletedPaths.has(file);
+  const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
+
+  const content = useWorkbenchFile(path, src, activeFile);
+  const fileDiff = useWorkbenchFileDiff(path, viewBase, src, activeFile, mode === 'diff');
 
   const statsMap = new Map(
     changeList.map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary, status: e.status, oldPath: e.oldPath || undefined }]),
