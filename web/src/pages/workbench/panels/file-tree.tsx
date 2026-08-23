@@ -126,10 +126,12 @@ export function FileTree({
     localStorage.setItem(TREE_EXPAND_KEY, 'none');
   }, []);
 
-  // 首次拿到树数据时按上次的 bulk 动作恢复（仅一次；之后的手动展开/折叠不记忆）
+  // 首次拿到树数据时按上次的 bulk 动作恢复（仅一次；之后的手动展开/折叠不记忆）。
+  // 空树（无 children）不消费恢复标记——差异范围刷新时变更清单未就绪会先建出空树，
+  // 在空树上恢复等于丢掉「全部展开」偏好，真数据到达后就不再恢复了
   const bulkInitRef = useRef(false);
   useEffect(() => {
-    if (bulkInitRef.current || !root) return;
+    if (bulkInitRef.current || !root || root.children.length === 0) return;
     bulkInitRef.current = true;
     const saved = localStorage.getItem(TREE_EXPAND_KEY);
     if (saved === 'all') setExpandedSet(allDirPaths(root));
