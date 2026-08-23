@@ -70,16 +70,17 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   );
   const editing = useFileEditing(path, src, activeFile, content.data?.content ?? '');
 
-  // 本地路径子串搜索：差异范围过滤变更清单（含 rename 旧路径），
-  // 全量范围过滤整棵树的文件路径（treeList 与 FileTree 同 query key，无额外请求）
+  // 本地路径搜索：空格分隔多个子串，须全部命中（AND）；差异范围对
+  // path + rename 旧路径匹配，全量范围对文件路径匹配（treeList 与 FileTree 同 key，无额外请求）
   const [query, setQuery] = useState('');
-  const q = query.trim();
-  const entries = changeList.filter((e) => !q || e.path.includes(q) || (e.oldPath ?? '').includes(q));
+  const terms = query.trim().split(/\s+/).filter(Boolean);
+  const matchAll = (s: string) => terms.every((t) => s.includes(t));
+  const entries = changeList.filter((e) => terms.length === 0 || matchAll(e.path + ' ' + (e.oldPath ?? '')));
   const diffFilter =
     treePrefs.scope === 'diff'
       ? new Set(entries.map((e) => e.path))
-      : q
-        ? new Set((treeList ?? []).filter((p) => p.includes(q)))
+      : terms.length > 0
+        ? new Set((treeList ?? []).filter(matchAll))
         : null;
 
   const pickFile = (f: string) =>
