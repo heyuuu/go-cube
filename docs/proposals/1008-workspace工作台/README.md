@@ -36,7 +36,7 @@
 - **纯读**：所有 git 写操作（commit / checkout / pull-push / stage）一律不做，后续另立提案。
 - **轻编辑**：只改工作区文件；默认只读模式，开启编辑和保存**都需要弹窗确认**。
 - 编辑器用 **CodeMirror 6**（不用 Monaco，已在其他讨论定案）。
-- diff 是 Beyond Compare 级别：两个目标的**目录树对比 + 文件级对比**，带筛选项（特别的：是否包含 `.gitignore` 忽略的文件——这意味着除 git diff 模式外还需要文件系统扫描对比模式）。
+- diff 是 Beyond Compare 级别：两个目标的**目录树对比 + 文件级对比**，带筛选项。原设想的「包含 `.gitignore` 忽略文件」开关**已砍掉**——产品不考虑 ignored 文件；但对比 worktree 工作区（含未提交/untracked）仍要求文件系统扫描对比模式。
 - PTY：后端 WebSocket + `creack/pty`，前端 **xterm.js**（term.js 是弃用前身）。技术成熟、边界清晰，作为独立面板。
 
 ### 架构形态
@@ -60,30 +60,33 @@ TreeSource = { type: "commit" | "ref" | "worktree", id: string }
   worktree: id = 工作副本目录绝对路径（当前文件状态，含未提交改动）
 ```
 
-由此工作台后端 API 面收敛为：
+由此工作台后端 API 面收敛为（传参定稿为单参数序列化 `source=type://id`，双源 `left`/`right`）：
 
 | 接口 | 作用 |
 |---|---|
-| `listTree(path, source, dir?)` | 列某 TreeSource 下的目录树（worktree 走文件系统；commit/ref 走 `git ls-tree`） |
+| `tree(path, source)` | 某 TreeSource 的文件清单（全量扁平相对路径，前端组树） |
 | `readFile(path, source, file)` | 读某 TreeSource 下某文件内容 |
+| `saveFile(path, dir, file)` | 保存工作区文件（唯一写，仅 worktree 源） |
 | `diffTrees(path, left, right, filters)` | 两个 TreeSource 的目录级对比 |
 | `readFileDiff(path, left, right, file)` | 两个 TreeSource 的单文件 diff |
-| `commits(path, ref?, cursor, limit)` | commit 图分页 |
-| `worktrees(path)` / `refs(path)` | 工作副本列表 / 分支 tag 列表 |
+| `commits(path, cursor, limit)` | commit 图分页（恒 `--all`） |
+| `worktrees(path)` / `refs(path)` | 工作副本状态聚合 / 分支 tag 列表 |
+| `changes(path, dir)` | worktree 变更文件清单（差异模式树） |
+| `pty(path)` | WebSocket 终端 |
 
 - 代码阅读 = 单 TreeSource 浏览；diff = 双 TreeSource 对比；编辑器/diff 里「切换分支」= 换 TreeSource。
-- 传参形态（如 `sourceType` + `sourceId`）在基座提案定稿，所有子提案复用。
+- 前后端统一用 `source` / `left` / `right`（`type://id` 格式）传 TreeSource。
 
 ## 子提案索引（按实施顺序）
 
 | # | 提案 | 内容 | 依赖 |
 |---|---|---|---|
-| 1 | [`1010-workbench基座`](../1010-workbench基座/README.md) | 路由 `/workbench`、TreeSource 抽象与核心 API、后端 workbench 领域包、固定布局面板骨架 | 无 |
-| 2 | [`1011-工作台git树面板`](../1011-工作台git树面板/README.md) | commit 图（分页）、工作副本状态区（worktree 分组）、单选/双选交互 | 1010 |
-| 3 | [`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md) | 虚拟树 + 真实树、CodeMirror6 只读 + 确认式轻编辑 | 1010 |
+| 1 | [`1010-workbench基座`](../archived/1010-workbench基座/README.md) ✅ | 路由 `/workbench`、TreeSource 抽象与核心 API、后端 workbench 领域包、固定布局面板骨架 | 无 |
+| 2 | [`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md) ✅ | commit 图（分页）、工作副本状态区（worktree 分组）、单选/双选交互 | 1010 |
+| 3 | [`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md) 🔶 | 虚拟树 + 真实树、CodeMirror6 只读 + 确认式轻编辑（目录树已验收，代码展示待开发验收） | 1010 |
 | 4 | [`1013-工作台diff面板`](../1013-工作台diff面板/README.md) | 双 TreeSource 对比：git 模式 + fs 扫描模式、目录级 + 文件级 | 1010、1012（复用文件查看底座） |
 | 5 | [`1014-工作台PTY面板`](../1014-工作台PTY面板/README.md) | WebSocket + pty + xterm.js、会话生命周期 | 1010（仅路由；可任意插队） |
-| 6 | [`1015-工作台面板组装`](../1015-工作台面板组装/README.md) | 自定义布局、面板注册、URL 状态总线收口 | 2-5 全部完成 |
+| 6 | [`1015-工作台面板组装`](../archived/1015-工作台面板组装/README.md) ✅ | 自定义布局、面板注册、URL 状态总线收口 | 2-5 全部完成 |
 
 每个子提案单独可交付、可验收。1010 做完是能进的空工作台；1011 做完已可用（取代 SourceTree 的核心）；1013-1015 任何一个延期不伤其他。
 

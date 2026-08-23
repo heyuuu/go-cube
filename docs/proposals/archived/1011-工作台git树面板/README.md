@@ -1,6 +1,6 @@
 # 工作台 git 树面板：commit 图 + 工作副本状态 + 选择交互
 
-> **状态**：✅ 已实现（2026-08-18）
+> **状态**：✅ 已完成并验收归档（2026-08-23）
 >
 > **所属**：[`1008-workspace工作台` 总纲](../1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
 > **依赖**：[`1010-workbench基座`](../1010-workbench基座/README.md)（路由、面板骨架、API 注册模式已就绪）。
@@ -15,19 +15,18 @@ git 树面板是工作台的**默认入口面板**，取代 SourceTree 的核心
 
 ### 1. 数据接口（后端）
 
-**commit 图分页**：`GET /api/workbench/commits?path=&ref=&cursor=&limit=`
+**commit 图分页**：`GET /api/workbench/commits?path=&cursor=&limit=`
 
-- 实现：`git log` 带拓扑与分页。推荐 `git log --all --topo-order --pretty=<结构化格式> --skip=<cursor> -n <limit>`（或用 `--max-count` + 末条 sha 作 cursor，实施时选更稳的方案并在代码注释里写明取舍）。
-- 每条 commit 返回：`sha`、`parents`、`shortMessage`、`author`、`date`、`refs`（该 commit 上挂的分支/tag，`git log --decorate` 解析）。
-- 分支拓扑信息（哪条线合并进哪条）由前端根据 `parents` 渲染连线，后端不预计算图。
-- 默认 `--all` 还是当前 HEAD 起单线，作为 query 参数（如 `scope=all|ref`）；大仓库首屏只取单线 + 懒展开是可接受的降级，实施时可调，但接口必须分页。
+- 实现：`git log --all --topo-order --pretty=<结构化格式> --skip=<cursor> -n <limit>`，多取 1 条探测 `HasMore`。
+- 每条 commit 返回：`sha`、`shortSha`、`parents`、`subject`（提交标题）、`author`、`timestamp`（unix 秒，前端格式化）、`refs`（该 commit 上挂的分支/tag，`%D` decorate 解析）。
+- 分支拓扑信息（哪条线合并进哪条）由前端根据 `parents` 渲染连线（前端本地泳道布局 + SVG），后端不预计算图。
+- **单线模式（scope/ref 参数）已移除**：恒 `--all` 全量拓扑，定稿决策不再保留单线降级。
 - worktree 各自检出的分支：从 `git worktree list` 结果（1010 已有）标注，不额外查。
 
-**工作副本状态**：`GET /api/workbench/status?path=&dir=<工作副本目录>`（每个 worktree 目录一次请求；不指定 `dir` 时默认主目录）
+**工作副本状态**：`GET /api/workbench/worktrees?path=`——**聚合接口**，一次返回全部工作副本的状态快照（不做按目录单查的独立 status 接口，status 只在这里拉）。
 
-- 内容：当前分支、ahead/behind（`util/git` 已有读能力，复用）、dirty 布尔、变更文件摘要（staged 数 / unstaged 数 / untracked 数，来自 `git status --porcelain` 解析）。
-- **实时性**：不走 gitcache（总纲决策），直接调 git。前端用 TanStack Query 控制：面板聚焦时 refetch、提供手动刷新按钮、staleTime 设短（如 30s）。
-- 每个状态项可加「刷新」粒度到整个工作副本，不做到单文件。
+- 每项内容：分支 / detached / bare、ahead/behind、dirty、staged / unstaged / untracked 计数（`git status --porcelain=v2 --branch` 解析）。单个副本采集失败降级为零值项，不拖垮整体。
+- **实时性**：不走 gitcache（总纲决策），直接调 git。前端用 TanStack Query 控制：staleTime 设短 + 手动刷新。
 
 ### 2. 面板 UI（前端，`web/src/pages/workbench/panels/git-tree/`）
 
@@ -48,8 +47,8 @@ git 树面板是工作台的**默认入口面板**，取代 SourceTree 的核心
 - **工作副本状态区**：`git worktree list` 结果分组展示；每项显示该目录的状态（上面的 status 接口）。点击 worktree 名 = 选中该 worktree 为 TreeSource。
 - **commit 图**：按 `parents` 画拓扑连线（MVP 可先做「缩进单线 + 合并点标记」的简化拓扑，不追求 SourceTree 级平行线；是否升级平行线留待使用反馈）。无限滚动加载下一页。分支/tag 用彩色标签（`refs` 字段）。
 - **选择交互**（核心）：
-  - 单选：点击 commit / 分支 / worktree 项 → 选中态写入 URL（`sourceType/sourceId`），内容区（1012 的代码阅读）随之切换。
-  - 双选：按住修饰键（如 cmd/ctrl）点击第二个目标 → URL 写入 `leftType/leftId + rightType/rightId`，内容区切到 diff（1013）。两个目标任意组合：分支 vs 分支、commit vs worktree 目录等。
+  - 单选：点击 commit / 分支 / worktree 项 → 选中态写入 URL（`source`），内容区（1012 的代码阅读）随之切换。
+  - 双选：按住修饰键（如 cmd/ctrl）点击第二个目标 → URL 写入 `left` + `right`，内容区切到 diff（1013）。两个目标任意组合：分支 vs 分支、commit vs worktree 目录等。
   - URL 参数驱动一切：刷新/分享后选择态恢复；面板自身只是 URL 的渲染者。
 - 选中高亮、hover 提亮参考 `web/src/pages/md/` 树组件的既有风格。
 
@@ -57,8 +56,8 @@ git 树面板是工作台的**默认入口面板**，取代 SourceTree 的核心
 
 ```
 /workbench?path=<主目录>
-           &sourceType=commit|ref|worktree&sourceId=<sha|ref名|目录>
-           &leftType=…&leftId=…&rightType=…&rightId=…
+           &source=<type>://<sha|ref名|目录>
+           &left=<type>://…&right=<type>://…
 ```
 
 单选与双选互斥（有双选时忽略 source）。写一个 `web/src/pages/workbench/params.ts` 的读写工具模块统一管理，面板不得自行 `useSearchParams` 拼参数。
@@ -66,7 +65,7 @@ git 树面板是工作台的**默认入口面板**，取代 SourceTree 的核心
 ## 验收标准
 
 1. `git log` 输出解析函数（结构化 pretty 格式解析、decorate refs 解析、porcelain status 解析）有表驱动测试（`server/workbench/` 或解析沉淀处）。
-2. httptest 用例：commits 分页（cursor 翻页两次）、status 正常路径。
+2. httptest 用例：commits 分页（cursor 翻页两次）、worktrees 聚合状态正常路径。
 3. 打开 `/workbench?path=<真实多 worktree 仓库>`：状态区正确分组显示各副本状态；commit 图滚动加载；单选/双选交互符合上述定义，URL 随之变化且刷新可恢复。
 4. `cd server && go vet ./... && go test ./...`、`pnpm -C web build` 通过。
 

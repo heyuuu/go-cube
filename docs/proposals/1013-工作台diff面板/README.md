@@ -3,7 +3,7 @@
 > **状态**：✅ 已实现（2026-08-18）
 >
 > **所属**：[`1008-workspace工作台` 总纲](../1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
-> **依赖**：[`1010-workbench基座`](../1010-workbench基座/README.md)（diff/file-diff API 契约）、[`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md)（文件树组件、CodeMirror 只读渲染底座）。
+> **依赖**：[`1010-workbench基座`](../archived/1010-workbench基座/README.md)（diff/file-diff API 契约）、[`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md)（文件树组件、CodeMirror 只读渲染底座）。
 
 ## 背景与目标
 
@@ -18,22 +18,21 @@ diff 面板对比**两个任意 TreeSource**（分支 vs 分支、commit vs work
 
 ### 1. 后端：diffTrees / readFileDiff 实现（1010 已定契约）
 
-**`GET /api/workbench/diff?path=&leftType=&leftId=&rightType=&rightId=&filters…`**
+**`GET /api/workbench/diff?path=&left=…&right=…&filters…`**
 
 返回目录级 diff 结果（递归全树，平铺为变更路径列表）：
 
-- **git 模式**（默认，两侧都是 commit/ref、或两侧 worktree 且无需看 ignored 时）：
-  - 两侧为 commit/ref/worktree 的组合统一处理：worktree 源取其当前状态（`git diff <A> <B>` 支持任意 tree-ish，worktree 用其 HEAD 不含未提交改动——**注意**：要对比 worktree 的**工作区**（含未提交）时，git 模式不适用，自动降级 fs 模式，接口返回所采用的模式）。
-  - `git diff --name-status <A> <B>` 解析：每项 `{path, status: added|deleted|modified|renamed, oldPath?}`。
-- **fs 扫描模式**（任一侧为 worktree 且开启含 ignored/含 untracked，或用户显式选择）：
-  - 分别遍历两侧文件树（真实目录直接 walk；commit/ref 源用 `git ls-tree -r` 平铺），按相对路径对齐，比较存在性 + 内容 hash（先比 size，再比 hash——commit 侧可用 blob sha，fs 侧算内容 hash；不同 hash 算法不可直接比，统一算内容 sha1 或 sha256，注意大文件成本，可只 hash 前 64KB+size+尾 64KB 作快速指纹，实施时写明取舍注释）。
-  - 并发 walk + 并发 hash（带 worker 上限，如 8），目录过大时返回进度友好错误或支持超时参数——MVP 可先同步算完，接口加合理超时。
-- **筛选项**（query 参数，两模式通用）：`showIgnored`（含 .gitignore 忽略文件，仅 fs 模式有效）、`showUntracked`（仅 fs 模式）、`statusFilter`（逗号分隔，如 `modified,added`）、`pathPrefix`（只看某子目录）。响应里注明实际生效的模式与被忽略的筛选。
+- **git 模式**（两侧都是 commit/ref 时）：`git diff --name-status <A> <B>` 解析，每项 `{path, status, oldPath?}`。
+- **fs 扫描模式**（**任一侧为 worktree 即走 fs**——定稿简化，不再按 ignored/untracked 开关细分；要对比工作区含未提交改动本来就必须 fs）：
+  - 真实目录 walk（非 ignored 场景走 `git ls-files` 提速，跳过 `.git`）；commit/ref 源用 `git ls-tree -r` 平铺。按相对路径对齐，比较存在性 + 内容 hash（**统一用 git blob sha1**（`sha1("blob <len>\0"+content)`），与 ls-tree 的 blob sha 直比，无需自造指纹算法）。
+  - 同步算完，无并发 worker（文档允许的 MVP 降级）。
+- **模式显式返回**：`DiffTreesResult.Mode`（"git"/"fs"）+ `IgnoredFilters`，前端不猜。
+- **筛选项**（query 参数）：`showIgnored`（仅 fs 模式有效）、`showUntracked`（fs 模式恒含 untracked，该参数当前不生效——定稿口径：untracked 是工作区对比的本体，不做减法）、`statusFilter`（逗号分隔）、`pathPrefix`。响应里注明实际生效的模式与被忽略的筛选。产品层面已**不考虑 ignored 文件**，showIgnored 属保留参数。
 
 **`GET /api/workbench/file-diff?path=&left…&right…&file=`**
 
-- 单文件统一 diff：优先 `git diff <A> <B> -- <file>`（两侧都 tree-ish 时）；涉及 fs 的组合自己拼两侧内容做 LCS diff（Go 库选型：`github.com/sergi/go-diff` 做行级或用简单 Myers 实现；选型时确认可维护，写进代码注释）。二进制文件返回 `{binary: true}`。
-- 返回结构化结果（分块 hunks：旧/新行号范围 + 行内容标记 +/-/ctx），前端渲染，不返回原始 patch 文本让前端解析。
+- 单文件统一 diff：任何组合统一走 `git diff --no-color`（两侧 tree-ish 直接比；涉及 fs 的组合把两侧内容落临时文件后 `git diff --no-index`——**未引入 Go LCS 库**，算法与展示语义和 git 完全一致）。二进制文件返回 `{binary: true}`。
+- 返回结构化结果（分块 hunks：旧/新行号范围 + 行内容标记 +/-/ctx，`parseUnifiedDiff`），前端渲染，不返回原始 patch 文本让前端解析。
 
 ### 2. 前端：面板组件（`web/src/pages/workbench/panels/diff-view/`）
 

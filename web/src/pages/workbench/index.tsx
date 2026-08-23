@@ -19,6 +19,7 @@ import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
 import { PanelSplitter } from './splitter';
 import { useWorkbenchLayout } from './workbench-layout';
+import { useWorkbenchInfo } from '@/queries/workbench';
 
 // 工作台页面（1010 基座 → 1011 选择 → 1015 面板组装）：以任意本机 git 目录为输入，
 // 聚合 git 可视化 / 代码阅读 / diff / PTY。独立于主应用 Layout（同 /md）。
@@ -31,6 +32,9 @@ export function WorkbenchPage() {
   const layout = useWorkbenchLayout();
   const slotsRef = useRef<HTMLDivElement>(null);
   const dragFrom = useRef<number | null>(null);
+  // path 合法性守门：非 git 目录退回入口页展示错误（与 git 树面板共用同一 query key，
+  // 校验通过后面板直接复用缓存）
+  const info = useWorkbenchInfo(params.path);
 
   const submitPath = (value: string) => {
     const next = new URLSearchParams(searchParams);
@@ -42,10 +46,14 @@ export function WorkbenchPage() {
     setSearchParams(next, { replace: true });
   };
 
-  if (!params.path) {
+  if (!params.path || info.isError) {
     return (
       <main className="h-dvh bg-background px-4">
-        <PathEntry initial="" onSubmit={submitPath} />
+        <PathEntry
+          initial={params.path}
+          initialError={info.isError ? String(info.error instanceof Error ? info.error.message : info.error) : undefined}
+          onSubmit={submitPath}
+        />
       </main>
     );
   }
