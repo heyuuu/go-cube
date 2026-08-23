@@ -28,6 +28,7 @@ import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import { quickOpens } from '@/pages/projects/shared';
 
 import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
+import { useWorktreeVisibility } from '../worktree-visibility';
 
 import { refShortName, sameSource, selectDiffSide, selectSource, type TreeSource, type WorkbenchParams } from '../params';
 
@@ -44,16 +45,9 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   // 点击分支的定位信号：即使重复点同一分支（选中值不变）也要重新定位+闪烁
   const [focusTick, setFocusTick] = useState(0);
   // 工作副本显隐开关（默认全展示）：关闭的副本不注入 commit 图——dirty 的虚拟节点、
-  // clean 的 HEAD 行装饰都不显示。纯视图过滤，不进 URL、不影响选中态
-  const [hiddenWorktrees, setHiddenWorktrees] = useState<Set<string>>(new Set());
-  const toggleWorktree = useCallback((wtPath: string) => {
-    setHiddenWorktrees((prev) => {
-      const next = new Set(prev);
-      if (prev.has(wtPath)) next.delete(wtPath);
-      else next.add(wtPath);
-      return next;
-    });
-  }, []);
+  // clean 的 HEAD 行装饰都不显示。纯视图过滤，不进 URL、不影响选中态；
+  // 持久化按 path 隔离存 localStorage（见 worktree-visibility.ts）
+  const { hiddenWorktrees, toggleWorktree } = useWorktreeVisibility(path);
 
   if (info.isPending) {
     return <div className="p-3 text-xs text-muted-foreground">加载中…</div>;
