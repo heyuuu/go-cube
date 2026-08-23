@@ -187,7 +187,12 @@ func (s *Service) DiffTrees(
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
 	if left.Type == SourceTypeWorktree || right.Type == SourceTypeWorktree {
-		return diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
+		result, err := diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
+		if err != nil {
+			return nil, err
+		}
+		annotateDiffStats(result, root, left, right)
+		return result, nil
 	}
 	result, err := diffTreesGit(root, left, right)
 	if err != nil {
@@ -197,6 +202,7 @@ func (s *Service) DiffTrees(
 		result.IgnoredFilters = append(result.IgnoredFilters, "showIgnored/showUntracked（git 模式下恒隐藏）")
 	}
 	applyDiffFilters(&result.List, statusFilter, pathPrefix)
+	annotateDiffStats(result, root, left, right)
 	return result, nil
 }
 
@@ -256,22 +262,26 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 	if err != nil {
 		return nil, err
 	}
-	annotateChangeStats(res, root, src, base)
 	return res, nil
 }
 
-// annotateChangeStats 为 Changes 的变更清单注入行级增删统计（git.Numstat）：
-//   - worktree 源：numstat 与工作区比（不含 untracked），未命中的 added 即 untracked，按文件行数计 adds；
-//   - commit/ref 源：numstat 与父提交比，全部命中。
+// annotateDiffStats 为 DiffTrees 的变更清单注入行级增删统计（git.Numstat，-M rename 检测）：
+//   - 右侧 worktree：numstat 与工作区比（不含 untracked），未命中的 added 即 untracked，
+//     按文件行数计 adds（二进制探测 NUL 字节）；
+//   - 双侧 tree-ish：numstat 直接可比，全部命中；
+//   - 左侧 worktree（含 worktree vs worktree）：numstat 方向不便，不注入（统计留零值）。
 //
 // 统计失败只降级（adds/dels 留零值），不阻断变更清单——文件列表本身仍可用。
-func annotateChangeStats(res *DiffTreesResult, root string, src TreeSource, base string) {
+func annotateDiffStats(res *DiffTreesResult, root string, left TreeSource, right TreeSource) {
+	if left.Type == SourceTypeWorktree {
+		return
+	}
 	var stats map[string]git.NumstatEntry
 	var err error
-	if src.Type == SourceTypeWorktree {
-		stats, err = git.Numstat(src.Id, base, "")
+	if right.Type == SourceTypeWorktree {
+		stats, err = git.Numstat(right.Id, left.Id, "")
 	} else {
-		stats, err = git.Numstat(root, base, src.Id)
+		stats, err = git.Numstat(root, left.Id, right.Id)
 	}
 	if err != nil {
 		slog.Debug("变更行数统计失败，降级为零值", "err", err)
@@ -284,9 +294,9 @@ func annotateChangeStats(res *DiffTreesResult, root string, src TreeSource, base
 			e.Adds, e.Dels, e.Binary = st.Adds, st.Dels, st.Binary
 			continue
 		}
-		// 未命中 numstat 的新增 = untracked 文件：按文件行数计 adds（二进制探测 NUL 字节）
-		if src.Type == SourceTypeWorktree && e.Status == "added" {
-			adds, binary := countFileLines(filepath.Join(src.Id, e.Path))
+		// 未命中 numstat 的新增 = untracked 文件：按文件行数计 adds
+		if right.Type == SourceTypeWorktree && e.Status == "added" {
+			adds, binary := countFileLines(filepath.Join(right.Id, e.Path))
 			e.Adds, e.Binary = adds, binary
 		}
 	}

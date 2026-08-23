@@ -10,8 +10,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useWorkbenchInfo } from '@/queries/workbench';
 
-import { CodeViewPanel } from './panels/code-view-panel';
-import { DiffViewPanel } from './panels/diff-view-panel';
+import { ContentViewPanel } from './panels/content-view-panel';
 import { GitTreePanel } from './panels/git-tree-panel';
 import { ContentPanelPlaceholder } from './panels/placeholders';
 import { PANEL_REGISTRY, PANEL_ORDER, type PanelId } from './panels/registry';
@@ -60,31 +59,17 @@ export function WorkbenchPage() {
     );
   }
 
-  const diffMode = params.left && params.right;
+  const hasSelection = params.source || (params.left && params.right);
 
   const renderPanel = (id: PanelId) => {
     switch (id) {
       case 'git-tree':
         return <GitTreePanel params={params} />;
-      case 'code':
-        return params.source ? (
-          <CodeViewPanel params={params} />
+      case 'content':
+        return hasSelection ? (
+          <ContentViewPanel params={params} />
         ) : (
-          <ContentPanelPlaceholder title="先在 Git 树面板选择一个目标" />
-        );
-      case 'diff':
-        return diffMode ? (
-          <DiffViewPanel params={params} />
-        ) : (
-          <ContentPanelPlaceholder title="先在 Git 树面板选择两个目标（cmd/ctrl 点第二个）" />
-        );
-      case 'auto':
-        return diffMode ? (
-          <DiffViewPanel params={params} />
-        ) : params.source ? (
-          <CodeViewPanel params={params} />
-        ) : (
-          <ContentPanelPlaceholder title="从 Git 树面板选择一个目标开始" />
+          <ContentPanelPlaceholder title="从 Git 树面板选择一个目标开始（cmd/ctrl 点第二个目标 = 对比）" />
         );
     }
   };
@@ -178,8 +163,6 @@ export function WorkbenchPage() {
                     <GripVertical className="size-3 shrink-0 opacity-50" />
                     <item.icon className="size-3.5" />
                     {item.label}
-                    {id === 'auto' && !diffMode && params.source ? <span className="text-[10px]">· 代码</span> : null}
-                    {id === 'auto' && diffMode ? <span className="text-[10px]">· diff</span> : null}
                     <button
                       type="button"
                       title="收窄面板（再点展开）"

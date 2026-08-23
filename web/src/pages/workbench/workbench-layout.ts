@@ -7,10 +7,14 @@ import { PANEL_ORDER, type PanelId } from './panels/registry';
 // 布局存 localStorage（个人偏好，不进 URL——URL 管选中态，是面板间总线）。
 // 分享 URL 时接收方按自己本地布局呈现选中态（总纲承诺）。
 // 兼容旧存储格式（纯 PanelId 数组）：无 sizes 时按等比归一。
+// code/diff/auto 合并为 content 后，旧布局里的这三个 id 迁移为 content（去重）。
 
 const LAYOUT_KEY = 'cube.workbench.layout';
-const DEFAULT_SLOTS: PanelId[] = ['git-tree', 'auto'];
-const MAX_SLOTS = 4; // 单实例约束下最多即全部四种
+const DEFAULT_SLOTS: PanelId[] = ['git-tree', 'content'];
+const MAX_SLOTS = 4;
+
+// 旧面板 id → 合并后的 content
+const LEGACY_CONTENT: Record<string, PanelId> = { code: 'content', diff: 'content', auto: 'content' };
 
 export type WorkbenchLayoutState = {
   slots: PanelId[];
@@ -39,7 +43,9 @@ function loadLayout(): WorkbenchLayoutState {
     const parsed: unknown = JSON.parse(raw);
     const arr: unknown = Array.isArray(parsed) ? parsed : (parsed as { slots?: unknown })?.slots;
     if (!Array.isArray(arr) || arr.length === 0) return fallback();
-    const valid = arr.filter((p): p is PanelId => typeof p === 'string' && PANEL_ORDER.includes(p as PanelId));
+    const valid = arr
+      .map((p) => (typeof p === 'string' ? (LEGACY_CONTENT[p] ?? p) : p))
+      .filter((p): p is PanelId => typeof p === 'string' && PANEL_ORDER.includes(p as PanelId));
     if (valid.length === 0) return fallback();
     const slots = [...new Set(valid)];
     const sizes = Array.isArray(parsed) ? null : (parsed as { sizes?: unknown }).sizes;
