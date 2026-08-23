@@ -87,7 +87,7 @@ export function WorkbenchPage() {
             <DropdownMenuTrigger
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               render={
-                <button type="button" disabled={addable.length === 0}>
+                <button type="button">
                   <LayoutGrid className="mr-1 inline size-3.5" />
                   面板
                   <Plus className="ml-0.5 inline size-3" />
@@ -95,10 +95,13 @@ export function WorkbenchPage() {
               }
             />
             <DropdownMenuContent align="end">
-              {addable.map((id) => {
+              {addable.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">所有面板均已打开（同类型单实例）</div>
+              ) : null}
+              {PANEL_ORDER.map((id) => {
                 const item = PANEL_REGISTRY[id];
                 return (
-                  <DropdownMenuItem key={id} onClick={() => layout.addPanel(id)}>
+                  <DropdownMenuItem key={id} disabled={!addable.includes(id)} onClick={() => layout.addPanel(id)}>
                     <item.icon className="mr-1.5 size-3.5" />
                     {item.label}
                   </DropdownMenuItem>
