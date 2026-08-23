@@ -39,6 +39,7 @@ export function useWorkbenchCommits(path: string) {
     queryFn: ({ pageParam }) => apiGet('/api/workbench/commits', { path, limit: 50, cursor: pageParam }),
     getNextPageParam: (last) => (last.hasMore ? last.nextCursor : undefined),
     staleTime: 30_000,
+    refetchInterval: 30_000, // 轮询：后台可能有 AI/其他进程在改仓库，干等也要能等到变化
     enabled: path !== '',
   });
 }
@@ -46,13 +47,14 @@ export function useWorkbenchCommits(path: string) {
 export type WorktreeStatus = components['schemas']['WorktreeStatus'];
 
 // 工作副本状态快照（全部副本一次拿全）：行徽标与 commit 图虚拟节点的共同数据源。
-// 实时性要求高，staleTime 短 + 窗口聚焦重取
+// 实时性要求高，staleTime 短 + 轮询 + 窗口聚焦重取
 export function useWorkbenchWorktrees(path: string) {
   return useQuery({
     queryKey: ['workbench', 'worktrees', path],
     queryFn: () => apiGet('/api/workbench/worktrees', { path }),
     enabled: path !== '',
     staleTime: 15_000,
+    refetchInterval: 15_000,
     refetchOnWindowFocus: true,
   });
 }
@@ -66,11 +68,13 @@ function sourceQuery(src: TreeSource) {
 }
 
 // 文件清单全量一次拉取（扁平相对路径，git 管理的文件），前端用 lib/tree 组树
+// 轮询仅对工作副本源生效——分支/提交源内容不可变，没必要周期性重取
 export function useWorkbenchTree(path: string, src: TreeSource) {
   return useQuery({
     queryKey: ['workbench', 'tree', path, toUri(src)],
     queryFn: () => apiGet('/api/workbench/tree', { path, ...sourceQuery(src) }),
     enabled: path !== '' && !!src,
+    refetchInterval: src?.type === 'worktree' ? 30_000 : false,
   });
 }
 
@@ -135,5 +139,6 @@ export function useWorkbenchChanges(path: string, src: TreeSource, enabled: bool
     queryFn: () => apiGet('/api/workbench/changes', { path, ...sourceQuery(src) }),
     enabled: enabled && path !== '' && !!src,
     staleTime: 0,
+    refetchInterval: src?.type === 'worktree' ? 30_000 : false,
   });
 }
