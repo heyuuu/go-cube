@@ -187,19 +187,22 @@ export function buildFileTree(root: string, files: string[]): FileTreeNode {
       cur = child;
     }
   }
-  return toFileNode(rootNode);
+  return toFileNode(rootNode, true);
 }
 
 // toFileNode 转排序树并自底向上折叠单链目录（name 取合并后路径，path 取最深层目录）
-// 同级排序：先目录后文件（文件混在目录间不易发现），各自按名称字典序
-function toFileNode(n: FileBuildNode): FileTreeNode {
+// 同级排序：先目录后文件（文件混在目录间不易发现），各自按名称字典序。
+// 根不参与折叠：根行不渲染（面板标题已提供上下文），根若吸收唯一子链，
+// 该链会随根一起不可见（差异模式只改一个深链文件时整条目录消失）
+function toFileNode(n: FileBuildNode, isRoot: boolean): FileTreeNode {
   const children = [...n.children.values()]
     .sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === 'dir' ? -1 : 1;
       return a.name.localeCompare(b.name);
     })
-    .map(toFileNode);
+    .map((c) => toFileNode(c, false));
   let node: FileTreeNode = { name: n.name, path: n.path, kind: n.kind, children };
+  if (isRoot) return node;
   while (node.kind === 'dir' && node.children.length === 1 && node.children[0].kind === 'dir') {
     const c = node.children[0];
     node = { ...node, name: `${node.name}/${c.name}`, path: c.path, children: c.children };

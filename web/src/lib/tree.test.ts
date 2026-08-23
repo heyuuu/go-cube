@@ -44,3 +44,12 @@ describe('flattenFileTree', () => {
     expect(rows[0]!.expanded).toBe(true);
   });
 });
+
+describe('根不参与单链折叠', () => {
+  it('根下唯一子链保持为根的子节点（折叠链仍生效），不随根隐藏', () => {
+    const root = buildFileTree('', ['xxx/yyy/m.md']);
+    expect(root.children.map((n) => n.name)).toEqual(['xxx/yyy']);
+    expect(root.children[0]!.path).toBe('xxx/yyy');
+    expect(root.children[0]!.children.map((n) => n.name)).toEqual(['m.md']);
+  });
+});

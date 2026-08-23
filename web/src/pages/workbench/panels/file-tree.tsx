@@ -78,10 +78,12 @@ export function FileTree({
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(() => new Set(['']));
   const tree = useWorkbenchTree(path, source);
 
-  // worktree 源时把「已删除」文件并进组树输入：它们不在 ls-files 清单里，
-  // 不并入就不会出现在树中（差异模式只能树底追加、全量模式完全不可见）。
-  // commit/ref 源不并——树语义是该提交的内容，父提交有而本提交没有的文件不该出现
+  // 组树输入按模式分叉：全量 = ls-files 清单（worktree 源并入已删除路径——
+  // 它们不在 ls-files 里，不并入就不会出现在树中；commit/ref 源不并，
+  // 树语义是该提交的内容）；差异 = 只对变更文件集组树——不能用全量树过滤行，
+  // 否则过滤后才变单链的目录（父目录的其他子项被滤掉）吃不到压缩逻辑
   const root = useMemo(() => {
+    if (filter) return buildFileTree('', [...filter]);
     const list = tree.data?.list ?? [];
     if (!list.length) return null;
     let files = list as string[];
@@ -93,7 +95,7 @@ export function FileTree({
       if (deleted.length) files = [...list, ...deleted];
     }
     return buildFileTree('', files);
-  }, [tree.data, stats, source.type]);
+  }, [tree.data, stats, source.type, filter]);
 
   const toggle = useCallback((dir: string) => {
     setExpandedSet((prev) => {
