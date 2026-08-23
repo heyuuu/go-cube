@@ -168,6 +168,12 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
       <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(160, w + dx)))} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
+          <Badge variant="secondary" className="max-w-48 shrink-0" title={source.id}>
+            <span className="text-[10px] text-muted-foreground">
+              {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
+            </span>
+            <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
+          </Badge>
           <span className="truncate text-xs font-medium">{activeFile || '未选择文件'}</span>
           {fileMissing ? (
             <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
@@ -196,12 +202,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
                 <span className={cn(editing && 'font-medium text-foreground')}>编辑</span>
               </div>
             ) : null}
-            <Badge variant="secondary" className="max-w-48" title={source.id}>
-              <span className="text-[10px] text-muted-foreground">
-                {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
-              </span>
-              <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
-            </Badge>
             {editing ? (
               <Button size="sm" disabled={!dirty || saving} onClick={() => setConfirmSave(true)}>
                 保存
