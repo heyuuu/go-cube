@@ -12,11 +12,10 @@ import {
   saveWorkbenchFile,
   useWorkbenchChanges,
   useWorkbenchFile,
-  useWorkbenchRefs,
   useWorkbenchTree,
 } from '@/queries/workbench';
 
-import { refShortName, selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
+import { sourceLabel, type WorkbenchParams } from '../params';
 import { PanelSplitter } from '../splitter';
 
 import { FileTree } from './file-tree';
@@ -24,7 +23,8 @@ import { FileTree } from './file-tree';
 // 代码阅读面板（提案 1012）：单选 TreeSource 的文件浏览。
 // 虚拟树（commit/ref）只读；真实树（worktree）支持确认式轻编辑——开启编辑、
 // 保存各一次弹窗确认；有未保存改动时切换文件/源被阻断。
-// 当前浏览的 file 进 URL（刷新恢复），源切换下拉是快捷方式（改写 source 参数）。
+// 当前浏览的 file 进 URL（刷新恢复）；源只展示不切换——选择入口统一在 git 树面板，
+// 面板内再做切换会与之冲突（早期版本的下拉可选项也不全，已移除）。
 //
 // 编辑态建模：editState 带「源+文件」键，源/文件变化后旧 editState 自动失效
 // （guardSwitch 已阻断带未保存改动的切换，此处只兜底直接改 URL 的场景），
@@ -82,7 +82,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
 
   const content = useWorkbenchFile(path, source!, activeFile);
-  const refs = useWorkbenchRefs(path);
   // changes 全量模式也拉：行级统计（+N -N/琥珀色）在两种模式下都展示
   const changes = useWorkbenchChanges(path, source!, true);
   const fileContent = content.data?.content ?? '';
@@ -129,19 +128,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   const pickFile = (f: string) => guardSwitch(() => setFileParam(f));
 
-  const switchSource = (src: TreeSource) =>
-    guardSwitch(() =>
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          selectSource(next, src);
-          next.delete('file');
-          return next;
-        },
-        { replace: true },
-      ),
-    );
-
   const doSave = async () => {
     setSaving(true);
     setSaveError('');
@@ -182,7 +168,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
           <span className="truncate text-xs font-medium">{activeFile || '未选择文件'}</span>
-          <Badge variant="secondary">{sourceLabel(source)}</Badge>
           {fileMissing ? (
             <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
               {activeFile ? '原文件不存在，已回退 README.md' : '原文件在此目标中不存在'}
@@ -191,12 +176,12 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
           {dirty ? <Badge variant="destructive">未保存</Badge> : null}
           <div className="ml-auto flex items-center gap-1.5">
-            <SourceSwitcher
-              locals={refs.data?.locals ?? []}
-              current={source.type === 'ref' ? source.id : ''}
-              disabled={dirty}
-              onPick={switchSource}
-            />
+            <Badge variant="secondary" className="max-w-48" title={source.id}>
+              <span className="text-[10px] text-muted-foreground">
+                {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
+              </span>
+              <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
+            </Badge>
             {canEdit && !editing ? (
               <Button
                 variant="outline"
@@ -296,34 +281,5 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
         }}
       />
     </div>
-  );
-}
-
-// 源切换下拉（快捷方式，非主流程）：直接改写 source 参数，等价于 git 树面板重新选择
-function SourceSwitcher({
-  locals,
-  current,
-  disabled,
-  onPick,
-}: {
-  locals: string[];
-  current: string;
-  disabled: boolean;
-  onPick: (src: TreeSource) => void;
-}) {
-  return (
-    <select
-      className="h-7 rounded-md border border-border bg-background px-1.5 text-xs text-muted-foreground disabled:opacity-50"
-      value={current}
-      disabled={disabled}
-      onChange={(e) => e.target.value && onPick({ type: 'ref', id: e.target.value })}
-    >
-      <option value="">切换分支…</option>
-      {locals.map((b) => (
-        <option key={b} value={b}>
-          {refShortName(b)}
-        </option>
-      ))}
-    </select>
   );
 }
