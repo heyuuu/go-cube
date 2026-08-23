@@ -68,7 +68,10 @@ tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0
 
 # -------
 
+# 起动前清掉 6001 上的残留监听：air 被异常退出后孤儿 server 会一直占着端口，
+# 之后 air 每次热重载的新进程都因端口冲突起不来，表现为「改了代码不生效」
 dev-server:
+	-@lsof -ti :6001 | xargs kill 2>/dev/null || true
 	cd server && air
 
 dev-web:
