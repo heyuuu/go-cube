@@ -149,8 +149,7 @@ export function computeGraph<T extends { sha: string; parents?: string[] | null 
       if (to < 0) return;
       const isParent = parentSet.has(entry.sha);
       // 上方是否有来线：条目由更早的行放置（首行上方无快照，必为 false）
-      const incoming =
-        i > 0 && snapshots[i - 1].some((l) => l.sha === entry.sha);
+      const incoming = i > 0 && snapshots[i - 1].some((l) => l.sha === entry.sha);
       // 节点出线（父提交）。颜色约定：本行新开的支线（分叉）用新泳道色；
       // 已存在的支线汇入主线（合并）用子节点自己的颜色——即支线全程同色，
       // 只有真正的主线竖线用主线色

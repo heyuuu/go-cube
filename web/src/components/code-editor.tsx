@@ -1,6 +1,6 @@
 import { EditorState, Compartment } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
 import { oneDark } from '@codemirror/theme-one-dark';
+import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 import { useEffect, useRef } from 'react';
 

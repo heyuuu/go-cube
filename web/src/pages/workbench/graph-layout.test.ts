@@ -104,13 +104,7 @@ function verifyGraphInvariants(commits: Entry[], laid: { sha: string; lane: numb
   // 不变量 A：每条 child→parent 边存在连续线段链。
   // 分叉点上同一泳道有多条 From 相同的线段（各父各一条），不能贪心逐段选——
   // 用 DFS 找「一条不重用线段、从子节点泳道出发、末段落到父节点泳道」的路径。
-  const findPath = (
-    from: number,
-    band: number,
-    endBand: number,
-    endLane: number,
-    used: Set<string>,
-  ): boolean => {
+  const findPath = (from: number, band: number, endBand: number, endLane: number, used: Set<string>): boolean => {
     if (band > endBand) return false;
     const segs = wiresByRow.get(band) ?? [];
     for (let idx = 0; idx < segs.length; idx++) {
@@ -188,10 +182,7 @@ describe('虚拟节点（dirty worktree 合成提交）', () => {
   // 顶部插入一个虚拟节点（parents 指向主线 tip m1），模拟 dirty 的主工作副本
   it('挂在 tip 上方，不扰动下方既有节点的泳道与颜色', () => {
     const base = computeGraph(branchMerge);
-    const virtual = [
-      { sha: 'worktree:main', parents: ['merge'] },
-      ...branchMerge,
-    ];
+    const virtual = [{ sha: 'worktree:main', parents: ['merge'] }, ...branchMerge];
     const withVt = computeGraph(virtual);
 
     // 下方每个真实节点的 lane/color 与基线完全一致（顶部纯插入）

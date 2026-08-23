@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useWorkbenchInfo } from '@/queries/workbench';
 
 import { CodeViewPanel } from './panels/code-view-panel';
 import { DiffViewPanel } from './panels/diff-view-panel';
@@ -19,7 +20,6 @@ import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
 import { PanelSplitter } from './splitter';
 import { useWorkbenchLayout } from './workbench-layout';
-import { useWorkbenchInfo } from '@/queries/workbench';
 
 // 工作台页面（1010 基座 → 1011 选择 → 1015 面板组装）：以任意本机 git 目录为输入，
 // 聚合 git 可视化 / 代码阅读 / diff / PTY。独立于主应用 Layout（同 /md）。
@@ -51,7 +51,9 @@ export function WorkbenchPage() {
       <main className="h-dvh bg-background px-4">
         <PathEntry
           initial={params.path}
-          initialError={info.isError ? String(info.error instanceof Error ? info.error.message : info.error) : undefined}
+          initialError={
+            info.isError ? String(info.error instanceof Error ? info.error.message : info.error) : undefined
+          }
           onSubmit={submitPath}
         />
       </main>

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
+import { relativeFilePath } from '@/lib/path';
 import { buildFileTree, flattenFileTree, type FileTreeNode } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useWorkbenchTree } from '@/queries/workbench';
@@ -89,9 +90,7 @@ export function FileTree({
     let files = list as string[];
     if (stats && source.type === 'worktree') {
       const inList = new Set(list);
-      const deleted = [...stats.entries()]
-        .filter(([p, s]) => s.status === 'deleted' && !inList.has(p))
-        .map(([p]) => p);
+      const deleted = [...stats.entries()].filter(([p, s]) => s.status === 'deleted' && !inList.has(p)).map(([p]) => p);
       if (deleted.length) files = [...list, ...deleted];
     }
     return buildFileTree('', files);
@@ -228,9 +227,7 @@ export function FileTree({
                     disabled={scope === 'diff' && scopePending}
                     className={cn(
                       'px-1.5 py-0.5 transition-colors',
-                      scope === m
-                        ? 'bg-primary/15 font-medium text-primary'
-                        : 'text-muted-foreground hover:bg-accent',
+                      scope === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
                     )}
                     onClick={() => onScope(m)}
                     title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
@@ -261,11 +258,7 @@ export function FileTree({
                 style={{ paddingLeft: depth * 12 + 4 }}
                 onClick={() => toggle(node.path)}
               >
-                {expanded ? (
-                  <ChevronDown className="size-3 shrink-0" />
-                ) : (
-                  <ChevronRight className="size-3 shrink-0" />
-                )}
+                {expanded ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
                 <Folder className="size-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{node.name}</span>
               </button>
@@ -300,14 +293,15 @@ export function FileTree({
                 {(() => {
                   const stat = stats?.get(node.path);
                   const color = stat ? STATUS_COLOR[stat.status] : undefined;
-                  // rename 行括号附注旧名：树形用旧 basename，平摊用旧完整路径
+                  // rename 行括号附注旧路径（相对新路径所在目录，如 ./a.md、../xx/a.md）：
+                  // 只改目录不改名时，旧 basename 看不出旧文件在哪
                   const oldNote =
-                    stat?.status === 'renamed' && stat.oldPath ? `（${flat ? stat.oldPath : stat.oldPath.split('/').pop()}）` : '';
+                    stat?.status === 'renamed' && stat.oldPath
+                      ? `（${relativeFilePath(node.path, stat.oldPath)}）`
+                      : '';
                   return (
                     <>
-                      <FileText
-                        className={cn('size-3.5 shrink-0', color ? color.icon : 'text-muted-foreground')}
-                      />
+                      <FileText className={cn('size-3.5 shrink-0', color ? color.icon : 'text-muted-foreground')} />
                       <span className={cn('truncate', color && color.text)}>
                         {(flat ? node.path : node.name) + oldNote}
                       </span>

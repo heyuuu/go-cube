@@ -35,8 +35,7 @@ export function useTheme(): Theme {
   );
 
   useEffect(() => {
-    const notify = () =>
-      setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+    const notify = () => setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light');
     listeners.add(notify);
 
     const onKeyDown = (e: KeyboardEvent) => {

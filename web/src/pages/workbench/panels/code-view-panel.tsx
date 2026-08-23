@@ -8,7 +8,13 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { saveWorkbenchFile, useWorkbenchChanges, useWorkbenchFile, useWorkbenchRefs, useWorkbenchTree } from '@/queries/workbench';
+import {
+  saveWorkbenchFile,
+  useWorkbenchChanges,
+  useWorkbenchFile,
+  useWorkbenchRefs,
+  useWorkbenchTree,
+} from '@/queries/workbench';
 
 import { refShortName, selectSource, sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
 import { PanelSplitter } from '../splitter';

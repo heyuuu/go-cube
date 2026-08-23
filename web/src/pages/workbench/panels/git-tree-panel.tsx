@@ -15,6 +15,8 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { quickOpens } from '@/pages/projects/shared';
+import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -23,14 +25,17 @@ import {
   type CommitEntry,
   type WorktreeStatus,
 } from '@/queries/workbench';
-import { useOpenerList, useOpenerOpen } from '@/queries/project';
-
-import { quickOpens } from '@/pages/projects/shared';
 
 import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
+import {
+  refShortName,
+  sameSource,
+  selectDiffSide,
+  selectSource,
+  type TreeSource,
+  type WorkbenchParams,
+} from '../params';
 import { useWorktreeVisibility } from '../worktree-visibility';
-
-import { refShortName, sameSource, selectDiffSide, selectSource, type TreeSource, type WorkbenchParams } from '../params';
 
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
@@ -156,15 +161,15 @@ function WorktreeRow({
         badges={
           <>
             {wt.branch ? <Badge variant="secondary">{wt.branch}</Badge> : null}
-          {wt.bare ? <Badge variant="outline">bare</Badge> : null}
-          {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
-          {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
-          {wt.dirty ? (
-            <Badge variant="destructive" className="px-1">
-              脏 {wt.staged + wt.unstaged + wt.untracked}
-            </Badge>
-          ) : null}
-          {wt.detached ? <Badge variant="outline">detached</Badge> : null}
+            {wt.bare ? <Badge variant="outline">bare</Badge> : null}
+            {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
+            {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
+            {wt.dirty ? (
+              <Badge variant="destructive" className="px-1">
+                脏 {wt.staged + wt.unstaged + wt.untracked}
+              </Badge>
+            ) : null}
+            {wt.detached ? <Badge variant="outline">detached</Badge> : null}
           </>
         }
       />
@@ -432,8 +437,7 @@ function CommitRow({
           const x2 = LANE_X0 + w.to * LANE_W;
           // 虚拟节点的连线段（起点在其泳道、且尚未到其 HEAD 行）置灰
           const end = virtualLaneEnd.get(w.from);
-          const color =
-            end !== undefined && w.row < end ? VIRTUAL_COLOR : LANE_PALETTE[w.color % LANE_PALETTE.length];
+          const color = end !== undefined && w.row < end ? VIRTUAL_COLOR : LANE_PALETTE[w.color % LANE_PALETTE.length];
           // 同泳道 = 竖线；切入/切出行 = 单条斜线（无曲线、无折线），其余位置恒竖线
           return <line key={wi} x1={x1} y1={-ROW_H / 2} x2={x2} y2={ROW_H / 2} stroke={color} strokeWidth={1.5} />;
         })}
