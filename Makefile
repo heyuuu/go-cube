@@ -65,3 +65,11 @@ tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0
 	echo "==> 新版本  : $$new_tag ($${curr_commit:0:7})"; \
 	git tag -a "$$new_tag" -m "release $$new_tag"; \
 	echo "==> 已打 tag $$new_tag, 如需推送: git push origin $$new_tag"
+
+# -------
+
+dev-server:
+	cd server && air
+
+dev-web:
+	cd web && pnpm dev
