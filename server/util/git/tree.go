@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,6 +25,42 @@ func ListFiles(path string) ([]string, error) {
 		if f != "" {
 			files = append(files, f)
 		}
+	}
+	return files, nil
+}
+
+// ListFilesUnder 返回 dir（可以是仓库内任意子目录）下全部非忽略文件的绝对路径：
+// 在 dir 下执行 ls-files，cwd 相对路径天然限定在 dir 子树内，而 --exclude-standard
+// 的忽略链（git 根 .gitignore / 祖先各层 / 全局 / .git/info/exclude）整条生效——
+// 仓库根的 .gitignore 对子目录同样过滤。已删除但仍在 index 的条目按工作区实际
+// 存在过滤掉。dir 不在任意仓库内、或 dir 自身被忽略链忽略时返回 (nil, nil)
+// （调用方据此降级普通遍历），不视为错误。
+func ListFilesUnder(dir string) ([]string, error) {
+	if _, ok := FindGitRoot(dir); !ok {
+		return nil, nil
+	}
+	out, err := runOut(dir, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files 执行失败: %w", err)
+	}
+	// 目录自身就被祖先 .gitignore 忽略时 ls-files 输出为空（如仓库内被忽略的
+	// 构建产物目录）——返回 nil 交上层降级普通遍历，而不是误判成「空目录」。
+	if out == "" {
+		if _, ignErr := runOut(dir, "check-ignore", "--quiet", "--", "."); ignErr == nil {
+			return nil, nil
+		}
+		return []string{}, nil
+	}
+	var files []string
+	for _, f := range strings.Split(out, "\x00") {
+		if f == "" {
+			continue
+		}
+		abs := filepath.Join(dir, f)
+		if info, err := os.Stat(abs); err != nil || !info.Mode().IsRegular() {
+			continue
+		}
+		files = append(files, abs)
 	}
 	return files, nil
 }

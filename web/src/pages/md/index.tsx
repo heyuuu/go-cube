@@ -381,7 +381,9 @@ export function MdPage() {
   const [openError, setOpenError] = useState('');
 
   const dirMode = list.data?.dir === true;
-  const files = list.data?.files ?? [];
+  // 后端只给全量非忽略文件，.md 过滤归前端（单文件模式不做扩展名过滤，path 即所选文件）
+  const allFiles = list.data?.files ?? [];
+  const files = dirMode ? allFiles.filter((f) => f.toLowerCase().endsWith('.md')) : allFiles;
   const tree = dirMode ? buildFileTree(path, files) : null;
 
   // 选中文件走 URL 参数 file（天然按目录隔离、可分享、支持前进/后退）；
