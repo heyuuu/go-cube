@@ -2,22 +2,19 @@ import { ArrowRight } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import type { components } from '@/api/schema';
-import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { cn } from '@/lib/utils';
-import { useWorkbenchDiff, useWorkbenchFileDiff } from '@/queries/workbench';
-
+import { useWorkbenchDiff, useWorkbenchFile, useWorkbenchFileDiff } from '@/queries/workbench';
 import { sourceLabel, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
+import { FileContentArea, useFileEditing, type ContentMode } from './file-content';
 import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
 // diff 面板（提案 1013）：双 TreeSource 对比（Beyond Compare 级）。
-// 目录级 = 变更文件树（复用 code 面板的 FileTree：组树/着色/树形平摊/宽度拖拽）；
-// 文件级 = side-by-side 双栏 hunks。方向约定：left = 基准（old），right = 对比（new）。
-// 状态多选/含 ignored 筛选已移除（着色直读、变更集不大）；路径搜索为前端本地子串过滤。
-// 筛选项不进 URL；选中文件复用 file 参数。
+// 树列 + 内容区均为公共组件（SourcePanelShell / FileContentArea），本文件只剩数据编排
+// 与左右源徽标。方向约定：left = 基准（old），right = 对比（new）。
+// 内容区支持 diff（默认，双栏 hunks）与 单文件（右侧源，worktree 时可轻编辑）双模式。
+// 路径搜索为前端本地子串过滤（变更清单一次全量返回）；筛选项不进 URL；选中文件复用 file 参数。
 
 // 树偏好 localStorage 键前缀（与 code 面板各自独立，见 tree-pane.tsx）
 const TREE_PREFS_KEY = 'cube.workbench.difftree';
@@ -29,13 +26,15 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
 
   const [query, setQuery] = useState('');
   const treePrefs = useTreePanePrefs(TREE_PREFS_KEY, 'diff');
+  const [mode, setMode] = useState<ContentMode>('diff');
 
   const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE);
-  const fileDiff = useWorkbenchFileDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, file);
-  if (!left || !right) return null;
+  const fileDiff = useWorkbenchFileDiff(path, left ?? null, right ?? EMPTY_SOURCE, file, mode === 'diff');
+  // 单文件模式的数据：右侧（新）源；worktree 源因此获得编辑能力
+  const content = useWorkbenchFile(path, right ?? EMPTY_SOURCE, file);
+  const editing = useFileEditing(path, right ?? EMPTY_SOURCE, file, content.data?.content ?? '');
 
-  // 本地路径子串搜索（只在差异范围下提供——全量树行数多，搜索语义另做）；
-  // 状态不提供筛选项——着色直读、变更集通常不大
+  // 本地路径子串搜索（只在差异范围下提供——全量树行数多，搜索语义另做）
   const q = query.trim();
   const entries = (diff.data?.list ?? []).filter(
     (e) => !q || e.path.includes(q) || (e.oldPath ?? '').includes(q),
@@ -45,18 +44,21 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
     (diff.data?.list ?? []).map((e) => [e.path, { adds: 0, dels: 0, status: e.status, oldPath: e.oldPath || undefined }]),
   );
 
-  const pickFile = (f: string) => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        writeFileParam(next, f);
-        return next;
-      },
-      { replace: true },
+  const pickFile = (f: string) =>
+    editing.guardSwitch(() =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          writeFileParam(next, f);
+          return next;
+        },
+        { replace: true },
+      ),
     );
-  };
 
-  const header = (
+  if (!left || !right) return null;
+
+  const headerLeading = (
     <>
       <Badge variant="secondary">{sourceLabel(left)}</Badge>
       <ArrowRight className="size-3 text-muted-foreground" />
@@ -94,102 +96,18 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
       diffFilter={treePrefs.scope === 'diff' ? filterSet : null}
       stats={statsMap}
       statsPending={diff.isPending}
-      header={header}
     >
-      {diff.isError ? (
-        <ErrorBanner message={diff.error.message} />
-      ) : !file ? (
-        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-          在左侧选择一个变更文件查看双栏对比
-        </div>
-      ) : fileDiff.isPending ? (
-        <div className="p-3 text-xs text-muted-foreground">计算 diff…</div>
-      ) : fileDiff.isError ? (
-        <ErrorBanner message={fileDiff.error.message} />
-      ) : fileDiff.data?.binary ? (
-        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
-      ) : (
-        <SideBySideHunks hunks={fileDiff.data?.hunks ?? []} />
-      )}
+      <FileContentArea
+        mode={mode}
+        onMode={setMode}
+        file={file}
+        canEdit={right.type === 'worktree'}
+        editing={editing}
+        contentQuery={content}
+        fileDiffQuery={fileDiff}
+        headerLeading={headerLeading}
+      />
     </SourcePanelShell>
-  );
-}
-
-// side-by-side 双栏渲染：del 进左栏、add 进右栏、ctx 两侧同步；连续 del/add 块按行配对
-function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) {
-  if (hunks.length === 0) {
-    return <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">两侧内容一致</div>;
-  }
-  return (
-    <div className="min-h-0 flex-1 overflow-auto font-mono text-[12px] leading-5">
-      {hunks.map((h, i) => (
-        <div key={i}>
-          <div className="bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-            @@ -{h.oldStart},{h.oldCount} +{h.newStart},{h.newCount} @@
-          </div>
-          <HunkRows hunk={h} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
-  // 连续 del 块与 add 块逐行配对（左删右增同行对照），剩余各自单侧展示
-  type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'pair' };
-  const rows: Row[] = [];
-  let pendingDels: string[] = [];
-  const flush = () => {
-    for (const d of pendingDels) rows.push({ left: d, kind: 'del' });
-    pendingDels = [];
-  };
-  for (const line of hunk.lines ?? []) {
-    if (line.kind === 'ctx') {
-      flush();
-      rows.push({ left: line.text, right: line.text, kind: 'pair' });
-    } else if (line.kind === 'del') {
-      pendingDels.push(line.text);
-    } else {
-      const paired = pendingDels.shift();
-      if (paired !== undefined) {
-        rows.push({ left: paired, right: line.text, kind: 'pair' });
-      } else {
-        rows.push({ right: line.text, kind: 'add' });
-      }
-    }
-  }
-  flush();
-
-  return (
-    <table className="w-full table-fixed border-collapse">
-      <tbody>
-        {rows.map((r, i) => {
-          const changed = r.kind !== 'pair';
-          const leftChanged = changed && r.left !== undefined && (r.right === undefined || r.kind === 'del');
-          const rightChanged = changed && r.right !== undefined && (r.left === undefined || r.kind === 'add');
-          return (
-            <tr key={i} className="align-top">
-              <td
-                className={cn(
-                  'w-1/2 whitespace-pre-wrap break-all border-r border-border px-2',
-                  leftChanged && 'bg-red-500/10 text-red-600 dark:text-red-400',
-                )}
-              >
-                {r.left ?? ''}
-              </td>
-              <td
-                className={cn(
-                  'w-1/2 whitespace-pre-wrap break-all px-2',
-                  rightChanged && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-                )}
-              >
-                {r.right ?? ''}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
   );
 }
 

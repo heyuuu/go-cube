@@ -434,6 +434,16 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	if len(same.Hunks) != 0 {
 		t.Errorf("相同文件应无 hunks: %d", len(same.Hunks))
 	}
+
+	// left 缺省 = 相对基准（worktree vs HEAD）：结果与显式 left=HEAD 等价
+	var noLeft struct {
+		Hunks []struct{} `json:"hunks"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&right="+wt+"&file=mod.txt")), &noLeft)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=mod.txt")), &got)
+	if len(noLeft.Hunks) != len(got.Hunks) {
+		t.Errorf("left 缺省应与显式 left=HEAD 等价: %d vs %d", len(noLeft.Hunks), len(got.Hunks))
+	}
 }
 
 func keysOf(m map[string]string) []string {

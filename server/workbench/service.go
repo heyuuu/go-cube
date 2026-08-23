@@ -200,11 +200,40 @@ func (s *Service) DiffTrees(
 	return result, nil
 }
 
+// changeBase 解析「相对上一版本」的基准：worktree → HEAD；commit/ref → 父提交（根提交落空树）。
+// Changes 与 ReadFileDiff（左源缺省时）共用
+func changeBase(root string, src TreeSource) (string, error) {
+	switch src.Type {
+	case SourceTypeWorktree:
+		head, err := git.HeadSha(src.Id)
+		if err != nil {
+			return "", fmt.Errorf("读取工作副本 HEAD 失败: dir=%s: %w", src.Id, err)
+		}
+		return head, nil
+	case SourceTypeCommit, SourceTypeRef:
+		parent, err := git.ParentSha(root, src.Id)
+		if err != nil {
+			return emptyTreeSha, nil // 根提交没有父：与空树比
+		}
+		return parent, nil
+	default:
+		return "", fmt.Errorf("未知的 sourceType: %q", src.Type)
+	}
+}
+
 // ReadFileDiff 对比两个源下同一相对路径的文件。实现在 diff.go。
+// left 为零值时按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 Changes）。
 func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	if left == (TreeSource{}) {
+		base, err := changeBase(root, right)
+		if err != nil {
+			return nil, err
+		}
+		left = TreeSource{Type: SourceTypeCommit, Id: base}
 	}
 	return readFileDiff(root, left, right, file)
 }
@@ -219,24 +248,9 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	var base string
-	switch src.Type {
-	case SourceTypeWorktree:
-		head, err := git.HeadSha(src.Id)
-		if err != nil {
-			return nil, fmt.Errorf("读取工作副本 HEAD 失败: dir=%s: %w", src.Id, err)
-		}
-		base = head
-	case SourceTypeCommit, SourceTypeRef:
-		parent, err := git.ParentSha(root, src.Id)
-		if err != nil {
-			// 根提交没有父：与空树比
-			base = emptyTreeSha
-		} else {
-			base = parent
-		}
-	default:
-		return nil, fmt.Errorf("未知的 sourceType: %q", src.Type)
+	base, err := changeBase(root, src)
+	if err != nil {
+		return nil, err
 	}
 	res, err := s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
 	if err != nil {

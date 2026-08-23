@@ -72,9 +72,8 @@ export function FileTreePane({
   );
 }
 
-// 单/双源面板的公共骨架：左侧树列（FileTreePane）+ 右侧（顶部信息条插槽 + 内容插槽）。
-// 面板只剩各自包装：数据 hooks、header 内容、内容区渲染（code = CodeMirror+编辑流，
-// diff = 双栏 hunks）。
+// 单/双源面板的公共骨架：左侧树列（FileTreePane）+ 右侧内容插槽（FileContentArea）。
+// 面板只剩各自包装：数据 hooks 与内容区参数（单文件源、diff 左右源、header 徽标）。
 export function SourcePanelShell({
   prefs,
   path,
@@ -84,7 +83,6 @@ export function SourcePanelShell({
   diffFilter,
   stats,
   statsPending,
-  header,
   above,
   toolbarExtra,
   children,
@@ -97,7 +95,6 @@ export function SourcePanelShell({
   diffFilter: Set<string> | null; // 差异范围的文件集（null = 全量树）
   stats: Map<string, FileStat> | null;
   statsPending: boolean;
-  header: ReactNode;
   above?: ReactNode;
   toolbarExtra?: ReactNode;
   children: ReactNode;
@@ -116,10 +113,7 @@ export function SourcePanelShell({
         stats={stats}
         statsPending={statsPending}
       />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">{header}</div>
-        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
-      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">{children}</div>
     </div>
   );
 }

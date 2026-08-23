@@ -129,13 +129,17 @@ func (h *WorkbenchHandler) diff(input struct {
 
 func (h *WorkbenchHandler) fileDiff(input struct {
 	Path  string `query:"path" required:"true"`
-	Left  string `query:"left" required:"true"`
+	Left  string `query:"left"` // 缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交）
 	Right string `query:"right" required:"true"`
 	File  string `query:"file" required:"true"`
 }) (*workbench.FileDiffResult, error) {
-	left, err := workbench.ParseTreeSource(input.Left)
-	if err != nil {
-		return nil, err
+	var left workbench.TreeSource
+	if input.Left != "" {
+		parsed, err := workbench.ParseTreeSource(input.Left)
+		if err != nil {
+			return nil, err
+		}
+		left = parsed
 	}
 	right, err := workbench.ParseTreeSource(input.Right)
 	if err != nil {

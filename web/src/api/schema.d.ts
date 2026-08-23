@@ -1319,7 +1319,7 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        left: string;
+        left?: string;
         right: string;
         file: string;
       };
