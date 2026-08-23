@@ -1,9 +1,9 @@
 # 工作台代码阅读面板：文件树 + CodeMirror6 查看 + 确认式轻编辑
 
-> **状态**：🔶 部分验收（2026-08-23）：目录树已验收通过；代码展示（CodeMirror 查看 / 轻编辑）**尚未开发验收**
+> **状态**：✅ 已完成并验收归档（2026-08-23。目录树先行验收；代码展示/轻编辑随「内容面板合并」一并验收，见文末「实现更新」）
 >
-> **所属**：[`1008-workspace工作台` 总纲](../1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
-> **依赖**：[`1010-workbench基座`](../archived/1010-workbench基座/README.md)（`tree`/`file` API 契约、面板骨架）。
+> **所属**：[`1008-workspace工作台` 总纲](./1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
+> **依赖**：[`1010-workbench基座`](./1010-workbench基座/README.md)（`tree`/`file` API 契约、面板骨架）。
 
 ## 背景与目标
 
@@ -62,3 +62,13 @@
 - git 读能力沉淀 `util/git`（纯函数），workbench 包编排；写文件属于 workbench 服务职责（不是 git 操作）。
 - save 接口是本工作台唯一落盘写路径，注意路径拼接安全（file 参数不得逃逸出目标目录，`secureJoin` 做 `filepath.Clean` + 前缀校验）。
 - 弹窗用仓库内 shadcn Dialog（Base UI，`render` prop 而非 asChild）。
+
+## 实现更新（2026-08-23 验收时回写）
+
+代码展示/轻编辑按本提案实现后，与 1013 的 diff 面板经历了一轮组件化收敛，最终**两面板物理合并**（讨论见 1008 总纲「实现更新」）：
+
+- 布局/树列/内容区/编辑流全部抽为公共组件：`SourcePanelShell` + `FileTreePane`（`tree-pane.tsx`，宽度/树形平摊/全量差异三偏好 localStorage 持久化）、`FileContentArea` + `useFileEditing`（`file-content.tsx`，单文件/diff 双模式 + 确认式编辑流）。本提案的面板文件 `code-view-panel.tsx` 已删除，能力并入 `content-view-panel.tsx`。
+- 编辑入口从「编辑/取消」按钮改为 **预览/编辑 switch**（双态），保存仍双弹窗确认。
+- 文件缺失返回 `deleted` 标记而非报错：差异树的**删除文件行可选中**，单文件模式显示「已删除」话术，编辑 switch 禁用；diff 模式呈现删除前内容 vs 空白。
+- `secureJoin` 显式拒绝含 `..` 段的路径（文件缺失不再报错后，逃逸企图必须独立报错）。
+- 源切换下拉早已移除（源选择收口 git 树面板），源徽标在工具栏最左。

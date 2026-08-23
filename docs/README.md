@@ -16,12 +16,12 @@
 
 - [`1009-模板引擎cube-create/`](proposals/1009-模板引擎cube-create/) — `cube create` 模板引擎（设计已完整）
 - [`1015-工作台面板组装/`](proposals/archived/1015-工作台面板组装/) — 工作台自定义布局（面板组装，最后做）
-- [`1014-工作台PTY面板/`](proposals/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）
-- [`1013-工作台diff面板/`](proposals/1013-工作台diff面板/) — 工作台双源 diff（目录 + 文件对比）
-- [`1012-工作台代码阅读面板/`](proposals/1012-工作台代码阅读面板/) — 工作台代码阅读（CodeMirror6 + 轻编辑）
+- [`1014-工作台PTY面板/`](proposals/archived/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）
+- [`1013-工作台diff面板/`](proposals/archived/1013-工作台diff面板/) — 工作台双源 diff（目录 + 文件对比）
+- [`1012-工作台代码阅读面板/`](proposals/archived/1012-工作台代码阅读面板/) — 工作台代码阅读（CodeMirror6 + 轻编辑）
 - [`1011-工作台git树面板/`](proposals/archived/1011-工作台git树面板/) — 工作台 git 树（commit 图 + 工作副本状态）
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
-- [`1008-workspace工作台/`](proposals/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
+- [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 - [`1006-history清理API/`](proposals/1006-history清理API/) — history 数据清理
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案

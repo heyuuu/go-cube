@@ -1,9 +1,9 @@
 # 工作台 diff 面板：双 TreeSource 目录/文件对比（Beyond Compare 级）
 
-> **状态**：✅ 已实现（2026-08-18）
+> **状态**：✅ 已完成并验收归档（2026-08-23，随「内容面板合并」验收，见文末「实现更新」）
 >
-> **所属**：[`1008-workspace工作台` 总纲](../1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
-> **依赖**：[`1010-workbench基座`](../archived/1010-workbench基座/README.md)（diff/file-diff API 契约）、[`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md)（文件树组件、CodeMirror 只读渲染底座）。
+> **所属**：[`1008-workspace工作台` 总纲](./1008-workspace工作台/README.md)（先读总纲「已收敛的全局决策」）。
+> **依赖**：[`1010-workbench基座`](./1010-workbench基座/README.md)（diff/file-diff API 契约）、[`1012-工作台代码阅读面板`](./1012-工作台代码阅读面板/README.md)（文件树组件、CodeMirror 只读渲染底座）。
 
 ## 背景与目标
 
@@ -54,3 +54,12 @@ diff 面板对比**两个任意 TreeSource**（分支 vs 分支、commit vs work
 - diff 核心逻辑沉淀在 `server/workbench/diff.go`；纯解析/对齐算法写成纯函数便于表驱动测试。
 - 降级规则（worktree 工作区对比自动 fs 模式）在接口响应中显式返回模式，前端不猜。
 - fs 模式遍历要跳过 `.git` 目录；路径拼接做逃逸校验（同 1012）。
+
+## 实现更新（2026-08-23 验收时回写）
+
+- **面板已与 1012 合并**：`diff-view-panel.tsx` 删除，能力并入 `content-view-panel.tsx`（source+base 视图模型，双选 = 与基准对比）。目录树复用 FileTree（组树/着色/树形平摊/宽度拖拽/全量差异切换），布局与编辑流共享 `SourcePanelShell` / `FileContentArea`。
+- `file-diff` 的 `left` 改**可选**：缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交，复用 `Changes` 的 `changeBase`），供内容面板单选场景的 diff 模式使用。
+- **单侧缺失文件不再报错**：一侧全文、一侧空白的整体增/删（worktree 侧 `os.IsNotExist`、tree-ish 侧 `cat-file -e` 探测）。
+- `DiffTrees` 泛化注入 numstat 行级统计与 rename 合并（原仅 `Changes` 有）——双选场景差异树也有 +N −N；左 worktree 场景方向不便，统计留零值。
+- 筛选工具条（状态多选/含 ignored）已移除——着色直读、变更集不大；路径搜索为**前端本地过滤**（空格分隔多关键字 AND，含 rename 旧路径；后端 `pathPrefix` 前缀匹配参数保留但前端不再传）。
+- 双栏渲染为自研表格（`SideBySideHunks`，未用 `@codemirror/merge`），行级粒度、del/add 逐行配对。

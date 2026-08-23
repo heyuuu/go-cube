@@ -1,6 +1,6 @@
 # workspace 工作台（总纲）
 
-> **状态**：📋 已完成需求拆解，按子提案顺序实施（2026-08-18 讨论定稿）
+> **状态**：✅ 全部子提案完成并验收归档（2026-08-23。验收期间的架构演进见文末「实现更新」）
 >
 > 本文是工作台需求群的**总纲**：沉淀已收敛的全局决策，索引全部子提案。各子功能的设计细节在子提案目录里，单独可执行。
 > 设计方法论讨论（工具选型 / 设计稿即契约）见 [`design-tooling.md`](./design-tooling.md)，不影响实施。
@@ -81,12 +81,12 @@ TreeSource = { type: "commit" | "ref" | "worktree", id: string }
 
 | # | 提案 | 内容 | 依赖 |
 |---|---|---|---|
-| 1 | [`1010-workbench基座`](../archived/1010-workbench基座/README.md) ✅ | 路由 `/workbench`、TreeSource 抽象与核心 API、后端 workbench 领域包、固定布局面板骨架 | 无 |
-| 2 | [`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md) ✅ | commit 图（分页）、工作副本状态区（worktree 分组）、单选/双选交互 | 1010 |
-| 3 | [`1012-工作台代码阅读面板`](../1012-工作台代码阅读面板/README.md) 🔶 | 虚拟树 + 真实树、CodeMirror6 只读 + 确认式轻编辑（目录树已验收，代码展示待开发验收） | 1010 |
-| 4 | [`1013-工作台diff面板`](../1013-工作台diff面板/README.md) | 双 TreeSource 对比：git 模式 + fs 扫描模式、目录级 + 文件级 | 1010、1012（复用文件查看底座） |
-| 5 | [`1014-工作台PTY面板`](../1014-工作台PTY面板/README.md) | WebSocket + pty + xterm.js、会话生命周期 | 1010（仅路由；可任意插队） |
-| 6 | [`1015-工作台面板组装`](../archived/1015-工作台面板组装/README.md) ✅ | 自定义布局、面板注册、URL 状态总线收口 | 2-5 全部完成 |
+| 1 | [`1010-workbench基座`](1010-workbench基座/README.md) ✅ | 路由 `/workbench`、TreeSource 抽象与核心 API、后端 workbench 领域包、固定布局面板骨架 | 无 |
+| 2 | [`1011-工作台git树面板`](1011-工作台git树面板/README.md) ✅ | commit 图（分页）、工作副本状态区（worktree 分组）、单选/双选交互 | 1010 |
+| 3 | [`1012-工作台代码阅读面板`](1012-工作台代码阅读面板/README.md) ✅ | 虚拟树 + 真实树、CodeMirror6 只读 + 确认式轻编辑 | 1010 |
+| 4 | [`1013-工作台diff面板`](1013-工作台diff面板/README.md) ✅ | 双 TreeSource 对比：git 模式 + fs 扫描模式、目录级 + 文件级 | 1010、1012（复用文件查看底座） |
+| 5 | [`1014-工作台PTY面板`](1014-工作台PTY面板/README.md) ✅ | WebSocket + pty + xterm.js、会话生命周期（后增补多终端 tab/分屏/偏好） | 1010（仅路由；可任意插队） |
+| 6 | [`1015-工作台面板组装`](1015-工作台面板组装/README.md) ✅ | 自定义布局、面板注册、URL 状态总线收口 | 2-5 全部完成 |
 
 每个子提案单独可交付、可验收。1010 做完是能进的空工作台；1011 做完已可用（取代 SourceTree 的核心）；1013-1015 任何一个延期不伤其他。
 
@@ -99,3 +99,13 @@ TreeSource = { type: "commit" | "ref" | "worktree", id: string }
 
 - [`AGENTS.md`](../../AGENTS.md) —— 分层依赖纪律、五处加法流程、编码规则、前端 Base UI（非 Radix）注意点。
 - [`docs/spec/现状.md`](../../spec/现状.md) —— 架构 / API / 前端工程现状（与代码冲突时以代码为准）。
+
+## 实现更新（2026-08-23 验收收官时回写）
+
+验收期间的架构演进（子提案各自 README 的「实现更新」有细节）：
+
+- **code / diff 面板物理合并为一个「内容面板」**：统一为 `source [+ base]` 视图模型——base 空 = 浏览 + 与父提交/HEAD 对比；base 有 = 与基准对比。由此 code 场景获得 diff 展示、diff 场景（右侧为 worktree）获得轻编辑能力。`auto` 面板随之删除，面板注册表收为 `git-tree + content`，旧布局 localStorage 自动迁移。
+- 公共组件沉淀：`SourcePanelShell` / `FileTreePane` / `FileContentArea` / `useFileEditing`（`panels/tree-pane.tsx`、`panels/file-content.tsx`）。
+- URL 参数仍为 `source / left+right`（单/双选互斥），内容面板内映射为 source/base 视图；「cmd=设 base、单击=设 source」的双选状态机迁移**已定稿方向、尚未实施**，需要时单独提交。
+- `file-diff` 的 `left` 可选（缺省 = 相对基准）；`DiffTrees` 泛化注入行级统计；单侧缺失文件呈现全文 vs 空白；差异树删除文件行可选中。
+- git 树面板增补：工作副本显隐开关（localStorage 按仓库 path 隔离）。
