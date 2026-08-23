@@ -173,6 +173,7 @@ export function WorkbenchPage() {
                     }}
                     className="flex h-7 shrink-0 cursor-grab items-center gap-1.5 border-b border-border bg-muted/30 px-2 text-[11px] text-muted-foreground active:cursor-grabbing"
                     title="拖拽调整面板顺序"
+                    onDoubleClick={() => layout.toggleSlim(id)}
                   >
                     <GripVertical className="size-3 shrink-0 opacity-50" />
                     <item.icon className="size-3.5" />
@@ -184,6 +185,7 @@ export function WorkbenchPage() {
                       title="收窄面板（再点展开）"
                       className="ml-auto rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
                       onClick={() => layout.toggleSlim(id)}
+                      onDoubleClick={(e) => e.stopPropagation()}
                     >
                       <ChevronsLeft className="size-3" />
                     </button>
@@ -192,6 +194,7 @@ export function WorkbenchPage() {
                       title="移除面板"
                       className="rounded p-0.5 hover:bg-accent hover:text-accent-foreground"
                       onClick={() => layout.removePanel(id)}
+                      onDoubleClick={(e) => e.stopPropagation()}
                     >
                       <X className="size-3" />
                     </button>
