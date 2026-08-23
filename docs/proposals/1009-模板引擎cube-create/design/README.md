@@ -23,14 +23,21 @@
 ## 二、调用方式
 
 ```bash
-cube create <模板名> <项目名> [--key=value ...]
+cube create <模板来源> [模板名] <目标路径> [--key=value ...]
 ```
 
-- 模板名：从内置/可用模板里选一套（如 `go-service`、`ts-plugin`）。
-- 项目名：生成的目标项目名。
+- **模板来源（二选一，不内置任何模板）**：
+  - 本地目录路径：`cube create ~/templates/go-service my-app`
+  - git 仓库地址：`cube create https://github.com/xxx/tpl-repo go-service my-app`
+- 模板名：来源是**模板集**（目录下无 template.yaml、一级子目录各有）时用于选子模板；来源本身就是模板时可省略；来源是模板集但没给模板名 → 交互式列出可选模板让用户选。
+- 目标路径：生成的项目位置。
 - 变量：命令行参数优先；缺的交互式提问补齐。
 
-参数和交互都支持：`cube create go-service my-app --author=heyu`，缺的变量会逐个问。
+参数和交互都支持：`cube create ~/templates/go-service my-app --author=heyu`，缺的变量会逐个问。
+
+**为什么不内置**：内置模板改一次要重新 build/install 二进制，迭代太重。外置让模板独立演进，且引擎统一面向「一个模板目录」——本地目录直接用，git 仓库 clone 到临时目录再用，对引擎核心透明。
+
+**目录判定规则**：根目录有 `template.yaml` → 单模板；没有但一级子目录有 → 模板集（只扫一级，不递归）；两者都不是 → 报错。
 
 ---
 
@@ -129,9 +136,13 @@ patterns:
 ## 六、引擎固定流程
 
 ```
-cube create <模板名> <项目名> [--key=value ...]
+cube create <模板来源> [模板名] <目标路径> [--key=value ...]
 
-1. 加载模板，读 template.yaml
+1. 解析模板来源：
+   a. 本地目录 → 直接用；git url → clone --depth 1 到临时目录（不缓存，用完删；遍历时跳过 .git）
+   b. 判定目录类型：根目录有 template.yaml → 单模板；否则扫一级子目录构成模板集
+   c. 模板集：给了模板名 → 校验并选中（不存在则报错并列出可用名）；没给 → 交互选择
+2. 读 template.yaml
 2. 收集变量：命令行参数优先，缺的交互式提问（用 variables 的 prompt）
 3. 对 template.yaml 做变量插值（${var} → 实际值）
 4. 遍历模板目录所有文件：
@@ -151,6 +162,10 @@ cube create <模板名> <项目名> [--key=value ...]
 
 - **变量派生**：自动生成 camelCase / PascalCase 变体。先不做，痛点出现再说。
 - **条件执行**：init 命令带 `when` 条件。先不做，用多模板解决。
-- **模板来源**：模板内置在 cube 里，还是从外部仓库拉。暂不锁定，先内置，将来支持 `--template-url`。
 - **失败处理策略**：`on_fail: continue/abort`。默认中止，够用。
 - **协议文件格式**：YAML。将来若嫌 yaml 库重，可换 TOML 或自定义格式。
+
+已定（原留白，后补决策）：
+
+- **模板来源：不内置，全部外置**（本地目录 / git 仓库二选一），git 来源 clone 到临时目录、**不缓存**。支持一个 git 仓库 / 目录内放**多个模板**（模板集，一级子目录各含 template.yaml），用可选位置参数「模板名」选择，缺省交互选择。见 discussion.md 9 节。
+- **开发顺序**：① 本地目录单模板 → ② 本地目录模板集 → ③ git 来源（clone 到临时目录后按 ①/② 执行，遍历跳过 `.git`）。
