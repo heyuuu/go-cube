@@ -1,0 +1,35 @@
+{
+  // Cursor/VS Code 只读取工作区根目录的 .vscode，打开本仓库时不会套用 web/.vscode。
+  // 这里把 web 的 oxfmt 约定提升到仓库级；Go 等其它语言不受 defaultFormatter 影响。
+  // 单独打开 web/ 时仍走 web/.vscode（路径相对 web/）。
+  "editor.formatOnSave": true,
+  "editor.formatOnSaveMode": "file",
+  "oxc.fmt.configPath": "web/oxfmt.config.ts",
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[json]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[jsonc]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  }
+}
