@@ -1,5 +1,5 @@
 import { ArrowRight } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { components } from '@/api/schema';
@@ -10,9 +10,8 @@ import { cn } from '@/lib/utils';
 import { useWorkbenchDiff, useWorkbenchFileDiff } from '@/queries/workbench';
 
 import { sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
-import { PanelSplitter } from '../splitter';
 
-import { FileTree } from './file-tree';
+import { FileTreePane, useTreePanePrefs } from './tree-pane';
 
 // diff 面板（提案 1013）：双 TreeSource 对比（Beyond Compare 级）。
 // 目录级 = 变更文件树（复用 code 面板的 FileTree：组树/着色/树形平摊/宽度拖拽）；
@@ -20,9 +19,8 @@ import { FileTree } from './file-tree';
 // 状态多选/含 ignored 筛选已移除（着色直读、变更集不大）；路径搜索为前端本地子串过滤。
 // 筛选项不进 URL；选中文件复用 file 参数。
 
-// 树偏好 localStorage 键（与 code 面板各自独立）
-const TREE_VIEW_KEY = 'cube.workbench.difftree.view';
-const TREE_WIDTH_KEY = 'cube.workbench.difftree.width';
+// 树偏好 localStorage 键前缀（与 code 面板各自独立，见 tree-pane.tsx）
+const TREE_PREFS_KEY = 'cube.workbench.difftree';
 
 export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
   const { path, left, right } = params;
@@ -30,33 +28,21 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
   const file = searchParams.get('file') ?? '';
 
   const [query, setQuery] = useState('');
-  const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
-    localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
-  );
-  const [treeWidth, setTreeWidth] = useState(() => {
-    const v = Number(localStorage.getItem(TREE_WIDTH_KEY));
-    return Number.isFinite(v) && v >= 200 && v <= 640 ? v : 280;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(TREE_VIEW_KEY, treeView);
-  }, [treeView]);
-  useEffect(() => {
-    localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
-  }, [treeWidth]);
+  const treePrefs = useTreePanePrefs(TREE_PREFS_KEY, 'diff');
 
   const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE);
   const fileDiff = useWorkbenchFileDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, file);
   if (!left || !right) return null;
 
-  // 本地路径子串搜索：状态不提供筛选项——着色已可直读，且变更集通常不大
+  // 本地路径子串搜索（只在差异范围下提供——全量树行数多，搜索语义另做）；
+  // 状态不提供筛选项——着色直读、变更集通常不大
   const q = query.trim();
   const entries = (diff.data?.list ?? []).filter(
     (e) => !q || e.path.includes(q) || (e.oldPath ?? '').includes(q),
   );
   const filterSet = new Set(entries.map((e) => e.path));
   const statsMap = new Map(
-    entries.map((e) => [e.path, { adds: 0, dels: 0, status: e.status, oldPath: e.oldPath || undefined }]),
+    (diff.data?.list ?? []).map((e) => [e.path, { adds: 0, dels: 0, status: e.status, oldPath: e.oldPath || undefined }]),
   );
 
   const pickFile = (f: string) => {
@@ -72,39 +58,41 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex shrink-0 flex-col border-r border-border" style={{ width: treeWidth }}>
-        <div className="shrink-0 border-b border-border px-2 py-1.5">
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="搜索路径（子串）…"
-            className="h-6 text-xs"
-          />
+      {diff.isError ? (
+        <div className="w-80 shrink-0">
+          <ErrorBanner message={diff.error.message} />
         </div>
-        <div className="min-h-0 flex-1">
-          {diff.isError ? (
-            <ErrorBanner message={diff.error.message} />
-          ) : (
-            <FileTree
-              path={path}
-              source={right} // 右侧 = 对比基准的「新」侧，目录状态以其为现状推导
-              selectedFile={file}
-              onPick={pickFile}
-              filter={filterSet}
-              stats={statsMap}
-              statsPending={diff.isPending}
-              viewMode={treeView}
-              onViewMode={setTreeView}
-            />
-          )}
-        </div>
-        {diff.isPending ? null : (
-          <div className="shrink-0 border-t border-border px-2 py-1 text-[11px] text-muted-foreground">
-            {diff.data?.mode === 'fs' ? '文件系统扫描模式' : 'git 模式'} · {entries.length} 项
-          </div>
-        )}
-      </div>
-      <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(200, w + dx)))} />
+      ) : (
+        <FileTreePane
+          prefs={treePrefs}
+          above={
+            treePrefs.scope === 'diff' ? (
+              <div className="shrink-0 border-b border-border px-2 py-1.5">
+                <Input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="搜索路径（子串）…"
+                  className="h-6 text-xs"
+                />
+              </div>
+            ) : null
+          }
+          toolbarExtra={
+            diff.data ? (
+              <span className="text-[10px] text-muted-foreground">
+                {diff.data.mode === 'fs' ? '文件系统扫描' : 'git 模式'} · {entries.length} 项
+              </span>
+            ) : null
+          }
+          path={path}
+          source={right} // 右侧 = 对比的「新」侧：全量树的现状、目录状态推导基准
+          selectedFile={file}
+          onPick={pickFile}
+          filter={treePrefs.scope === 'diff' ? filterSet : null}
+          stats={statsMap}
+          statsPending={diff.isPending}
+        />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
           <Badge variant="secondary">{sourceLabel(left)}</Badge>

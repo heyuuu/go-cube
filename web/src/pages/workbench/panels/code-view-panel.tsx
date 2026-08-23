@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import { CodeEditor } from '@/components/code-editor';
@@ -17,9 +17,8 @@ import {
 
 import { cn } from '@/lib/utils';
 import { sourceLabel, type WorkbenchParams } from '../params';
-import { PanelSplitter } from '../splitter';
 
-import { FileTree } from './file-tree';
+import { FileTreePane, useTreePanePrefs } from './tree-pane';
 
 // 代码阅读面板（提案 1012）：单选 TreeSource 的文件浏览。
 // 虚拟树（commit/ref）只读；真实树（worktree）支持确认式轻编辑——开启编辑、
@@ -33,10 +32,8 @@ import { FileTree } from './file-tree';
 
 type EditState = { key: string; draft: string };
 
-// 文件树偏好（视图模式/差异范围/宽度）的 localStorage 键
-const TREE_VIEW_KEY = 'cube.workbench.codetree.view';
-const TREE_SCOPE_KEY = 'cube.workbench.codetree.scope';
-const TREE_WIDTH_KEY = 'cube.workbench.codetree.width';
+// 文件树偏好键前缀（视图/范围/宽度，见 tree-pane.tsx 的 useTreePanePrefs）
+const TREE_PREFS_KEY = 'cube.workbench.codetree';
 
 export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const { path, source } = params;
@@ -45,27 +42,7 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const file = searchParams.get('file') ?? '';
 
   const [editState, setEditState] = useState<EditState | null>(null);
-  const [treeMode, setTreeMode] = useState<'all' | 'diff'>(() =>
-    localStorage.getItem(TREE_SCOPE_KEY) === 'diff' ? 'diff' : 'all',
-  );
-  const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
-    localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
-  );
-  // 文件树宽度：个人偏好，存 localStorage（同面板布局），拖拽范围 160~640
-  const [treeWidth, setTreeWidth] = useState(() => {
-    const v = Number(localStorage.getItem(TREE_WIDTH_KEY));
-    return Number.isFinite(v) && v >= 160 && v <= 640 ? v : 240;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(TREE_VIEW_KEY, treeView);
-  }, [treeView]);
-  useEffect(() => {
-    localStorage.setItem(TREE_SCOPE_KEY, treeMode);
-  }, [treeMode]);
-  useEffect(() => {
-    localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
-  }, [treeWidth]);
+  const treePrefs = useTreePanePrefs(TREE_PREFS_KEY, 'all');
 
   const [confirmEdit, setConfirmEdit] = useState(false);
   const [confirmSave, setConfirmSave] = useState(false);
@@ -88,7 +65,8 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
   const fileContent = content.data?.content ?? '';
 
   const currentKey = `${source?.type}:${source?.id}:${activeFile}`;
-  const diffFilter = treeMode === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
+  const diffFilter =
+    treePrefs.scope === 'diff' && changes.data ? new Set((changes.data.list ?? []).map((e) => e.path)) : null;
   // 差异文件的行级增删与状态（后端 Changes 注入），键为文件相对路径
   const diffStats = changes.data
     ? new Map(
@@ -149,23 +127,16 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="shrink-0 overflow-y-auto border-r border-border" style={{ width: treeWidth }}>
-        <FileTree
-          path={path}
-          source={source}
-          selectedFile={activeFile}
-          onPick={pickFile}
-          filter={diffFilter}
-          stats={diffStats}
-          statsPending={changes.isPending}
-          viewMode={treeView}
-          onViewMode={setTreeView}
-          scope={treeMode}
-          onScope={setTreeMode}
-          scopePending={changes.isPending}
-        />
-      </div>
-      <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(160, w + dx)))} />
+      <FileTreePane
+        prefs={treePrefs}
+        path={path}
+        source={source}
+        selectedFile={activeFile}
+        onPick={pickFile}
+        filter={diffFilter}
+        stats={diffStats}
+        statsPending={changes.isPending}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
           <Badge variant="secondary" className="max-w-48 shrink-0" title={source.id}>
