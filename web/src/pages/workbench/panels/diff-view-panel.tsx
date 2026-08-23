@@ -5,7 +5,6 @@ import { useSearchParams } from 'react-router';
 import type { components } from '@/api/schema';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useWorkbenchDiff, useWorkbenchFileDiff } from '@/queries/workbench';
@@ -18,15 +17,8 @@ import { FileTree } from './file-tree';
 // diff 面板（提案 1013）：双 TreeSource 对比（Beyond Compare 级）。
 // 目录级 = 变更文件树（复用 code 面板的 FileTree：组树/着色/树形平摊/宽度拖拽）；
 // 文件级 = side-by-side 双栏 hunks。方向约定：left = 基准（old），right = 对比（new）。
-// 状态多选/路径搜索为前端本地过滤（变更清单一次全量返回，子串搜索即时命中）；
-// 含 ignored 走服务端（改变 fs 扫描结果集）。筛选项不进 URL；选中文件复用 file 参数。
-
-const STATUS_LABELS: Record<string, string> = {
-  added: '新增',
-  deleted: '删除',
-  modified: '修改',
-  renamed: '重命名',
-};
+// 状态多选/含 ignored 筛选已移除（着色直读、变更集不大）；路径搜索为前端本地子串过滤。
+// 筛选项不进 URL；选中文件复用 file 参数。
 
 // 树偏好 localStorage 键（与 code 面板各自独立）
 const TREE_VIEW_KEY = 'cube.workbench.difftree.view';
@@ -37,8 +29,6 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const file = searchParams.get('file') ?? '';
 
-  const [statusOn, setStatusOn] = useState<Record<string, boolean>>({});
-  const [showIgnored, setShowIgnored] = useState(false);
   const [query, setQuery] = useState('');
   const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
     localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
@@ -55,18 +45,15 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
     localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
   }, [treeWidth]);
 
-  const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, showIgnored);
+  const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE);
   const fileDiff = useWorkbenchFileDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, file);
   if (!left || !right) return null;
 
-  // 本地过滤：状态多选（未勾选任一 = 全部）+ 路径子串搜索
+  // 本地路径子串搜索：状态不提供筛选项——着色已可直读，且变更集通常不大
   const q = query.trim();
-  const anyStatus = Object.values(statusOn).some(Boolean);
-  const entries = (diff.data?.list ?? []).filter((e) => {
-    if (anyStatus && !statusOn[e.status]) return false;
-    if (q && !e.path.includes(q) && !(e.oldPath ?? '').includes(q)) return false;
-    return true;
-  });
+  const entries = (diff.data?.list ?? []).filter(
+    (e) => !q || e.path.includes(q) || (e.oldPath ?? '').includes(q),
+  );
   const filterSet = new Set(entries.map((e) => e.path));
   const statsMap = new Map(
     entries.map((e) => [e.path, { adds: 0, dels: 0, status: e.status, oldPath: e.oldPath || undefined }]),
@@ -86,21 +73,6 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
   return (
     <div className="flex h-full min-h-0">
       <div className="flex shrink-0 flex-col border-r border-border" style={{ width: treeWidth }}>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-2 py-1.5">
-          {(['added', 'deleted', 'modified', 'renamed'] as const).map((s) => (
-            <label key={s} className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Checkbox
-                checked={statusOn[s] ?? false}
-                onCheckedChange={() => setStatusOn((prev) => ({ ...prev, [s]: !prev[s] }))}
-              />
-              {STATUS_LABELS[s]}
-            </label>
-          ))}
-          <label className="flex items-center gap-1 text-xs text-muted-foreground">
-            <Checkbox checked={showIgnored} onCheckedChange={() => setShowIgnored((v) => !v)} />
-            含 ignored
-          </label>
-        </div>
         <div className="shrink-0 border-b border-border px-2 py-1.5">
           <Input
             value={query}
