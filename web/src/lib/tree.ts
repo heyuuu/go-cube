@@ -232,3 +232,83 @@ export function flattenFileTree(root: FileTreeNode, isExpanded: (path: string) =
   walk(root, 0, true);
   return rows;
 }
+
+// --- 目录状态推导（差异模式目录行配色） ---
+
+export interface TreeChange {
+  status: string; // added / modified / deleted / renamed
+  oldPath?: string; // rename 的旧路径
+}
+
+// computeDirStatuses 由「当前全量文件清单 + 变更集」推导每个目录的状态（added/modified/deleted/renamed）。
+// git 语义：目录存在当且仅当其下有文件——基准版文件集不必另拉接口，
+// = 现存文件中去掉新增/改名进入的，再并入已删除路径与 rename 旧路径。
+// 目录状态不是其内文件状态的直接复用：
+// - deleted：之前有子文件、现在一个都没有（树上只剩删除行）；
+// - added：之前没有子文件、现在有（往老目录里加文件算 modified）；
+// - renamed：子文件全部 rename 自同一旧目录、且旧位置已无文件（整目录搬移）；
+//   旧目录在自身之下（内部挪动）或旧父目录不唯一时不判定，落 modified；
+// - modified：其余有变更的目录。无变更的目录不进结果（不着色）。
+export function computeDirStatuses(
+  stats: ReadonlyMap<string, TreeChange>,
+  currentFiles: readonly string[],
+): Map<string, string> {
+  const currentSet = new Set(currentFiles);
+  const oldSet = new Set<string>();
+  for (const f of currentFiles) {
+    const st = stats.get(f);
+    if (!st || st.status === 'modified' || st.status === 'deleted') oldSet.add(f);
+  }
+  for (const [p, st] of stats) {
+    if (st.status === 'deleted' && !currentSet.has(p)) oldSet.add(p);
+    if (st.status === 'renamed' && st.oldPath) oldSet.add(st.oldPath);
+  }
+
+  const dirsOf = (files: Iterable<string>) => {
+    const dirs = new Set<string>();
+    for (const f of files) {
+      const segs = f.split('/');
+      for (let i = 1; i < segs.length; i++) dirs.add(segs.slice(0, i).join('/'));
+    }
+    return dirs;
+  };
+  const oldDirs = dirsOf(oldSet);
+  const currentDirs = dirsOf(currentSet);
+
+  // 按目录聚合（递归）子孙变更：是否出现非 rename 变更、rename 的旧父目录集合
+  const hasNonRename = new Set<string>();
+  const renameParents = new Map<string, Set<string>>();
+  for (const [p, st] of stats) {
+    const segs = p.split('/');
+    for (let i = 1; i < segs.length; i++) {
+      const dir = segs.slice(0, i).join('/');
+      if (st.status !== 'renamed') {
+        hasNonRename.add(dir);
+      } else if (st.oldPath) {
+        const cut = st.oldPath.lastIndexOf('/');
+        const parent = cut === -1 ? '' : st.oldPath.slice(0, cut);
+        let set = renameParents.get(dir);
+        if (!set) renameParents.set(dir, (set = new Set()));
+        set.add(parent);
+      }
+    }
+  }
+
+  const out = new Map<string, string>();
+  const changedDirs = new Set([...renameParents.keys(), ...hasNonRename]);
+  for (const dir of changedDirs) {
+    if (oldDirs.has(dir) && !currentDirs.has(dir)) {
+      out.set(dir, 'deleted');
+      continue;
+    }
+    // 整目录搬移：旧父目录唯一、根级旧位置（''）不判、旧位置已无现存文件、且不是自身内部挪动
+    const parents = renameParents.get(dir);
+    const oldParent = parents && parents.size === 1 ? [...parents][0]! : '';
+    if (!hasNonRename.has(dir) && oldParent !== '' && !currentDirs.has(oldParent) && !oldParent.startsWith(dir + '/')) {
+      out.set(dir, 'renamed');
+      continue;
+    }
+    out.set(dir, oldDirs.has(dir) ? 'modified' : 'added');
+  }
+  return out;
+}

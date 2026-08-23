@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
 import { relativeFilePath } from '@/lib/path';
-import { buildFileTree, flattenFileTree, type FileTreeNode } from '@/lib/tree';
+import { buildFileTree, computeDirStatuses, flattenFileTree, type FileTreeNode } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useWorkbenchTree } from '@/queries/workbench';
 
@@ -95,6 +95,13 @@ export function FileTree({
     }
     return buildFileTree('', files);
   }, [tree.data, stats, source.type, filter]);
+
+  // 目录行配色：状态由全量清单 + 变更集推导（基准版文件集可从二者反推，见 lib/tree）。
+  // 用原始 list（不含上面并入的删除路径）——「现在有子文件」以真实现存文件为准
+  const dirStatuses = useMemo(
+    () => (stats ? computeDirStatuses(stats, tree.data?.list ?? []) : null),
+    [stats, tree.data],
+  );
 
   const toggle = useCallback((dir: string) => {
     setExpandedSet((prev) => {
@@ -250,18 +257,27 @@ export function FileTree({
         ) : (
           rows.map(({ node, depth, expanded }) =>
             node.kind === 'dir' && !flat ? (
-              <button
-                key={node.path}
-                type="button"
-                data-path={node.path}
-                className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent"
-                style={{ paddingLeft: depth * 12 + 4 }}
-                onClick={() => toggle(node.path)}
-              >
-                {expanded ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
-                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">{node.name}</span>
-              </button>
+              (() => {
+                const dColor = dirStatuses ? STATUS_COLOR[dirStatuses.get(node.path) ?? ''] : undefined;
+                return (
+                  <button
+                    key={node.path}
+                    type="button"
+                    data-path={node.path}
+                    className="flex w-full items-center gap-1 rounded px-1 py-0.5 text-left hover:bg-accent"
+                    style={{ paddingLeft: depth * 12 + 4 }}
+                    onClick={() => toggle(node.path)}
+                  >
+                    {expanded ? (
+                      <ChevronDown className="size-3 shrink-0" />
+                    ) : (
+                      <ChevronRight className="size-3 shrink-0" />
+                    )}
+                    <Folder className={cn('size-3.5 shrink-0', dColor ? dColor.icon : 'text-muted-foreground')} />
+                    <span className={cn('truncate', dColor && dColor.text)}>{node.name}</span>
+                  </button>
+                );
+              })()
             ) : stats?.get(node.path)?.status === 'deleted' ? (
               // 删除文件：磁盘与 index 均无，不可选不可读；并入树后与其他差异行对齐
               <div

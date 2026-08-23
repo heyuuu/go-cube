@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildFileTree, flattenFileTree } from './tree';
+import { buildFileTree, computeDirStatuses, flattenFileTree } from './tree';
 
 describe('buildFileTree 绝对根（md 页语义）', () => {
   it('组树 + 目录前置排序 + 单链折叠', () => {
@@ -51,5 +51,66 @@ describe('根不参与单链折叠', () => {
     expect(root.children.map((n) => n.name)).toEqual(['xxx/yyy']);
     expect(root.children[0]!.path).toBe('xxx/yyy');
     expect(root.children[0]!.children.map((n) => n.name)).toEqual(['m.md']);
+  });
+});
+
+describe('computeDirStatuses（目录状态推导）', () => {
+  const st = (status: string, oldPath?: string) => ({ status, oldPath });
+
+  it('新目录（之前无子文件）→ added；往老目录加文件 → modified', () => {
+    const stats = new Map([
+      ['new/a.md', st('added')],
+      ['src/new.ts', st('added')],
+    ]);
+    // src 下有未变更的 old.ts → src 在基准版就存在
+    const out = computeDirStatuses(stats, ['new/a.md', 'src/new.ts', 'src/old.ts']);
+    expect(out.get('new')).toBe('added');
+    expect(out.get('src')).toBe('modified');
+  });
+
+  it('目录下全删除且无幸存子文件 → deleted；仍有幸存文件 → modified', () => {
+    const gone = new Map([['a/gone.ts', st('deleted')]]);
+    expect(computeDirStatuses(gone, ['other.txt']).get('a')).toBe('deleted');
+    expect(computeDirStatuses(gone, ['other.txt', 'a/keep.ts']).get('a')).toBe('modified');
+  });
+
+  it('子文件全部 rename 自同一旧目录且旧位置已空 → renamed', () => {
+    const stats = new Map([
+      ['yy/a.md', st('renamed', 'xx/a.md')],
+      ['yy/b.md', st('renamed', 'xx/b.md')],
+    ]);
+    const out = computeDirStatuses(stats, ['yy/a.md', 'yy/b.md']);
+    expect(out.get('yy')).toBe('renamed');
+  });
+
+  it('旧位置仍有文件（部分搬走）或旧父目录不唯一：新目录仍算 added', () => {
+    const partial = new Map([['yy/a.md', st('renamed', 'xx/a.md')]]);
+    // xx/b.md 未动 → xx 仍有子文件，yy 不算整目录搬移；但 yy 之前不存在 → 新增
+    expect(computeDirStatuses(partial, ['yy/a.md', 'xx/b.md']).get('yy')).toBe('added');
+
+    const mixed = new Map([
+      ['yy/a.md', st('renamed', 'xx/a.md')],
+      ['yy/b.md', st('renamed', 'zz/b.md')],
+    ]);
+    expect(computeDirStatuses(mixed, ['yy/a.md', 'yy/b.md']).get('yy')).toBe('added');
+  });
+
+  it('内部挪动（a/b → a/c）：a 是 modified，a/c 是 renamed', () => {
+    const stats = new Map([['a/c/f.md', st('renamed', 'a/b/f.md')]]);
+    const out = computeDirStatuses(stats, ['a/c/f.md']);
+    expect(out.get('a')).toBe('modified');
+    expect(out.get('a/c')).toBe('renamed');
+  });
+
+  it('同目录内改名（目录本身 modified）', () => {
+    const stats = new Map([['x/b.md', st('renamed', 'x/a.md')]]);
+    expect(computeDirStatuses(stats, ['x/b.md']).get('x')).toBe('modified');
+  });
+
+  it('嵌套聚合：深层目录删除，父目录是 modified', () => {
+    const stats = new Map([['a/b/gone.ts', st('deleted')]]);
+    const out = computeDirStatuses(stats, ['a/keep.ts']);
+    expect(out.get('a')).toBe('modified');
+    expect(out.get('a/b')).toBe('deleted');
   });
 });
