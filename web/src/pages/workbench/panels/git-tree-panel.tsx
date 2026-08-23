@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, GitBranch, Monitor } from 'lucide-react';
+import { ChevronDown, Copy, Eye, EyeOff, GitBranch, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -43,6 +43,17 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   const info = useWorkbenchInfo(path);
   // 点击分支的定位信号：即使重复点同一分支（选中值不变）也要重新定位+闪烁
   const [focusTick, setFocusTick] = useState(0);
+  // 工作副本显隐开关（默认全展示）：关闭的副本不注入 commit 图——dirty 的虚拟节点、
+  // clean 的 HEAD 行装饰都不显示。纯视图过滤，不进 URL、不影响选中态
+  const [hiddenWorktrees, setHiddenWorktrees] = useState<Set<string>>(new Set());
+  const toggleWorktree = useCallback((wtPath: string) => {
+    setHiddenWorktrees((prev) => {
+      const next = new Set(prev);
+      if (prev.has(wtPath)) next.delete(wtPath);
+      else next.add(wtPath);
+      return next;
+    });
+  }, []);
 
   if (info.isPending) {
     return <div className="p-3 text-xs text-muted-foreground">加载中…</div>;
@@ -58,9 +69,11 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
           path={path}
           params={params}
           onBranchPicked={() => setFocusTick((n) => n + 1)}
+          hiddenWorktrees={hiddenWorktrees}
+          onToggleWorktree={toggleWorktree}
         />
       </div>
-      <CommitGraphSection path={path} params={params} focusTick={focusTick} />
+      <CommitGraphSection path={path} params={params} focusTick={focusTick} hiddenWorktrees={hiddenWorktrees} />
     </div>
   );
 }
@@ -71,10 +84,14 @@ function WorktreeSection({
   path,
   params,
   onBranchPicked,
+  hiddenWorktrees,
+  onToggleWorktree,
 }: {
   path: string;
   params: WorkbenchParams;
   onBranchPicked: () => void;
+  hiddenWorktrees: Set<string>;
+  onToggleWorktree: (wtPath: string) => void;
 }) {
   const refs = useWorkbenchRefs(path);
   const worktrees = useWorkbenchWorktrees(path);
@@ -83,7 +100,14 @@ function WorktreeSection({
     <>
       <Section title="工作副本" icon={<Monitor className="size-3.5" />}>
         {(worktrees.data ?? []).map((wt) => (
-          <WorktreeRow key={wt.path} wt={wt} params={params} afterSelect={onBranchPicked} />
+          <WorktreeRow
+            key={wt.path}
+            wt={wt}
+            params={params}
+            afterSelect={onBranchPicked}
+            hidden={hiddenWorktrees.has(wt.path)}
+            onToggle={() => onToggleWorktree(wt.path)}
+          />
         ))}
       </Section>
       <Section title="分支" icon={<GitBranch className="size-3.5" />}>
@@ -106,16 +130,29 @@ function WorktreeRow({
   wt,
   params,
   afterSelect,
+  hidden,
+  onToggle,
 }: {
   wt: WorktreeStatus;
   params: WorkbenchParams;
   afterSelect?: () => void;
+  hidden: boolean;
+  onToggle: () => void;
 }) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
 
   return (
-    <div className="flex items-center">
+    <div className={cn('flex items-center', hidden && 'opacity-50')}>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title={hidden ? '在 commit 图中展示该副本' : '在 commit 图中隐藏该副本'}
+        aria-label={hidden ? `展示 ${name}` : `隐藏 ${name}`}
+        onClick={onToggle}
+      >
+        {hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+      </Button>
       <SelectableRow
         label={name}
         source={src}
@@ -201,7 +238,17 @@ type RowCommit = (CommitEntry | WorktreeNode) & LaneInfo;
 
 // --- commit 图 ---
 
-function CommitGraphSection({ path, params, focusTick }: { path: string; params: WorkbenchParams; focusTick: number }) {
+function CommitGraphSection({
+  path,
+  params,
+  focusTick,
+  hiddenWorktrees,
+}: {
+  path: string;
+  params: WorkbenchParams;
+  focusTick: number;
+  hiddenWorktrees: Set<string>;
+}) {
   const commits = useWorkbenchCommits(path);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -238,6 +285,7 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
     const now = Math.floor(Date.now() / 1000);
     const virtual: WorktreeNode[] = [];
     for (const wt of worktrees.data ?? []) {
+      if (hiddenWorktrees.has(wt.path)) continue; // 关闭开关的副本不进图（虚拟节点与装饰都不注入）
       if (wt.bare) continue; // bare 无工作区，无未提交概念
       const label = wt.path.split('/').pop() || wt.path;
       if (wt.dirty) {
@@ -272,7 +320,7 @@ function CommitGraphSection({ path, params, focusTick }: { path: string; params:
       virtualLaneEnd.set(n.lane, headRow);
     }
     return { rows: nodes, wireMap: map, virtualLaneEnd };
-  }, [commits.data, worktrees.data]);
+  }, [commits.data, worktrees.data, hiddenWorktrees]);
 
   // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
   // / clean 的 HEAD 行；commit → 自身。选中态高亮不能只比对 source（ref/worktree 与
