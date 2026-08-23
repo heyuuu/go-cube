@@ -367,31 +367,6 @@
    用 inset box-shadow 而非 background-color——flash 类会加在带选中底色
    （bg-primary/15）的同一元素上，动画 background-color 会把选中色盖掉，
    脉冲间隙整行变白；inset 填充叠加在既有背景之上，选中态始终可见 */
-/* CodeMirror 跟随全局暗色：basicSetup 是固定浅色主题（行号槽/选区白底），
-   覆盖为透明背景 + 主题 token；语法 token 的默认配色在暗底上可读，不另配 */
-.dark .cm-editor {
-  background-color: transparent;
-  color: inherit;
-}
-.dark .cm-editor .cm-gutters {
-  background-color: transparent;
-  border-right-color: hsl(var(--border));
-  color: hsl(var(--muted-foreground));
-}
-.dark .cm-editor .cm-activeLine {
-  background-color: hsl(var(--muted) / 0.4);
-}
-.dark .cm-editor .cm-activeLineGutter {
-  background-color: hsl(var(--muted));
-  color: hsl(var(--foreground));
-}
-.dark .cm-editor .cm-cursor {
-  border-left-color: hsl(var(--foreground));
-}
-.dark .cm-editor .cm-selectionBackground {
-  background-color: hsl(var(--primary) / 0.35);
-}
-
 @keyframes row-flash {
   0%,
   100% {
