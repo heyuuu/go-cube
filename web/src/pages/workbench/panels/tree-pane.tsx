@@ -51,7 +51,7 @@ export function FileTreePane({
   prefs: TreePanePrefs;
   above?: ReactNode; // 树上方附加行（diff 面板的路径搜索框）
   toolbarExtra?: ReactNode; // 树工具条附加区（diff 面板的对比模式·数量）
-} & Omit<Parameters<typeof FileTree>[0], 'viewMode' | 'onViewMode' | 'scope' | 'onScope' | 'scopePending'>) {
+} & Omit<Parameters<typeof FileTree>[0], 'viewMode' | 'onViewMode' | 'scope' | 'onScope'>) {
   const { view, setView, scope, setScope, width, setWidth } = prefs;
   return (
     <>
