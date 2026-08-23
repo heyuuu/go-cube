@@ -70,7 +70,9 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '/api': apiTarget,
+        // ws: true —— pty 终端走 WebSocket upgrade（/api/workbench/pty），
+        // 字符串简写不代理 upgrade 请求，终端面板会一直「连接中…」后失败
+        '/api': { target: apiTarget, ws: true },
         '/docs': apiTarget,
         '/openapi.json': apiTarget,
       },
