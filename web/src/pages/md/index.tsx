@@ -1,7 +1,7 @@
-import { ChevronDown, ChevronRight, Ellipsis, Folder, FileText } from 'lucide-react';
+import { ChevronDown, ChevronRight, ArrowLeft, Ellipsis, Folder, FileText } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Markdown from 'react-markdown';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import remarkGfm from 'remark-gfm';
 
 import type { Opener } from '@/api/client';
@@ -374,6 +374,10 @@ function MdContent({
 
 export function MdPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // 轻量返回（1023）：同 tab 导航进来（location.key 非 default）才显示，直接开 URL（cube md 新 tab）不显示
+  const canBack = location.key !== 'default';
   const path = searchParams.get('path') ?? '';
   const list = useMdList(path);
   const openers = useOpenerList();
@@ -538,11 +542,20 @@ export function MdPage() {
 
   const themeDark = mdThemes.find((t) => t.id === theme)?.dark === true;
 
+  const backButton = canBack ? (
+    <Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-xs" onClick={() => navigate(-1)}>
+      <ArrowLeft className="size-3" />
+      返回
+    </Button>
+  ) : null;
+
   return (
     <div className={cn('flex h-dvh bg-background text-foreground', themeDark && 'dark')}>
       {dirMode && (
         <>
           <aside className="shrink-0 overflow-y-auto border-r p-3" style={{ width: sidebarW - 4 }}>
+            {/* 返回按钮嵌在侧栏顶部（同 tab 进入才有）；单文件模式无侧栏，改浮在左上角 */}
+            {backButton}
             {/* 共用目录树工具条（与工作台代码阅读面板同款）；额外按钮经 extra 注入 */}
             <TreeToolbar onExpandAll={expandAll} onCollapseAll={collapseAll} />
             {list.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
@@ -569,6 +582,8 @@ export function MdPage() {
         </>
       )}
 
+      {/* 单文件模式无侧栏，返回按钮浮在左上角 */}
+      {!dirMode && backButton && <div className="fixed top-3 left-3 z-20">{backButton}</div>}
       <main className="min-w-0 flex-1 overflow-y-auto px-6 py-8">
         <div className={cn(viewMode === 'split' ? 'w-full' : 'mx-auto max-w-3xl')}>
           {openError && <ErrorBanner message={openError} />}

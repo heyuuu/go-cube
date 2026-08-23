@@ -1,4 +1,4 @@
-import { Box, ChevronsLeft, ChevronsRight, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
+import { ChevronsLeft, ChevronsRight, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
 import { Fragment, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -17,11 +17,12 @@ import { PANEL_REGISTRY, PANEL_ORDER, type PanelId } from './panels/registry';
 import { TerminalPanel } from './panels/terminal-panel';
 import { readWorkbenchParams, writePathParam } from './params';
 import { PathEntry } from './path-entry';
+import { ProjectSwitcher } from './project-switcher';
 import { PanelSplitter } from './splitter';
 import { useWorkbenchLayout } from './workbench-layout';
 
 // 工作台页面（1010 基座 → 1011 选择 → 1015 面板组装）：以任意本机 git 目录为输入，
-// 聚合 git 可视化 / 代码阅读 / diff / PTY。独立于主应用 Layout（同 /md）。
+// 聚合 git 可视化 / 代码阅读 / diff / PTY。挂全局壳（1023），Layout 按本前缀切铺满型 main。
 // URL 是面板间唯一总线（path + 选中态 source/left/right/file，见 params.ts）；
 // 布局（面板槽位组合）存 localStorage，属个人偏好不进 URL。
 // 终端固定底部抽屉，不进主区布局；主区面板同类型单实例（多实例留待后续）。
@@ -45,9 +46,13 @@ export function WorkbenchPage() {
     setSearchParams(next, { replace: true });
   };
 
+  // 切项目（1023）：清空旧仓库的选中态参数（source/left/right 属于旧仓库，留着是脏数据），
+  // 保留 panel 等与仓库无关的个人偏好参数由各面板自行管理（目前无此类参数，仅 path）
+  const switchProject = (path: string) => setSearchParams({ path });
+
   if (!params.path || info.isError) {
     return (
-      <main className="h-dvh bg-background px-4">
+      <main className="h-full bg-background px-4">
         <PathEntry
           initial={params.path}
           initialError={
@@ -77,11 +82,11 @@ export function WorkbenchPage() {
   const addable = PANEL_ORDER.filter((p) => !layout.slots.includes(p));
 
   return (
-    <div className="flex h-dvh flex-col bg-background text-foreground">
+    <div className="flex h-full flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-        <Box className="size-4 text-primary" />
         <span className="text-xs font-semibold tracking-wide">工作台</span>
-        <span className="truncate text-xs text-muted-foreground">{params.path}</span>
+        {/* 项目下拉（1023）：沉浸场景下不退回列表直接横跳其他项目；非项目目录（任意 git 目录入口）时菜单仍可用 */}
+        <ProjectSwitcher current={params.path} onSwitch={switchProject} />
         <div className="ml-auto flex items-center gap-1">
           <DropdownMenu>
             <DropdownMenuTrigger

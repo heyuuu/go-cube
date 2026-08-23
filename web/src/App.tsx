@@ -9,19 +9,18 @@ import { ProjectsPage } from './pages/projects';
 import { WorkbenchPage } from './pages/workbench';
 
 function App() {
-  // 挂在 App 根上（而非 Layout），保证 /workbench、/md 独立路由也有 Cmd+D 切主题
+  // 挂在 App 根上（而非 Layout），保证壳外的 /md 独立路由也有 Cmd+D 切主题
   useTheme();
 
   return (
     <Routes>
-      {/* md 渲染页独立于主应用 Layout：文档查看器，不带业务侧栏 */}
-      {/* md 渲染页独立于主应用 Layout：文档查看器，不带业务侧栏 */}
+      {/* md 渲染页独立于主应用 Layout：文档查看器（如 `cube md` 新 tab 打开），不带业务侧栏 */}
       <Route path="/md" element={<MdPage />} />
-      {/* 工作台独立于主应用 Layout：以 git 目录为输入的聚合界面，自带整体布局 */}
-      <Route path="/workbench" element={<WorkbenchPage />} />
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="projects" element={<ProjectsPage />} />
+        {/* 工作台挂进全局壳（提案 1023）：Layout 按此前缀切铺满型 main，不吃 max-w 收敛 */}
+        <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="config" element={<ConfigPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
