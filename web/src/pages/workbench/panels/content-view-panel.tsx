@@ -70,11 +70,17 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   );
   const editing = useFileEditing(path, src, activeFile, content.data?.content ?? '');
 
-  // 本地路径子串搜索（只在差异范围下提供）
+  // 本地路径子串搜索：差异范围过滤变更清单（含 rename 旧路径），
+  // 全量范围过滤整棵树的文件路径（treeList 与 FileTree 同 query key，无额外请求）
   const [query, setQuery] = useState('');
   const q = query.trim();
   const entries = changeList.filter((e) => !q || e.path.includes(q) || (e.oldPath ?? '').includes(q));
-  const diffFilter = treePrefs.scope === 'diff' ? new Set(entries.map((e) => e.path)) : null;
+  const diffFilter =
+    treePrefs.scope === 'diff'
+      ? new Set(entries.map((e) => e.path))
+      : q
+        ? new Set((treeList ?? []).filter((p) => p.includes(q)))
+        : null;
 
   const pickFile = (f: string) =>
     editing.guardSwitch(() =>
@@ -118,16 +124,14 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
     <SourcePanelShell
       prefs={treePrefs}
       above={
-        treePrefs.scope === 'diff' ? (
-          <div className="shrink-0 border-b border-border px-2 py-1.5">
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索路径（子串）…"
-              className="h-6 text-xs"
-            />
-          </div>
-        ) : null
+        <div className="shrink-0 border-b border-border px-2 py-1.5">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索路径（子串）…"
+            className="h-6 text-xs"
+          />
+        </div>
       }
       toolbarExtra={
         !listPending && changeList.length >= 0 && (viewBase || treePrefs.scope === 'diff') ? (

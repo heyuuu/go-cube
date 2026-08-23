@@ -258,7 +258,7 @@ export function FileTree({
         ) : tree.isError ? (
           <div className="py-1 pl-3 text-destructive">{tree.error.message}</div>
         ) : rows.length === 0 ? (
-          <div className="py-1 pl-3 text-muted-foreground">（{filter ? '无变更文件' : '空目录'}）</div>
+          <div className="py-1 pl-3 text-muted-foreground">（{filter ? '无匹配文件' : '空目录'}）</div>
         ) : (
           rows.map(({ node, depth, expanded }) =>
             node.kind === 'dir' && !flat ? (
