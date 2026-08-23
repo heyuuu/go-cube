@@ -627,7 +627,6 @@ export interface components {
       text: string;
     };
     DiffTreesResult: {
-      ignoredFilters: string[] | null;
       list: components['schemas']['DiffEntry'][] | null;
       mode: string;
     };
@@ -1252,10 +1251,6 @@ export interface operations {
         path: string;
         left: string;
         right: string;
-        showIgnored?: boolean;
-        showUntracked?: boolean;
-        statusFilter?: string;
-        pathPrefix?: string;
       };
       header?: never;
       path?: never;

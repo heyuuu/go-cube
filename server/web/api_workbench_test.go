@@ -372,27 +372,9 @@ func TestWorkbenchDiffGit(t *testing.T) {
 			t.Errorf("缺少 %s（got %v）", want, keysOf(byPath))
 		}
 	}
-	// ignored.log 默认被过滤
+	// ignored 文件恒不出现（showIgnored 参数已随筛选链移除，ignored 不在产品范围）
 	if _, ok := byPath["ignored.log/added"]; ok {
-		t.Error("ignored 文件默认不应出现")
-	}
-
-	// showIgnored=true：ignored.log 出现
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&showIgnored=true")), &got)
-	found := false
-	for _, e := range got.List {
-		if e.Path == "ignored.log" {
-			found = true
-		}
-	}
-	if !found {
-		t.Error("showIgnored=true 时 ignored.log 应出现")
-	}
-
-	// statusFilter 过滤
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&statusFilter=modified")), &got)
-	if len(got.List) != 1 || got.List[0].Path != "mod.txt" {
-		t.Errorf("statusFilter=modified 应只剩 mod.txt: %+v", got.List)
+		t.Error("ignored 文件不应出现")
 	}
 }
 

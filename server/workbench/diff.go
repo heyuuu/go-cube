@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"crypto/sha1"
 	"fmt"
-	"io/fs"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -32,18 +30,14 @@ type DiffEntry struct {
 //   - git：两侧都是 commit/ref，走 git diff（快、语义准，但不含 untracked/ignored）
 //   - fs：任一侧是 worktree（其语义就是「工作区当前状态」），走文件系统扫描对比
 type DiffTreesResult struct {
-	Mode           string      `json:"mode"`
-	List           []DiffEntry `json:"list"`
-	IgnoredFilters []string    `json:"ignoredFilters"` // 请求了但在该模式下无效的筛选项名
+	Mode string      `json:"mode"`
+	List []DiffEntry `json:"list"`
 }
 
-// sourceFileMap 收集一个源的「相对路径 → blob sha」全量平铺。
-func sourceFileMap(root string, src TreeSource, includeIgnored bool) (map[string]string, error) {
+// sourceFileMap 收集一个源的「相对路径 → blob sha」全量平铺（ignored 文件不在产品范围，恒排除）。
+func sourceFileMap(root string, src TreeSource) (map[string]string, error) {
 	switch src.Type {
 	case SourceTypeWorktree:
-		if includeIgnored {
-			return fsFileMap(src.Id, true)
-		}
 		return lsFilesFileMap(src.Id)
 	case SourceTypeCommit, SourceTypeRef:
 		return git.FileShasAtRef(root, src.Id)
@@ -74,69 +68,6 @@ func lsFilesFileMap(wtDir string) (map[string]string, error) {
 	return result, nil
 }
 
-// loadIgnoredDegrade 加载工作副本的忽略集合；判定失败不致命，降级为空集合
-// （宁可多显示，不可误隐藏）。treeFs 与目录对比（fsFileMap）共用此降级策略。
-func loadIgnoredDegrade(wtDir string) *git.Ignored {
-	ig, err := git.LoadIgnored(wtDir)
-	if err != nil {
-		slog.Debug("忽略判定失败，降级为不过滤", "dir", wtDir, "err", err)
-		return &git.Ignored{Dirs: map[string]bool{}, Files: map[string]bool{}}
-	}
-	return ig
-}
-
-// fsFileMap walk 工作副本目录，跳过 .git；忽略项默认排除（includeIgnored=true 时保留）。
-// 忽略判定：git.LoadIgnored 给出的忽略文件/目录集合（目录级命中即其下全部忽略）。
-func fsFileMap(wtDir string, includeIgnored bool) (map[string]string, error) {
-	ig := loadIgnoredDegrade(wtDir)
-	result := map[string]string{}
-	err := filepath.WalkDir(wtDir, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			if d.Name() == ".git" {
-				return filepath.SkipDir
-			}
-			// 忽略目录整棵剪枝（node_modules 等）：不剪的话几万条目录项逐个做忽略判定，
-			// 大仓库的目录级对比会拖到秒级
-			if rel, relErr := filepath.Rel(wtDir, p); relErr == nil && ig.Dirs[filepath.ToSlash(rel)] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		rel, err := filepath.Rel(wtDir, p)
-		if err != nil {
-			return nil
-		}
-		rel = filepath.ToSlash(rel)
-		if !includeIgnored && (ig.Files[rel] || underAnyDir(rel, ig.Dirs)) {
-			return nil
-		}
-		data, err := os.ReadFile(p)
-		if err != nil {
-			return nil // 单文件读失败跳过（权限等），不阻断整体对比
-		}
-		result[rel] = blobSha(data)
-		return nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("扫描目录失败: dir=%s: %w", wtDir, err)
-	}
-	return result, nil
-}
-
-func underAnyDir(rel string, dirs map[string]bool) bool {
-	for d := range dirs {
-		if strings.HasPrefix(rel, d+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-// blobSha 计算 git blob 对象 sha（sha1("blob <len>\0" + 内容)），
-// 与 git ls-tree 给出的 sha 同算法，两侧可直比。
 func blobSha(data []byte) string {
 	h := sha1.New()
 	fmt.Fprintf(h, "blob %d\x00", len(data))
@@ -154,33 +85,6 @@ func letterToStatus(c byte) string {
 		return "renamed"
 	default:
 		return "modified"
-	}
-}
-
-func applyDiffFilters(list *[]DiffEntry, statusFilter string, pathPrefix string) {
-	if statusFilter != "" {
-		want := map[string]bool{}
-		for _, s := range strings.Split(statusFilter, ",") {
-			if s != "" {
-				want[strings.TrimSpace(s)] = true
-			}
-		}
-		filtered := (*list)[:0]
-		for _, e := range *list {
-			if want[e.Status] {
-				filtered = append(filtered, e)
-			}
-		}
-		*list = filtered
-	}
-	if pathPrefix != "" {
-		filtered := (*list)[:0]
-		for _, e := range *list {
-			if strings.HasPrefix(e.Path, pathPrefix) {
-				filtered = append(filtered, e)
-			}
-		}
-		*list = filtered
 	}
 }
 
@@ -303,17 +207,15 @@ func diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesRes
 
 // diffTreesFs 文件系统层扫描对比（Beyond Compare 模式）：
 // 两侧各收集「路径 → 内容指纹（git blob sha1）」，按路径对齐。
-// worktree 侧走 fs walk；commit/ref 侧走 ls-tree -r（blob sha 现成）。
+// worktree 侧走 ls-files 清单 + 磁盘读；commit/ref 侧走 ls-tree -r（blob sha 现成）。
 // 两个 sha 算法一致（blob sha = sha1("blob <len>\0" + content)），可直接比较。
-func diffTreesFs(
-	root string, left TreeSource, right TreeSource,
-	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
-) (*DiffTreesResult, error) {
-	leftMap, err := sourceFileMap(root, left, showIgnored)
+// untracked 也是「工作区状态」的一部分，恒包含（不做减法）。
+func diffTreesFs(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
+	leftMap, err := sourceFileMap(root, left)
 	if err != nil {
 		return nil, fmt.Errorf("扫描左侧失败: %w", err)
 	}
-	rightMap, err := sourceFileMap(root, right, showIgnored)
+	rightMap, err := sourceFileMap(root, right)
 	if err != nil {
 		return nil, fmt.Errorf("扫描右侧失败: %w", err)
 	}
@@ -334,14 +236,7 @@ func diffTreesFs(
 		}
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Path < list[j].Path })
-	result := &DiffTreesResult{Mode: "fs", List: list}
-	if !showUntracked {
-		// fs 模式只过滤 untracked 时按两侧 worktree 的 index 判定成本高，MVP 不做减法，
-		// 返回全集（untracked 也是「工作区状态」的一部分）；显式告知前端该筛选未生效
-		result.IgnoredFilters = append(result.IgnoredFilters, "showUntracked=false（fs 模式下恒包含 untracked）")
-	}
-	applyDiffFilters(&result.List, statusFilter, pathPrefix)
-	return result, nil
+	return &DiffTreesResult{Mode: "fs", List: list}, nil
 }
 
 // readFileDiff 对比两个源下同一相对路径的文件。

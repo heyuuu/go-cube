@@ -176,18 +176,14 @@ func (s *Service) SaveFile(path string, src TreeSource, file string, content str
 }
 
 // DiffTrees 对比两个 TreeSource 的目录树。实现在 diff.go（git 模式 / fs 扫描模式）。
-// 筛选项：statusFilter（逗号分隔 added,deleted,modified,renamed）、pathPrefix；
-// showIgnored / showUntracked 仅 fs 模式有效（git 模式下收进 IgnoredFilters）。
-func (s *Service) DiffTrees(
-	path string, left TreeSource, right TreeSource,
-	showIgnored bool, showUntracked bool, statusFilter string, pathPrefix string,
-) (*DiffTreesResult, error) {
+// 状态/路径筛选在 diff 面板前端本地做（变更清单一次全量返回）。
+func (s *Service) DiffTrees(path string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
 	if left.Type == SourceTypeWorktree || right.Type == SourceTypeWorktree {
-		result, err := diffTreesFs(root, left, right, showIgnored, showUntracked, statusFilter, pathPrefix)
+		result, err := diffTreesFs(root, left, right)
 		if err != nil {
 			return nil, err
 		}
@@ -198,10 +194,6 @@ func (s *Service) DiffTrees(
 	if err != nil {
 		return nil, err
 	}
-	if showIgnored || showUntracked {
-		result.IgnoredFilters = append(result.IgnoredFilters, "showIgnored/showUntracked（git 模式下恒隐藏）")
-	}
-	applyDiffFilters(&result.List, statusFilter, pathPrefix)
 	annotateDiffStats(result, root, left, right)
 	return result, nil
 }
@@ -258,7 +250,7 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 	if err != nil {
 		return nil, err
 	}
-	res, err := s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src, false, false, "", "")
+	res, err := s.DiffTrees(path, TreeSource{Type: SourceTypeCommit, Id: base}, src)
 	if err != nil {
 		return nil, err
 	}

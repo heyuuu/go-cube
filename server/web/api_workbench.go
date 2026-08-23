@@ -107,13 +107,9 @@ func (h *WorkbenchHandler) saveFile(input struct {
 }
 
 func (h *WorkbenchHandler) diff(input struct {
-	Path          string `query:"path" required:"true"`
-	Left          string `query:"left" required:"true"`
-	Right         string `query:"right" required:"true"`
-	ShowIgnored   bool   `query:"showIgnored"`
-	ShowUntracked bool   `query:"showUntracked"`
-	StatusFilter  string `query:"statusFilter"`
-	PathPrefix    string `query:"pathPrefix"`
+	Path  string `query:"path" required:"true"`
+	Left  string `query:"left" required:"true"`
+	Right string `query:"right" required:"true"`
 }) (*workbench.DiffTreesResult, error) {
 	left, err := workbench.ParseTreeSource(input.Left)
 	if err != nil {
@@ -123,8 +119,7 @@ func (h *WorkbenchHandler) diff(input struct {
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.DiffTrees(input.Path, left, right,
-		input.ShowIgnored, input.ShowUntracked, input.StatusFilter, input.PathPrefix)
+	return h.workbenchService.DiffTrees(input.Path, left, right)
 }
 
 func (h *WorkbenchHandler) fileDiff(input struct {
