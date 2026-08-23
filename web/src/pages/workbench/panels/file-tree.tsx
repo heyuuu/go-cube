@@ -71,9 +71,9 @@ export function FileTree({
   statsPending: boolean; // 统计/清单未就绪时不渲染行——避免先闪全量再过滤/着色
   viewMode: 'tree' | 'flat';
   onViewMode: (m: 'tree' | 'flat') => void;
-  scope: 'all' | 'diff';
-  onScope: (s: 'all' | 'diff') => void;
-  scopePending: boolean;
+  scope?: 'all' | 'diff'; // 全量/差异切换；不传（diff 面板复用时）不渲染该切换
+  onScope?: (s: 'all' | 'diff') => void;
+  scopePending?: boolean;
 }) {
   // 展开状态提升到树级统一管理（按目录相对路径），行组件无状态渲染
   const [expandedSet, setExpandedSet] = useState<ReadonlySet<string>>(() => new Set(['']));
@@ -221,28 +221,30 @@ export function FileTree({
                   </button>
                 ))}
               </div>
-              <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
-                {(
-                  [
-                    ['all', '全量'],
-                    ['diff', '差异'],
-                  ] as const
-                ).map(([m, label]) => (
-                  <button
-                    key={m}
-                    type="button"
-                    disabled={scope === 'diff' && scopePending}
-                    className={cn(
-                      'px-1.5 py-0.5 transition-colors',
-                      scope === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
-                    )}
-                    onClick={() => onScope(m)}
-                    title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              {onScope ? (
+                <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
+                  {(
+                    [
+                      ['all', '全量'],
+                      ['diff', '差异'],
+                    ] as const
+                  ).map(([m, label]) => (
+                    <button
+                      key={m}
+                      type="button"
+                      disabled={scope === 'diff' && scopePending}
+                      className={cn(
+                        'px-1.5 py-0.5 transition-colors',
+                        scope === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
+                      )}
+                      onClick={() => onScope(m)}
+                      title={m === 'diff' ? '只看相对上一版本的变更文件' : '查看全部文件'}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </>
         }

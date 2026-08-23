@@ -1,5 +1,5 @@
-import { ArrowRight, FilePlus2, FileX2, FilePen, ArrowLeftRight } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { components } from '@/api/schema';
@@ -11,18 +11,15 @@ import { cn } from '@/lib/utils';
 import { useWorkbenchDiff, useWorkbenchFileDiff } from '@/queries/workbench';
 
 import { sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
+import { PanelSplitter } from '../splitter';
+
+import { FileTree } from './file-tree';
 
 // diff 面板（提案 1013）：双 TreeSource 对比（Beyond Compare 级）。
-// 目录级 = 变更文件列表（状态过滤 / ignored 开关 / 路径过滤）；
+// 目录级 = 变更文件树（复用 code 面板的 FileTree：组树/着色/树形平摊/宽度拖拽）；
 // 文件级 = side-by-side 双栏 hunks。方向约定：left = 基准（old），right = 对比（new）。
-// 筛选项放组件内 state 不进 URL（避免参数爆炸）；选中文件复用 file 参数。
-
-const STATUS_ICONS: Record<string, typeof FilePen> = {
-  added: FilePlus2,
-  deleted: FileX2,
-  modified: FilePen,
-  renamed: ArrowLeftRight,
-};
+// 状态多选/路径搜索为前端本地过滤（变更清单一次全量返回，子串搜索即时命中）；
+// 含 ignored 走服务端（改变 fs 扫描结果集）。筛选项不进 URL；选中文件复用 file 参数。
 
 const STATUS_LABELS: Record<string, string> = {
   added: '新增',
@@ -31,6 +28,10 @@ const STATUS_LABELS: Record<string, string> = {
   renamed: '重命名',
 };
 
+// 树偏好 localStorage 键（与 code 面板各自独立）
+const TREE_VIEW_KEY = 'cube.workbench.difftree.view';
+const TREE_WIDTH_KEY = 'cube.workbench.difftree.width';
+
 export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
   const { path, left, right } = params;
   const [searchParams, setSearchParams] = useSearchParams();
@@ -38,20 +39,38 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
 
   const [statusOn, setStatusOn] = useState<Record<string, boolean>>({});
   const [showIgnored, setShowIgnored] = useState(false);
-  const [pathPrefix, setPathPrefix] = useState('');
-
-  const statusFilter = Object.entries(statusOn)
-    .filter(([, on]) => on)
-    .map(([s]) => s)
-    .join(',');
-
-  const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, {
-    showIgnored,
-    statusFilter,
-    pathPrefix,
+  const [query, setQuery] = useState('');
+  const [treeView, setTreeView] = useState<'tree' | 'flat'>(() =>
+    localStorage.getItem(TREE_VIEW_KEY) === 'flat' ? 'flat' : 'tree',
+  );
+  const [treeWidth, setTreeWidth] = useState(() => {
+    const v = Number(localStorage.getItem(TREE_WIDTH_KEY));
+    return Number.isFinite(v) && v >= 200 && v <= 640 ? v : 280;
   });
+
+  useEffect(() => {
+    localStorage.setItem(TREE_VIEW_KEY, treeView);
+  }, [treeView]);
+  useEffect(() => {
+    localStorage.setItem(TREE_WIDTH_KEY, String(treeWidth));
+  }, [treeWidth]);
+
+  const diff = useWorkbenchDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, showIgnored);
   const fileDiff = useWorkbenchFileDiff(path, left ?? EMPTY_SOURCE, right ?? EMPTY_SOURCE, file);
   if (!left || !right) return null;
+
+  // 本地过滤：状态多选（未勾选任一 = 全部）+ 路径子串搜索
+  const q = query.trim();
+  const anyStatus = Object.values(statusOn).some(Boolean);
+  const entries = (diff.data?.list ?? []).filter((e) => {
+    if (anyStatus && !statusOn[e.status]) return false;
+    if (q && !e.path.includes(q) && !(e.oldPath ?? '').includes(q)) return false;
+    return true;
+  });
+  const filterSet = new Set(entries.map((e) => e.path));
+  const statsMap = new Map(
+    entries.map((e) => [e.path, { adds: 0, dels: 0, status: e.status, oldPath: e.oldPath || undefined }]),
+  );
 
   const pickFile = (f: string) => {
     setSearchParams(
@@ -66,7 +85,7 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
 
   return (
     <div className="flex h-full min-h-0">
-      <div className="flex w-80 shrink-0 flex-col border-r border-border">
+      <div className="flex shrink-0 flex-col border-r border-border" style={{ width: treeWidth }}>
         <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-2 py-1.5">
           {(['added', 'deleted', 'modified', 'renamed'] as const).map((s) => (
             <label key={s} className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -84,57 +103,36 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
         </div>
         <div className="shrink-0 border-b border-border px-2 py-1.5">
           <Input
-            value={pathPrefix}
-            onChange={(e) => setPathPrefix(e.target.value)}
-            placeholder="路径过滤…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜索路径（子串）…"
             className="h-6 text-xs"
           />
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-1">
-          {diff.isPending ? (
-            <div className="p-2 text-xs text-muted-foreground">对比中…</div>
-          ) : diff.isError ? (
+        <div className="min-h-0 flex-1">
+          {diff.isError ? (
             <ErrorBanner message={diff.error.message} />
           ) : (
-            <>
-              <div className="flex items-center gap-1 px-1 pb-1 text-[11px] text-muted-foreground">
-                {diff.data?.mode === 'fs' ? '文件系统扫描模式' : 'git 模式'} · {diff.data?.list?.length ?? 0} 项
-              </div>
-              {(diff.data?.list ?? []).map((e) => {
-                const Icon = STATUS_ICONS[e.status] ?? FilePen;
-                return (
-                  <button
-                    key={e.path}
-                    type="button"
-                    title={e.oldPath ? `${e.oldPath} → ${e.path}` : e.path}
-                    onClick={() => pickFile(e.path)}
-                    className={cn(
-                      'flex w-full items-center gap-1.5 rounded px-1.5 py-0.5 text-left text-xs hover:bg-accent',
-                      file === e.path && 'bg-primary/15 font-medium',
-                    )}
-                  >
-                    <Icon
-                      className={cn(
-                        'size-3.5 shrink-0',
-                        e.status === 'added' && 'text-emerald-500',
-                        e.status === 'deleted' && 'text-red-500',
-                        (e.status === 'modified' || e.status === 'renamed') && 'text-amber-500',
-                      )}
-                    />
-                    <span className="truncate">{e.path}</span>
-                    {e.oldPath ? (
-                      <span className="shrink-0 text-[10px] text-muted-foreground">← {e.oldPath}</span>
-                    ) : null}
-                  </button>
-                );
-              })}
-              {(diff.data?.list ?? []).length === 0 ? (
-                <div className="p-2 text-xs text-muted-foreground">无差异</div>
-              ) : null}
-            </>
+            <FileTree
+              path={path}
+              source={right} // 右侧 = 对比基准的「新」侧，目录状态以其为现状推导
+              selectedFile={file}
+              onPick={pickFile}
+              filter={filterSet}
+              stats={statsMap}
+              statsPending={diff.isPending}
+              viewMode={treeView}
+              onViewMode={setTreeView}
+            />
           )}
         </div>
+        {diff.isPending ? null : (
+          <div className="shrink-0 border-t border-border px-2 py-1 text-[11px] text-muted-foreground">
+            {diff.data?.mode === 'fs' ? '文件系统扫描模式' : 'git 模式'} · {entries.length} 项
+          </div>
+        )}
       </div>
+      <PanelSplitter onDelta={(dx) => setTreeWidth((w) => Math.min(640, Math.max(200, w + dx)))} />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
           <Badge variant="secondary">{sourceLabel(left)}</Badge>

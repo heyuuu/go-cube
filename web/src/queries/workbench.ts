@@ -95,22 +95,17 @@ export type DiffTreesResult = components['schemas']['DiffTreesResult'];
 export type FileDiffResult = components['schemas']['FileDiffResult'];
 export type Hunk = components['schemas']['Hunk'];
 
-export function useWorkbenchDiff(
-  path: string,
-  left: TreeSource,
-  right: TreeSource,
-  filters: { showIgnored: boolean; statusFilter: string; pathPrefix: string },
-) {
+// 状态/路径过滤在 diff 面板内做（变更清单一次全量返回，前端过滤即时且支持子串搜索）；
+// showIgnored 走服务端——它改变 fs 扫描的结果集
+export function useWorkbenchDiff(path: string, left: TreeSource, right: TreeSource, showIgnored: boolean) {
   return useQuery({
-    queryKey: ['workbench', 'diff', path, toUri(left), toUri(right), filters],
+    queryKey: ['workbench', 'diff', path, toUri(left), toUri(right), showIgnored],
     queryFn: () =>
       apiGet('/api/workbench/diff', {
         path,
         left: toUri(left),
         right: toUri(right),
-        showIgnored: filters.showIgnored,
-        statusFilter: filters.statusFilter || undefined,
-        pathPrefix: filters.pathPrefix || undefined,
+        showIgnored,
       }),
     enabled: path !== '' && left.id !== '' && right.id !== '',
     staleTime: 0, // 对比结果实时算
