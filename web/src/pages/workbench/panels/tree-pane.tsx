@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react';
 
+import type { TreeSource } from '../params';
 import { PanelSplitter } from '../splitter';
 
-import { FileTree } from './file-tree';
+import { FileTree, type FileStat } from './file-tree';
 
 // 左侧文件树列的公共封装（code / diff 面板共用）：FileTree + 宽度拖拽 +
 // 树形/平摊、全量/差异 视图偏好持久化（localStorage，按 storageKey 隔离）。
@@ -68,5 +69,57 @@ export function FileTreePane({
       </div>
       <PanelSplitter onDelta={(dx) => setWidth((w) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w + dx)))} />
     </>
+  );
+}
+
+// 单/双源面板的公共骨架：左侧树列（FileTreePane）+ 右侧（顶部信息条插槽 + 内容插槽）。
+// 面板只剩各自包装：数据 hooks、header 内容、内容区渲染（code = CodeMirror+编辑流，
+// diff = 双栏 hunks）。
+export function SourcePanelShell({
+  prefs,
+  path,
+  treeSource,
+  selectedFile,
+  onPick,
+  diffFilter,
+  stats,
+  statsPending,
+  header,
+  above,
+  toolbarExtra,
+  children,
+}: {
+  prefs: TreePanePrefs;
+  path: string;
+  treeSource: TreeSource; // 全量范围浏览的源（diff 面板传右侧「新」源）
+  selectedFile: string;
+  onPick: (file: string) => void;
+  diffFilter: Set<string> | null; // 差异范围的文件集（null = 全量树）
+  stats: Map<string, FileStat> | null;
+  statsPending: boolean;
+  header: ReactNode;
+  above?: ReactNode;
+  toolbarExtra?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-full min-h-0">
+      <FileTreePane
+        prefs={prefs}
+        above={above}
+        toolbarExtra={toolbarExtra}
+        path={path}
+        source={treeSource}
+        selectedFile={selectedFile}
+        onPick={onPick}
+        filter={diffFilter}
+        stats={stats}
+        statsPending={statsPending}
+      />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">{header}</div>
+        <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+      </div>
+    </div>
   );
 }

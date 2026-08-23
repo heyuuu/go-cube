@@ -16,9 +16,9 @@ import {
 } from '@/queries/workbench';
 
 import { cn } from '@/lib/utils';
-import { sourceLabel, type WorkbenchParams } from '../params';
+import { sourceLabel, writeFileParam, type WorkbenchParams } from '../params';
 
-import { FileTreePane, useTreePanePrefs } from './tree-pane';
+import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
 // 代码阅读面板（提案 1012）：单选 TreeSource 的文件浏览。
 // 虚拟树（commit/ref）只读；真实树（worktree）支持确认式轻编辑——开启编辑、
@@ -94,18 +94,17 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
     action();
   };
 
-  const setFileParam = (f: string) => {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set('file', f);
-        return next;
-      },
-      { replace: true },
+  const pickFile = (f: string) =>
+    guardSwitch(() =>
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          writeFileParam(next, f);
+          return next;
+        },
+        { replace: true },
+      ),
     );
-  };
-
-  const pickFile = (f: string) => guardSwitch(() => setFileParam(f));
 
   const doSave = async () => {
     setSaving(true);
@@ -125,92 +124,91 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
 
   if (!source) return null;
 
-  return (
-    <div className="flex h-full min-h-0">
-      <FileTreePane
-        prefs={treePrefs}
-        path={path}
-        source={source}
-        selectedFile={activeFile}
-        onPick={pickFile}
-        filter={diffFilter}
-        stats={diffStats}
-        statsPending={changes.isPending}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5">
-          <Badge variant="secondary" className="max-w-48 shrink-0" title={source.id}>
-            <span className="text-[10px] text-muted-foreground">
-              {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
-            </span>
-            <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
-          </Badge>
-          <span className="truncate text-xs font-medium">{activeFile || '未选择文件'}</span>
-          {fileMissing ? (
-            <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
-              {activeFile ? '原文件不存在，已回退 README.md' : '原文件在此目标中不存在'}
-            </Badge>
-          ) : null}
-          {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
-          {dirty ? <Badge variant="destructive">未保存</Badge> : null}
-          <div className="ml-auto flex items-center gap-1.5">
-            {canEdit ? (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground" title="预览 / 编辑切换">
-                <span className={cn(!editing && 'font-medium text-foreground')}>预览</span>
-                <Switch
-                  checked={editing}
-                  disabled={!activeFile || !!content.data?.binary}
-                  aria-label="切换预览/编辑"
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setConfirmEdit(true);
-                    } else {
-                      // 关编辑 = 旧「取消」：有未保存改动走丢弃确认，否则直接退出
-                      guardSwitch(() => setEditState(null));
-                    }
-                  }}
-                />
-                <span className={cn(editing && 'font-medium text-foreground')}>编辑</span>
-              </div>
-            ) : null}
-            {editing ? (
-              <Button size="sm" disabled={!dirty || saving} onClick={() => setConfirmSave(true)}>
-                保存
-              </Button>
-            ) : null}
-          </div>
-        </div>
-        {content.isError ? <ErrorBanner message={content.error.message} /> : null}
-        {saveError ? <ErrorBanner message={saveError} /> : null}
-        <div className="min-h-0 flex-1 overflow-hidden">
-          {fileMissing && !activeFile ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              当前文件在所选目标中不存在（无 README.md 可回退）
-            </div>
-          ) : !activeFile ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              在左侧选择一个文件
-            </div>
-          ) : content.isPending ? (
-            <div className="p-3 text-xs text-muted-foreground">读取中…</div>
-          ) : content.data?.binary ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              二进制文件不支持预览（{content.data.size} 字节）
-            </div>
-          ) : (
-            <CodeEditor
-              key={activeFile}
-              value={editing ? draft : fileContent}
-              file={activeFile}
-              readOnly={!editing}
-              onChange={(next) => {
-                setEditState((s) => (s ? { ...s, draft: next } : s));
+  const header = (
+    <>
+      <Badge variant="secondary" className="max-w-48 shrink-0" title={source.id}>
+        <span className="text-[10px] text-muted-foreground">
+          {source.type === 'worktree' ? '工作副本' : source.type === 'ref' ? '分支' : '提交'}
+        </span>
+        <span className="ml-1 truncate font-mono">{sourceLabel(source)}</span>
+      </Badge>
+      <span className="truncate font-medium">{activeFile || '未选择文件'}</span>
+      {fileMissing ? (
+        <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
+          {activeFile ? '原文件不存在，已回退 README.md' : '原文件在此目标中不存在'}
+        </Badge>
+      ) : null}
+      {content.data?.binary ? <Badge variant="outline">二进制 {content.data.size}B</Badge> : null}
+      {dirty ? <Badge variant="destructive">未保存</Badge> : null}
+      <div className="ml-auto flex items-center gap-1.5">
+        {canEdit ? (
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground" title="预览 / 编辑切换">
+            <span className={cn(!editing && 'font-medium text-foreground')}>预览</span>
+            <Switch
+              checked={editing}
+              disabled={!activeFile || !!content.data?.binary}
+              aria-label="切换预览/编辑"
+              onCheckedChange={(checked) => {
+                if (checked) {
+                  setConfirmEdit(true);
+                } else {
+                  // 关编辑 = 旧「取消」：有未保存改动走丢弃确认，否则直接退出
+                  guardSwitch(() => setEditState(null));
+                }
               }}
-              className="h-full"
             />
-          )}
-        </div>
+            <span className={cn(editing && 'font-medium text-foreground')}>编辑</span>
+          </div>
+        ) : null}
+        {editing ? (
+          <Button size="sm" disabled={!dirty || saving} onClick={() => setConfirmSave(true)}>
+            保存
+          </Button>
+        ) : null}
       </div>
+    </>
+  );
+
+  return (
+    <SourcePanelShell
+      prefs={treePrefs}
+      path={path}
+      treeSource={source}
+      selectedFile={activeFile}
+      onPick={pickFile}
+      diffFilter={diffFilter}
+      stats={diffStats}
+      statsPending={changes.isPending}
+      header={header}
+    >
+      {content.isError ? <ErrorBanner message={content.error.message} /> : null}
+      {saveError ? <ErrorBanner message={saveError} /> : null}
+      {fileMissing && !activeFile ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+          当前文件在所选目标中不存在（无 README.md 可回退）
+        </div>
+      ) : !activeFile ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+          在左侧选择一个文件
+        </div>
+      ) : content.isPending ? (
+        <div className="p-3 text-xs text-muted-foreground">读取中…</div>
+      ) : content.data?.binary ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+          二进制文件不支持预览（{content.data.size} 字节）
+        </div>
+      ) : (
+        <CodeEditor
+          key={activeFile}
+          value={editing ? draft : fileContent}
+          file={activeFile}
+          readOnly={!editing}
+          onChange={(next) => {
+            setEditState((s) => (s ? { ...s, draft: next } : s));
+          }}
+          className="h-full"
+        />
+      )}
 
       <ConfirmDialog
         open={confirmEdit}
@@ -246,6 +244,6 @@ export function CodeViewPanel({ params }: { params: WorkbenchParams }) {
           action?.();
         }}
       />
-    </div>
+    </SourcePanelShell>
   );
 }

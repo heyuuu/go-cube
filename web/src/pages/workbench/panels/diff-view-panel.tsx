@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useWorkbenchDiff, useWorkbenchFileDiff } from '@/queries/workbench';
 
-import { sourceLabel, type TreeSource, type WorkbenchParams } from '../params';
+import { sourceLabel, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
-import { FileTreePane, useTreePanePrefs } from './tree-pane';
+import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
 // diff 面板（提案 1013）：双 TreeSource 对比（Beyond Compare 级）。
 // 目录级 = 变更文件树（复用 code 面板的 FileTree：组树/着色/树形平摊/宽度拖拽）；
@@ -49,72 +49,69 @@ export function DiffViewPanel({ params }: { params: WorkbenchParams }) {
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        next.set('file', f);
+        writeFileParam(next, f);
         return next;
       },
       { replace: true },
     );
   };
 
+  const header = (
+    <>
+      <Badge variant="secondary">{sourceLabel(left)}</Badge>
+      <ArrowRight className="size-3 text-muted-foreground" />
+      <Badge variant="secondary">{sourceLabel(right)}</Badge>
+      <span className="ml-2 truncate font-medium">{file || '未选择文件'}</span>
+    </>
+  );
+
   return (
-    <div className="flex h-full min-h-0">
-      {diff.isError ? (
-        <div className="w-80 shrink-0">
-          <ErrorBanner message={diff.error.message} />
-        </div>
-      ) : (
-        <FileTreePane
-          prefs={treePrefs}
-          above={
-            treePrefs.scope === 'diff' ? (
-              <div className="shrink-0 border-b border-border px-2 py-1.5">
-                <Input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="搜索路径（子串）…"
-                  className="h-6 text-xs"
-                />
-              </div>
-            ) : null
-          }
-          toolbarExtra={
-            diff.data ? (
-              <span className="text-[10px] text-muted-foreground">
-                {diff.data.mode === 'fs' ? '文件系统扫描' : 'git 模式'} · {entries.length} 项
-              </span>
-            ) : null
-          }
-          path={path}
-          source={right} // 右侧 = 对比的「新」侧：全量树的现状、目录状态推导基准
-          selectedFile={file}
-          onPick={pickFile}
-          filter={treePrefs.scope === 'diff' ? filterSet : null}
-          stats={statsMap}
-          statsPending={diff.isPending}
-        />
-      )}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
-          <Badge variant="secondary">{sourceLabel(left)}</Badge>
-          <ArrowRight className="size-3 text-muted-foreground" />
-          <Badge variant="secondary">{sourceLabel(right)}</Badge>
-          <span className="ml-2 truncate font-medium">{file || '未选择文件'}</span>
-        </div>
-        {!file ? (
-          <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">
-            在左侧选择一个变更文件查看双栏对比
+    <SourcePanelShell
+      prefs={treePrefs}
+      above={
+        treePrefs.scope === 'diff' ? (
+          <div className="shrink-0 border-b border-border px-2 py-1.5">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="搜索路径（子串）…"
+              className="h-6 text-xs"
+            />
           </div>
-        ) : fileDiff.isPending ? (
-          <div className="p-3 text-xs text-muted-foreground">计算 diff…</div>
-        ) : fileDiff.isError ? (
-          <ErrorBanner message={fileDiff.error.message} />
-        ) : fileDiff.data?.binary ? (
-          <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
-        ) : (
-          <SideBySideHunks hunks={fileDiff.data?.hunks ?? []} />
-        )}
-      </div>
-    </div>
+        ) : null
+      }
+      toolbarExtra={
+        diff.data ? (
+          <span className="text-[10px] text-muted-foreground">
+            {diff.data.mode === 'fs' ? '文件系统扫描' : 'git 模式'} · {entries.length} 项
+          </span>
+        ) : null
+      }
+      path={path}
+      treeSource={right} // 右侧 = 对比的「新」侧：全量树的现状、目录状态推导基准
+      selectedFile={file}
+      onPick={pickFile}
+      diffFilter={treePrefs.scope === 'diff' ? filterSet : null}
+      stats={statsMap}
+      statsPending={diff.isPending}
+      header={header}
+    >
+      {diff.isError ? (
+        <ErrorBanner message={diff.error.message} />
+      ) : !file ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+          在左侧选择一个变更文件查看双栏对比
+        </div>
+      ) : fileDiff.isPending ? (
+        <div className="p-3 text-xs text-muted-foreground">计算 diff…</div>
+      ) : fileDiff.isError ? (
+        <ErrorBanner message={fileDiff.error.message} />
+      ) : fileDiff.data?.binary ? (
+        <div className="flex h-full items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
+      ) : (
+        <SideBySideHunks hunks={fileDiff.data?.hunks ?? []} />
+      )}
+    </SourcePanelShell>
   );
 }
 

@@ -64,6 +64,11 @@ export function writePathParam(params: URLSearchParams, path: string) {
   params.set('path', path);
 }
 
+// 选中文件进 URL（code/diff 面板共用的 file 参数），刷新恢复
+export function writeFileParam(params: URLSearchParams, file: string) {
+  params.set('file', file);
+}
+
 // 单选：清空双选，只留 source
 export function selectSource(params: URLSearchParams, src: TreeSource) {
   writeSource(params, 'left', null);
