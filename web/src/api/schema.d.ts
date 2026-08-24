@@ -1249,8 +1249,8 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        left: string;
-        right: string;
+        base: string;
+        current: string;
       };
       header?: never;
       path?: never;
@@ -1315,10 +1315,10 @@ export interface operations {
     parameters: {
       query: {
         path: string;
-        left?: string;
-        right: string;
+        base?: string;
+        current: string;
         file: string;
-        leftFile?: string;
+        baseFile?: string;
       };
       header?: never;
       path?: never;

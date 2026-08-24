@@ -64,7 +64,7 @@ export function WorkbenchPage() {
     );
   }
 
-  const hasSelection = params.source || (params.left && params.right);
+  const hasSelection = params.current;
 
   const renderPanel = (id: PanelId) => {
     switch (id) {

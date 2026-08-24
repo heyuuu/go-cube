@@ -65,7 +65,7 @@ func (h *WorkbenchHandler) worktrees(input struct {
 }
 
 // 注意：huma 不展开嵌入 struct 的 query tag，参数一律平铺声明。
-// source/left/right 均为 "type://id" 形态（workbench.ParseTreeSource 定义文法）。
+// source/base/current 均为 "type://id" 形态（workbench.ParseTreeSource 定义文法）。
 func (h *WorkbenchHandler) tree(input struct {
 	Path   string `query:"path" required:"true"`
 	Source string `query:"source" required:"true"`
@@ -107,41 +107,41 @@ func (h *WorkbenchHandler) saveFile(input struct {
 }
 
 func (h *WorkbenchHandler) diff(input struct {
-	Path  string `query:"path" required:"true"`
-	Left  string `query:"left" required:"true"`
-	Right string `query:"right" required:"true"`
+	Path    string `query:"path" required:"true"`
+	Base    string `query:"base" required:"true"`
+	Current string `query:"current" required:"true"`
 }) (*workbench.DiffTreesResult, error) {
-	left, err := workbench.ParseTreeSource(input.Left)
+	base, err := workbench.ParseTreeSource(input.Base)
 	if err != nil {
 		return nil, err
 	}
-	right, err := workbench.ParseTreeSource(input.Right)
+	current, err := workbench.ParseTreeSource(input.Current)
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.DiffTrees(input.Path, left, right)
+	return h.workbenchService.DiffTrees(input.Path, base, current)
 }
 
 func (h *WorkbenchHandler) fileDiff(input struct {
 	Path     string `query:"path" required:"true"`
-	Left     string `query:"left"` // 缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交）
-	Right    string `query:"right" required:"true"`
+	Base     string `query:"base"` // 缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交）
+	Current  string `query:"current" required:"true"`
 	File     string `query:"file" required:"true"`
-	LeftFile string `query:"leftFile"` // 基准侧路径（rename 条目与右侧不同；空则同 file）
+	BaseFile string `query:"baseFile"` // 基准侧路径（rename 条目与当前侧不同；空则同 file）
 }) (*workbench.FileDiffResult, error) {
-	var left workbench.TreeSource
-	if input.Left != "" {
-		parsed, err := workbench.ParseTreeSource(input.Left)
+	var base workbench.TreeSource
+	if input.Base != "" {
+		parsed, err := workbench.ParseTreeSource(input.Base)
 		if err != nil {
 			return nil, err
 		}
-		left = parsed
+		base = parsed
 	}
-	right, err := workbench.ParseTreeSource(input.Right)
+	current, err := workbench.ParseTreeSource(input.Current)
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.ReadFileDiff(input.Path, left, right, input.File, input.LeftFile)
+	return h.workbenchService.ReadFileDiff(input.Path, base, current, input.File, input.BaseFile)
 }
 
 // RegisterRaw 注册 WebSocket 路由（upgrade 不走 huma）

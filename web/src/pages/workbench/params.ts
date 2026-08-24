@@ -1,7 +1,11 @@
 // 工作台 URL 状态总线（提案 1010 定）：URL search params 是面板间唯一通信渠道，
 // 所有面板读写选中态都必须经过本模块，不得自行 useSearchParams 拼参数。
 // 选中目标统一序列化为 "type://id"（commit://<sha>、ref://refs/heads/master、worktree://<目录>），
-// 参数名与后端 API 一致：source / left / right（文法见后端 workbench.ParseTreeSource）。
+// 文法见后端 workbench.ParseTreeSource。
+//
+// 角色命名（current + base）：current = 当前查看的版本（工作副本/分支/提交），
+// base = 对比基准版本；diff 方向固定 base → current，base 缺省 = current 的相对基准
+// （worktree→HEAD、ref/commit→父提交，由后端解析）。
 
 export type SourceType = 'commit' | 'ref' | 'worktree';
 
@@ -12,9 +16,8 @@ export type TreeSource = {
 
 export type WorkbenchParams = {
   path: string;
-  source: TreeSource | null;
-  left: TreeSource | null;
-  right: TreeSource | null;
+  current: TreeSource | null;
+  base: TreeSource | null;
 };
 
 // 解析 "type://id"：已知 scheme 精确前缀匹配，余部原样取出（与后端解析同构）。
@@ -42,11 +45,11 @@ export function refShortName(id: string): string {
   return id;
 }
 
-function readSource(params: URLSearchParams, key: 'source' | 'left' | 'right'): TreeSource | null {
+function readSource(params: URLSearchParams, key: 'current' | 'base'): TreeSource | null {
   return parseSource(params.get(key));
 }
 
-function writeSource(params: URLSearchParams, key: 'source' | 'left' | 'right', src: TreeSource | null) {
+function writeSource(params: URLSearchParams, key: 'current' | 'base', src: TreeSource | null) {
   if (src) params.set(key, toUri(src));
   else params.delete(key);
 }
@@ -54,9 +57,8 @@ function writeSource(params: URLSearchParams, key: 'source' | 'left' | 'right', 
 export function readWorkbenchParams(params: URLSearchParams): WorkbenchParams {
   return {
     path: params.get('path') ?? '',
-    source: readSource(params, 'source'),
-    left: readSource(params, 'left'),
-    right: readSource(params, 'right'),
+    current: readSource(params, 'current'),
+    base: readSource(params, 'base'),
   };
 }
 
@@ -64,36 +66,33 @@ export function writePathParam(params: URLSearchParams, path: string) {
   params.set('path', path);
 }
 
-// 选中文件进 URL（code/diff 面板共用的 file 参数），刷新恢复
+// 选中文件进 URL（内容面板的 file 参数），刷新恢复
 export function writeFileParam(params: URLSearchParams, file: string) {
   params.set('file', file);
 }
 
-// 单选：清空双选，只留 source
-export function selectSource(params: URLSearchParams, src: TreeSource) {
-  writeSource(params, 'left', null);
-  writeSource(params, 'right', null);
-  writeSource(params, 'source', src);
+// 单选：只设 current、清掉 base（base 缺省 = 相对基准对比）
+export function selectCurrent(params: URLSearchParams, src: TreeSource) {
+  writeSource(params, 'base', null);
+  writeSource(params, 'current', src);
 }
 
-// 双选追加（cmd/ctrl 点第二个目标）：left 空则填 left，right 空且不同才填 right，
-// 两边都满则重开一轮（新目标为 left）
+// 双选追加（cmd/ctrl 点第二个目标）：base 空则填 base，current 空且不同才填 current，
+// 两边都满则重开一轮（新目标为 base）
 export function selectDiffSide(params: URLSearchParams, src: TreeSource) {
   const cur = readWorkbenchParams(params);
-  params.delete('source');
-  if (!cur.left || (cur.left && cur.right)) {
-    writeSource(params, 'left', src);
-    writeSource(params, 'right', null);
+  if (!cur.base || (cur.base && cur.current)) {
+    writeSource(params, 'base', src);
+    writeSource(params, 'current', null);
     return;
   }
-  if (sameSource(cur.left, src)) return;
-  writeSource(params, 'right', src);
+  if (sameSource(cur.base, src)) return;
+  writeSource(params, 'current', src);
 }
 
 export function clearSelection(params: URLSearchParams) {
-  writeSource(params, 'source', null);
-  writeSource(params, 'left', null);
-  writeSource(params, 'right', null);
+  writeSource(params, 'current', null);
+  writeSource(params, 'base', null);
 }
 
 export function sameSource(a: TreeSource | null, b: TreeSource | null): boolean {

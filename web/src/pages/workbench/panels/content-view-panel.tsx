@@ -11,16 +11,16 @@ import {
   useWorkbenchFileDiff,
   useWorkbenchTree,
 } from '@/queries/workbench';
+
 import { sourceLabel, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
 import { FileContentArea, useFileEditing, type ContentMode } from './file-content';
 import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
-// 内容面板（code + diff 合并）：统一为「source [+ base]」视图模型——
-//   单选：source = 选中目标，base = 空 → diff 模式与父提交/HEAD 比（worktree 则 vs HEAD）；
-//   双选：source = 右侧（新），base = 左侧（基准）→ diff 模式与 base 比。
-// URL 参数仍用 source / left+right（交互迁移另做），此处映射：
-//   viewSource = params.source ?? params.right；viewBase = 双选时的 params.left。
+// 内容面板（code + diff 合并）：统一为「current [+ base]」视图模型——
+//   current = 当前查看的版本；base 空 = diff 模式与相对基准比
+//   （worktree vs HEAD、ref/commit vs 父提交，后端解析）；base 有 = 与 base 比。
+// URL 参数 current / base（见 ../params.ts 的角色命名说明）。
 // 树列/内容区/编辑流均为公共组件（SourcePanelShell / FileContentArea / useFileEditing）。
 
 // 树偏好键前缀（视图/范围/宽度，见 tree-pane.tsx 的 useTreePanePrefs）
@@ -33,8 +33,8 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const file = searchParams.get('file') ?? '';
 
-  const viewSource = params.source ?? params.right ?? null;
-  const viewBase = params.source ? null : (params.left ?? null);
+  const viewSource = params.current;
+  const viewBase = params.base;
   // 空源占位（hooks 必须无条件调用；空源走 enabled=false）
   const src = viewSource ?? EMPTY_SOURCE;
 
@@ -69,7 +69,7 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   // 差异范围的变更清单：base 空 = 相对基准（changes，含 untracked 与行级统计）；
   // base 有 = 两源对比（diff）。两者同构，行级统计后端均已注入
   const changes = useWorkbenchChanges(path, src, !viewBase);
-  const diff = useWorkbenchDiff(path, viewBase ?? EMPTY_SOURCE, src); // 空 base 时 enabled=false（left.id 为空）
+  const diff = useWorkbenchDiff(path, viewBase ?? EMPTY_SOURCE, src); // 空 base 时 enabled=false（base.id 为空）
   const changeList = viewBase ? (diff.data?.list ?? []) : (changes.data?.list ?? []);
   const listPending = viewBase ? diff.isPending : changes.isPending;
 
@@ -87,7 +87,10 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const fileDiff = useWorkbenchFileDiff(path, viewBase, src, activeFile, mode === 'diff', renameOldPath);
 
   const statsMap = new Map(
-    changeList.map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary, status: e.status, oldPath: e.oldPath || undefined }]),
+    changeList.map((e) => [
+      e.path,
+      { adds: e.adds, dels: e.dels, binary: e.binary, status: e.status, oldPath: e.oldPath || undefined },
+    ]),
   );
   const editing = useFileEditing(path, src, activeFile, content.data?.content ?? '');
 

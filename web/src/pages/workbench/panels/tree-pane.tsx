@@ -58,13 +58,7 @@ export function FileTreePane({
       <div className="flex shrink-0 flex-col border-r border-border" style={{ width }}>
         {above}
         <div className="min-h-0 flex-1">
-          <FileTree
-            {...fileTreeProps}
-            viewMode={view}
-            onViewMode={setView}
-            scope={scope}
-            onScope={setScope}
-          />
+          <FileTree {...fileTreeProps} viewMode={view} onViewMode={setView} scope={scope} onScope={setScope} />
         </div>
       </div>
       <PanelSplitter onDelta={(dx) => setWidth((w) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w + dx)))} />
@@ -89,7 +83,7 @@ export function SourcePanelShell({
 }: {
   prefs: TreePanePrefs;
   path: string;
-  treeSource: TreeSource; // 全量范围浏览的源（diff 面板传右侧「新」源）
+  treeSource: TreeSource; // 全量范围浏览的源（双选时传 current 侧源）
   selectedFile: string;
   onPick: (file: string) => void;
   diffFilter: Set<string> | null; // 差异范围的文件集（null = 全量树）

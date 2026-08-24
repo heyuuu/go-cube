@@ -96,42 +96,42 @@ export type FileDiffResult = components['schemas']['FileDiffResult'];
 export type Hunk = components['schemas']['Hunk'];
 
 // 过滤（路径搜索）在 diff 面板内做（变更清单一次全量返回）；ignored 文件不在产品范围（默认过滤）
-export function useWorkbenchDiff(path: string, left: TreeSource, right: TreeSource) {
+export function useWorkbenchDiff(path: string, base: TreeSource, current: TreeSource) {
   return useQuery({
-    queryKey: ['workbench', 'diff', path, toUri(left), toUri(right)],
+    queryKey: ['workbench', 'diff', path, toUri(base), toUri(current)],
     queryFn: () =>
       apiGet('/api/workbench/diff', {
         path,
-        left: toUri(left),
-        right: toUri(right),
+        base: toUri(base),
+        current: toUri(current),
       }),
-    enabled: path !== '' && left.id !== '' && right.id !== '',
+    enabled: path !== '' && base.id !== '' && current.id !== '',
     staleTime: 0, // 对比结果实时算
   });
 }
 
-// left 为 null 时后端按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 /changes）；
-// leftFile 为基准侧路径（rename 条目与右侧不同，未改内容的 rename 两侧字节相同应显示一致）；
+// base 为 null 时后端按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 /changes）；
+// baseFile 为基准侧路径（rename 条目与当前侧不同，未改内容的 rename 两侧字节相同应显示一致）；
 // enabled 供面板按内容模式懒拉
 export function useWorkbenchFileDiff(
   path: string,
-  left: TreeSource | null,
-  right: TreeSource,
+  base: TreeSource | null,
+  current: TreeSource,
   file: string,
   enabled = true,
-  leftFile = '',
+  baseFile = '',
 ) {
   return useQuery({
-    queryKey: ['workbench', 'fileDiff', path, left ? toUri(left) : 'base', toUri(right), file, leftFile],
+    queryKey: ['workbench', 'fileDiff', path, base ? toUri(base) : 'auto', toUri(current), file, baseFile],
     queryFn: () =>
       apiGet('/api/workbench/file-diff', {
         path,
-        ...(left ? { left: toUri(left) } : {}),
-        right: toUri(right),
+        ...(base ? { base: toUri(base) } : {}),
+        current: toUri(current),
         file,
-        ...(leftFile ? { leftFile } : {}),
+        ...(baseFile ? { baseFile } : {}),
       }),
-    enabled: enabled && path !== '' && file !== '' && right.id !== '',
+    enabled: enabled && path !== '' && file !== '' && current.id !== '',
     staleTime: 0,
   });
 }

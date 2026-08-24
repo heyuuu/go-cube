@@ -361,7 +361,7 @@ func TestWorkbenchDiffGit(t *testing.T) {
 		} `json:"list"`
 	}
 	wt := urlQueryEscape("worktree://" + repo)
-	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&left=commit://"+head+"&right="+wt)), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/diff?path="+repo+"&base=commit://"+head+"&current="+wt)), &got)
 	if got.Mode != "fs" {
 		t.Fatalf("含 worktree 源应为 fs 模式, got %q", got.Mode)
 	}
@@ -397,7 +397,7 @@ func TestWorkbenchFileDiff(t *testing.T) {
 			} `json:"lines"`
 		} `json:"hunks"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=mod.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+head+"&current="+wt+"&file=mod.txt")), &got)
 	if got.Binary || len(got.Hunks) == 0 {
 		t.Fatalf("mod.txt 应有 diff hunks: binary=%v hunks=%d", got.Binary, len(got.Hunks))
 	}
@@ -415,7 +415,7 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	var same struct {
 		Hunks []struct{} `json:"hunks"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right=commit://"+head+"&file=keep.txt")), &same)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+head+"&current=commit://"+head+"&file=keep.txt")), &same)
 	if len(same.Hunks) != 0 {
 		t.Errorf("相同文件应无 hunks: %d", len(same.Hunks))
 	}
@@ -424,14 +424,14 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	var noLeft struct {
 		Hunks []struct{} `json:"hunks"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&right="+wt+"&file=mod.txt")), &noLeft)
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=mod.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&current="+wt+"&file=mod.txt")), &noLeft)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+head+"&current="+wt+"&file=mod.txt")), &got)
 	if len(noLeft.Hunks) != len(got.Hunks) {
 		t.Errorf("left 缺省应与显式 left=HEAD 等价: %d vs %d", len(noLeft.Hunks), len(got.Hunks))
 	}
 
 	// 单侧缺失的文件（新增 new.txt 只在右侧）：一侧空白一侧全文，全为 add 行，不报错
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+head+"&right="+wt+"&file=new.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+head+"&current="+wt+"&file=new.txt")), &got)
 	if got.Binary || len(got.Hunks) == 0 {
 		t.Fatalf("new.txt 应呈现整体新增的 hunks: binary=%v hunks=%d", got.Binary, len(got.Hunks))
 	}
@@ -458,11 +458,11 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	} else {
 		base = strings.TrimSpace(string(b))
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+base+"&right="+wt+"&file=ren-new.txt&leftFile=ren-old.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+base+"&current="+wt+"&file=ren-new.txt&baseFile=ren-old.txt")), &got)
 	if got.Binary || len(got.Hunks) != 0 {
 		t.Errorf("未改内容的 rename 应两侧一致（空 hunks）: binary=%v hunks=%d", got.Binary, len(got.Hunks))
 	}
-	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+base+"&right="+wt+"&file=ren-new.txt")), &got)
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&base=commit://"+base+"&current="+wt+"&file=ren-new.txt")), &got)
 	if len(got.Hunks) == 0 {
 		t.Error("不带 leftFile 时基准侧按新路径读不到，应呈现整体新增（对照）")
 	}

@@ -193,8 +193,8 @@ const emptyTreeSha = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 // diffTreesGit 两侧都是 tree-ish：走 git.DiffFiles（name-status + rename 检测），
 // 状态字母映射为前端语义词。
-func diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	files, err := git.DiffFiles(root, left.Id, right.Id)
+func diffTreesGit(root string, base TreeSource, current TreeSource) (*DiffTreesResult, error) {
+	files, err := git.DiffFiles(root, base.Id, current.Id)
 	if err != nil {
 		return nil, err
 	}
@@ -210,28 +210,28 @@ func diffTreesGit(root string, left TreeSource, right TreeSource) (*DiffTreesRes
 // worktree 侧走 ls-files 清单 + 磁盘读；commit/ref 侧走 ls-tree -r（blob sha 现成）。
 // 两个 sha 算法一致（blob sha = sha1("blob <len>\0" + content)），可直接比较。
 // untracked 也是「工作区状态」的一部分，恒包含（不做减法）。
-func diffTreesFs(root string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
-	leftMap, err := sourceFileMap(root, left)
+func diffTreesFs(root string, base TreeSource, current TreeSource) (*DiffTreesResult, error) {
+	baseMap, err := sourceFileMap(root, base)
 	if err != nil {
-		return nil, fmt.Errorf("扫描左侧失败: %w", err)
+		return nil, fmt.Errorf("扫描基准侧失败: %w", err)
 	}
-	rightMap, err := sourceFileMap(root, right)
+	currentMap, err := sourceFileMap(root, current)
 	if err != nil {
-		return nil, fmt.Errorf("扫描右侧失败: %w", err)
+		return nil, fmt.Errorf("扫描当前侧失败: %w", err)
 	}
 
 	var list []DiffEntry
-	for p, h := range leftMap {
-		rh, ok := rightMap[p]
+	for p, h := range baseMap {
+		ch, ok := currentMap[p]
 		switch {
 		case !ok:
 			list = append(list, DiffEntry{Path: p, Status: "deleted"})
-		case rh != h:
+		case ch != h:
 			list = append(list, DiffEntry{Path: p, Status: "modified"})
 		}
 	}
-	for p := range rightMap {
-		if _, ok := leftMap[p]; !ok {
+	for p := range currentMap {
+		if _, ok := baseMap[p]; !ok {
 			list = append(list, DiffEntry{Path: p, Status: "added"})
 		}
 	}
@@ -239,28 +239,28 @@ func diffTreesFs(root string, left TreeSource, right TreeSource) (*DiffTreesResu
 	return &DiffTreesResult{Mode: "fs", List: list}, nil
 }
 
-// readFileDiff 对比两个源下某文件的行级差异。file 为右侧（新侧）路径；
-// rename 条目在基准侧的路径不同——leftFile 非空时左侧按旧路径读，
+// readFileDiff 对比 base → current 两个源下某文件的行级差异。file 为当前侧（新侧）路径；
+// rename 条目在基准侧的路径不同——baseFile 非空时基准侧按旧路径读，
 // 未改内容的 rename 两侧字节相同，自然落进「内容一致」分支。
 // 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
 // 行级 diff 用 git.DiffNoIndex（算法与展示语义和 git 完全一致），
 // 内容落临时文件后比较，结束清理。
-func readFileDiff(root string, left TreeSource, right TreeSource, file string, leftFile string) (*FileDiffResult, error) {
-	if leftFile == "" {
-		leftFile = file
+func readFileDiff(root string, base TreeSource, current TreeSource, file string, baseFile string) (*FileDiffResult, error) {
+	if baseFile == "" {
+		baseFile = file
 	}
-	leftData, err := readSide(root, left, leftFile)
+	baseData, err := readSide(root, base, baseFile)
 	if err != nil {
-		return nil, fmt.Errorf("读取左侧文件失败: %w", err)
+		return nil, fmt.Errorf("读取基准侧文件失败: %w", err)
 	}
-	rightData, err := readSide(root, right, file)
+	currentData, err := readSide(root, current, file)
 	if err != nil {
-		return nil, fmt.Errorf("读取右侧文件失败: %w", err)
+		return nil, fmt.Errorf("读取当前侧文件失败: %w", err)
 	}
-	if bytes.Equal(leftData, rightData) {
+	if bytes.Equal(baseData, currentData) {
 		return &FileDiffResult{}, nil
 	}
-	if isBinary(leftData) || isBinary(rightData) {
+	if isBinary(baseData) || isBinary(currentData) {
 		return &FileDiffResult{Binary: true}, nil
 	}
 
@@ -274,10 +274,10 @@ func readFileDiff(root string, left TreeSource, right TreeSource, file string, l
 		return nil, fmt.Errorf("创建临时文件失败: %w", err)
 	}
 	defer os.Remove(tmpB.Name())
-	if _, err := tmpA.Write(leftData); err != nil {
+	if _, err := tmpA.Write(baseData); err != nil {
 		return nil, err
 	}
-	if _, err := tmpB.Write(rightData); err != nil {
+	if _, err := tmpB.Write(currentData); err != nil {
 		return nil, err
 	}
 	tmpA.Close()

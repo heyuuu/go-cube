@@ -175,31 +175,31 @@ func (s *Service) SaveFile(path string, src TreeSource, file string, content str
 	return saveFile(path, src, file, content)
 }
 
-// DiffTrees 对比两个 TreeSource 的目录树。实现在 diff.go（git 模式 / fs 扫描模式）。
+// DiffTrees 对比 base → current 两个 TreeSource 的目录树。实现在 diff.go（git 模式 / fs 扫描模式）。
 // 状态/路径筛选在 diff 面板前端本地做（变更清单一次全量返回）。
-func (s *Service) DiffTrees(path string, left TreeSource, right TreeSource) (*DiffTreesResult, error) {
+func (s *Service) DiffTrees(path string, base TreeSource, current TreeSource) (*DiffTreesResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	if left.Type == SourceTypeWorktree || right.Type == SourceTypeWorktree {
-		result, err := diffTreesFs(root, left, right)
+	if base.Type == SourceTypeWorktree || current.Type == SourceTypeWorktree {
+		result, err := diffTreesFs(root, base, current)
 		if err != nil {
 			return nil, err
 		}
-		annotateDiffStats(result, root, left, right)
+		annotateDiffStats(result, root, base, current)
 		return result, nil
 	}
-	result, err := diffTreesGit(root, left, right)
+	result, err := diffTreesGit(root, base, current)
 	if err != nil {
 		return nil, err
 	}
-	annotateDiffStats(result, root, left, right)
+	annotateDiffStats(result, root, base, current)
 	return result, nil
 }
 
 // changeBase 解析「相对上一版本」的基准：worktree → HEAD；commit/ref → 父提交（根提交落空树）。
-// Changes 与 ReadFileDiff（左源缺省时）共用
+// Changes 与 ReadFileDiff（base 缺省时）共用
 func changeBase(root string, src TreeSource) (string, error) {
 	switch src.Type {
 	case SourceTypeWorktree:
@@ -219,22 +219,22 @@ func changeBase(root string, src TreeSource) (string, error) {
 	}
 }
 
-// ReadFileDiff 对比两个源下某文件。实现在 diff.go。leftFile 为基准侧路径
-// （rename 条目与右侧路径不同，空则同 file）；left 为零值时按「相对基准」对比
+// ReadFileDiff 对比 base → current 两个源下某文件。实现在 diff.go。baseFile 为基准侧路径
+// （rename 条目与当前侧路径不同，空则同 file）；base 为零值时按「相对基准」对比
 // （worktree vs HEAD、ref/commit vs 父提交，同 Changes）。
-func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string, leftFile string) (*FileDiffResult, error) {
+func (s *Service) ReadFileDiff(path string, base TreeSource, current TreeSource, file string, baseFile string) (*FileDiffResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
 	}
-	if left == (TreeSource{}) {
-		base, err := changeBase(root, right)
+	if base == (TreeSource{}) {
+		baseSha, err := changeBase(root, current)
 		if err != nil {
 			return nil, err
 		}
-		left = TreeSource{Type: SourceTypeCommit, Id: base}
+		base = TreeSource{Type: SourceTypeCommit, Id: baseSha}
 	}
-	return readFileDiff(root, left, right, file, leftFile)
+	return readFileDiff(root, base, current, file, baseFile)
 }
 
 // Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：
@@ -259,22 +259,22 @@ func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error)
 }
 
 // annotateDiffStats 为 DiffTrees 的变更清单注入行级增删统计（git.Numstat，-M rename 检测）：
-//   - 右侧 worktree：numstat 与工作区比（不含 untracked），未命中的 added 即 untracked，
+//   - 当前侧 worktree：numstat 与工作区比（不含 untracked），未命中的 added 即 untracked，
 //     按文件行数计 adds（二进制探测 NUL 字节）；
 //   - 双侧 tree-ish：numstat 直接可比，全部命中；
-//   - 左侧 worktree（含 worktree vs worktree）：numstat 方向不便，不注入（统计留零值）。
+//   - 基准侧 worktree（含 worktree vs worktree）：numstat 方向不便，不注入（统计留零值）。
 //
 // 统计失败只降级（adds/dels 留零值），不阻断变更清单——文件列表本身仍可用。
-func annotateDiffStats(res *DiffTreesResult, root string, left TreeSource, right TreeSource) {
-	if left.Type == SourceTypeWorktree {
+func annotateDiffStats(res *DiffTreesResult, root string, base TreeSource, current TreeSource) {
+	if base.Type == SourceTypeWorktree {
 		return
 	}
 	var stats map[string]git.NumstatEntry
 	var err error
-	if right.Type == SourceTypeWorktree {
-		stats, err = git.Numstat(right.Id, left.Id, "")
+	if current.Type == SourceTypeWorktree {
+		stats, err = git.Numstat(current.Id, base.Id, "")
 	} else {
-		stats, err = git.Numstat(root, left.Id, right.Id)
+		stats, err = git.Numstat(root, base.Id, current.Id)
 	}
 	if err != nil {
 		slog.Debug("变更行数统计失败，降级为零值", "err", err)
@@ -288,8 +288,8 @@ func annotateDiffStats(res *DiffTreesResult, root string, left TreeSource, right
 			continue
 		}
 		// 未命中 numstat 的新增 = untracked 文件：按文件行数计 adds
-		if right.Type == SourceTypeWorktree && e.Status == "added" {
-			adds, binary := countFileLines(filepath.Join(right.Id, e.Path))
+		if current.Type == SourceTypeWorktree && e.Status == "added" {
+			adds, binary := countFileLines(filepath.Join(current.Id, e.Path))
 			e.Adds, e.Binary = adds, binary
 		}
 	}

@@ -31,7 +31,7 @@ import {
   refShortName,
   sameSource,
   selectDiffSide,
-  selectSource,
+  selectCurrent,
   type TreeSource,
   type WorkbenchParams,
 } from '../params';
@@ -41,7 +41,7 @@ import { useWorktreeVisibility } from '../worktree-visibility';
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
 // 下段 = commit 图（前端本地 active-lanes 布局 + SVG 拓扑 + 无限滚动；
 // dirty 工作副本以虚拟节点挂在各自 HEAD 上方，clean 的以徽标装饰 HEAD 行）。
-// 核心交互「选择」：单击 = 单选（source）；cmd/ctrl 单击 = 追加双选（left/right）。
+// 核心交互「选择」：单击 = 设 current；cmd/ctrl 单击 = 追加双选（先 base 后 current）。
 // 全部选中态写 URL（params 模块统一管理），本面板只是 URL 的渲染者。
 
 export function GitTreePanel({ params }: { params: WorkbenchParams }) {
@@ -325,7 +325,7 @@ function CommitGraphSection({
   // / clean 的 HEAD 行；commit → 自身。选中态高亮不能只比对 source（ref/worktree 与
   // 行上的 commit source 永不相等），定位与高亮共用 focusSha 才能对准同一行。
   const focusSha = useMemo(() => {
-    const src = params.source;
+    const src = params.current;
     if (!src) return null;
     if (src.type === 'ref') {
       const short = refShortName(src.id);
@@ -337,7 +337,7 @@ function CommitGraphSection({
       return wt.dirty ? `worktree:${wt.path}` : wt.head;
     }
     return src.id;
-  }, [params.source, rows, worktrees.data]);
+  }, [params.current, rows, worktrees.data]);
 
   // 点击定位：滚到 focusSha 行；目标行未加载时自动翻页寻找
   // （无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
@@ -345,7 +345,7 @@ function CommitGraphSection({
   // 或 ref 的 tip 行尚未加载（memo 在 rows 里找不到）——后者要继续翻页。
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!focusSha && !params.source) return;
+    if (!focusSha && !params.current) return;
     const el = scrollRef.current?.querySelector(`[data-sha="${focusSha}"]`);
     if (el) {
       el.scrollIntoView({ block: 'center' });
@@ -359,7 +359,7 @@ function CommitGraphSection({
     if (commits.hasNextPage && !commits.isFetchingNextPage) {
       void commits.fetchNextPage();
     }
-  }, [params.source, focusSha, focusTick, rows, commits]);
+  }, [params.current, focusSha, focusTick, rows, commits]);
 
   const maxLane = useMemo(() => {
     let m = 0;
@@ -557,7 +557,7 @@ function SelectableRow({
           if (e.metaKey || e.ctrlKey) {
             selectDiffSide(next, source);
           } else {
-            selectSource(next, source);
+            selectCurrent(next, source);
             afterSelect?.();
           }
           return next;
@@ -568,10 +568,9 @@ function SelectableRow({
     [source, setSearchParams, afterSelect],
   );
 
-  const isSource = sameSource(params.source, source);
-  const isLeft = sameSource(params.left, source);
-  const isRight = sameSource(params.right, source);
-  const selected = active || isSource || isLeft || isRight;
+  const isCurrent = sameSource(params.current, source);
+  const isBase = sameSource(params.base, source);
+  const selected = active || isCurrent || isBase;
 
   return (
     <button
@@ -590,8 +589,8 @@ function SelectableRow({
       <span className={cn('truncate', selected ? 'font-medium' : undefined)}>{label}</span>
       {badge ? <Badge variant="secondary">{badge}</Badge> : null}
       {badges}
-      {isLeft ? <Badge className="ml-auto shrink-0">左</Badge> : null}
-      {isRight ? <Badge className="ml-auto shrink-0">右</Badge> : null}
+      {isBase ? <Badge className="ml-auto shrink-0">基准</Badge> : null}
+      {isCurrent ? <Badge className="ml-auto shrink-0">当前</Badge> : null}
       {time ? (
         <span className="ml-auto shrink-0 text-[10px] text-muted-foreground" title={formatCommitTime(time).full}>
           {formatCommitTime(time).text}
