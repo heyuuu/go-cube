@@ -2,15 +2,15 @@
 
 > **状态**：📝 提案（2026-08-24，方向已与 owner 对齐）
 >
-> **依赖**：[`1016-opener改造`](../1016-opener改造/README.md)第 1-2 步（opener 落库 + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
+> **依赖**：[`1016-opener改造`](../1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
 > **关联**：[`1024-projects筛选URL化`](../1024-projects筛选URL化/README.md)（无硬依赖，但其完成后「业务页 ↔ settings 往返无损」才成立）。
 
 ## 背景与目标
 
-现在的 `/config` 是 config.json 的只读展示。随着 1016 把 opener 迁入 sqlite 并提供 Web 增删改，以及未来 scan 规则等更多配置落库，需要一个**真实可编辑的配置管理页**，且语义与「config.json 只读事实」分开：
+现在的 `/config` 是 config.json 的只读展示。随着 1016 把 opener 迁入 settings.json 并提供 Web 增删改，以及未来 scan 规则等更多配置进 settings.json，需要一个**真实可编辑的配置管理页**，且语义与「config.json 只读事实」分开：
 
-- **settings** = 用户可管理的数据（opener 表、扫描规则表、……），真实增删改；
-- **config** = config.json 的只读事实（log/dataDir 等），后续收缩为 settings 的一个分区。
+- **settings** = 用户可管理的数据（openers、扫描规则、……，统一存 settings.json——无需启动时加载、可在运行中变更），真实增删改；
+- **config** = config.json 的只读事实（log/dataDir 等，启动期读一次），后续收缩为 settings 的一个分区。
 
 形态讨论已收敛：**整页路由 + ⌘, 快捷键 + 新 tab 打开**。曾评估宽 Sheet 覆盖层（保上下文）与路由页（保宽度）之争，结论：表格/表单编辑需要完整视口宽度，上下文保持由「业务状态 URL 化（1024）+ 新 tab」解决。
 
