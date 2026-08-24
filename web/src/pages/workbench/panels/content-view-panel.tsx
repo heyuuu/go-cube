@@ -25,6 +25,8 @@ import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
 // 树偏好键前缀（视图/范围/宽度，见 tree-pane.tsx 的 useTreePanePrefs）
 const TREE_PREFS_KEY = 'cube.workbench.contenttree';
+// 内容模式（单文件/diff）持久化键
+const MODE_KEY = 'cube.workbench.content.mode';
 
 export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const { path } = params;
@@ -37,15 +39,26 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const src = viewSource ?? EMPTY_SOURCE;
 
   const treePrefs = useTreePanePrefs(TREE_PREFS_KEY, 'all');
-  // 内容模式默认随双选态：双选进 diff、单选进单文件；用户手动切换后保留，
-  // 双选↔单选切换时重置（render 期 setState 的派生重置模式）
+  // 内容模式默认随双选态：双选进 diff、单选进单文件；用户手动切换后保留并持久化
+  // （刷新恢复），双选↔单选切换时重置（render 期 setState 的派生重置模式）
   const baseKey = viewBase ? `${viewBase.type}:${viewBase.id}` : '';
-  const [mode, setMode] = useState<ContentMode>(viewBase ? 'diff' : 'file');
+  const defaultMode = (): ContentMode => {
+    const saved = localStorage.getItem(MODE_KEY);
+    if (saved === 'diff' || saved === 'file') return saved;
+    return viewBase ? 'diff' : 'file';
+  };
+  const [mode, setMode] = useState<ContentMode>(defaultMode);
   const [prevBaseKey, setPrevBaseKey] = useState(baseKey);
   if (prevBaseKey !== baseKey) {
     setPrevBaseKey(baseKey);
-    setMode(viewBase ? 'diff' : 'file');
+    const next: ContentMode = viewBase ? 'diff' : 'file';
+    setMode(next);
+    localStorage.setItem(MODE_KEY, next);
   }
+  const switchMode = (m: ContentMode) => {
+    setMode(m);
+    localStorage.setItem(MODE_KEY, m);
+  };
 
   // 与 FileTree 同 key 的树数据（react-query 去重复用）：单选时做 file 回退判定——
   // 切换 commit/分支后 file 参数可能指向新源里不存在的文件。只做显示层回退不改写
@@ -158,7 +171,7 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
     >
       <FileContentArea
         mode={mode}
-        onMode={setMode}
+        onMode={switchMode}
         file={activeFile}
         fileMissing={fileMissing}
         canEdit={viewSource.type === 'worktree'}
