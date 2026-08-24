@@ -126,17 +126,22 @@ export function FileTree({
     localStorage.setItem(TREE_EXPAND_KEY, 'none');
   }, []);
 
-  // 首次拿到树数据时按上次的 bulk 动作恢复（仅一次；之后的手动展开/折叠不记忆）。
+  // 拿到树数据时按上次的 bulk 动作恢复（每个 source 一次；之后的手动展开/折叠不记忆）。
+  // 切换 commit/分支/worktree = 新树骨架，旧展开集只剩路径交集、新目录全折叠——
+  // source 变化时重新应用 bulk 偏好（点过「全部展开」的用户切任意源都应全展开）。
   // 空树（无 children）不消费恢复标记——差异范围刷新时变更清单未就绪会先建出空树，
   // 在空树上恢复等于丢掉「全部展开」偏好，真数据到达后就不再恢复了
-  const bulkInitRef = useRef(false);
+  const sourceKey = `${source.type}:${source.id}`;
+  const bulkInitRef = useRef<{ source: string; done: boolean }>({ source: sourceKey, done: false });
   useEffect(() => {
-    if (bulkInitRef.current || !root || root.children.length === 0) return;
-    bulkInitRef.current = true;
+    const state = bulkInitRef.current;
+    if (state.source !== sourceKey) bulkInitRef.current = { source: sourceKey, done: false };
+    if (bulkInitRef.current.done || !root || root.children.length === 0) return;
+    bulkInitRef.current.done = true;
     const saved = localStorage.getItem(TREE_EXPAND_KEY);
     if (saved === 'all') setExpandedSet(allDirPaths(root));
     else if (saved === 'none') setExpandedSet(new Set(['']));
-  }, [root]);
+  }, [root, sourceKey]);
 
   const listRef = useRef<HTMLDivElement>(null);
   // 定位当前文件：展开其祖先目录 → 滚动到该行 → 闪烁高亮（class 命令式添加，同 git 树定位）
