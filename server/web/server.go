@@ -36,7 +36,7 @@ type Server struct {
 func NewServer(handlers ...Handler) *Server {
 	mux := http.NewServeMux()
 
-	cfg := huma.DefaultConfig("Cube API", version.Version)
+	cfg := huma.DefaultConfig("Cube API", version.Version())
 	cfg.DocsRenderer = huma.DocsRendererScalar // 切换 /docs 页面风格为 Scalar 渲染器
 	cfg.Formats = map[string]huma.Format{
 		"application/json": nilSliceJSONFormat, // nil 切片/map → []/{}，避免前端拿到 null 崩溃

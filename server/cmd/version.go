@@ -15,7 +15,7 @@ func newVersionCmd(a *app.App) *cobra.Command {
 		Short: "show version",
 		Long:  `显示 cube 当前版本号。`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			fmt.Println("cube " + version.Version)
+			fmt.Println("cube " + version.VersionInfo())
 			return nil
 		},
 	}

@@ -11,9 +11,9 @@ BUILD_TIME := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 
 VERSION_PKG := cube/version
 LDFLAGS := \
-  -X $(VERSION_PKG).Version=$(VERSION) \
-  -X $(VERSION_PKG).Commit=$(COMMIT) \
-  -X $(VERSION_PKG).BuildTime=$(BUILD_TIME)
+  -X $(VERSION_PKG).version=$(VERSION) \
+  -X $(VERSION_PKG).commit=$(COMMIT) \
+  -X $(VERSION_PKG).buildTime=$(BUILD_TIME)
 
 ZSH_COMPLETION_FILE := ~/.config/cube/zsh.sh
 

@@ -8,6 +8,7 @@ import (
 
 	"cube/app"
 	"cube/serve"
+	"cube/version"
 )
 
 // DefaultPort server 默认端口。
@@ -46,6 +47,7 @@ func startDetached(port int) error {
 	if err != nil {
 		return err
 	}
+	fmt.Printf("cube version: %s\n", version.VersionInfo())
 	fmt.Printf("server 后台启动中（pid=%d）\n", pid)
 	fmt.Printf("  访问地址：%s\n", serverURL(port))
 	return nil
@@ -56,6 +58,7 @@ func startServer(a *app.App, port int) error {
 	a.StartBackgroundJobs()
 	defer a.StopBackgroundJobs()
 
+	fmt.Printf("cube version: %s\n", version.VersionInfo())
 	fmt.Printf("server 启动中\n")
 	fmt.Printf("  访问地址：%s\n", serverURL(port))
 	slog.Info("server 启动中", "port", port)

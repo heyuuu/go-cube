@@ -20,7 +20,7 @@ import (
 func newRootCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "cube",
-		Short: "cube " + version.Version,
+		Short: "cube " + version.Version(),
 		Long: `cube —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。
 
 命令按领域分组：
@@ -70,7 +70,13 @@ func newRootCmd(a *app.App) *cobra.Command {
 	return cmd
 }
 
-const defaultConfigPath = "~/.config/cube/config.json"
+// 默认配置文件路径，区分开发环境、正式环境
+func defaultConfigPath() string {
+	if version.IsDev() {
+		return "~/.config/cube-dev/config.json"
+	}
+	return "~/.config/cube/config.json"
+}
 
 // localMode 是 --local 全局 flag 的落点：query 缺省的命令（info/pull/push/open）
 // 在此模式下以 cwd 为起点定位项目（等同 query="."）。由 Execute 在预解析后赋值。
@@ -78,7 +84,7 @@ var localMode bool
 
 func Execute() {
 	// 在 cobra 初始化之前，使用 Go 原生 flag 包预解析全局 flag（--config, --debug, --local）
-	cfgFile, debug, local, remaining := extractGlobalFlags(os.Args[1:], defaultConfigPath)
+	cfgFile, debug, local, remaining := extractGlobalFlags(os.Args[1:], defaultConfigPath())
 	localMode = local
 
 	// 初始化配置
@@ -98,7 +104,7 @@ func Execute() {
 	cmd.SetArgs(remaining)
 
 	// cmd 上绑定全局 flag，仅用于生成 help 提示(此时 --config/--debug/--local 早解析完了)
-	cmd.PersistentFlags().String("config", defaultConfigPath, "config folder path (default is ~/.config/cube/config.json)")
+	cmd.PersistentFlags().String("config", defaultConfigPath(), fmt.Sprintf("config file (default is %s)", defaultConfigPath()))
 	cmd.PersistentFlags().BoolP("debug", "D", false, "enable debug mode")
 	cmd.PersistentFlags().Bool("local", false, "query 缺省时以当前目录定位项目（cubex 入口即此模式）")
 
