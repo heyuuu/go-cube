@@ -19,9 +19,9 @@
 
 ## 已收敛的设计决策
 
-### 1. env 由 ldflags 注入，二进制自识别
+### 1. env 由 version 推导，二进制自识别
 
-`version` 包加 `Env`：默认 `dev`（源码/air/run.sh 跑出来的都是 dev，零额外动作）；`make install` 通过 `-ldflags` 注入 `prod`。不做环境变量方案——env 跟着二进制走，单条命令即可自证身份，无「每次调用都要带 env」的心智负担。
+不引入独立的 `Env` 注入——`version.IsDev()` 以「version 是否为默认值 `dev`」判定环境：ldflags 注入了正式 version 的二进制（`make build` / `make install`，产物本就带正式 tag/commit）即 prod；无注入的（源码直跑、air、run.sh）即 dev。env 跟着二进制走，单条命令即可自证身份，Makefile 无需任何改动。
 
 ### 2. 默认配置目录按 env 分流
 
@@ -29,13 +29,13 @@
 - prod → `~/.config/cube/`
 - `-c` 全局 flag 保持最高优先级，覆盖一切。
 
-`make build`（不带 install）产物视为 dev。air / run.sh 不动——无注入即 dev，自动落 dev 目录。
+`make build` 与 `make install` 产物均为 prod（都注入了 version）；air / run.sh 不动——无注入即 dev，自动落 dev 目录。
 
 ### 3. env 可见（对付孤儿/错环境的直接手段）
 
-- `cube version` 输出 env；
-- `/api/system/whoami` 返回 env + configDir；
-- server 启动日志打 `env=dev configDir=~/.config/cube-dev port=6001`。
+- `cube version` 输出 `VersionInfo()`：dev 显示 `dev`，正式显示 `tag (commit time)`——version 本身即环境标识（env 由它推导），无需单独的 env 字段；
+- `/api/system/whoami` 返回 version，同理可判环境；
+- server 启动时打印 `cube version: ...`。
 
 ### 4. 端口单一事实源 = config.json 的 `server.port`
 
@@ -56,16 +56,16 @@
 
 ## 实施顺序
 
-1. `version.Env` + Makefile ldflags 注入（`make install` → prod）；
-2. config 包默认目录按 env 分流（dev `~/.config/cube-dev/`，prod `~/.config/cube/`；`-c` 不变）；
-3. env 可见性：`cube version` / whoami / 启动日志；
+1. `version` 包收口为未导出 var + getter（`IsDev()`/`Version()`/`VersionInfo()` 等），ldflags 注入小写字段名；✅ 已完成
+2. config 默认目录按 env 分流（dev `~/.config/cube-dev/`，prod `~/.config/cube/`；`-c` 不变）；✅ 已完成
+3. env 可见性：`cube version` / whoami / 启动日志；✅ 已完成
 4. `server.port` 成为端口事实源：DefaultPort 6101、md 及 server 子命令读 config 端口；
 5. 环境清理：air args_bin 去 `-p`、launchd plist 去 `-p` 并 bootout+bootstrap、给 `~/.config/cube-dev/` 初始化一份 config（含 port 6001）、`~/.config/cube/config.json` 补 port 6101；
 6. 更新 `docs/spec/现状.md`（配置目录、端口、env 章节）。
 
 ## 验收标准
 
-1. 源码直跑（air / run.sh / go run）与 `make build` 产物为 dev：配置目录 `~/.config/cube-dev/`；`make install` 产物为 prod：`~/.config/cube/`；`-c` 可覆盖。
-2. `cube version` 与 whoami 能看出 env；启动日志含 env + configDir + port。
+1. 源码直跑（air / run.sh / go run）产物为 dev：配置目录 `~/.config/cube-dev/`；`make build` / `make install` 产物为 prod：`~/.config/cube/`；`-c` 可覆盖。
+2. `cube version` 与 whoami 能看出 env（version 为 `dev` 或正式 tag）；server 启动打印 version。
 3. prod 常驻（launchd）在 6101，dev（air）在 6001，互不可见对方数据；`cube md .` 在 prod 环境下直接可用（不传端口）。
 4. `cd server && goimports -w . && go vet ./... && go test ./...` 通过。
