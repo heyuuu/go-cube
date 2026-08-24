@@ -9,16 +9,23 @@ import (
 	"cube/app"
 )
 
-// cmd `cube create`（模板引擎，第①步：本地目录单模板）
+// cmd `cube create`（模板引擎：本地目录 / git 仓库，单模板或模板集）
 func newCreateCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create <模板目录> <目标路径> [--key=value ...]",
-		Short: "使用本地模板目录生成项目",
+		Use:   "create <模板来源> [模板名] <目标路径> [--var key=value ...]",
+		Short: "使用模板生成项目（本地目录或 git 仓库）",
 		Long: `使用模板生成项目（引擎是机制，模板是数据，协议见 template.yaml）。
 
-模板目录根下须有 template.yaml；目标路径已存在时必须是空目录。
-变量优先取 --key=value，缺的交互式提问补齐。`,
-		Args: cobra.ExactArgs(2),
+模板来源为本地目录或 git 仓库（--depth 1 clone 到临时目录）。
+来源根目录有 template.yaml 则为单模板；一级子目录各有 template.yaml 则为模板集，
+模板集须用「模板名」参数指定子模板（缺省时交互式选择）。
+目标路径已存在时必须是空目录。变量优先取 --var key=value，缺的交互式提问补齐。
+
+示例：
+  cube create ~/templates/go-service my-app
+  cube create ~/templates go-service-full my-app
+  cube create https://github.com/xxx/templates go-service my-app --var author=heyu`,
+		Args: cobra.RangeArgs(2, 3),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliVars, err := cmd.Flags().GetStringSlice("var")
 			if err != nil {
@@ -28,7 +35,11 @@ func newCreateCmd(a *app.App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			return a.CreateService().Create(args[0], args[1], vars)
+			source, templateName, target := args[0], "", args[1]
+			if len(args) == 3 {
+				templateName, target = args[1], args[2]
+			}
+			return a.CreateService().Create(source, templateName, target, vars)
 		},
 	}
 

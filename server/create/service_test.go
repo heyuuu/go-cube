@@ -27,7 +27,7 @@ init:
 	target := ws.Join("out", "demo")
 
 	svc := NewService()
-	err := svc.Create(templateDir, target, map[string]string{
+	err := svc.Create(templateDir, "", target, map[string]string{
 		"project-name": "demo",
 		"module":       "demo",
 	})
@@ -56,7 +56,7 @@ func TestCreateErrors(t *testing.T) {
 
 	t.Run("缺少 template.yaml", func(t *testing.T) {
 		empty := ws.Mkdir("empty")
-		err := svc.Create(empty, ws.Join("out1"), nil)
+		err := svc.Create(empty, "", ws.Join("out1"), nil)
 		if err == nil {
 			t.Fatal("期望报错")
 		}
@@ -65,7 +65,7 @@ func TestCreateErrors(t *testing.T) {
 	t.Run("未声明的变量", func(t *testing.T) {
 		tpl := makeTemplateDir(t, ws, "tpl2")
 		ws.WriteFile(filepath.Join("tpl2", "template.yaml"), []byte("version: 1\nvariables:\n  a: {prompt: a}\n"))
-		err := svc.Create(tpl, ws.Join("out2"), map[string]string{"typo": "x"})
+		err := svc.Create(tpl, "", ws.Join("out2"), map[string]string{"typo": "x"})
 		if err == nil {
 			t.Fatal("期望报错")
 		}
@@ -76,7 +76,7 @@ func TestCreateErrors(t *testing.T) {
 		ws.WriteFile(filepath.Join("tpl3", "template.yaml"), []byte("version: 1\n"))
 		busy := ws.Mkdir("busy")
 		ws.WriteFile(filepath.Join("busy", "x.txt"), []byte("x"))
-		err := svc.Create(tpl, busy, nil)
+		err := svc.Create(tpl, "", busy, nil)
 		if err == nil {
 			t.Fatal("期望报错")
 		}
@@ -86,7 +86,7 @@ func TestCreateErrors(t *testing.T) {
 		tpl := makeTemplateDir(t, ws, "tpl4")
 		ws.WriteFile(filepath.Join("tpl4", "template.yaml"), []byte("version: 1\ninit:\n  - exit 3\n  - echo ok > after.txt\n"))
 		target := ws.Join("out4")
-		if err := svc.Create(tpl, target, nil); err == nil {
+		if err := svc.Create(tpl, "", target, nil); err == nil {
 			t.Fatal("期望 init 失败报错")
 		}
 		if _, err := os.Stat(filepath.Join(target, "after.txt")); !os.IsNotExist(err) {

@@ -14,10 +14,29 @@ type Service struct{}
 
 func NewService() *Service { return &Service{} }
 
-// Create 从本地模板目录生成项目到 targetPath：
+// Create 从模板来源（本地目录或 git url）生成项目到 targetPath：
+// 解析来源 → 定位模板目录（单模板直取，模板集按 templateName 选择/交互选择）→
 // 解析 template.yaml → 收集变量（cliVars 优先，缺的交互提问）→ 插值 →
 // 生成文件（路径+内容替换）→ 执行 init（任一失败中止）。
-func (s *Service) Create(templateDir, targetPath string, cliVars map[string]string) error {
+// git 来源 clone 到临时目录，成功后删除、失败保留现场（路径在错误信息中）。
+func (s *Service) Create(source, templateName, targetPath string, cliVars map[string]string) error {
+	sourceDir, cleanup, err := ResolveTemplateDir(source)
+	if err != nil {
+		return err
+	}
+	if cleanup != nil {
+		defer cleanup()
+	}
+
+	layout, err := InspectSource(sourceDir)
+	if err != nil {
+		return err
+	}
+	templateDir, err := SelectTemplateDir(layout, templateName)
+	if err != nil {
+		return err
+	}
+
 	tpl, err := loadTemplate(templateDir)
 	if err != nil {
 		return err
