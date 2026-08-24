@@ -198,9 +198,17 @@ function WorktreeRow({
 }) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
+  // hover/选中态放整行容器（前后的开关/opener 按钮同属一行，只亮中间段会很碎）
+  const selected = sameSource(params.current, src) || sameSource(params.base, src);
 
   return (
-    <div className={cn('flex items-center', hidden && 'opacity-50')}>
+    <div
+      className={cn(
+        'flex items-center transition-colors hover:bg-accent',
+        selected && 'bg-primary/15',
+        hidden && 'opacity-50',
+      )}
+    >
       <Button
         variant="ghost"
         size="icon-sm"
@@ -216,6 +224,7 @@ function WorktreeRow({
         params={params}
         title={wt.path}
         afterSelect={afterSelect}
+        bare
         badges={
           <>
             {wt.branch ? <Badge variant="secondary">{wt.branch}</Badge> : null}
@@ -589,6 +598,7 @@ type SelectableRowProps = {
   fixedRow?: boolean; // commit 图行：固定 px 高度（外层行 div 已定高），不用 rem 行高
   active?: boolean; // 选中态外部判定（选中的是 ref/worktree 时，其 tip/HEAD 所在行）
   afterSelect?: () => void; // 单击选中后回调（分支行用于触发重新定位）
+  bare?: boolean; // 只承担点击/内容，hover/选中态由外层行容器接管（工作副本行整行高亮）
 };
 
 function SelectableRow({
@@ -605,6 +615,7 @@ function SelectableRow({
   fixedRow,
   active,
   afterSelect,
+  bare,
 }: SelectableRowProps) {
   const [, setSearchParams] = useSearchParams();
   const handleClick = useCallback(
@@ -636,9 +647,10 @@ function SelectableRow({
       title={title}
       onClick={handleClick}
       className={cn(
-        'min-w-0 flex-1 flex items-center gap-1.5 px-2 text-left text-xs transition-colors hover:bg-accent',
+        'min-w-0 flex-1 flex items-center gap-1.5 px-2 text-left text-xs transition-colors',
+        !bare && 'hover:bg-accent',
         fixedRow ? 'h-full' : 'leading-7',
-        selected && 'bg-primary/15',
+        selected && !bare && 'bg-primary/15',
       )}
       style={laneColor && selected ? { boxShadow: `inset 2px 0 0 ${laneColor}` } : undefined}
     >
