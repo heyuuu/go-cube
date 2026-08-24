@@ -123,6 +123,14 @@ func FetchIntoBranch(dir string, remote string, branch string) error {
 	return Run(dir, "fetch", remote, branch+":"+branch)
 }
 
+// Fetch 从指定 remote 拉取最新 refs 到 remote-tracking（不动本地分支与工作区）。
+// 供 push/pull 展示真实的 ahead/behind 前刷新比较基准；网络失败返回错误，
+// 调用方降级为「不显示差异数字」即可，不应阻断主流程。
+func Fetch(dir string, remote string) error {
+	_, err := runOut(dir, "fetch", remote)
+	return err
+}
+
 // FindGitRoot 从 dir 开始向上查找，返回最先出现 .git(文件或目录均可) 的目录。
 //
 // 与 git 自身的向上查找语义一致：能识别普通仓库的 .git 目录，也能识别 worktree /

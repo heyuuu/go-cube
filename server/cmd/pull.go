@@ -260,7 +260,7 @@ func confirmPullPlan(repoPath string, remote git.Remote, branches []string, curr
 	}
 	tui.PrintTable([]string{"Ref", "方式"}, rows)
 	fmt.Println()
-	return tui.ConfirmInline(fmt.Sprintf("确认从 %s 拉取以上 %d 个分支？", remote.Name, len(branches)))
+	return tui.ConfirmInlineDefault(fmt.Sprintf("确认从 %s 拉取以上 %d 个分支？", remote.Name, len(branches)), true)
 }
 
 // runPull 逐条执行拉取，best-effort：单条失败不中断后续（同 push），最后汇总。
