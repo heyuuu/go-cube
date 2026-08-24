@@ -1,18 +1,17 @@
 import { useQueryClient } from '@tanstack/react-query';
+import type { UseQueryResult } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
+import type { components } from '@/api/schema';
 import { CodeEditor } from '@/components/code-editor';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
-import type { components } from '@/api/schema';
+import { cn } from '@/lib/utils';
 import { saveWorkbenchFile } from '@/queries/workbench';
 import type { FileDiffResult, FileResult } from '@/queries/workbench';
-import { cn } from '@/lib/utils';
-
-import type { UseQueryResult } from '@tanstack/react-query';
 
 import type { TreeSource } from '../params';
 
@@ -280,8 +279,8 @@ function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) 
 }
 
 function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
-  // 连续 del 块与 add 块逐行配对（左删右增同行对照），剩余各自单侧展示
-  type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'pair' };
+  // 连续 del 块与 add 块逐行配对（左删右增同行对照）为 mod 行，剩余各自单侧展示
+  type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'mod' | 'ctx' };
   const rows: Row[] = [];
   let pendingDels: string[] = [];
   const flush = () => {
@@ -291,13 +290,13 @@ function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
   for (const line of hunk.lines ?? []) {
     if (line.kind === 'ctx') {
       flush();
-      rows.push({ left: line.text, right: line.text, kind: 'pair' });
+      rows.push({ left: line.text, right: line.text, kind: 'ctx' });
     } else if (line.kind === 'del') {
       pendingDels.push(line.text);
     } else {
       const paired = pendingDels.shift();
       if (paired !== undefined) {
-        rows.push({ left: paired, right: line.text, kind: 'pair' });
+        rows.push({ left: paired, right: line.text, kind: 'mod' });
       } else {
         rows.push({ right: line.text, kind: 'add' });
       }
@@ -309,9 +308,8 @@ function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
     <table className="w-full table-fixed border-collapse">
       <tbody>
         {rows.map((r, i) => {
-          const changed = r.kind !== 'pair';
-          const leftChanged = changed && r.left !== undefined && (r.right === undefined || r.kind === 'del');
-          const rightChanged = changed && r.right !== undefined && (r.left === undefined || r.kind === 'add');
+          const leftChanged = r.kind === 'del' || r.kind === 'mod';
+          const rightChanged = r.kind === 'add' || r.kind === 'mod';
           return (
             <tr key={i} className="align-top">
               <td
