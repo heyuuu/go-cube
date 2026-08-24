@@ -63,11 +63,14 @@ func New(cfg *config.Config) (*App, error) {
 	mdHandler := web.NewMdHandler()
 	workbenchHandler := web.NewWorkbenchHandler(workbenchService)
 	server := web.NewServer(
-		configHandler,
-		projectHandler,
-		openerHandler,
-		mdHandler,
-		workbenchHandler,
+		cfg.Server,
+		[]web.Handler{
+			configHandler,
+			projectHandler,
+			openerHandler,
+			mdHandler,
+			workbenchHandler,
+		},
 	)
 
 	return &App{

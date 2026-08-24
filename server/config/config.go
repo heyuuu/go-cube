@@ -13,6 +13,7 @@ import (
 type Config struct {
 	DataDir string         `json:"dataDir"` // 数据目录
 	Log     LogConfig      `json:"log"`
+	Server  ServerConfig   `json:"server"`
 	Project ProjectConfig  `json:"project"`
 	Openers []OpenerConfig `json:"openers"`
 }
@@ -21,6 +22,10 @@ type LogConfig struct {
 	Path   string `json:"path"`
 	Level  string `json:"level"`
 	Format string `json:"format"`
+}
+
+type ServerConfig struct {
+	Port int `json:"port"`
 }
 
 type ProjectConfig struct {

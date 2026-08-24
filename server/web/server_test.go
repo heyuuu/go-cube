@@ -65,11 +65,14 @@ func newTestEnv(t *testing.T) *testEnv {
 	}
 
 	srv := NewServer(
-		NewProjectHandler(projSvc),
-		NewOpenerHandler(openerSvc),
-		NewConfigHandler(cfg),
-		NewMdHandler(),
-		NewWorkbenchHandler(workbench.NewService()),
+		config.ServerConfig{Port: 6101},
+		[]Handler{
+			NewProjectHandler(projSvc),
+			NewOpenerHandler(openerSvc),
+			NewConfigHandler(cfg),
+			NewMdHandler(),
+			NewWorkbenchHandler(workbench.NewService()),
+		},
 	)
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
@@ -296,4 +299,21 @@ func truncate(b []byte, n int) string {
 		return string(b[:n]) + "..."
 	}
 	return string(b)
+}
+
+func TestServerPortAndURL(t *testing.T) {
+	srv := NewServer(config.ServerConfig{Port: 6101}, nil)
+	if srv.Port() != 6101 {
+		t.Errorf("Port() = %d, want 6101", srv.Port())
+	}
+	if got := srv.ServerURL(); got != "http://localhost:6101/" {
+		t.Errorf("ServerURL() = %q, want http://localhost:6101/", got)
+	}
+}
+
+func TestServerStartWithoutPort(t *testing.T) {
+	srv := NewServer(config.ServerConfig{}, nil)
+	if err := srv.Start(); err == nil {
+		t.Fatal("port=0 时 Start 应返回中文错误，得到 nil")
+	}
 }

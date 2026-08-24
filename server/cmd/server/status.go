@@ -12,35 +12,33 @@ import (
 
 // newStatusCmd `cube server status` —— 探活（GET /api/system/whoami）。
 func newStatusCmd(a *app.App) *cobra.Command {
-	var port int
 	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "查看 server 运行状态",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			st, err := serve.Status(port)
+			st, err := serve.Status(a.Server().Port())
 			if err != nil {
 				return err
 			}
-			printStatus(st, port)
+			printStatus(a, st)
 			return nil
 		},
 	}
-	cmd.Flags().IntVarP(&port, "port", "p", DefaultPort, "server port")
 	return cmd
 }
 
-func printStatus(st serve.StatusInfo, port int) {
+func printStatus(a *app.App, st serve.StatusInfo) {
 	state := "未运行"
 	version := "-"
 	url := "-"
 	if st.Running {
 		state = "运行中"
 		version = st.Version
-		url = serverURL(port)
+		url = a.Server().ServerURL()
 	}
 	tui.PrintTable(
 		[]string{"状态", "端口", "版本", "访问地址"},
-		[][]string{{state, fmt.Sprintf("%d", port), version, url}},
+		[][]string{{state, fmt.Sprintf("%d", a.Server().Port()), version, url}},
 	)
 }

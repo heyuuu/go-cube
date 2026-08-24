@@ -14,6 +14,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 
+	"cube/config"
 	"cube/version"
 )
 
@@ -29,11 +30,14 @@ type RawHandler interface {
 
 // Server 服务器，响应 api 请求
 type Server struct {
+	// config
+	port int
+	// runtime
 	mux *http.ServeMux
 	api huma.API
 }
 
-func NewServer(handlers ...Handler) *Server {
+func NewServer(c config.ServerConfig, handlers []Handler) *Server {
 	mux := http.NewServeMux()
 
 	cfg := huma.DefaultConfig("Cube API", version.Version())
@@ -61,9 +65,16 @@ func NewServer(handlers ...Handler) *Server {
 	// 静态前端资源路由（/ 与 /ui/*）
 	registerStaticRoutes(mux)
 
-	return &Server{mux: mux, api: api}
+	return &Server{
+		// config
+		port: c.Port,
+		// runtime
+		mux: mux,
+		api: api,
+	}
 }
 
+func (s *Server) Port() int     { return s.port }
 func (s *Server) API() huma.API { return s.api }
 
 // Handler 返回底层 http.Handler，供 httptest 拉起真实路由做集成测试。
@@ -74,8 +85,19 @@ func (s *Server) OpenAPIJSON() ([]byte, error) {
 	return s.api.OpenAPI().MarshalJSON()
 }
 
+// ServerURL 访问地址
+func (s *Server) ServerURL() string {
+	return fmt.Sprintf("http://localhost:%d/", s.port)
+}
+
 // Start 启动 server，收到 SIGINT/SIGTERM 时优雅关闭。
-func (s *Server) Start(addr string) error {
+func (s *Server) Start() error {
+	if s.port == 0 {
+		return fmt.Errorf("未配置服务端口号(配置项 config.Server.Port)")
+	}
+
+	addr := fmt.Sprintf(":%d", s.port)
+
 	server := &http.Server{
 		Addr:              addr,
 		Handler:           s.mux,
