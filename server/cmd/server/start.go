@@ -19,7 +19,6 @@ func newStartCmd(a *app.App) *cobra.Command {
 }
 
 func newStartCmdEx(a *app.App, use string, short string) *cobra.Command {
-	var port int
 	var detach bool
 	cmd := &cobra.Command{
 		Use:   use,
@@ -27,7 +26,7 @@ func newStartCmdEx(a *app.App, use string, short string) *cobra.Command {
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if detach {
-				return startDetached(a, port)
+				return startDetached(a)
 			}
 			return startServer(a)
 		},
@@ -37,8 +36,8 @@ func newStartCmdEx(a *app.App, use string, short string) *cobra.Command {
 }
 
 // startDetached 后台 fork 一个 server 子进程（参 serve.Fork）。
-func startDetached(a *app.App, port int) error {
-	pid, err := serve.Fork(port)
+func startDetached(a *app.App) error {
+	pid, err := serve.Fork()
 	if err != nil {
 		return err
 	}
@@ -58,9 +57,4 @@ func startServer(a *app.App) error {
 	fmt.Printf("  访问地址：%s\n", a.Server().ServerURL())
 	slog.Info("server 启动中", "url", a.Server().ServerURL())
 	return a.Server().Start()
-}
-
-// serverURL 拼出 server 的访问地址。
-func serverURL(port int) string {
-	return fmt.Sprintf("http://localhost:%d/", port)
 }
