@@ -188,6 +188,11 @@ func TestWorkbenchCommits(t *testing.T) {
 func TestWorkbenchWorktrees(t *testing.T) {
 	env := newTestEnv(t)
 	repo := env.ws.Join("g1/proj1")
+	// git 输出的路径经符号链接规范化（macOS 上 /var → /private/var），比较前同样求值
+	canonicalRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatalf("解析真实路径失败: %v", err)
+	}
 
 	var got []struct {
 		Path      string `json:"path"`
@@ -197,7 +202,7 @@ func TestWorkbenchWorktrees(t *testing.T) {
 		Untracked int    `json:"untracked"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/workbench/worktrees?path="+repo)), &got)
-	if len(got) != 1 || got[0].Path != repo {
+	if len(got) != 1 || got[0].Path != canonicalRepo {
 		t.Fatalf("应有且仅有主工作副本: %+v", got)
 	}
 	if got[0].Branch == "" || got[0].Head == "" || got[0].Dirty {

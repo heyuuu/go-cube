@@ -2,6 +2,7 @@ package git
 
 import (
 	"os/exec"
+	"path/filepath"
 	"testing"
 
 	"cube/internal/testfixture"
@@ -71,10 +72,19 @@ func TestWorktreeList(t *testing.T) {
 		t.Fatalf("应有 2 个工作副本, got %d (%+v)", len(list), list)
 	}
 	mainWt, hotWt := list[0], list[1]
-	if mainWt.Path != repo || mainWt.Branch == "" || mainWt.Head == "" {
+	// git 输出的路径经符号链接规范化（macOS 上 /var → /private/var），比较前同样求值
+	canonicalRepo, err := filepath.EvalSymlinks(repo)
+	if err != nil {
+		t.Fatalf("解析真实路径失败: %v", err)
+	}
+	canonicalWtDir, err := filepath.EvalSymlinks(wtDir)
+	if err != nil {
+		t.Fatalf("解析真实路径失败: %v", err)
+	}
+	if mainWt.Path != canonicalRepo || mainWt.Branch == "" || mainWt.Head == "" {
 		t.Errorf("主目录字段不完整: %+v", mainWt)
 	}
-	if hotWt.Path != wtDir || hotWt.Branch != "hotfix" {
+	if hotWt.Path != canonicalWtDir || hotWt.Branch != "hotfix" {
 		t.Errorf("linked worktree 字段不符: %+v", hotWt)
 	}
 
