@@ -79,8 +79,8 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return errors.New("未选择任何 remote")
 			}
 
-			// 4. 选择 ref（flag 优先，否则 TUI 多选，默认当前分支）
-			chosenRefs, err := pickRefs(repoRefs, headRef, refs)
+			// 4. 选择 ref（flag 优先，否则 TUI 多选，默认当前分支；标签带各 remote 的真实 ahead/behind）
+			chosenRefs, err := pickRefs(repoPath, repoRefs, headRef, chosenRemotes, refs)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
 					return nil
@@ -93,7 +93,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 
 			// 5. 展示推送计划 + 二次确认
 			if !yes {
-				ok, err := confirmPlan(repoPath, chosenRemotes, chosenRefs, localBranchNames(repoRefs), force)
+				ok, err := confirmPlan(repoPath, chosenRemotes, chosenRefs, force)
 				if err != nil {
 					if errors.Is(err, tui.ErrUserAborted) {
 						return nil
@@ -157,12 +157,31 @@ const refAllTags = "--tags"
 //   - 候选 = 本地分支 + 一条「全部 tags」合并项（tag 数量随时间线性增长，逐条列出
 //     只会让候选列表越来越长，故合并成 refAllTags 一项整体推送）。
 //   - 默认勾选当前分支（若存在）。
-func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string, error) {
+//   - 分支标签带相对各选中 remote 的真实 ahead/behind（先 fetch 刷新 remote-tracking，
+//     单 remote 显示 "↑2 ↓0"，多 remote 逐个标注 "origin ↑2↓0"）；tag 无此语义。
+//     fetch 失败（网络不通等）打警告降级为不显示，不阻断选择。
+func pickRefs(repoPath string, refs *git.RefsResult, headRef string, remotes []git.Remote, flagRefs []string) ([]string, error) {
 	if len(flagRefs) > 0 {
 		return flagRefs, nil
 	}
 	if !tui.IsTTY() {
 		return nil, errors.New("非交互环境(tty)下必须通过 --ref 指定分支/tag")
+	}
+
+	fetched := make(map[string]bool, len(remotes))
+	for _, r := range remotes {
+		fmt.Printf("正在 fetch %s ...", r.Name)
+		if err := git.Fetch(repoPath, r.Name); err != nil {
+			fmt.Printf(" 失败，ahead/behind 可能不准: %v\n", err)
+		} else {
+			fmt.Println(" 完成")
+			fetched[r.Name] = true
+		}
+	}
+	// fetch 后重读 refs，拿到最新 remote-tracking；远端没有同名分支的显示 ↑0 ↓0 会误导（像是已同步），跳过
+	remoteBranches := map[string]map[string]bool{}
+	if fresh, err := git.Refs(repoPath); err == nil {
+		remoteBranches = buildRemoteBranchMap(fresh)
 	}
 
 	type refItem struct {
@@ -171,7 +190,7 @@ func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string
 	}
 	var items []refItem
 	for _, ref := range refs.Locals {
-		items = append(items, refItem{label: "branch: " + ref.ShortName, ref: ref.Name})
+		items = append(items, refItem{label: "branch: " + ref.ShortName + aheadBehindSuffix(repoPath, ref.ShortName, remotes, fetched, remoteBranches), ref: ref.Name})
 	}
 	if len(refs.Tags) > 0 {
 		items = append(items, refItem{
@@ -210,38 +229,35 @@ func pickRefs(refs *git.RefsResult, headRef string, flagRefs []string) ([]string
 	return result, nil
 }
 
-// localBranchNames 收集本地分支短名集合，用于区分计划表里的 ref 是分支还是 tag。
-func localBranchNames(refs *git.RefsResult) map[string]bool {
-	names := make(map[string]bool, len(refs.Locals))
-	for _, r := range refs.Locals {
-		names[r.ShortName] = true
+// aheadBehindSuffix 生成分支标签的 ahead/behind 后缀（真实值，依赖调用方已 fetch）。
+// 远端没有同名分支、或无任何 fetch 成功的 remote 时返回空串；单 remote 省略 remote 名，多 remote 逐个标注。
+func aheadBehindSuffix(repoPath, branch string, remotes []git.Remote, fetched map[string]bool, remoteBranches map[string]map[string]bool) string {
+	var parts []string
+	for _, r := range remotes {
+		if !fetched[r.Name] || !remoteBranches[branch][r.Name] {
+			continue
+		}
+		ahead, behind, _ := git.AheadBehindRemote(repoPath, branch, r.Name, branch)
+		if len(remotes) == 1 {
+			parts = append(parts, fmt.Sprintf("  ↑%d ↓%d", ahead, behind))
+		} else {
+			parts = append(parts, fmt.Sprintf("  %s ↑%d↓%d", r.Name, ahead, behind))
+		}
 	}
-	return names
+	return strings.Join(parts, "")
 }
 
 // confirmPlan 打印推送计划表并要求二次确认。返回 (是否确认, 错误)。
-//
-// 计划表对每个 remote 先 fetch 刷新 remote-tracking ref，再给分支算真实的
-// ahead/behind（"↑2 ↓0"：领先 2 待推送 / 落后 0）；tag 无此语义显示 "-"。
-// fetch 失败（网络不通等）降级为 "-"，不阻断确认流程。
-func confirmPlan(repoPath string, remotes []git.Remote, refs []string, branches map[string]bool, force bool) (bool, error) {
+func confirmPlan(repoPath string, remotes []git.Remote, refs []string, force bool) (bool, error) {
 	fmt.Println()
 	fmt.Printf("仓库: %s\n", repoPath)
 	if force {
 		fmt.Println("模式: 强制推送（--force-with-lease）")
 	}
-	fetched := make(map[string]bool, len(remotes))
-	for _, r := range remotes {
-		if err := git.Fetch(repoPath, r.Name); err != nil {
-			fmt.Printf("警告: fetch %s 失败，ahead/behind 可能不准: %v\n", r.Name, err)
-		} else {
-			fetched[r.Name] = true
-		}
-	}
 	fmt.Println("推送计划：")
 	tui.PrintTable(
-		[]string{"Remote", "URL", "Ref", "领先/落后"},
-		buildPlanRows(repoPath, remotes, refs, branches, fetched),
+		[]string{"Remote", "URL", "Ref"},
+		buildPlanRows(remotes, refs),
 	)
 	fmt.Println()
 	return tui.ConfirmInlineDefault(fmt.Sprintf("确认推送到以上 %d 个 remote × %d 个 ref？", len(remotes), len(refs)), true)
@@ -255,27 +271,12 @@ func refDisplayName(ref string) string {
 	return ref
 }
 
-// aheadBehindLabel 返回分支相对 remote 的差异数字（"↑2 ↓0"）。
-// 非 tag 哨兵的 ref 若不在本地分支集合中（如 flag 指定的 tag）或 ref 不存在
-// 于该 remote，AheadBehindRemote 返回 0/0——统一显示为 "-"，避免误导。
-func aheadBehindLabel(repoPath, remote, ref string, branches map[string]bool, fetched bool) string {
-	if !fetched || ref == refAllTags {
-		return "-"
-	}
-	short := strings.TrimPrefix(ref, "refs/heads/")
-	if !branches[short] {
-		return "-"
-	}
-	ahead, behind, _ := git.AheadBehindRemote(repoPath, short, remote, short)
-	return fmt.Sprintf("↑%d ↓%d", ahead, behind)
-}
-
 // buildPlanRows 展开成 (remote × ref) 行用于表格展示。
-func buildPlanRows(repoPath string, remotes []git.Remote, refs []string, branches map[string]bool, fetched map[string]bool) [][]string {
+func buildPlanRows(remotes []git.Remote, refs []string) [][]string {
 	var rows [][]string
 	for _, r := range remotes {
 		for _, ref := range refs {
-			rows = append(rows, []string{r.Name, r.Push, refDisplayName(ref), aheadBehindLabel(repoPath, r.Name, ref, branches, fetched[r.Name])})
+			rows = append(rows, []string{r.Name, r.Push, refDisplayName(ref)})
 		}
 	}
 	return rows
