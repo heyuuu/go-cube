@@ -5,7 +5,9 @@ tmp_dir = "tmp"
 [build]
   # 编译
   pre_cmd = [
-    "goimports -w .",
+    # GOMODCACHE 指空目录：禁止 goimports 全量扫描 module cache 建候选包索引（否则 18GB cache 要扫 9s）；
+    # 已写明的 import 整理/排序不受影响，只损失「自动补未写 import」的能力（交给编辑器）
+    "GOMODCACHE=/tmp/empty-modcache goimports -w .",
     "go vet ./..."
   ]
   cmd = "go build -o ./tmp/main ."
