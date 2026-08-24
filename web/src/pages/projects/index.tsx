@@ -1,5 +1,5 @@
 import { ChevronRight, Folder, FolderGit2, RefreshCw, RotateCcw } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
 import type { Opener, Project } from '@/api/client';
@@ -228,15 +228,47 @@ export function ProjectsPage() {
   const openers = useOpenerList();
   const open = useOpenerOpen();
 
-  const [keyword, setKeyword] = useState('');
-  const [groupFilter, setGroupFilter] = useState<string[]>([]);
-  const [gitFilter, setGitFilter] = useState<GitStatus | 'all'>('all');
-  const [tagFilter, setTagFilter] = useState('all');
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [openError, setOpenError] = useState('');
   const [drawer, setDrawer] = useState<Project | null>(null);
-  // 显示模式走 URL（?view=tree）：可刷新保状态、可分享；两种模式共用筛选状态，切换不丢
+  // 筛选状态全部走 URL（?q=&group=&git=&tag=，?view= 同理）：刷新/前进后退/跨页往返均无损
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // 增量更新 query 参数（replace 避免每点一个筛选压一条历史）；空值参数不落 URL
+  function updateParams(patch: Record<string, string | null>) {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }
+
+  const keyword = searchParams.get('q') ?? '';
+  const groupFilter = searchParams.get('group')?.split(',').filter(Boolean) ?? [];
+  const gitParam = searchParams.get('git');
+  const gitFilter: GitStatus | 'all' = gitFilters.some((f) => f.value === gitParam)
+    ? (gitParam as GitStatus | 'all')
+    : 'all';
+  const tagFilter = searchParams.get('tag') ?? 'all';
+
+  // 搜索输入本地 state + 300ms debounce 后投影到 URL；URL 侧变化（后退/重置）回灌输入
+  const [keywordInput, setKeywordInput] = useState(keyword);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (keywordInput !== keyword) updateParams({ q: keywordInput });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [keywordInput, keyword]);
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
   const mode: 'table' | 'tree' = searchParams.get('view') === 'tree' ? 'tree' : 'table';
   const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set());
 
@@ -255,27 +287,37 @@ export function ProjectsPage() {
   });
 
   function toggleGroup(g: string) {
-    setGroupFilter((prev) => (prev.includes(g) ? prev.filter((x) => x !== g) : [...prev, g]));
+    updateParams({
+      group: groupFilter.includes(g)
+        ? groupFilter.filter((x) => x !== g).join(',') || null
+        : [...groupFilter, g].join(','),
+    });
   }
 
   // badge 点击筛选：定位到唯一值；再点一次（已是唯一选中）则取消
   function toggleGroupSolo(g: string) {
-    setGroupFilter((prev) => (prev.length === 1 && prev[0] === g ? [] : [g]));
+    updateParams({ group: groupFilter.length === 1 && groupFilter[0] === g ? null : g });
   }
 
   function toggleTagSolo(t: string) {
-    setTagFilter((prev) => (prev === t ? 'all' : t));
+    updateParams({ tag: tagFilter === t ? null : t });
   }
 
   function toggleGitSolo(s: GitStatus) {
-    setGitFilter((prev) => (prev === s ? 'all' : s));
+    updateParams({ git: gitFilter === s ? null : s });
+  }
+
+  function setGitFilterValue(v: GitStatus | 'all') {
+    updateParams({ git: v === 'all' ? null : v });
+  }
+
+  function setTagFilterValue(t: string) {
+    updateParams({ tag: t === 'all' ? null : t });
   }
 
   function resetFilters() {
-    setKeyword('');
-    setGroupFilter([]);
-    setGitFilter('all');
-    setTagFilter('all');
+    setKeywordInput('');
+    updateParams({ q: null, group: null, git: null, tag: null });
   }
 
   function toggleSelect(path: string) {
@@ -288,7 +330,7 @@ export function ProjectsPage() {
   }
 
   function switchMode(next: 'table' | 'tree') {
-    setSearchParams(next === 'tree' ? { view: 'tree' } : {});
+    updateParams({ view: next === 'tree' ? 'tree' : null });
   }
 
   function toggleTreeNode(path: string) {
@@ -351,8 +393,8 @@ export function ProjectsPage() {
       {/* 工具条：搜索 + 计数 */}
       <div className="flex items-center gap-3 px-6 pb-2">
         <Input
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
+          value={keywordInput}
+          onChange={(e) => setKeywordInput(e.target.value)}
           placeholder="搜索项目名 / 路径"
           className="w-64"
         />
@@ -396,7 +438,7 @@ export function ProjectsPage() {
       <div className="flex flex-col gap-1.5 px-6 pb-3 text-xs">
         <div className="flex flex-wrap items-center gap-1.5">
           <FilterLabel label="group" mode="多选" />
-          <Chip active={groupFilter.length === 0} onClick={() => setGroupFilter([])}>
+          <Chip active={groupFilter.length === 0} onClick={() => updateParams({ group: null })}>
             全部
           </Chip>
           {groups.map((g) => (
@@ -408,7 +450,7 @@ export function ProjectsPage() {
         <div className="flex flex-wrap items-center gap-1.5">
           <FilterLabel label="git" mode="单选" />
           {gitFilters.map((s) => (
-            <Chip key={s.value} active={gitFilter === s.value} onClick={() => setGitFilter(s.value)}>
+            <Chip key={s.value} active={gitFilter === s.value} onClick={() => setGitFilterValue(s.value)}>
               {s.label}
             </Chip>
           ))}
@@ -416,11 +458,11 @@ export function ProjectsPage() {
         {tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             <FilterLabel label="tag" mode="单选" />
-            <Chip active={tagFilter === 'all'} onClick={() => setTagFilter('all')}>
+            <Chip active={tagFilter === 'all'} onClick={() => setTagFilterValue('all')}>
               全部
             </Chip>
             {tags.map((t) => (
-              <Chip key={t} active={tagFilter === t} onClick={() => setTagFilter(t)}>
+              <Chip key={t} active={tagFilter === t} onClick={() => setTagFilterValue(t)}>
                 {t}
               </Chip>
             ))}
