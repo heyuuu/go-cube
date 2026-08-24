@@ -1,6 +1,6 @@
 # 环境分离：dev / prod 二进制身份 + 配置目录分流
 
-> **状态**：🚀 提案（2026-08-25，方向已与 owner 对齐，**优先级高**——落地前 dev/prod 互相干扰持续存在）
+> **状态**：✅ 已交付（2026-08-25 归档）。六步全部落地：env 由 version 推导（`version.IsDev()`）、配置目录分流、version/whoami/启动日志可见、`server.port` 唯一事实源（`-p` flag 全移除）、环境清理（launchd 常驻 6101 + air dev 6001）、现状.md 落档。实施过程与设计的偏差均已回写本文（env 不独立注入、`make build` 亦为 prod）。
 >
 > **关联**：[1016-opener改造](../1016-opener改造/README.md)、[1025-settings配置页](../1025-settings配置页/README.md)（settings.json 的切割规则由本提案的边界定义衍生）。
 
