@@ -58,3 +58,37 @@ func ConfirmInline(title string) (bool, error) {
 	}
 	return strings.ToLower(value) == "y", nil
 }
+
+// ConfirmInlineDefault 与 ConfirmInline 的区别：支持默认值——直接回车返回 def，
+// 无需手输 Y/N。提示文案按默认值标注（如 def=true 时显示 "(Y 是 / N 否，回车=Y)"）。
+//
+// 用户取消（Ctrl+C）时返回 (false, ErrUserAborted)。
+func ConfirmInlineDefault(title string, def bool) (bool, error) {
+	hint := "(Y 是 / N 否，回车=Y)"
+	if !def {
+		hint = "(Y 是 / N 否，回车=N)"
+	}
+	value, err := runInput(InputOptions{
+		Title:     title + " " + hint,
+		Inline:    true,
+		Prompt:    ": ",
+		CharLimit: 1,
+		Validate: func(s string) error {
+			if s == "" {
+				return nil
+			}
+			lc := strings.ToLower(s)
+			if lc != "y" && lc != "n" {
+				return fmt.Errorf("请输入 Y 或 N")
+			}
+			return nil
+		},
+	})
+	if err != nil {
+		return false, err
+	}
+	if value == "" {
+		return def, nil
+	}
+	return strings.ToLower(value) == "y", nil
+}

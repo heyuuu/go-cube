@@ -223,7 +223,7 @@ func confirmPlan(repoPath string, remotes []git.Remote, refs []string, force boo
 		buildPlanRows(remotes, refs),
 	)
 	fmt.Println()
-	return tui.ConfirmInline(fmt.Sprintf("确认推送到以上 %d 个 remote × %d 个 ref？", len(remotes), len(refs)))
+	return tui.ConfirmInlineDefault(fmt.Sprintf("确认推送到以上 %d 个 remote × %d 个 ref？", len(remotes), len(refs)), true)
 }
 
 // refDisplayName 返回 ref 在计划表中的展示名；哨兵 refAllTags 展示为更友好的说明。
