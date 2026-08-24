@@ -45,8 +45,8 @@ func newRootCmd(a *app.App) *cobra.Command {
 	cmd.AddCommand(newInfoCmd(a))     // 项目信息
 	cmd.AddCommand(newOpenCmd(a))     // 打开项目
 	cmd.AddCommand(newInitCmd(a))     // 初始化空项目
-	//cmd.AddCommand(newCreateCmd(a))   // 使用模板初始化项目
-	cmd.AddCommand(newCloneCmd(a)) // 使用 RepoUrl 初始化项目
+	cmd.AddCommand(newCreateCmd(a))   // 使用模板初始化项目
+	cmd.AddCommand(newCloneCmd(a))    // 使用 RepoUrl 初始化项目
 
 	// open 相关
 	cmd.AddCommand(newOpenersCmd(a))

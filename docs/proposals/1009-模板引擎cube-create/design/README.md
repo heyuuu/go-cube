@@ -43,9 +43,12 @@ cube create <模板来源> [模板名] <目标路径> [--key=value ...]
 
 ## 三、协议（template.yaml）
 
-模板根目录放一个 `template.yaml`，这是引擎和模板之间的**唯一契约**。三个顶层 key：
+模板根目录放一个 `template.yaml`，这是引擎和模板之间的**唯一契约**。顶层 key：`version`（int，协议版本，当前 `1`，方便后续兼容升级——引擎按版本分支处理，未知版本报错）+ 三个功能 key：
 
 ```yaml
+# 0. 协议版本（int，当前 1）
+version: 1
+
 # 1. 变量声明：引擎据此收集输入
 variables:
   project-name:

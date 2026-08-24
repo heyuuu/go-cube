@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 
 	"cube/config"
+	"cube/create"
 	"cube/db"
 	"cube/history"
 	"cube/opener"
@@ -26,6 +27,7 @@ type App struct {
 	workbenchService *workbench.Service
 	openerService    *opener.Service
 	historyService   *history.Service
+	createService    *create.Service
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -42,7 +44,8 @@ func New(cfg *config.Config) (*App, error) {
 	openerService := opener.NewService(cfg.Openers, nil)
 	historyService := history.NewService(dataDb)
 	workbenchService := workbench.NewService()
-	services := []any{projectService, openerService, historyService, workbenchService}
+	createService := create.NewService()
+	services := []any{projectService, openerService, historyService, workbenchService, createService}
 
 	// 各 service 就绪后触发一次性初始化（AutoMigrate 等）
 	for _, s := range services {
@@ -78,6 +81,7 @@ func New(cfg *config.Config) (*App, error) {
 		workbenchService: workbenchService,
 		openerService:    openerService,
 		historyService:   historyService,
+		createService:    createService,
 	}, nil
 }
 
@@ -89,6 +93,7 @@ func (a *App) ProjectService() *project.Service     { return a.projectService }
 func (a *App) WorkbenchService() *workbench.Service { return a.workbenchService }
 func (a *App) OpenerService() *opener.Service       { return a.openerService }
 func (a *App) HistoryService() *history.Service     { return a.historyService }
+func (a *App) CreateService() *create.Service       { return a.createService }
 
 // StartBackgroundJobs 启动常驻进程的后台任务（分发到各 service 的 OnServerStart 钩子）。
 // 仅常驻 server 调用；CLI 短命进程不调用。

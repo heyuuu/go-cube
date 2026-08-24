@@ -234,7 +234,7 @@ glob 从来没有过正式标准。`**`（递归匹配）是各家后加的扩�
 
 ## 八、最终协议形态（汇总）
 
-见 `README.md`。三个顶层 key：`variables` / `patterns` / `init`。
+见 `README.md`。顶层 key：`version`（int 协议版本，当前 1，未知版本报错，方便后续兼容升级）+ 三个功能 key：`variables` / `patterns` / `init`。
 
 设计哲学一句话：**引擎是机制，模板是策略。协议是两者之间最小且明确的契约。**
 
