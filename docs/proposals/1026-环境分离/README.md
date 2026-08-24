@@ -59,9 +59,9 @@
 1. `version` 包收口为未导出 var + getter（`IsDev()`/`Version()`/`VersionInfo()` 等），ldflags 注入小写字段名；✅ 已完成
 2. config 默认目录按 env 分流（dev `~/.config/cube-dev/`，prod `~/.config/cube/`；`-c` 不变）；✅ 已完成
 3. env 可见性：`cube version` / whoami / 启动日志；✅ 已完成
-4. `server.port` 成为端口事实源：DefaultPort 6101、md 及 server 子命令读 config 端口；
-5. 环境清理：air args_bin 去 `-p`、launchd plist 去 `-p` 并 bootout+bootstrap、给 `~/.config/cube-dev/` 初始化一份 config（含 port 6001）、`~/.config/cube/config.json` 补 port 6101；
-6. 更新 `docs/spec/现状.md`（配置目录、端口、env 章节）。
+4. `server.port` 成为端口事实源：md 及 server 子命令读 config 端口，`-p` flag 全部移除；✅ 已完成
+5. 环境清理：air args_bin 去 `-p`、launchd plist 去 `-p` 并 bootout+bootstrap、给 `~/.config/cube-dev/` 初始化一份 config（含 port 6001）、`~/.config/cube/config.json` 补 port 6101；✅ 已完成（`serve.Fork()` 子进程自读 config 端口）
+6. 更新 `docs/spec/现状.md`（配置目录、端口、env 章节）。✅ 已完成
 
 ## 验收标准
 

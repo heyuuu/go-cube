@@ -34,7 +34,7 @@
 - **opener role + slotCount + Executor**：`Opener` 的能力由 `roles []Role` 声明（`open-dir`/`open-file`/`diff-dir`/`diff-file`，见 `opener/role.go`），`slotCount` 由 role 推导（1 或 2，同 opener 所有 role 必须一致）；`cmd` 中用 `$0/$1...` 占位符引用路径槽位，无占位符时路径追加末尾。`Open()` 通过 `Executor` 接口执行（`opener/executor.go`），默认实现走 `os/exec`，测试可注入 fake——**改 opener 时务必同步看 `opener/role.go`、`opener/opener.go`、`opener/executor.go` 三处**。
 - **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
 - **Web 装配**：`web.NewServer(handlers ...Handler)`，每个 domain 实现 `Handler.Register(api huma.API)`；统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
-- **配置**：默认目录 `~/.config/cube/`，`config.json` 按 domain 分节。`-c` 覆盖目录，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、`cube.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。
+- **配置与双环境**：默认目录按环境分流——dev（源码直跑 / air / run.sh）→ `~/.config/cube-dev/`，prod（`make build` / `make install`，ldflags 注入了正式 version）→ `~/.config/cube/`；身份判定见 `version.IsDev()`，详见 [`docs/proposals/1026-环境分离/`](./docs/proposals/1026-环境分离/)。`config.json` 按 domain 分节，`server.port` 是端口唯一事实源（无 `-p` flag、不支持多实例）。`-c` 覆盖配置文件路径，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、`cube.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。
 
 ## 常用命令
 
@@ -49,7 +49,7 @@ make tag          # 当前位置打递增版本 tag（末位 +1）
 Web 开发热重载（`server/.air.toml`，已内置 `goimports -w .` + `go vet ./...` 预检）：
 
 ```bash
-cd server && air               # 需安装 air；args_bin = ["-d", "server", "-p", "6001"]
+cd server && air               # 需安装 air；args_bin = ["--debug", "server"]（端口读 dev config 的 6001）
 ./run.sh [args]                # 手动：goimports -> go vet -> go build -> 运行（在 server/ 下）
 ```
 
@@ -173,5 +173,5 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **module path 是 `cube`**（不是 `github.com/heyuuu/cube`——README 里写的旧值，以 go.mod 为准）。import 路径写 `cube/...`。
 - `logger` 包用 `runtime.Callers` 在 `init()` 里推算项目绝对路径（`relativeProjPath = "../../"`），移动/重命名 logger 源文件位置会让日志里的 `file` 相对路径错位。
 - `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `web/dist` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
-- 默认配置目录是 `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）都落在那里。
+- 默认配置目录按环境分流：dev `~/.config/cube-dev/`、prod `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）落在对应配置目录。两环境数据不互通（history 各自积累、config 人工 diff 合并）。
 - **前端源码在 `web/`（仓库根）**，`make build-ui` 时 `pnpm -C web build` 后把 `web/dist` 拷到 `server/web/ui` 供 go:embed 嵌入。改前端改 `web/`，不要直接改 `server/web/ui/`（会被覆盖）；旧版 vanilla 前端 `ui/` 已删除。
