@@ -333,15 +333,17 @@ func setupDiffRepo(t *testing.T, env *testEnv) (repo, head string) {
 	}
 	head = gitHead(t, repo)
 
-	// 工作区改动：mod 改、del 删、new 增（untracked）、ignored.log 增（ignored）
+	// 工作区改动：mod 改、del 删、new 增（untracked）、ignored.log 增（ignored）、
+	// ren-old 改名 ren-new（内容不变）
 	env.ws.WriteFile("g1/proj1/mod.txt", []byte("v2 line1\nv2 line2\n"))
 	os.Remove(filepath.Join(repo, "del.txt"))
 	env.ws.WriteFile("g1/proj1/new.txt", []byte("new file"))
 	env.ws.WriteFile("g1/proj1/ignored.log", []byte("ignored"))
 	env.ws.WriteFile("g1/proj1/.gitignore", []byte("*.log\n"))
 	_ = exec.Command("git", "-C", repo, "add", ".gitignore").Run()
+	_ = exec.Command("git", "-C", repo, "mv", "ren-old.txt", "ren-new.txt").Run()
 	if err := git.Commit(repo, "ignore rules"); err != nil {
-		t.Fatalf("提交 ignore 失败: %v", err)
+		t.Fatalf("提交 ignore rules 失败: %v", err)
 	}
 	return repo, gitHead(t, repo)
 }
@@ -446,6 +448,23 @@ func TestWorkbenchFileDiff(t *testing.T) {
 	}
 	if got.Hunks[0].OldCount != 0 {
 		t.Errorf("左侧空白 oldCount 应为 0: %d", got.Hunks[0].OldCount)
+	}
+
+	// rename 未改内容（base 的 ren-old → HEAD 的 ren-new）：leftFile 指旧路径时两侧字节相同
+	// → 空 hunks「内容一致」；不带 leftFile 时基准侧读不到新路径 → 一侧全文（旧行为，作对照）
+	var base string
+	if b, err := exec.Command("git", "-C", repo, "rev-parse", head+"^").Output(); err != nil {
+		t.Fatalf("取父提交失败: %v", err)
+	} else {
+		base = strings.TrimSpace(string(b))
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+base+"&right="+wt+"&file=ren-new.txt&leftFile=ren-old.txt")), &got)
+	if got.Binary || len(got.Hunks) != 0 {
+		t.Errorf("未改内容的 rename 应两侧一致（空 hunks）: binary=%v hunks=%d", got.Binary, len(got.Hunks))
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/file-diff?path="+repo+"&left=commit://"+base+"&right="+wt+"&file=ren-new.txt")), &got)
+	if len(got.Hunks) == 0 {
+		t.Error("不带 leftFile 时基准侧按新路径读不到，应呈现整体新增（对照）")
 	}
 }
 

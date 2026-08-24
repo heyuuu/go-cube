@@ -219,9 +219,10 @@ func changeBase(root string, src TreeSource) (string, error) {
 	}
 }
 
-// ReadFileDiff 对比两个源下同一相对路径的文件。实现在 diff.go。
-// left 为零值时按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 Changes）。
-func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
+// ReadFileDiff 对比两个源下某文件。实现在 diff.go。leftFile 为基准侧路径
+// （rename 条目与右侧路径不同，空则同 file）；left 为零值时按「相对基准」对比
+// （worktree vs HEAD、ref/commit vs 父提交，同 Changes）。
+func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, file string, leftFile string) (*FileDiffResult, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {
 		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
@@ -233,7 +234,7 @@ func (s *Service) ReadFileDiff(path string, left TreeSource, right TreeSource, f
 		}
 		left = TreeSource{Type: SourceTypeCommit, Id: base}
 	}
-	return readFileDiff(root, left, right, file)
+	return readFileDiff(root, left, right, file, leftFile)
 }
 
 // Changes 列出源相对「上一版本」的变更文件（代码阅读面板的差异模式）：

@@ -123,10 +123,11 @@ func (h *WorkbenchHandler) diff(input struct {
 }
 
 func (h *WorkbenchHandler) fileDiff(input struct {
-	Path  string `query:"path" required:"true"`
-	Left  string `query:"left"` // 缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交）
-	Right string `query:"right" required:"true"`
-	File  string `query:"file" required:"true"`
+	Path     string `query:"path" required:"true"`
+	Left     string `query:"left"` // 缺省 = 相对基准（worktree vs HEAD、ref/commit vs 父提交）
+	Right    string `query:"right" required:"true"`
+	File     string `query:"file" required:"true"`
+	LeftFile string `query:"leftFile"` // 基准侧路径（rename 条目与右侧不同；空则同 file）
 }) (*workbench.FileDiffResult, error) {
 	var left workbench.TreeSource
 	if input.Left != "" {
@@ -140,7 +141,7 @@ func (h *WorkbenchHandler) fileDiff(input struct {
 	if err != nil {
 		return nil, err
 	}
-	return h.workbenchService.ReadFileDiff(input.Path, left, right, input.File)
+	return h.workbenchService.ReadFileDiff(input.Path, left, right, input.File, input.LeftFile)
 }
 
 // RegisterRaw 注册 WebSocket 路由（upgrade 不走 huma）

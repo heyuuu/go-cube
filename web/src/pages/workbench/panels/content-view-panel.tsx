@@ -81,7 +81,10 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
 
   const content = useWorkbenchFile(path, src, activeFile);
-  const fileDiff = useWorkbenchFileDiff(path, viewBase, src, activeFile, mode === 'diff');
+  // rename 条目基准侧路径不同：未改内容的 rename 两侧字节相同，diff 应显示「内容一致」
+  // 而非「一侧全文」（左侧按旧路径读）；改了内容则呈现真实的行级差异
+  const renameOldPath = changeList.find((e) => e.path === activeFile && e.status === 'renamed')?.oldPath ?? '';
+  const fileDiff = useWorkbenchFileDiff(path, viewBase, src, activeFile, mode === 'diff', renameOldPath);
 
   const statsMap = new Map(
     changeList.map((e) => [e.path, { adds: e.adds, dels: e.dels, binary: e.binary, status: e.status, oldPath: e.oldPath || undefined }]),

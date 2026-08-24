@@ -1318,6 +1318,7 @@ export interface operations {
         left?: string;
         right: string;
         file: string;
+        leftFile?: string;
       };
       header?: never;
       path?: never;

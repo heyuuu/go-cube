@@ -110,23 +110,26 @@ export function useWorkbenchDiff(path: string, left: TreeSource, right: TreeSour
   });
 }
 
-// left 为 null 时后端按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 /changes），
-// 供 code 面板的 diff 模式使用；enabled 供面板按内容模式懒拉
+// left 为 null 时后端按「相对基准」对比（worktree vs HEAD、ref/commit vs 父提交，同 /changes）；
+// leftFile 为基准侧路径（rename 条目与右侧不同，未改内容的 rename 两侧字节相同应显示一致）；
+// enabled 供面板按内容模式懒拉
 export function useWorkbenchFileDiff(
   path: string,
   left: TreeSource | null,
   right: TreeSource,
   file: string,
   enabled = true,
+  leftFile = '',
 ) {
   return useQuery({
-    queryKey: ['workbench', 'fileDiff', path, left ? toUri(left) : 'base', toUri(right), file],
+    queryKey: ['workbench', 'fileDiff', path, left ? toUri(left) : 'base', toUri(right), file, leftFile],
     queryFn: () =>
       apiGet('/api/workbench/file-diff', {
         path,
         ...(left ? { left: toUri(left) } : {}),
         right: toUri(right),
         file,
+        ...(leftFile ? { leftFile } : {}),
       }),
     enabled: enabled && path !== '' && file !== '' && right.id !== '',
     staleTime: 0,

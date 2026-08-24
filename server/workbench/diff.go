@@ -239,12 +239,17 @@ func diffTreesFs(root string, left TreeSource, right TreeSource) (*DiffTreesResu
 	return &DiffTreesResult{Mode: "fs", List: list}, nil
 }
 
-// readFileDiff 对比两个源下同一相对路径的文件。
+// readFileDiff 对比两个源下某文件的行级差异。file 为右侧（新侧）路径；
+// rename 条目在基准侧的路径不同——leftFile 非空时左侧按旧路径读，
+// 未改内容的 rename 两侧字节相同，自然落进「内容一致」分支。
 // 两侧内容经各自渠道取出（worktree 走 fs、tree-ish 走 git show），
 // 行级 diff 用 git.DiffNoIndex（算法与展示语义和 git 完全一致），
 // 内容落临时文件后比较，结束清理。
-func readFileDiff(root string, left TreeSource, right TreeSource, file string) (*FileDiffResult, error) {
-	leftData, err := readSide(root, left, file)
+func readFileDiff(root string, left TreeSource, right TreeSource, file string, leftFile string) (*FileDiffResult, error) {
+	if leftFile == "" {
+		leftFile = file
+	}
+	leftData, err := readSide(root, left, leftFile)
 	if err != nil {
 		return nil, fmt.Errorf("读取左侧文件失败: %w", err)
 	}
