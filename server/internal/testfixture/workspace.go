@@ -1,53 +1,23 @@
 // Package testfixture 提供 cube 测试用的通用辅助：临时工作区、git 仓库 fixture、工程目录 fixture。
 //
-// 临时目录策略：默认写到项目根的 runtime/test/ 下（已 gitignore），而非系统 /tmp。
-// 理由：测试失败时方便人工翻看现场排查；runtime/test/ 持久保留，不自动清理。
+// 临时目录策略：写到系统临时目录（os.MkdirTemp），测试成功后自动删除；
+// 测试失败时保留现场并在日志中打印路径，便于人工排查。
+// （旧方案写项目内 runtime/test/ 且永不清理，会持续膨胀并被 goimports/IDE 扫描拖慢。）
 //
 // 用法：
 //
 //	ws := testfixture.NewWorkspace(t)
-//	dir := ws.Dir  // 该测试专属目录（runtime/test/<毫秒时间戳>-<testname>/）
+//	dir := ws.Dir  // 该测试专属目录（系统临时目录下 <testname>-<随机后缀>/）
 //
 // 该包是普通包（非 _test.go），可被任何测试包 import。
 package testfixture
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"sync"
 	"testing"
-	"time"
 )
-
-// testRootOnce 保证 runtime/test 目录只创建一次。
-var (
-	testRootOnce sync.Once
-	testRootErr  error
-	testRootPath string
-)
-
-// ensureTestRoot 确保 runtime/test 存在，返回其绝对路径。
-// 依赖项目根定位（testfixture 包位于 <root>/internal/testfixture，向上两级即项目根）。
-func ensureTestRoot() (string, error) {
-	testRootOnce.Do(func() {
-		_, file, _, ok := runtime.Caller(0)
-		if !ok {
-			testRootErr = fmt.Errorf("无法定位 testfixture 源文件")
-			return
-		}
-		// file = <root>/internal/testfixture/workspace.go
-		root := filepath.Join(filepath.Dir(file), "..", "..")
-		testRootPath = filepath.Join(root, "runtime", "test")
-		if err := os.MkdirAll(testRootPath, 0755); err != nil {
-			testRootErr = fmt.Errorf("创建测试根目录失败: %w", err)
-			return
-		}
-	})
-	return testRootPath, testRootErr
-}
 
 // Workspace 表示一个测试的专属工作目录。
 // 每个测试获得独立子目录（带时间戳 + 测试名），互不污染，失败后可翻看现场。
@@ -56,22 +26,25 @@ type Workspace struct {
 	Dir string // 该测试的工作目录（绝对路径）
 }
 
-// NewWorkspace 在 runtime/test/ 下为当前测试创建一个独立工作目录。
-// 目录名格式：<毫秒时间戳>-<sanitized testname>，便于排序与定位。
-// 目录不自动清理（排查用）；如需清理可在测试末尾调 ws.Cleanup()。
+// NewWorkspace 在系统临时目录下为当前测试创建一个独立工作目录。
+// 目录名格式：cube-test-<sanitized testname>-<随机后缀>。
+// 测试成功结束后自动删除；失败时保留并打印路径供排查。
 func NewWorkspace(t testing.TB) *Workspace {
 	t.Helper()
-	root, err := ensureTestRoot()
-	if err != nil {
-		t.Fatalf("testfixture: %v", err)
-	}
 	name := sanitizeName(t.Name())
-	dirName := fmt.Sprintf("%s-%s", time.Now().Format("20060102-150405.000"), name)
-	dir := filepath.Join(root, dirName)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	dir, err := os.MkdirTemp("", "cube-test-"+name+"-")
+	if err != nil {
 		t.Fatalf("testfixture: 创建工作目录失败: %v", err)
 	}
-	return &Workspace{TB: t, Dir: dir}
+	ws := &Workspace{TB: t, Dir: dir}
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("测试失败，现场保留于: %s", dir)
+			return
+		}
+		_ = os.RemoveAll(dir)
+	})
+	return ws
 }
 
 // sanitizeName 把测试名（含 "/" 等）压成目录安全字符串。
