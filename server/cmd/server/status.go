@@ -17,15 +17,19 @@ func newStatusCmd(a *app.App) *cobra.Command {
 		Short: "查看 server 运行状态",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			st, err := serve.Status(a.Server().Port())
-			if err != nil {
-				return err
-			}
-			printStatus(a, st)
-			return nil
+			return runStatus(a)
 		},
 	}
 	return cmd
+}
+
+func runStatus(a *app.App) error {
+	st, err := serve.Status(a.Server().Port())
+	if err != nil {
+		return err
+	}
+	printStatus(a, st)
+	return nil
 }
 
 func printStatus(a *app.App, st serve.StatusInfo) {

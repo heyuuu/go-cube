@@ -15,14 +15,10 @@ import (
 //
 // 默认前台（开发/调试用，Ctrl+C 退）；--detach 后台 fork 脱终端。
 func newStartCmd(a *app.App) *cobra.Command {
-	return newStartCmdEx(a, "start", "前台启动 server（Ctrl+C 退出）")
-}
-
-func newStartCmdEx(a *app.App, use string, short string) *cobra.Command {
 	var detach bool
 	cmd := &cobra.Command{
-		Use:   use,
-		Short: short,
+		Use:   "start",
+		Short: "前台启动 server（Ctrl+C 退出）",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if detach {
