@@ -215,7 +215,7 @@ export function TerminalPanel({ path }: { path: string }) {
             >
               <Settings2 className="size-3.5" />
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-44">
+            <DropdownMenuContent align="end" className="min-w-56">
               <DropdownMenuRadioGroup
                 value={fontId}
                 onValueChange={(v) => setFontId(v as (typeof FONT_PRESETS)[number]['id'])}

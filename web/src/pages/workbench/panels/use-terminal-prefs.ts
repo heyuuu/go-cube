@@ -17,6 +17,9 @@ export const FONT_PRESETS = [
   { id: 'monaco', label: 'Monaco', stack: 'Monaco, Menlo, monospace' },
   { id: 'sfmono', label: 'SF Mono', stack: "'SF Mono', Menlo, monospace" },
   { id: 'jetbrains', label: 'JetBrains Mono', stack: "'JetBrains Mono', Menlo, monospace" },
+  // Nerd Font 系自带 powerline 图标字形，选它即可正常显示终端提示符里的箭头/分支符号
+  { id: 'jetbrains-nf', label: 'JetBrainsMono Nerd Font', stack: "'JetBrainsMono Nerd Font', Menlo, monospace" },
+  { id: 'maple-nf', label: 'Maple Mono NF CN', stack: "'Maple Mono NF CN', 'JetBrainsMono Nerd Font', Menlo, monospace" },
 ] as const;
 
 export type FontPresetId = (typeof FONT_PRESETS)[number]['id'];
