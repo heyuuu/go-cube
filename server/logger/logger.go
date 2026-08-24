@@ -56,8 +56,8 @@ func initFileHandler(level slog.Level, logPath string) slog.Handler {
 	logFile := filepath.Join(logPath, logFileName)
 
 	// init log file
-	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
-		panic(fmt.Errorf("创建日志目录失败: dir=%s err=%w", filepath.Dir(logPath), err))
+	if err := os.MkdirAll(filepath.Dir(logFile), 0o755); err != nil {
+		panic(fmt.Errorf("创建日志目录失败: dir=%s err=%w", filepath.Dir(logFile), err))
 	}
 	file, err := os.OpenFile(logFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0666)
 	if err != nil {
