@@ -1,4 +1,4 @@
-import { ChevronDown, Copy, Eye, EyeOff, GitBranch, Monitor } from 'lucide-react';
+import { Check, ChevronDown, Cloud, Copy, ExternalLink, Eye, EyeOff, GitBranch, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -21,8 +21,10 @@ import {
   useWorkbenchCommits,
   useWorkbenchInfo,
   useWorkbenchRefs,
+  useWorkbenchRemotes,
   useWorkbenchWorktrees,
   type CommitEntry,
+  type RemoteEntry,
   type WorktreeStatus,
 } from '@/queries/workbench';
 
@@ -109,6 +111,7 @@ function WorktreeSection({
           />
         ))}
       </Section>
+      <RemoteSection path={path} />
       <Section title="分支" icon={<GitBranch className="size-3.5" />}>
         {(refs.data?.locals ?? []).map((b) => (
           <SelectableRow
@@ -122,6 +125,61 @@ function WorktreeSection({
         ))}
       </Section>
     </>
+  );
+}
+
+// --- 远端分组：remote 配置列表（非 ref，不可选中），复制地址 + 跳转托管平台网页 ---
+
+function RemoteSection({ path }: { path: string }) {
+  const remotes = useWorkbenchRemotes(path);
+  const list = remotes.data ?? [];
+  if (list.length === 0) return null;
+  return (
+    <Section title="远端" icon={<Cloud className="size-3.5" />}>
+      {list.map((r) => (
+        <RemoteRow key={r.name} remote={r} />
+      ))}
+    </Section>
+  );
+}
+
+function RemoteRow({ remote }: { remote: RemoteEntry }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    void navigator.clipboard.writeText(remote.url).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    });
+  };
+  return (
+    <div className="flex items-center px-2 leading-7 text-xs">
+      <span className="shrink-0 font-medium">{remote.name}</span>
+      <span className="ml-2 min-w-0 truncate font-mono text-[10px] text-muted-foreground" title={remote.url}>
+        {remote.url}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        className="ml-auto shrink-0"
+        title="复制 git 地址"
+        aria-label={`复制 ${remote.name} 的地址`}
+        onClick={copy}
+      >
+        {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
+      </Button>
+      {remote.webUrl ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0"
+          title={remote.webUrl}
+          aria-label={`打开 ${remote.name} 的网页`}
+          onClick={() => window.open(remote.webUrl, '_blank', 'noopener')}
+        >
+          <ExternalLink className="size-3.5" />
+        </Button>
+      ) : null}
+    </div>
   );
 }
 

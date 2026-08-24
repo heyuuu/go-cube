@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"cube/internal/testfixture"
 	"cube/util/git"
 	"cube/workbench"
 
@@ -66,6 +67,33 @@ func TestWorkbenchRefs(t *testing.T) {
 	// 无 remote/tag 的 fixture：remotes/tags 是 nil 切片，envelope 应序列化为 []
 	if got.Remotes == nil || got.Tags == nil {
 		t.Errorf("nil 切片应序列化为 [], got remotes=%v tags=%v", got.Remotes, got.Tags)
+	}
+}
+
+func TestWorkbenchRemotes(t *testing.T) {
+	env := newTestEnv(t)
+	// fixture 项目无 remote；单独建一个带 origin 的仓库，覆盖 ssh 地址 → webUrl 转换
+	repo := env.ws.MakeGitRepoWith("with-remote", testfixture.GitRepoSpec{RemoteUrl: "git@github.com:heyuuu/cube.git"})
+
+	var got []struct {
+		Name   string `json:"name"`
+		Url    string `json:"url"`
+		WebUrl string `json:"webUrl"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/remotes?path="+repo)), &got)
+	if len(got) != 1 || got[0].Name != "origin" {
+		t.Fatalf("应只有一个 origin remote, got %+v", got)
+	}
+	if got[0].Url != "git@github.com:heyuuu/cube.git" {
+		t.Errorf("url 应为抓取地址, got %q", got[0].Url)
+	}
+	if got[0].WebUrl != "https://github.com/heyuuu/cube" {
+		t.Errorf("ssh 地址应转换为网页地址, got %q", got[0].WebUrl)
+	}
+
+	// 无 remote 的仓库：nil 切片序列化为 []
+	if r := getJSON(t, env.url("/api/workbench/remotes?path="+env.ws.Join("g1/proj1"))); !r.Ok {
+		t.Error("无 remote 的仓库应为空列表而非报错")
 	}
 }
 

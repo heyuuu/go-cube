@@ -27,6 +27,14 @@ type Refs struct {
 	Tags    []string `json:"tags"`    // 全部 tag（refs/tags/*）
 }
 
+// RemoteEntry 单个 remote 的展示信息：抓取地址 + 转换出的托管平台网页地址
+// （ParseRepoUrl().WebUrl()，自建私服等无法识别的 host 为空串）。
+type RemoteEntry struct {
+	Name   string `json:"name"`
+	Url    string `json:"url"`
+	WebUrl string `json:"webUrl"`
+}
+
 // CommitsPageResult commit 日志一页数据（纯列表，泳道布局由前端对已持有数据计算）。
 // Cursor 用 skip 偏移（依赖 git log 对同一 ref 集合的确定序），前端按 sha 去重兜底翻页边界。
 type CommitsPageResult struct {

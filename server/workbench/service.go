@@ -67,6 +67,28 @@ func (s *Service) Refs(path string) (*Refs, error) {
 	}, nil
 }
 
+// Remotes 列出仓库配置的 remote（名字 + 抓取地址 + 网页地址），git 树面板
+// 「远端」分组展示。url 无法解析成网页地址时 webUrl 为空，前端隐藏跳转按钮。
+func (s *Service) Remotes(path string) ([]RemoteEntry, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	remotes, err := git.Remotes(root)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]RemoteEntry, 0, len(remotes))
+	for _, r := range remotes {
+		entry := RemoteEntry{Name: r.Name, Url: r.Fetch}
+		if repoUrl, err := git.ParseRepoUrl(r.Fetch); err == nil {
+			entry.WebUrl = repoUrl.WebUrl()
+		}
+		list = append(list, entry)
+	}
+	return list, nil
+}
+
 // Commits 拉取 commit 日志一页（--all 全分支；纯列表，泳道布局由前端对已持有数据计算）。
 func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResult, error) {
 	root, ok := git.FindGitRoot(path)

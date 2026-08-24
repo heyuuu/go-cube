@@ -27,6 +27,18 @@ export function useWorkbenchRefs(path: string) {
   });
 }
 
+export type RemoteEntry = components['schemas']['RemoteEntry'];
+
+// remote 配置列表（名字 + 抓取地址 + 网页地址），低频基础信息
+export function useWorkbenchRemotes(path: string) {
+  return useQuery({
+    queryKey: ['workbench', 'remotes', path],
+    queryFn: () => apiGet('/api/workbench/remotes', { path }),
+    enabled: path !== '',
+    staleTime: 30_000,
+  });
+}
+
 export type CommitEntry = components['schemas']['CommitEntry'];
 export type CommitRef = components['schemas']['CommitRef'];
 

@@ -28,6 +28,7 @@ func NewWorkbenchHandler(workbenchService *workbench.Service) *WorkbenchHandler 
 func (h *WorkbenchHandler) Register(api huma.API) {
 	apiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
 	apiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
+	apiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
 	apiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
 	apiGet(api, "/api/workbench/worktrees", "全部工作副本的状态快照", h.worktrees)
 	apiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
@@ -48,6 +49,12 @@ func (h *WorkbenchHandler) refs(input struct {
 	Path string `query:"path" required:"true"`
 }) (*workbench.Refs, error) {
 	return h.workbenchService.Refs(input.Path)
+}
+
+func (h *WorkbenchHandler) remotes(input struct {
+	Path string `query:"path" required:"true"`
+}) ([]workbench.RemoteEntry, error) {
+	return h.workbenchService.Remotes(input.Path)
 }
 
 func (h *WorkbenchHandler) commits(input struct {

@@ -327,6 +327,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/remotes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取工作台 remote 列表 */
+    get: operations['workbench.remotes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/tree': {
     parameters: {
       query?: never;
@@ -428,6 +445,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Info'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputListRemoteEntryBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListRemoteEntryBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['RemoteEntry'][] | null;
       message: string;
       ok: boolean;
     };
@@ -802,6 +830,11 @@ export interface components {
       locals: string[] | null;
       remotes: string[] | null;
       tags: string[] | null;
+    };
+    RemoteEntry: {
+      name: string;
+      url: string;
+      webUrl: string;
     };
     ScanRule: {
       group: string;
@@ -1428,6 +1461,37 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputRefsBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.remotes': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListRemoteEntryBody'];
         };
       };
       /** @description Error */
