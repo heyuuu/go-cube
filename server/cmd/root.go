@@ -12,6 +12,7 @@ import (
 	"cube/cmd/alfred"
 	"cube/cmd/dev"
 	"cube/cmd/server"
+	"cube/cmd/web"
 	"cube/config"
 	"cube/logger"
 	"cube/version"
@@ -27,7 +28,7 @@ func newRootCmd(a *app.App) *cobra.Command {
   - 项目：projects(列表) info(详情) open(打开) init/clone(初始化) check(检查)
   - opener：openers(列表) open-path(打开路径) diff(对比)
   - git：push(批量推送) pull(批量拉取)
-  - Web：server(本地服务) openapi(导出 API spec)
+  - Web：server(本地服务) web(打开 Web UI) openapi(导出 API spec)
 
 配置默认在 ~/.config/cube/，全局 flag -c 可覆盖配置目录，-d 开 debug 日志。
 --local 让 query 缺省的命令（info/pull/push/open）以当前目录定位项目，
@@ -38,6 +39,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 
 	// web server 相关
 	cmd.AddCommand(server.NewCmd(a))
+	cmd.AddCommand(web.NewCmd(a))
 	cmd.AddCommand(newOpenapiCmd(a))
 
 	// project 相关
@@ -51,7 +53,6 @@ func newRootCmd(a *app.App) *cobra.Command {
 	// open 相关
 	cmd.AddCommand(newOpenersCmd(a))
 	cmd.AddCommand(newOpenPathCmd(a))
-	cmd.AddCommand(newMdCmd(a)) // 以 Web 方式打开 markdown
 	cmd.AddCommand(newDiffCmd(a))
 
 	// git 相关

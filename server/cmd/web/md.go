@@ -1,11 +1,10 @@
-package cmd
+package web
 
 import (
 	"errors"
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 
 	"github.com/spf13/cobra"
 
@@ -14,9 +13,8 @@ import (
 	"cube/util/pathkit"
 )
 
-// newMdCmd `cube md <path>` —— 以 Web 方式打开 markdown 文件。
+// newMdCmd `cube web md <path>` —— 以 Web 方式打开 markdown 文件（原一级命令 `cube md` 迁入）。
 //
-// server 不在跑时报错退出（不做 lazy 拉起，遵循「显式 start」的 server 管理模式）；
 // 页面与渲染归前端工程（/md?path=<abs>），本命令只负责拼 URL 并开浏览器。
 func newMdCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
@@ -51,11 +49,6 @@ func runMd(a *app.App, rawPath string) error {
 	}
 
 	pageURL := fmt.Sprintf("%smd?path=%s", a.Server().ServerURL(), url.QueryEscape(absPath))
-	if err := exec.Command("open", pageURL).Run(); err != nil {
-		// 打开浏览器失败不阻断：把 URL 打出来让用户手动访问
-		fmt.Printf("自动打开浏览器失败，请手动访问：%s\n", pageURL)
-	} else {
-		fmt.Printf("%s\n", pageURL)
-	}
+	openInBrowser(pageURL)
 	return nil
 }
