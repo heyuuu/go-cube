@@ -116,3 +116,67 @@ func TestServiceIconEndToEnd(t *testing.T) {
 		t.Fatalf("无 icon 应得零值, got %+v", p.Icon())
 	}
 }
+
+func TestServiceSaveDelete(t *testing.T) {
+	t.Run("新增后可读回", func(t *testing.T) {
+		s, _ := newServiceAt(t, nil)
+		if err := s.SaveOpener(Spec{Name: "code", Cmd: []string{"code"}}); err != nil {
+			t.Fatalf("保存失败: %v", err)
+		}
+		if o := s.FindByName("code"); o == nil {
+			t.Fatal("保存后应可读回")
+		}
+	})
+
+	t.Run("按名替换不重复", func(t *testing.T) {
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: []string{"code"}}})
+		if err := s.SaveOpener(Spec{Name: "code", Cmd: []string{"code", "$0"}}); err != nil {
+			t.Fatalf("保存失败: %v", err)
+		}
+		if got := s.AllOpeners(); len(got) != 1 {
+			t.Fatalf("应仍为 1 条, got %d", len(got))
+		}
+		if o := s.FindByName("code"); o.Summary() != "code $0" {
+			t.Fatalf("内容应被替换, got %q", o.Summary())
+		}
+	})
+
+	t.Run("坏数据返回中文错误且不落文件", func(t *testing.T) {
+		s, _ := newServiceAt(t, nil)
+		if err := s.SaveOpener(Spec{Name: "bad", Cmd: nil}); err == nil {
+			t.Fatal("缺 cmd 应报错")
+		}
+		if err := s.SaveOpener(Spec{Name: "bad", Type: "ftp"}); err == nil {
+			t.Fatal("未知 type 应报错")
+		}
+		if err := s.SaveOpener(Spec{Name: "", Cmd: []string{"x"}}); err == nil {
+			t.Fatal("空 name 应报错")
+		}
+		if got := s.AllOpeners(); len(got) != 0 {
+			t.Fatalf("坏数据不应落文件, got %d", len(got))
+		}
+	})
+
+	t.Run("web 形态经 save 校验", func(t *testing.T) {
+		s, _ := newServiceAt(t, nil)
+		if err := s.SaveOpener(Spec{Name: "wb", Type: "web", Target: "workbench"}); err != nil {
+			t.Fatalf("合法 web opener 保存失败: %v", err)
+		}
+		if err := s.SaveOpener(Spec{Name: "wb2", Type: "web", Target: "nope"}); err == nil {
+			t.Fatal("未知 target 应报错")
+		}
+	})
+
+	t.Run("删除与不存在报错", func(t *testing.T) {
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: []string{"code"}}})
+		if err := s.DeleteOpener("code"); err != nil {
+			t.Fatalf("删除失败: %v", err)
+		}
+		if got := s.AllOpeners(); len(got) != 0 {
+			t.Fatalf("删除后应为空, got %d", len(got))
+		}
+		if err := s.DeleteOpener("nope"); err == nil {
+			t.Fatal("删除不存在项应报错")
+		}
+	})
+}

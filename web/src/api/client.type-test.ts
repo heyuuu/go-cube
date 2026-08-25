@@ -32,7 +32,7 @@ export async function typeContractProbe() {
   // 端点可测，QueryArg 类型仍保留该分支，待未来出现可选 query 端点时补回探针。
 
   // POST body 类型应精确为 OpenerOpenInputBody
-  await apiPost('/api/opener/open', { path: '/tmp/x', app: 'code' });
+  await apiPost('/api/opener/open', { path: '/tmp/x', opener: 'code' });
   // @ts-expect-error body 字段名错误
   await apiPost('/api/opener/open', { wrong: 'field' });
 }

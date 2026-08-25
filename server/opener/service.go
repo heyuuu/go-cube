@@ -1,6 +1,7 @@
 package opener
 
 import (
+	"fmt"
 	"slices"
 
 	"cube/settings"
@@ -78,4 +79,56 @@ func (s *Service) FindByName(name string) Opener {
 		}
 	}
 	return nil
+}
+
+// SaveOpener 新增或按名替换一条 opener。
+// 写前先走领域构造校验（按 Type 分发到对应 Init，只验不留实例）——坏数据返回
+// 中文错误、落不了文件（提案「校验收敛在读写边界」的写侧）。
+func (s *Service) SaveOpener(spec Spec) error {
+	if spec.Name == "" {
+		return fmt.Errorf("opener name 不得为空")
+	}
+	switch spec.Type {
+	case SpecTypeExec, "":
+		if _, err := InitExecOpener(spec, s.executor); err != nil {
+			return err
+		}
+	case SpecTypeWeb:
+		if _, err := InitWebOpener(spec, s.serverBaseURL, s.executor); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("未知的 opener type %q（合法值：exec/web）", spec.Type)
+	}
+
+	var specs []Spec
+	settings.LoadSection(s.settingsFile, settingsSection, &specs)
+	replaced := false
+	for i, cur := range specs {
+		if cur.Name == spec.Name {
+			specs[i] = spec
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		specs = append(specs, spec)
+	}
+	return settings.SaveSection(s.settingsFile, settingsSection, specs)
+}
+
+// DeleteOpener 按名删除一条 opener；不存在时返回中文错误。
+func (s *Service) DeleteOpener(name string) error {
+	var specs []Spec
+	settings.LoadSection(s.settingsFile, settingsSection, &specs)
+	rest := make([]Spec, 0, len(specs))
+	for _, cur := range specs {
+		if cur.Name != name {
+			rest = append(rest, cur)
+		}
+	}
+	if len(rest) == len(specs) {
+		return fmt.Errorf("未找到指定 opener: %s", name)
+	}
+	return settings.SaveSection(s.settingsFile, settingsSection, rest)
 }

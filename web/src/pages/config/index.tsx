@@ -2,6 +2,7 @@ import { ErrorBanner } from '@/components/error-banner';
 import { PageHeader } from '@/components/page-header';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useConfig } from '@/queries/config';
+import { OpenersSection } from './openers';
 
 // 配置小节：标题 + 表格（空数据显示占位行）
 function ConfigSection({ title, sub, head, rows }: { title: string; sub?: string; head: string[]; rows: string[][] }) {
@@ -51,7 +52,7 @@ export function ConfigPage() {
 
   return (
     <div>
-      <PageHeader title="Config" meta="配置只读展示；修改请编辑 config.json 或使用 CLI" />
+      <PageHeader title="Config" meta="配置展示（openers 可直接编辑，其余请编辑 config.json 或使用 CLI）" />
       {config.error && <ErrorBanner message={`加载失败：${config.error.message}`} />}
 
       <div className="flex flex-col gap-6 px-6 pb-6">
@@ -87,12 +88,7 @@ export function ConfigPage() {
               rows={(cfg.project?.clone ?? []).map((r) => [r.repoHost, r.repoPrefix, r.localPath])}
             />
 
-            <ConfigSection
-              title="打开工具（openers）"
-              sub="cmd 用 $0/$1 占位路径槽位"
-              head={['name', 'cmd', 'roles']}
-              rows={(cfg.openers ?? []).map((o) => [o.name, (o.cmd ?? []).join(' '), (o.roles ?? []).join(', ')])}
-            />
+            <OpenersSection />
           </>
         )}
       </div>

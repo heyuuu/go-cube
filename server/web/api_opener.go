@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/opener"
+	"cube/util/iconkit"
 	"cube/util/slicekit"
 )
 
@@ -63,6 +65,9 @@ func (h *OpenerHandler) Register(api huma.API) {
 	apiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
 	apiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
 	apiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
+	apiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
+	apiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
+	apiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
 }
 
 func (h *OpenerHandler) openerList(_ struct{}) (ListResult[*OpenerDTO], error) {
@@ -111,4 +116,63 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 		return nil, fmt.Errorf("打开失败: %w", err)
 	}
 	return map[string]any{"ok": true}, nil
+}
+
+// OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
+type OpenerSaveInput struct {
+	Body struct {
+		Name   string         `json:"name" doc:"opener 名称（唯一标识）"`
+		Type   string         `json:"type,omitempty" doc:"exec（默认）| web"`
+		Cmd    []string       `json:"cmd,omitempty" doc:"exec：启动命令，$0/$1 占位路径槽位"`
+		Target string         `json:"target,omitempty" doc:"web：目标页面（workbench）"`
+		Roles  []string       `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
+		Icon   *OpenerIconDTO `json:"icon,omitempty" doc:"图标声明"`
+	}
+}
+
+func (h *OpenerHandler) openerSave(input OpenerSaveInput) (map[string]any, error) {
+	spec := opener.Spec{
+		Name:   input.Body.Name,
+		Type:   input.Body.Type,
+		Cmd:    input.Body.Cmd,
+		Target: input.Body.Target,
+		Roles:  input.Body.Roles,
+	}
+	if input.Body.Icon != nil {
+		spec.Icon = &opener.Icon{Type: input.Body.Icon.Type, Value: input.Body.Icon.Value}
+	}
+	// 校验在 Service 写侧（领域构造函数），坏数据返回中文错误、不落文件
+	if err := h.service.SaveOpener(spec); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// OpenerDeleteInput delete 接口入参。
+type OpenerDeleteInput struct {
+	Body struct {
+		Name string `json:"name" doc:"opener 名称"`
+	}
+}
+
+func (h *OpenerHandler) openerDelete(input OpenerDeleteInput) (map[string]any, error) {
+	if err := h.service.DeleteOpener(input.Body.Name); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// OpenerExtractIconInput extract-icon 接口入参。
+type OpenerExtractIconInput struct {
+	Body struct {
+		Path string `json:"path" doc:".app 目录绝对路径"`
+	}
+}
+
+func (h *OpenerHandler) openerExtractIcon(input OpenerExtractIconInput) (map[string]any, error) {
+	pngData, err := iconkit.ExtractAppIcon(input.Body.Path)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{"value": base64.StdEncoding.EncodeToString(pngData)}, nil
 }

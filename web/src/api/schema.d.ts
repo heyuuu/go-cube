@@ -55,6 +55,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/opener/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按名删除 opener */
+    post: operations['opener.delete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/extract-icon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 从本地 .app 提取图标（64px PNG，base64） */
+    post: operations['opener.extractIcon'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/info': {
     parameters: {
       query?: never;
@@ -100,6 +134,23 @@ export interface paths {
     put?: never;
     /** 用指定 opener 打开任意文件或目录 */
     post: operations['opener.open'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新增或更新 opener（按 name 替换） */
+    post: operations['opener.save'];
     delete?: never;
     options?: never;
     head?: never;
@@ -789,6 +840,26 @@ export interface components {
       summary: string;
       type: string;
     };
+    OpenerDeleteInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerDeleteInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description opener 名称 */
+      name: string;
+    };
+    OpenerExtractIconInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerExtractIconInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description .app 目录绝对路径 */
+      path: string;
+    };
     OpenerIconDTO: {
       type: string;
       value: string;
@@ -804,6 +875,26 @@ export interface components {
       opener: string;
       /** @description 文件或目录绝对路径 */
       path: string;
+    };
+    OpenerSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description exec：启动命令，$0/$1 占位路径槽位 */
+      cmd?: string[] | null;
+      /** @description 图标声明 */
+      icon?: components['schemas']['OpenerIconDTO'];
+      /** @description opener 名称（唯一标识） */
+      name: string;
+      /** @description 业务用途枚举，缺省视为 open-dir */
+      roles?: string[] | null;
+      /** @description web：目标页面（workbench） */
+      target?: string;
+      /** @description exec（默认）| web */
+      type?: string;
     };
     ProjectConfig: {
       clone: components['schemas']['CloneRuleConfig'][] | null;
@@ -982,6 +1073,72 @@ export interface operations {
       };
     };
   };
+  'opener.delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.extractIcon': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerExtractIconInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'opener.info': {
     parameters: {
       query: {
@@ -1052,6 +1209,39 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['OpenerOpenInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerSaveInputBody'];
       };
     };
     responses: {
