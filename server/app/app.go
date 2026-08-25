@@ -44,7 +44,7 @@ func New(cfg *config.Config) (*App, error) {
 	openerService := opener.NewService(cfg.Openers, nil)
 	historyService := history.NewService(dataDb)
 	workbenchService := workbench.NewService()
-	createService := create.NewService()
+	createService := create.NewService(cfg.Create)
 	services := []any{projectService, openerService, historyService, workbenchService, createService}
 
 	// 各 service 就绪后触发一次性初始化（AutoMigrate 等）

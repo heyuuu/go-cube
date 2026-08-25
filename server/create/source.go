@@ -52,36 +52,44 @@ func ResolveTemplateDir(source string) (dir string, cleanup func(), err error) {
 	return tempDir, func() { _ = os.RemoveAll(tempDir) }, nil
 }
 
-// SourceLayout 描述来源根目录的形态：单模板或模板集。
+// SourceLayout 描述来源的形态：单模板或模板集。
 type SourceLayout struct {
-	Dir           string   // 来源根目录（绝对路径）
-	TemplateNames []string // 非空表示模板集（一级子目录名，字典序）；空表示根目录即单模板
+	Dir           string   // 模板所在目录（单模板=来源根；模板集=templates/ 子目录）
+	TemplateNames []string // 非空表示模板集（templates/ 一级子目录名，字典序）；空表示单模板
 }
 
 // InspectSource 判定来源目录形态：根目录有 template.yaml → 单模板；
-// 否则扫一级子目录找 template.yaml → 模板集（只扫一级，嵌套模板集无场景）；两者都不是 → 报错。
+// InspectSource 判定来源目录形态（收纳式，模板只活在 templates/ 里）：
+// 根目录有 template.yaml → 单模板；否则 templates/ 子目录的一级子目录（各含
+// template.yaml，跳过隐藏目录）构成模板集；两者都不是 → 报错。
+// 根目录的其他内容（README/docs/草稿目录等）不参与判定。
 func InspectSource(dir string) (*SourceLayout, error) {
 	if fileExists(filepath.Join(dir, "template.yaml")) {
 		return &SourceLayout{Dir: dir}, nil
 	}
-	entries, err := os.ReadDir(dir)
+	tplRoot := filepath.Join(dir, "templates")
+	if info, err := os.Stat(tplRoot); err != nil || !info.IsDir() {
+		return nil, fmt.Errorf("%s 不是合法模板来源：根目录无 template.yaml，也无 templates/ 子目录", pathkit.PrettyPath(dir))
+	}
+	entries, err := os.ReadDir(tplRoot)
 	if err != nil {
-		return nil, fmt.Errorf("读取模板来源目录失败: %w", err)
+		return nil, fmt.Errorf("读取 templates/ 目录失败: %w", err)
 	}
 	var names []string
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
-		if fileExists(filepath.Join(dir, e.Name(), "template.yaml")) {
+		if fileExists(filepath.Join(tplRoot, e.Name(), "template.yaml")) {
 			names = append(names, e.Name())
 		}
 	}
 	if len(names) == 0 {
-		return nil, fmt.Errorf("%s 不是合法模板来源：根目录及一级子目录均无 template.yaml", pathkit.PrettyPath(dir))
+		return nil, fmt.Errorf("templates/ 子目录下没有任何模板（一级子目录需各含 template.yaml）: %s", pathkit.PrettyPath(tplRoot))
 	}
 	sort.Strings(names)
-	return &SourceLayout{Dir: dir, TemplateNames: names}, nil
+	// Dir 指向「模板所在的目录」：单模板是来源根，模板集是 templates/
+	return &SourceLayout{Dir: tplRoot, TemplateNames: names}, nil
 }
 
 // SelectTemplateDir 在来源内定位最终的模板目录：

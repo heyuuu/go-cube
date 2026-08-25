@@ -16,6 +16,11 @@ type Config struct {
 	Server  ServerConfig   `json:"server"`
 	Project ProjectConfig  `json:"project"`
 	Openers []OpenerConfig `json:"openers"`
+	Create  CreateConfig   `json:"create"`
+}
+
+type CreateConfig struct {
+	TemplateSource string `json:"templateSource"` // cube create 未显式传 --tpl 时的默认模板来源（本地目录或 git url）
 }
 
 type LogConfig struct {

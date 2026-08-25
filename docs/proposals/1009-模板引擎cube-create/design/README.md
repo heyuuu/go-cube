@@ -23,21 +23,30 @@
 ## 二、调用方式
 
 ```bash
-cube create <模板来源> [模板名] <目标路径> [--key=value ...]
+cube create <目标路径> [--tpl 模板来源] [--tpl-name 模板名] [--var key=value ...]
 ```
 
-- **模板来源（二选一，不内置任何模板）**：
-  - 本地目录路径：`cube create ~/templates/go-service my-app`
-  - git 仓库地址：`cube create https://github.com/xxx/tpl-repo go-service my-app`
-- 模板名：来源是**模板集**（目录下无 template.yaml、一级子目录各有）时用于选子模板；来源本身就是模板时可省略；来源是模板集但没给模板名 → 交互式列出可选模板让用户选。
-- 目标路径：生成的项目位置。
-- 变量：命令行参数优先；缺的交互式提问补齐。
+- **目标路径**：唯一位置参数，必传，不存在时自动创建（含多级）。
+- **--tpl 模板来源**（不内置任何模板）：本地目录或 git 仓库 url（`--depth 1` clone 到临时目录）。缺省时弹交互输入框，预填 config.json `create.templateSource`（默认来源）。
+- **--tpl-name 模板名**：模板集选子模板用。单模板传名报错；指定名不存在报错并列出可用；模板集缺省交互选择。
+- **--var key=value**：模板变量，可多次。传未声明的变量报错，缺的交互提问。
 
-参数和交互都支持：`cube create ~/templates/go-service my-app --author=heyu`，缺的变量会逐个问。
+两种主用法，其余是边缘校验：
+
+1. `cube create my-app` —— 交互式逐步创建（来源/模板名/变量缺啥问啥）；
+2. `cube create my-app --tpl ... --tpl-name ... --var k=v ...` —— 外部拼好的命令，非交互一步生成。
+
+**为什么来源/模板名/变量全走 flag（位置参数只有目标路径）**：位置参数按个数切语义（1/2/3 参各不相同、每个位置的作用不统一）难记且传多传少会变形；flag 语义固定、互不依赖，将来加字段也不挤压位置参数空间。
+
+**config 配置**（`config.json` 的 `create` 节）：
+
+```json
+{ "create": { "templateSource": "https://github.com/xxx/templates.git" } }
+```
 
 **为什么不内置**：内置模板改一次要重新 build/install 二进制，迭代太重。外置让模板独立演进，且引擎统一面向「一个模板目录」——本地目录直接用，git 仓库 clone 到临时目录再用，对引擎核心透明。
 
-**目录判定规则**：根目录有 `template.yaml` → 单模板；没有但一级子目录有 → 模板集（只扫一级，不递归）；两者都不是 → 报错。
+**目录判定规则（收纳式）**：根目录有 `template.yaml` → 单模板；否则 `templates/` 子目录的一级子目录（各含 template.yaml，跳过隐藏目录）构成模板集；两者都不是 → 报错。根目录其他内容（README/docs/草稿目录）不参与判定。
 
 ---
 
@@ -139,12 +148,12 @@ patterns:
 ## 六、引擎固定流程
 
 ```
-cube create <模板来源> [模板名] <目标路径> [--key=value ...]
+cube create <目标路径> [--tpl 模板来源] [--tpl-name 模板名] [--var key=value ...]
 
-1. 解析模板来源：
+1. 解析模板来源（--tpl 缺省 → 交互输入框，预填 config 的 create.templateSource）：
    a. 本地目录 → 直接用；git url → clone --depth 1 到临时目录（不缓存，用完删；遍历时跳过 .git）
-   b. 判定目录类型：根目录有 template.yaml → 单模板；否则扫一级子目录构成模板集
-   c. 模板集：给了模板名 → 校验并选中（不存在则报错并列出可用名）；没给 → 交互选择
+   b. 判定目录类型：根目录有 template.yaml → 单模板；否则扫 templates/ 子目录的一级子目录构成模板集
+   c. 模板集：给了 --tpl-name → 校验并选中（不存在则报错并列出可用名；单模板传名报错）；没给 → 交互选择
 2. 读 template.yaml
 2. 收集变量：命令行参数优先，缺的交互式提问（用 variables 的 prompt）
 3. 对 template.yaml 做变量插值（${var} → 实际值）
@@ -170,5 +179,5 @@ cube create <模板来源> [模板名] <目标路径> [--key=value ...]
 
 已定（原留白，后补决策）：
 
-- **模板来源：不内置，全部外置**（本地目录 / git 仓库二选一），git 来源 clone 到临时目录、**不缓存**。支持一个 git 仓库 / 目录内放**多个模板**（模板集，一级子目录各含 template.yaml），用可选位置参数「模板名」选择，缺省交互选择。见 discussion.md 9 节。
+- **模板来源：不内置，全部外置**（本地目录 / git 仓库二选一），git 来源 clone 到临时目录、**不缓存**。支持一个 git 仓库 / 目录内放**多个模板**（模板集收纳式：统一在 `templates/` 子目录下，一级各含 template.yaml，根目录其他内容不参与判定），用 `--tpl-name` 选择（缺省交互选择；来源本身用 `--tpl` 或 config 默认来源给）。见 discussion.md 9 节。
 - **开发顺序**：① 本地目录单模板 → ② 本地目录模板集 → ③ git 来源（clone 到临时目录后按 ①/② 执行，遍历跳过 `.git`）。

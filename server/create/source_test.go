@@ -1,6 +1,8 @@
 package create
 
 import (
+	"cube/config"
+
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,12 +30,15 @@ func TestInspectSource(t *testing.T) {
 	t.Run("模板集", func(t *testing.T) {
 		dir := ws.Mkdir("set")
 		for _, n := range []string{"full", "minimal", "with-docker"} {
-			ws.WriteFile(filepath.Join("set", n, "template.yaml"), []byte("version: 1\n"))
+			ws.WriteFile(filepath.Join("set", "templates", n, "template.yaml"), []byte("version: 1\n"))
 		}
-		// 干扰项：非模板子目录、隐藏目录不算
-		ws.Mkdir("set/docs")
-		ws.Mkdir("set/.hidden")
-		ws.WriteFile(filepath.Join("set/docs/readme.md"), []byte("非模板目录"))
+		// 干扰项：templates/ 内的非模板子目录、隐藏目录不算
+		ws.Mkdir("set/templates/docs")
+		ws.Mkdir("set/templates/.hidden")
+		ws.WriteFile(filepath.Join("set/templates/docs/readme.md"), []byte("非模板目录"))
+		// 根目录其他内容不参与判定：README、docs、草稿目录（即使含 template.yaml）均不可见
+		ws.WriteFile(filepath.Join("set", "README.md"), []byte("库说明"))
+		ws.WriteFile(filepath.Join("set", "drafts", "wip", "template.yaml"), []byte("version: 1\n"))
 		layout, err := InspectSource(dir)
 		if err != nil {
 			t.Fatalf("报错: %v", err)
@@ -44,10 +49,10 @@ func TestInspectSource(t *testing.T) {
 		}
 	})
 
-	t.Run("单模板优先于子模板", func(t *testing.T) {
+	t.Run("单模板优先于模板集", func(t *testing.T) {
 		dir := ws.Mkdir("mixed")
 		ws.WriteFile(filepath.Join("mixed", "template.yaml"), []byte("version: 1\n"))
-		ws.WriteFile(filepath.Join("mixed/sub/template.yaml"), []byte("version: 1\n"))
+		ws.WriteFile(filepath.Join("mixed", "templates/sub/template.yaml"), []byte("version: 1\n"))
 		layout, err := InspectSource(dir)
 		if err != nil {
 			t.Fatalf("报错: %v", err)
@@ -63,13 +68,21 @@ func TestInspectSource(t *testing.T) {
 			t.Fatal("期望报错")
 		}
 	})
+
+	t.Run("templates 为空报错", func(t *testing.T) {
+		dir := ws.Mkdir("blankset")
+		ws.Mkdir("blankset/templates")
+		if _, err := InspectSource(dir); err == nil {
+			t.Fatal("期望报错")
+		}
+	})
 }
 
 func TestSelectTemplateDir(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	dir := ws.Mkdir("set")
-	ws.WriteFile(filepath.Join("set/full/template.yaml"), []byte("version: 1\n"))
-	ws.WriteFile(filepath.Join("set/minimal/template.yaml"), []byte("version: 1\n"))
+	ws.WriteFile(filepath.Join("set/templates/full/template.yaml"), []byte("version: 1\n"))
+	ws.WriteFile(filepath.Join("set/templates/minimal/template.yaml"), []byte("version: 1\n"))
 	layout, err := InspectSource(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -154,12 +167,12 @@ func TestResolveTemplateDirGit(t *testing.T) {
 
 func TestCreateFromCollection(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	ws.WriteFile(filepath.Join("tpls/full/template.yaml"), []byte("version: 1\nvariables:\n  project-name: {prompt: 名, required: true}\npatterns:\n  \"**/*.go\":\n    - {pattern: __PROJECT__, replace: \"${project-name}\"}\n"))
-	ws.WriteFile(filepath.Join("tpls/full/main.go"), []byte("package __PROJECT__"))
-	ws.WriteFile(filepath.Join("tpls/minimal/template.yaml"), []byte("version: 1\n"))
-	ws.WriteFile(filepath.Join("tpls/minimal/x.go"), []byte("x"))
+	ws.WriteFile(filepath.Join("tpls/templates/full/template.yaml"), []byte("version: 1\nvariables:\n  project-name: {prompt: 名, required: true}\npatterns:\n  \"**/*.go\":\n    - {pattern: __PROJECT__, replace: \"${project-name}\"}\n"))
+	ws.WriteFile(filepath.Join("tpls/templates/full/main.go"), []byte("package __PROJECT__"))
+	ws.WriteFile(filepath.Join("tpls/templates/minimal/template.yaml"), []byte("version: 1\n"))
+	ws.WriteFile(filepath.Join("tpls/templates/minimal/x.go"), []byte("x"))
 
-	svc := NewService()
+	svc := NewService(config.CreateConfig{})
 	target := ws.Join("out")
 	if err := svc.Create(ws.Join("tpls"), "full", target, map[string]string{"project-name": "demo"}); err != nil {
 		t.Fatalf("Create 报错: %v", err)

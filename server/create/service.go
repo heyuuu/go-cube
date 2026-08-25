@@ -5,21 +5,39 @@ import (
 	"os"
 	"os/exec"
 
+	"cube/config"
 	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
-// Service 是模板引擎（cube create）的入口，第①步只支持本地目录单模板。
-type Service struct{}
+// Service 是模板引擎（cube create）的入口。
+// cfg.TemplateSource 是未显式传来源时的默认值（也是交互输入框的预填值）。
+type Service struct {
+	defaultSource string
+}
 
-func NewService() *Service { return &Service{} }
+func NewService(cfg config.CreateConfig) *Service {
+	return &Service{defaultSource: cfg.TemplateSource}
+}
 
-// Create 从模板来源（本地目录或 git url）生成项目到 targetPath：
-// 解析来源 → 定位模板目录（单模板直取，模板集按 templateName 选择/交互选择）→
-// 解析 template.yaml → 收集变量（cliVars 优先，缺的交互提问）→ 插值 →
-// 生成文件（路径+内容替换）→ 执行 init（任一失败中止）。
-// git 来源 clone 到临时目录，成功后删除、失败保留现场（路径在错误信息中）。
+// Create 生成项目到 targetPath。
+// source 为空时用默认来源（config 的 create.templateSource）弹交互输入框（预填该默认值）；
+// templateName 语义：单模板传名报错、模板集缺省交互选择、指定名不存在报错并列出可用；
+// cliVars 传了未声明的 key 报错，缺的交互提问。
 func (s *Service) Create(source, templateName, targetPath string, cliVars map[string]string) error {
+	if source == "" {
+		v, err := tui.Input("模板来源（本地目录或 git url）", s.defaultSource, "", func(v string) error {
+			if v == "" {
+				return fmt.Errorf("模板来源不能为空")
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		source = v
+	}
+
 	sourceDir, cleanup, err := ResolveTemplateDir(source)
 	if err != nil {
 		return err

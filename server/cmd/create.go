@@ -10,22 +10,33 @@ import (
 )
 
 // cmd `cube create`（模板引擎：本地目录 / git 仓库，单模板或模板集）
+//
+// 两种主用法，其余是边缘校验：
+//  1. cube create <目标路径> —— 交互式逐步创建（来源/模板名/变量缺啥问啥）；
+//  2. cube create <目标路径> --tpl ... --tpl-name ... --var k=v ... —— 非交互一步生成。
 func newCreateCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "create <模板来源> [模板名] <目标路径> [--var key=value ...]",
+		Use:   "create <目标路径> [--tpl 模板来源] [--tpl-name 模板名] [--var key=value ...]",
 		Short: "使用模板生成项目（本地目录或 git 仓库）",
 		Long: `使用模板生成项目（引擎是机制，模板是数据，协议见 template.yaml）。
 
-模板来源为本地目录或 git 仓库（--depth 1 clone 到临时目录）。
-来源根目录有 template.yaml 则为单模板；一级子目录各有 template.yaml 则为模板集，
-模板集须用「模板名」参数指定子模板（缺省时交互式选择）。
-目标路径已存在时必须是空目录。变量优先取 --var key=value，缺的交互式提问补齐。
+目标路径必传，不存在时自动创建（含多级）。
+
+--tpl 模板来源：本地目录或 git 仓库 url（--depth 1 clone 到临时目录）。
+缺省时弹交互输入框，预填 config.json 的 create.templateSource。
+来源根目录有 template.yaml 则为单模板；一级子目录各有则为模板集。
+
+--tpl-name 模板名：模板集选择子模板用。单模板传名报错；
+模板集指定了不存在的名报错（列出可用）；模板集缺省则交互选择。
+
+--var key=value：模板变量，可多次。传未声明的变量报错，缺的交互提问。
 
 示例：
-  cube create ~/templates/go-service my-app
-  cube create ~/templates go-service-full my-app
-  cube create https://github.com/xxx/templates go-service my-app --var author=heyu`,
-		Args: cobra.RangeArgs(2, 3),
+  cube create my-app
+  cube create my-app --tpl-name go-service --var author=heyu
+  cube create my-app --tpl ~/templates --tpl-name full
+  cube create my-app --tpl https://github.com/xxx/templates.git --tpl-name go-service --var author=heyu`,
+		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cliVars, err := cmd.Flags().GetStringSlice("var")
 			if err != nil {
@@ -35,15 +46,15 @@ func newCreateCmd(a *app.App) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			source, templateName, target := args[0], "", args[1]
-			if len(args) == 3 {
-				templateName, target = args[1], args[2]
-			}
-			return a.CreateService().Create(source, templateName, target, vars)
+			tpl, _ := cmd.Flags().GetString("tpl")
+			tplName, _ := cmd.Flags().GetString("tpl-name")
+			return a.CreateService().Create(tpl, tplName, args[0], vars)
 		},
 	}
 
-	cmd.Flags().StringSlice("var", nil, "模板变量，格式 --var key=value（可多次）")
+	cmd.Flags().String("tpl", "", "模板来源（本地目录或 git url），缺省交互输入")
+	cmd.Flags().String("tpl-name", "", "模板集内的模板名，缺省交互选择")
+	cmd.Flags().StringSlice("var", nil, "模板变量 key=value（可多次）")
 	return cmd
 }
 
