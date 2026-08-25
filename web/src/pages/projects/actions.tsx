@@ -12,6 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { openWithOpener } from '@/lib/opener';
 import { cn } from '@/lib/utils';
 import { useOpenerOpen } from '@/queries/project';
 
@@ -42,7 +43,7 @@ export function ProjectActions({
             title={q.title}
             aria-label={`${q.title}（${p.name}）`}
             disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === q.opener}
-            onClick={() => onOpen(p.path, q.opener)}
+            onClick={() => openWithOpener(openerList, q.opener, p.path, onOpen)}
           >
             {q.icon}
           </Button>
@@ -68,7 +69,7 @@ export function ProjectActions({
             {openerList.map((op) => (
               <DropdownMenuItem
                 key={op.name}
-                onClick={() => onOpen(p.path, op.name)}
+                onClick={() => openWithOpener(openerList, op.name, p.path, onOpen)}
                 disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === op.name}
               >
                 {op.name}

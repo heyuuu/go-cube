@@ -18,7 +18,7 @@ func newServiceAt(t *testing.T, specs []Spec) (*Service, *fakeExecutor) {
 		}
 	}
 	fake := &fakeExecutor{}
-	return NewService(file, fake), fake
+	return NewService(file, "http://localhost:6100", fake), fake
 }
 
 func TestServiceDirectRead(t *testing.T) {
@@ -100,4 +100,19 @@ func TestServiceDirectRead(t *testing.T) {
 			t.Fatalf("写其他节不应影响 openers, got %v", got)
 		}
 	})
+}
+
+func TestServiceIconEndToEnd(t *testing.T) {
+	// icon 随 Spec 存进 settings.json，读出后透传到 Opener 接口
+	s, _ := newServiceAt(t, []Spec{
+		{Name: "code", Cmd: []string{"code"}, Icon: &Icon{Type: IconTypeLucide, Value: "app-window"}},
+		{Name: "plain", Cmd: []string{"plain"}},
+	})
+	o := s.FindByName("code")
+	if o == nil || o.Icon().Value != "app-window" {
+		t.Fatalf("icon 未透传: %+v", o)
+	}
+	if p := s.FindByName("plain"); p.Icon() != (Icon{}) {
+		t.Fatalf("无 icon 应得零值, got %+v", p.Icon())
+	}
 }

@@ -61,7 +61,7 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	projSvc := project.NewService(config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg}, ws.Join("cache"))
 	exec := &fakeExecutor{}
-	openerSvc := opener.NewService(settingsFile, exec)
+	openerSvc := opener.NewService(settingsFile, "http://localhost:6101", exec)
 	cfg := &config.Config{
 		DataDir: ws.Join("data"),
 		Project: config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg},

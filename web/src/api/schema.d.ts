@@ -635,10 +635,14 @@ export interface components {
       nextCursor: number;
     };
     Config: {
+      create: components['schemas']['CreateConfig'];
       dataDir: string;
       log: components['schemas']['LogConfig'];
-      openers: components['schemas']['OpenerConfig'][] | null;
       project: components['schemas']['ProjectConfig'];
+      server: components['schemas']['ServerConfig'];
+    };
+    CreateConfig: {
+      templateSource: string;
     };
     DiffEntry: {
       /** Format: int64 */
@@ -778,15 +782,16 @@ export interface components {
       dir: boolean;
       files: string[] | null;
     };
-    OpenerConfig: {
-      cmd: string[] | null;
-      name: string;
-      roles: string[] | null;
-    };
     OpenerDTO: {
-      cmd: string[] | null;
+      icon?: components['schemas']['OpenerIconDTO'];
       name: string;
       roles: string[] | null;
+      summary: string;
+      type: string;
+    };
+    OpenerIconDTO: {
+      type: string;
+      value: string;
     };
     OpenerOpenInputBody: {
       /**
@@ -796,7 +801,7 @@ export interface components {
        */
       readonly $schema?: string;
       /** @description opener 名称 */
-      app: string;
+      opener: string;
       /** @description 文件或目录绝对路径 */
       path: string;
     };
@@ -847,6 +852,10 @@ export interface components {
       /** Format: int64 */
       maxDepth: number;
       path: string;
+    };
+    ServerConfig: {
+      /** Format: int64 */
+      port: number;
     };
     TreeListResult: {
       list: string[] | null;

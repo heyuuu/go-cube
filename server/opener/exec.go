@@ -14,6 +14,7 @@ type execOpener struct {
 	cmd       []string // 启动命令模板
 	roles     []Role   // 该 opener 的业务用途集合；slotCount 由 roles 推导
 	slotCount int      // 参数槽个数（由 roles 推导，供 BuildArgs 校验占位符）
+	icon      Icon     // 图标声明，零值未配置
 	executor  Executor // 启动子进程的执行器（测试可注入 fake）
 }
 
@@ -34,6 +35,11 @@ func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
 		return nil, fmt.Errorf("opener %q roles 解析失败: %w", spec.Name, err)
 	}
 
+	icon, err := InitIcon(spec.Icon)
+	if err != nil {
+		return nil, fmt.Errorf("opener %q icon 解析失败: %w", spec.Name, err)
+	}
+
 	// 校验 cmd 中的占位符索引不越界（slotCount 由 roles 推导）
 	for _, arg := range spec.Cmd {
 		if n, ok := placeholderIndex(arg); ok && n >= slotCount {
@@ -50,12 +56,15 @@ func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
 		cmd:       slices.Clone(spec.Cmd),
 		roles:     roles,
 		slotCount: slotCount,
+		icon:      icon,
 		executor:  executor,
 	}, nil
 }
 
 func (o *execOpener) Name() string  { return o.name }
 func (o *execOpener) Roles() []Role { return o.roles }
+func (o *execOpener) Icon() Icon    { return o.icon }
+func (o *execOpener) Kind() string  { return SpecTypeExec }
 
 func (o *execOpener) Summary() string {
 	return strings.Join(o.cmd, " ")

@@ -15,9 +15,16 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name    string   `json:"name"`
-	Summary string   `json:"summary"`
-	Roles   []string `json:"roles"`
+	Name    string         `json:"name"`
+	Type    string         `json:"type"`    // exec | web；web 时前端直接路由跳转，不发 open
+	Summary string         `json:"summary"` // 展示串：exec 为命令模板，web 为 target
+	Roles   []string       `json:"roles"`
+	Icon    *OpenerIconDTO `json:"icon,omitempty"` // 缺省无图标（前端 fallback 默认）
+}
+
+type OpenerIconDTO struct {
+	Type  string `json:"type"`  // lucide | image
+	Value string `json:"value"` // lucide 图名 或 base64 PNG
 }
 
 func toOpenerDTO(entity opener.Opener) *OpenerDTO {
@@ -25,12 +32,18 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 		return nil
 	}
 
+	var icon *OpenerIconDTO
+	if i := entity.Icon(); i.Type != "" {
+		icon = &OpenerIconDTO{Type: i.Type, Value: i.Value}
+	}
 	return &OpenerDTO{
 		Name:    entity.Name(),
+		Type:    entity.Kind(),
 		Summary: entity.Summary(),
 		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
 			return string(r)
 		}),
+		Icon: icon,
 	}
 }
 
