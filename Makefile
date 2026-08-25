@@ -78,3 +78,8 @@ dev-server:
 
 dev-web:
 	cd web && pnpm dev
+
+dev-link-config:
+	mkdir -p ./tmp/.config
+	ln -s ~/.config/cube-dev ./tmp/.config/cube-dev
+	ln -s ~/.config/cube ./tmp/.config/cube
