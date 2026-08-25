@@ -1,6 +1,8 @@
 # 模板引擎（cube create）
 
-> **状态**：✅ 已实现（本地目录单模板 / 本地模板集 / git 仓库三种来源，domain 包 `server/create`；剩余留白：init 失败处理策略 `on_fail`）
+> **状态**：✅ 已交付（2026-08-25 归档）。三步全部落地（本地单模板 → 模板集 → git 来源），domain 包 `server/create`，测试 50+ 用例全绿。
+> 实施与设计的偏差均已回写：协议加 `version` 字段；模板集判定改**收纳式**（模板统一在 `templates/` 下）；CLI 从「位置参数切语义」改为**单位置参数 + flag**（`cube create <目标路径> [--tpl] [--tpl-name] [--var]`）；config 加 `create.templateSource` 默认来源（`--tpl` 缺省交互输入框预填）；目标路径校验提前到一切交互之前。
+> 留白：init 失败处理策略 `on_fail`（默认中止，够用）。
 
 ## 说明
 

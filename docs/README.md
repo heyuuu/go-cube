@@ -14,7 +14,6 @@
 
 未来需求的提案，每个提案一个目录（`YYMMDD-提案名/`）。活动提案摊平在顶层；挂起的进 `parked/`，完成的进 `archived/`。
 
-- [`1009-模板引擎cube-create/`](proposals/1009-模板引擎cube-create/) — `cube create` 模板引擎（设计已完整）
 - [`1015-工作台面板组装/`](proposals/archived/1015-工作台面板组装/) — 工作台自定义布局（面板组装，最后做）
 - [`1014-工作台PTY面板/`](proposals/archived/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）
 - [`1013-工作台diff面板/`](proposals/archived/1013-工作台diff面板/) — 工作台双源 diff（目录 + 文件对比）
@@ -34,6 +33,7 @@
 
 已实现的需求总结（从 proposals 顶层移入，记录最终落地形态与方案演变）。
 
+- [`1009-模板引擎cube-create/`](proposals/archived/1009-模板引擎cube-create/) — `cube create` 模板引擎（template.yaml 协议 + glob 替换 + init 执行；本地目录/git 仓库/模板集收纳式；引擎是机制，模板是数据）
 - [`1001-server后台常驻与HTTP管理/`](proposals/archived/1001-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
 - [`1002-前端栈迁移/`](proposals/archived/1002-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口
 - [`1005-md渲染/`](proposals/archived/1005-md渲染/) — `cube md` Web 渲染 markdown：零模板渲染 + 目录浏览模式 + opener 打开归一
