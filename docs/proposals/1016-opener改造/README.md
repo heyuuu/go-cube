@@ -1,6 +1,6 @@
 # opener 改造：icon + web 形态 + settings.json 与 Web 配置
 
-> **状态**：🚧 提案（2026-08-22，方向已与 owner 对齐）
+> **状态**：✅ 已实施（2026-08-26，待 owner 验收归档）
 
 ## 背景与目标
 
@@ -45,11 +45,13 @@ type Opener interface {
 ### 3. settings.json + 迁移 + 直读文件
 
 - opener 数据落到配置目录下的 `settings.json`（openers 节），不引入 sqlite / gorm model / AutoMigrate——sqlite 回归到只放 history。
-- **校验收敛在读写边界**：读时逐条走领域构造函数（parseRoles / icon 解析，失败按现有「单条跳过不阻断」降级）；写时只接受已构造好的领域类型——坏数据唯一入口是 save API，service 写文件前先走领域构造函数校验，失败 400 中文错误，落不了文件。
-- **写入原子**：写临时文件 + rename，避免写一半被读到；整个文件读取失败按降级风格「记日志、当空配置」。
-- **单写者假设**：每个环境一个 server，写路径都走它的 API；CLI 直接手改 settings.json 属人工干预，与手改 config.json 同待遇，先不做 flock。
-- 一次性迁移：启动时 settings.json 无 openers 节且 config.json 有 → 导入后**删除 config.json 的 openers 节**并记日志，避免双事实源。
+- **实施定稿：独立 `settings` 包（与 config 平级）+ 节级 API**（`LoadSection` / `SaveSection` / `HasSection`，函数 + file string 形态，无 Store 对象、无接口——测试用 testfixture 真文件即可，不 mock）。API 粒度是**节**而非整文档：调用方（opener.Service）从头到尾拿不到完整 Doc，杜绝「读整文档→改→写回」覆盖其他节的 lost update，多节是立项前提。节名常量归域包（`opener.settingsSection`）。
+- **校验收敛在读写边界**：读时逐条走领域构造函数（parseRoles / icon 解析，失败按现有「单条跳过不阻断」降级）；写时（save API → `Service.SaveOpener`）先走领域构造函数校验，失败中文错误，落不了文件。
+- **写入原子**：包级锁内「读全文档→仅换该节→临时文件 + rename」；坏 JSON 拒写（防静默覆盖手工搞坏的其他节）；读一律降级（文件不存在/坏 JSON/节缺失/节坏→空值 + 日志，读路径永不阻塞）。
+- **单写者假设**：每个环境一个 server，写路径都走它的 API；CLI 直接手改 settings.json 属人工干预，先不做 flock。
+- **迁移偏差：不做代码迁移**——一次性迁移改为手动执行（jq 抽 openers 节到 settings.json + 删 config 节）；config 包已删 `Openers` 字段与 `OpenerConfig` DTO（残留旧键被 json 静默忽略）。
 - Service 的 `AllOpeners()`/`FindByName()` 等每次读 settings.json。
+- **透传措辞修正**：非目标节为「语义级透传」（JSON 值不变），非字节级——`json.Unmarshal` 落 `RawMessage` 会压缩空白，存盘统一缩进，首次写入会规范化其他节格式。
 
 ### 4. Web API 与前端配置页
 
@@ -63,6 +65,15 @@ type Opener interface {
 3. **icon 字段**：领域类型 + settings.json 存储 + 提取 util（darwin）。
 4. **Web CRUD API + 前端配置页**。
 5. **收尾**：干掉前端 finder/stree 硬编码；更新 `docs/spec/现状.md` 3.3/3.5/6.2 与 web API 表。
+
+## 实施偏差备忘（2026-08-26 回写）
+
+- 接口面：`Open(role, slotArgs...)` + `Summary()`（跨实现统一展示串）/ `Kind()`（exec|web，前端据此前端路由跳转）；`RolesString` 是 `Roles()` 纯派生，降为包级函数不上接口。`Icon()` 按提案加入接口。
+- `webOpener` 打开浏览器：darwin 用 `open`，其他平台返回中文错误（TODO：xdg-open / start）。`serverBaseURL` 由装配处从 `config.Server.Port` 拼出，注入 `opener.NewService`。
+- icon 提取（`util/iconkit`）：不解析二进制 Info.plist，直接扫 `Contents/Resources/*.icns` 取最大文件；容器内只取 PNG magic 命中的条目（老式 ARGB 位图条目跳过）；nearest 邻采样缩放（不引 x/image）。
+- Web API：`opener/open` 的 body 字段 `app` 改名 `opener`（术语统一，前端同步）；新增 `opener/save`、`opener/delete`、`opener/extract-icon`。
+- 前端：配置页 openers 区块换 live 数据源（`opener/list`）+ Sheet 编辑表单；快捷图标按 icon 声明动态渲染（lucide 按名 kebab→Pascal 查 `icons` 映射 / image base64），`shared.tsx` 的 finder/stree 硬编码降级为 fallback。
+- 测试侧顺带修复：testfixture `sanitizeName` 按 rune 截断（原按字节截中文测试名会切坏 UTF-8）。
 
 ## 验收标准
 

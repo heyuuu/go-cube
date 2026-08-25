@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { openWithOpener } from '@/lib/opener';
+import { renderOpenerIcon } from '@/lib/opener-icon';
 import { cn } from '@/lib/utils';
 import { quickOpens } from '@/pages/projects/shared';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
@@ -252,6 +253,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
   const openerList = openers.data?.list ?? [];
+  const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
   const onOpen = (name: string) =>
     openWithOpener(openerList, name, path, (p, opener) => open.mutate({ path: p, opener }));
@@ -270,7 +272,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             disabled={open.isPending && open.variables?.opener === q.opener}
             onClick={() => onOpen(q.opener)}
           >
-            {q.icon}
+            {renderOpenerIcon(openerByName.get(q.opener), q.fallbackIcon)}
           </Button>
         ))}
       <DropdownMenu>

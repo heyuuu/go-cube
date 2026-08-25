@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { openWithOpener } from '@/lib/opener';
+import { renderOpenerIcon } from '@/lib/opener-icon';
 import { cn } from '@/lib/utils';
 import { useOpenerOpen } from '@/queries/project';
 
@@ -30,6 +31,7 @@ export function ProjectActions({
   open: ReturnType<typeof useOpenerOpen>;
   onOpen: (path: string, opener: string) => void;
 }) {
+  const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
@@ -45,7 +47,7 @@ export function ProjectActions({
             disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === q.opener}
             onClick={() => openWithOpener(openerList, q.opener, p.path, onOpen)}
           >
-            {q.icon}
+            {renderOpenerIcon(openerByName.get(q.opener), q.fallbackIcon)}
           </Button>
         ))}
       {/* 工作台入口（非 opener）：新窗口打开 /workbench，与快捷图标平齐 */}

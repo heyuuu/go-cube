@@ -9,8 +9,9 @@ export const tagVariants: Record<string, 'default' | 'secondary' | 'outline'> = 
   godot: 'default',
 };
 
-// 行内固定快捷打开（opener 名对应 /api/opener/list）；调整入口在此
-export const quickOpens: { opener: string; title: string; icon: ReactNode }[] = [
-  { opener: 'finder', title: '打开所在目录', icon: <FolderOpen className="size-3.5" /> },
-  { opener: 'stree', title: '打开 Git 信息', icon: <GitBranch className="size-3.5" /> },
+// 行内固定快捷打开（opener 名对应 /api/opener/list）；调整入口在此。
+// 图标取 opener 的 icon 声明（lucide/base64，见 lib/opener-icon），无声明时用 fallback。
+export const quickOpens: { opener: string; title: string; fallbackIcon: ReactNode }[] = [
+  { opener: 'finder', title: '打开所在目录', fallbackIcon: <FolderOpen className="size-3.5" /> },
+  { opener: 'stree', title: '打开 Git 信息', fallbackIcon: <GitBranch className="size-3.5" /> },
 ];
