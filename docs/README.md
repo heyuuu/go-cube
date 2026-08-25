@@ -28,6 +28,7 @@
 方向认可但触发条件未到，暂不实施；README 内记录解挂条件。
 
 - [`1007-sqlc代替gorm/`](proposals/parked/1007-sqlc代替gorm/) — sqlc 代替 gorm（未来方向）
+- [`1027-工作台暂存区分组展示/`](proposals/parked/1027-工作台暂存区分组展示/) — 工作台变更清单按暂存区/未暂存分组展示 + stage/unstage（SourceTree 式）
 
 #### [proposals/archived/](proposals/archived/) — 已完成提案归档
 
