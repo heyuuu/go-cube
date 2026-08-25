@@ -1,6 +1,8 @@
 package create
 
 import (
+	"strings"
+
 	"cube/config"
 
 	"os"
@@ -70,6 +72,16 @@ func TestCreateErrors(t *testing.T) {
 		err := svc.Create(tpl, "", ws.Join("out2"), map[string]string{"typo": "x"})
 		if err == nil {
 			t.Fatal("期望报错")
+		}
+	})
+
+	t.Run("目标目录非空且预检先于一切", func(t *testing.T) {
+		// 来源故意给一个不存在的路径：若预检不先跑，会先报来源错误而非目标错误
+		busy := ws.Mkdir("busy2")
+		ws.WriteFile(filepath.Join("busy2", "x.txt"), []byte("x"))
+		err := svc.Create("/nonexistent/template-source", "", busy, nil)
+		if err == nil || !strings.Contains(err.Error(), "非空") {
+			t.Fatalf("目标预检应最先执行: %v", err)
 		}
 	})
 

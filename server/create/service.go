@@ -25,6 +25,11 @@ func NewService(cfg config.CreateConfig) *Service {
 // templateName 语义：单模板传名报错、模板集缺省交互选择、指定名不存在报错并列出可用；
 // cliVars 传了未声明的 key 报错，缺的交互提问。
 func (s *Service) Create(source, templateName, targetPath string, cliVars map[string]string) error {
+	// 目标路径预检放在一切交互之前——不能让用户答完来源/模板/变量才被告知路径非法
+	if err := validateTarget(targetPath); err != nil {
+		return err
+	}
+
 	if source == "" {
 		v, err := tui.Input("模板来源（本地目录或 git url）", s.defaultSource, "", func(v string) error {
 			if v == "" {
@@ -168,23 +173,33 @@ func interpolateTemplate(tpl *TemplateYaml, vars map[string]string) error {
 	return nil
 }
 
-// prepareTarget 解析并校验目标路径：已存在时必须是空目录（防覆盖既有内容）。
+// validateTarget 预检目标路径：已存在时必须是空目录（防覆盖既有内容）。
+// 在 Create 一切交互之前调用，让路径错误第一时间暴露。
+func validateTarget(targetPath string) error {
+	absPath, err := pathkit.AbsPath(targetPath)
+	if err != nil {
+		return fmt.Errorf("解析目标路径失败: %w", err)
+	}
+	if info, err := os.Stat(absPath); err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("目标路径已存在且不是目录: %s", pathkit.PrettyPath(absPath))
+		}
+		entries, err := os.ReadDir(absPath)
+		if err != nil {
+			return fmt.Errorf("读取目标目录失败: %w", err)
+		}
+		if len(entries) > 0 {
+			return fmt.Errorf("目标目录非空，拒绝覆盖: %s", pathkit.PrettyPath(absPath))
+		}
+	}
+	return nil
+}
+
+// prepareTarget 创建目标目录（含多级），返回绝对路径。合法性已由 validateTarget 预检。
 func prepareTarget(targetPath string) (string, error) {
 	absPath, err := pathkit.AbsPath(targetPath)
 	if err != nil {
 		return "", fmt.Errorf("解析目标路径失败: %w", err)
-	}
-	if info, err := os.Stat(absPath); err == nil {
-		if !info.IsDir() {
-			return "", fmt.Errorf("目标路径已存在且不是目录: %s", pathkit.PrettyPath(absPath))
-		}
-		entries, err := os.ReadDir(absPath)
-		if err != nil {
-			return "", fmt.Errorf("读取目标目录失败: %w", err)
-		}
-		if len(entries) > 0 {
-			return "", fmt.Errorf("目标目录非空，拒绝覆盖: %s", pathkit.PrettyPath(absPath))
-		}
 	}
 	if err := os.MkdirAll(absPath, 0o755); err != nil {
 		return "", fmt.Errorf("创建目标目录失败: %w", err)
