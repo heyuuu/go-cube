@@ -41,7 +41,7 @@ export function ProjectDrawer({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useOpenerOpen>;
-  onOpen: (path: string, app: string) => void;
+  onOpen: (path: string, opener: string) => void;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);

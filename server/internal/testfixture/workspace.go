@@ -56,8 +56,9 @@ func sanitizeName(name string) string {
 		"\\", "_",
 	)
 	s := r.Replace(name)
-	if len(s) > 60 {
-		s = s[:60]
+	// 按 rune 截断：中文测试名按字节截会切坏 UTF-8，导致 mkdir 报 illegal byte sequence
+	if runes := []rune(s); len(runes) > 60 {
+		return string(runes[:60])
 	}
 	return s
 }

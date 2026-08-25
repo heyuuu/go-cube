@@ -129,7 +129,7 @@ func checkOpenPath(path string) (absPath string, isDir bool, err error) {
 // pickOpener 根据 role 和关键词匹配 opener：精确匹配直接返回，多项匹配则交互选择。
 //
 // 非交互环境不支持多项选择，会报错提示使用精确 opener 名。
-func pickOpener(service *opener.Service, role opener.Role, name string) (*opener.Opener, error) {
+func pickOpener(service *opener.Service, role opener.Role, name string) (opener.Opener, error) {
 	openers := service.SearchFor(role, name)
 	if len(openers) == 0 {
 		return nil, fmt.Errorf("未找到匹配的 opener: role=%s, name=`%s`", role, name)
@@ -138,7 +138,7 @@ func pickOpener(service *opener.Service, role opener.Role, name string) (*opener
 	}
 
 	// 匹配多个 opener 时，触发用户选择
-	pick, err := tui.SelectItem("选择 opener", openers, (*opener.Opener).Name)
+	pick, err := tui.SelectItem("选择 opener", openers, opener.Opener.Name)
 	if err != nil {
 		if errors.Is(err, tui.ErrNotTTY) {
 			return nil, fmt.Errorf("非 TTY 环境请使用精确 opener 名，避免匹配多项: name=`%s`", name)

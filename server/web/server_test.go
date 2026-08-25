@@ -21,6 +21,7 @@ import (
 	"cube/internal/testfixture"
 	"cube/opener"
 	"cube/project"
+	"cube/settings"
 	"cube/workbench"
 )
 
@@ -50,18 +51,20 @@ func newTestEnv(t *testing.T) *testEnv {
 	cloneCfg := []config.CloneRuleConfig{
 		{RepoHost: "github.com", LocalPath: ws.Join("repo")},
 	}
-	openerCfg := []config.OpenerConfig{
+	settingsFile := ws.Join("settings.json")
+	if err := settings.SaveSection(settingsFile, "openers", []opener.Spec{
 		{Name: "finder", Cmd: []string{"/usr/bin/open", "$0"}, Roles: []string{"open-dir"}},
 		{Name: "broken", Cmd: []string{}}, // 缺 cmd，解析失败被跳过
+	}); err != nil {
+		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
 
 	projSvc := project.NewService(config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg}, ws.Join("cache"))
 	exec := &fakeExecutor{}
-	openerSvc := opener.NewService(openerCfg, exec)
+	openerSvc := opener.NewService(settingsFile, exec)
 	cfg := &config.Config{
 		DataDir: ws.Join("data"),
 		Project: config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg},
-		Openers: openerCfg,
 	}
 
 	srv := NewServer(

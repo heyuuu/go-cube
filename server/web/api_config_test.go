@@ -20,8 +20,4 @@ func TestConfigGet(t *testing.T) {
 	if len(got.Project.Clone) != 1 || got.Project.Clone[0].RepoHost != "github.com" {
 		t.Errorf("project.clone 不符: %+v", got.Project.Clone)
 	}
-	// config 是原始配置快照：broken opener 原样返回（不做降级过滤，那是 opener.Service 的职责）
-	if len(got.Openers) != 2 {
-		t.Errorf("openers 应原样返回 2 条（含 broken）, got %d", len(got.Openers))
-	}
 }

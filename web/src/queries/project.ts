@@ -18,6 +18,6 @@ export function useOpenerList() {
 // 用指定 opener 打开任意文件/目录（项目打开也走这里；role 由后端按路径类型校验）
 export function useOpenerOpen() {
   return useMutation({
-    mutationFn: (input: { path: string; app: string }) => apiPost('/api/opener/open', input),
+    mutationFn: (input: { path: string; opener: string }) => apiPost('/api/opener/open', input),
   });
 }

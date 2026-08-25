@@ -459,9 +459,9 @@ export function MdPage() {
     window.addEventListener('mouseup', onUp);
   }
 
-  function openNode(path: string, app: string) {
+  function openNode(path: string, opener: string) {
     setOpenError('');
-    open.mutate({ path, app }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
+    open.mutate({ path, opener }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 
   // expandTo 展开目标路径的全部祖先目录节点（含自身；单链折叠节点的 path 是

@@ -42,7 +42,7 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 			}
 
 			// 打开
-			if err := pick.Open(path); err != nil {
+			if err := pick.Open(role, path); err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}
 			return nil

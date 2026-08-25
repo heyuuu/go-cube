@@ -12,9 +12,9 @@ func TestOpenerList(t *testing.T) {
 	env := newTestEnv(t)
 	var got struct {
 		List []struct {
-			Name  string   `json:"name"`
-			Cmd   []string `json:"cmd"`
-			Roles []string `json:"roles"`
+			Name    string   `json:"name"`
+			Summary string   `json:"summary"`
+			Roles   []string `json:"roles"`
 		} `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/opener/list")), &got)
@@ -27,8 +27,8 @@ func TestOpenerList(t *testing.T) {
 	if op.Name != "finder" {
 		t.Errorf("name 应为 finder, got %q", op.Name)
 	}
-	if len(op.Cmd) != 2 || op.Cmd[0] != "/usr/bin/open" || op.Cmd[1] != "$0" {
-		t.Errorf("cmd 应保留 $0 占位符原样输出, got %v", op.Cmd)
+	if op.Summary != "/usr/bin/open $0" {
+		t.Errorf("summary 应保留 $0 占位符原样输出, got %q", op.Summary)
 	}
 	if len(op.Roles) != 1 || op.Roles[0] != "open-dir" {
 		t.Errorf("roles 应为 [open-dir], got %v", op.Roles)
@@ -89,7 +89,7 @@ func TestOpenerOpen(t *testing.T) {
 	}
 
 	// 打开目录：finder（open-dir）合法，fakeExecutor 应收到组装后的命令
-	env1 := post(`{"path":"` + env.ws.Join("notes") + `","app":"finder"}`)
+	env1 := post(`{"path":"` + env.ws.Join("notes") + `","opener":"finder"}`)
 	if !env1.Ok {
 		t.Fatalf("打开目录应成功, message=%q", env1.Message)
 	}
@@ -98,14 +98,14 @@ func TestOpenerOpen(t *testing.T) {
 	}
 
 	// role 不匹配：finder 只有 open-dir，开文件应报错
-	env2 := post(`{"path":"` + md + `","app":"finder"}`)
+	env2 := post(`{"path":"` + md + `","opener":"finder"}`)
 	if env2.Ok || !strings.Contains(env2.Message, "open-file") {
 		t.Errorf("open-dir opener 开文件应报 role 错误, got ok=%v message=%q", env2.Ok, env2.Message)
 	}
 
 	// 不存在的 opener
-	env3 := post(`{"path":"` + md + `","app":"nope"}`)
-	if env3.Ok || !strings.Contains(env3.Message, "未找到指定 app") {
+	env3 := post(`{"path":"` + md + `","opener":"nope"}`)
+	if env3.Ok || !strings.Contains(env3.Message, "未找到指定 opener") {
 		t.Errorf("未知 opener 应报错, got ok=%v message=%q", env3.Ok, env3.Message)
 	}
 }

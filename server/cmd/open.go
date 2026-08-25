@@ -15,7 +15,7 @@ func newOpenCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "open [query] [-o|--opener=打开工具名]",
 		Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",
-		Long: `用指定 app(opener) 打开一个已收录的项目目录。
+		Long: `用指定 opener 打开一个已收录的项目目录。
 
 query 支持项目名和项目列表模糊搜索，具体规则同 info 命令。
 --opener 为 opener 名称，支持模糊搜索。`,
@@ -30,13 +30,14 @@ query 支持项目名和项目列表模糊搜索，具体规则同 info 命令�
 			}
 
 			// 选 opener
-			openApp, err := pickOpener(a.OpenerService(), opener.RoleOpenDir, openerName)
+			role := opener.RoleOpenDir
+			o, err := pickOpener(a.OpenerService(), role, openerName)
 			if err != nil {
 				return err
 			}
 
 			// 打开项目
-			err = openApp.Open(proj.Path())
+			err = o.Open(role, proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}

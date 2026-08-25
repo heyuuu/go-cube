@@ -56,7 +56,7 @@ func newDiffCmd(a *app.App) *cobra.Command {
 			}
 
 			// 打开
-			if err := pick.Open(path1, path2); err != nil {
+			if err := pick.Open(role, path1, path2); err != nil {
 				return fmt.Errorf("打开对比软件失败: %w", err)
 			}
 			return nil

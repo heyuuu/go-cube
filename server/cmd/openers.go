@@ -25,26 +25,26 @@ query 按 opener 名称模糊搜索，不传时显示全部。`,
 			}
 
 			service := a.OpenerService()
-			apps := service.SearchAll(query)
-			showOpeners(apps)
+			openers := service.SearchAll(query)
+			showOpeners(openers)
 			return nil
 		},
 	}
 	return cmd
 }
 
-func showOpeners(apps []*opener.Opener) {
+func showOpeners(list []opener.Opener) {
 	tui.PrintTable(
 		[]string{
-			fmt.Sprintf("Opener(%d)", len(apps)),
-			"Cmd",
+			fmt.Sprintf("Opener(%d)", len(list)),
+			"Summary",
 			"Roles",
 		},
-		slicekit.Map(apps, func(app *opener.Opener) []string {
+		slicekit.Map(list, func(o opener.Opener) []string {
 			return []string{
-				app.Name(),
-				app.CmdString(),
-				app.RolesString(),
+				o.Name(),
+				o.Summary(),
+				opener.RolesString(o.Roles()),
 			}
 		}),
 	)

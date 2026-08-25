@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 
 	"github.com/danielgtaylor/huma/v2"
 
@@ -16,19 +15,19 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name  string   `json:"name"`
-	Cmd   []string `json:"cmd"`
-	Roles []string `json:"roles"`
+	Name    string   `json:"name"`
+	Summary string   `json:"summary"`
+	Roles   []string `json:"roles"`
 }
 
-func toOpenerDTO(entity *opener.Opener) *OpenerDTO {
+func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 	if entity == nil {
 		return nil
 	}
 
 	return &OpenerDTO{
-		Name: entity.Name(),
-		Cmd:  entity.Cmd(),
+		Name:    entity.Name(),
+		Summary: entity.Summary(),
 		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
 			return string(r)
 		}),
@@ -54,8 +53,8 @@ func (h *OpenerHandler) Register(api huma.API) {
 }
 
 func (h *OpenerHandler) openerList(_ struct{}) (ListResult[*OpenerDTO], error) {
-	apps := h.service.AllOpeners()
-	list := slicekit.Map(apps, toOpenerDTO)
+	openers := h.service.AllOpeners()
+	list := slicekit.Map(openers, toOpenerDTO)
 	return listResult(list), nil
 }
 
@@ -69,8 +68,8 @@ func (h *OpenerHandler) openerInfo(input struct {
 // OpenerOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。
 type OpenerOpenInput struct {
 	Body struct {
-		Path string `json:"path" doc:"文件或目录绝对路径"`
-		App  string `json:"app" doc:"opener 名称"`
+		Path   string `json:"path" doc:"文件或目录绝对路径"`
+		Opener string `json:"opener" doc:"opener 名称"`
 	}
 }
 
@@ -85,19 +84,17 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 		return nil, fmt.Errorf("读取路径失败: %w", err)
 	}
 
-	openApp := h.service.FindByName(input.Body.App)
-	if openApp == nil {
-		return nil, fmt.Errorf("未找到指定 app: %s", input.Body.App)
+	o := h.service.FindByName(input.Body.Opener)
+	if o == nil {
+		return nil, fmt.Errorf("未找到指定 opener: %s", input.Body.Opener)
 	}
-	required := opener.RoleOpenFile
+	role := opener.RoleOpenFile
 	if info.IsDir() {
-		required = opener.RoleOpenDir
-	}
-	if !slices.Contains(openApp.Roles(), required) {
-		return nil, fmt.Errorf("opener %s 不支持 %s（该路径需要此 role）", input.Body.App, required)
+		role = opener.RoleOpenDir
 	}
 
-	if err := openApp.Open(input.Body.Path); err != nil {
+	// role 是否支持由实现内校验（Open 首步），这里只透传错误
+	if err := o.Open(role, input.Body.Path); err != nil {
 		return nil, fmt.Errorf("打开失败: %w", err)
 	}
 	return map[string]any{"ok": true}, nil

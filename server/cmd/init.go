@@ -85,11 +85,12 @@ func newInitCmd(a *app.App) *cobra.Command {
 			}
 
 			// 打开逻辑同 cube open：按 open-dir role 挑选 opener 后打开目录
-			openApp, err := pickOpener(a.OpenerService(), opener.RoleOpenDir, "")
+			role := opener.RoleOpenDir
+			o, err := pickOpener(a.OpenerService(), role, "")
 			if err != nil {
 				return err
 			}
-			if err = openApp.Open(absPath); err != nil {
+			if err = o.Open(role, absPath); err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}
 			return nil

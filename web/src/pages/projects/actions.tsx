@@ -27,7 +27,7 @@ export function ProjectActions({
   p: Project;
   openerList: Opener[];
   open: ReturnType<typeof useOpenerOpen>;
-  onOpen: (path: string, app: string) => void;
+  onOpen: (path: string, opener: string) => void;
 }) {
   const openerNames = new Set(openerList.map((op) => op.name));
   return (
@@ -41,7 +41,7 @@ export function ProjectActions({
             size="icon-sm"
             title={q.title}
             aria-label={`${q.title}（${p.name}）`}
-            disabled={open.isPending && open.variables?.path === p.path && open.variables?.app === q.opener}
+            disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === q.opener}
             onClick={() => onOpen(p.path, q.opener)}
           >
             {q.icon}
@@ -69,7 +69,7 @@ export function ProjectActions({
               <DropdownMenuItem
                 key={op.name}
                 onClick={() => onOpen(p.path, op.name)}
-                disabled={open.isPending && open.variables?.path === p.path && open.variables?.app === op.name}
+                disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === op.name}
               >
                 {op.name}
               </DropdownMenuItem>

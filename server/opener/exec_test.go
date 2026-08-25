@@ -3,8 +3,6 @@ package opener
 import (
 	"reflect"
 	"testing"
-
-	"cube/config"
 )
 
 // fakeExecutor 记录 Run 调用的 bin+args，不真正启动子进程。供 Open 全链路测试用。
@@ -119,9 +117,9 @@ func TestBuildArgs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: c.cmd, Roles: c.roles}, &fakeExecutor{})
+			o, err := InitExecOpener(Spec{Name: "t", Cmd: c.cmd, Roles: c.roles}, &fakeExecutor{})
 			if err != nil {
-				t.Fatalf("InitOpener 失败: %v", err)
+				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
 			bin, args, err := o.BuildArgs(c.paths...)
 			if err != nil {
@@ -134,7 +132,7 @@ func TestBuildArgs(t *testing.T) {
 	}
 }
 
-// ---------- InitOpener cmd 校验 ----------
+// ---------- InitExecOpener cmd 校验 ----------
 
 func TestInitOpenerCmdValidation(t *testing.T) {
 	cases := []struct {
@@ -154,8 +152,8 @@ func TestInitOpenerCmdValidation(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			oc := config.OpenerConfig{Name: "test", Cmd: c.cmd, Roles: c.roles}
-			o, err := InitOpener(oc, &fakeExecutor{})
+			spec := Spec{Name: "test", Cmd: c.cmd, Roles: c.roles}
+			o, err := InitExecOpener(spec, &fakeExecutor{})
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("期望报错，实际 o=%+v err=nil", o)
@@ -214,11 +212,15 @@ func TestOpenInvokesExecutor(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fake := &fakeExecutor{}
-			o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: c.cmd, Roles: c.roles}, fake)
+			o, err := InitExecOpener(Spec{Name: "t", Cmd: c.cmd, Roles: c.roles}, fake)
 			if err != nil {
-				t.Fatalf("InitOpener 失败: %v", err)
+				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
-			if err := o.Open(c.paths...); err != nil {
+			roles, _, err := ParseRoles(c.roles)
+			if err != nil {
+				t.Fatalf("roles 解析失败: %v", err)
+			}
+			if err := o.Open(roles[0], c.paths...); err != nil {
 				t.Fatalf("Open 失败: %v", err)
 			}
 			if len(fake.calls) != 1 {
@@ -234,16 +236,33 @@ func TestOpenInvokesExecutor(t *testing.T) {
 
 func TestOpenSlotCountMismatch(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitOpener(config.OpenerConfig{Name: "t", Cmd: []string{"code", "$0"}, Roles: []string{"open-dir"}}, fake)
+	o, err := InitExecOpener(Spec{Name: "t", Cmd: []string{"code", "$0"}, Roles: []string{"open-dir"}}, fake)
 	if err != nil {
-		t.Fatalf("InitOpener 失败: %v", err)
+		t.Fatalf("InitExecOpener 失败: %v", err)
 	}
 	// slotCount=1 但传 2 个路径，应在 BuildArgs 阶段报错，executor 不被调用
-	err = o.Open("/a", "/b")
+	err = o.Open(RoleOpenDir, "/a", "/b")
 	if err == nil {
 		t.Fatalf("期望 slotCount 不匹配报错，实际 nil")
 	}
 	if len(fake.calls) != 0 {
 		t.Fatalf("期望 executor 未被调用，实际调用 %d 次", len(fake.calls))
+	}
+}
+
+// ---------- Open role 前置校验（收敛在实现内） ----------
+
+func TestOpenRoleUnsupported(t *testing.T) {
+	fake := &fakeExecutor{}
+	o, err := InitExecOpener(Spec{Name: "code", Cmd: []string{"code"}, Roles: []string{"open-dir"}}, fake)
+	if err != nil {
+		t.Fatalf("InitExecOpener 失败: %v", err)
+	}
+	// 用未声明的 role 调 Open 应在实现内报错，且不触达 executor
+	if err := o.Open(RoleDiffDir, "/a"); err == nil {
+		t.Fatal("期望 role 不支持报错")
+	}
+	if len(fake.calls) != 0 {
+		t.Fatalf("期望 executor 未被调用，实际 %d 次", len(fake.calls))
 	}
 }

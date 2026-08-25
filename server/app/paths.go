@@ -10,8 +10,9 @@ import (
 
 // 子项相对根的文件/目录名。
 const (
-	dbFileName   = "data.db"
-	cacheDirName = "cache"
+	settingsFileName = "settings.json"
+	dbFileName       = "data.db"
+	cacheDirName     = "cache"
 )
 
 // Paths cube 持有的数据目录的路径
@@ -33,6 +34,7 @@ func NewPaths(dataDir string) *Paths {
 	return &Paths{dataDir: absDataDir}
 }
 
-func (p *Paths) DataDir() string    { return p.dataDir }
-func (p *Paths) DataDbFile() string { return filepath.Join(p.dataDir, dbFileName) }
-func (p *Paths) CacheDir() string   { return filepath.Join(p.dataDir, cacheDirName) }
+func (p *Paths) DataDir() string      { return p.dataDir }
+func (p *Paths) SettingsFile() string { return filepath.Join(p.dataDir, settingsFileName) }
+func (p *Paths) DataDbFile() string   { return filepath.Join(p.dataDir, dbFileName) }
+func (p *Paths) CacheDir() string     { return filepath.Join(p.dataDir, cacheDirName) }

@@ -35,10 +35,10 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 			}
 
 			// 返回结果
-			return PrintResult(openers, func(item *opener.Opener) Item {
+			return PrintResult(openers, func(item opener.Opener) Item {
 				return Item{
 					Title:    item.Name(),
-					SubTitle: item.CmdString(),
+					SubTitle: item.Summary(),
 					Arg:      item.Name(),
 				}
 			})
@@ -49,7 +49,7 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 	return cmd
 }
 
-func sortOpeners(openers []*opener.Opener, history []string) []*opener.Opener {
+func sortOpeners(openers []opener.Opener, history []string) []opener.Opener {
 	if len(openers) <= 1 || len(history) == 0 {
 		return openers
 	}
@@ -75,7 +75,7 @@ func sortOpeners(openers []*opener.Opener, history []string) []*opener.Opener {
 	slices.SortFunc(targets, func(t1, t2 *target) int {
 		return t1.weight - t2.weight
 	})
-	return slicekit.Map(targets, func(t *target) *opener.Opener {
+	return slicekit.Map(targets, func(t *target) opener.Opener {
 		return openers[t.index]
 	})
 }

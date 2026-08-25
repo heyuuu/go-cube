@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
+	"cube/opener"
 )
 
 // cmd `alfred project-open`
@@ -30,13 +31,13 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 			}
 
 			// 按 opener 名精确查找（区别于主命令的模糊 pickOpener）
-			opener := a.OpenerService().FindByName(openerName)
-			if opener == nil {
+			o := a.OpenerService().FindByName(openerName)
+			if o == nil {
 				return errors.New("未找到指定 opener: " + openerName)
 			}
 
 			// 打开项目
-			err := opener.Open(proj.Path())
+			err := o.Open(opener.RoleOpenDir, proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}

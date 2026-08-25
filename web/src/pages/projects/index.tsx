@@ -155,7 +155,7 @@ function TreeRowView({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useOpenerOpen>;
-  onOpen: (path: string, app: string) => void;
+  onOpen: (path: string, opener: string) => void;
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
   onFilterTag: (t: string) => void;
@@ -342,9 +342,9 @@ export function ProjectsPage() {
     });
   }
 
-  function openProject(path: string, app: string) {
+  function openProject(path: string, opener: string) {
     setOpenError('');
-    open.mutate({ path, app }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
+    open.mutate({ path, opener }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 
   const error = list.error ? `加载失败：${list.error.message}` : openError || '';

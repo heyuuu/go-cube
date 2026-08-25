@@ -66,16 +66,17 @@ func ParseRoles(raw []string) (roles []Role, slotCount int, err error) {
 	slotCount = roleSlotCount(roles[0])
 	for _, r := range roles[1:] {
 		if roleSlotCount(r) != slotCount {
-			return nil, 0, fmt.Errorf("opener 声明的 role slotCount 不一致（占位符个数需唯一）：涉及 %s", joinRoles(roles))
+			return nil, 0, fmt.Errorf("opener 声明的 role slotCount 不一致（占位符个数需唯一）：涉及 %s", RolesString(roles))
 		}
 	}
 	return roles, slotCount, nil
 }
 
-func joinRoles(roles []Role) string {
+// RolesString 把 role 声明格式化为 "open-dir,diff-file"（展示用）。
+func RolesString(roles []Role) string {
 	parts := make([]string, len(roles))
 	for i, r := range roles {
 		parts[i] = string(r)
 	}
-	return strings.Join(parts, ", ")
+	return strings.Join(parts, ",")
 }
