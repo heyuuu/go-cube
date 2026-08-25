@@ -29,6 +29,7 @@
 
 - [`1007-sqlc代替gorm/`](proposals/parked/1007-sqlc代替gorm/) — sqlc 代替 gorm（未来方向）
 - [`1027-工作台暂存区分组展示/`](proposals/parked/1027-工作台暂存区分组展示/) — 工作台变更清单按暂存区/未暂存分组展示 + stage/unstage（SourceTree 式）
+- [`1028-desktop壳与wails评估/`](proposals/parked/1028-desktop壳与wails评估/) — 不做 desktop 壳；wails 与「本地 server + 通用 HTTP API」结构性不匹配（私有 RPC vs 开放 API），个人工具线转投 Swift/SwiftUI
 
 #### [proposals/archived/](proposals/archived/) — 已完成提案归档
 
