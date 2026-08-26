@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -38,7 +39,7 @@ func NewMdHandler() *MdHandler {
 	return &MdHandler{}
 }
 
-func (h *MdHandler) Register(api huma.API) {
+func (h *MdHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/md/content", "读取 markdown 文件原文", h.mdContent)
 	web.ApiGet(api, "/api/md/list", "列出目录下的 markdown 文件", h.mdList)
 }

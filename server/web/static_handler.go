@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+
+	"github.com/danielgtaylor/huma/v2"
 )
 
 // uiFS 前端构建产物（make build-ui 把 web/dist 的内容拷到这里，go:embed 嵌入）
@@ -13,13 +15,19 @@ import (
 //go:embed ui/*
 var uiFS embed.FS
 
-// registerStaticRoutes 挂载前端静态资源与 SPA fallback：
+type staticHandler struct{}
+
+func newStaticHandler() *staticHandler {
+	return &staticHandler{}
+}
+
+// Register 挂载前端静态资源与 SPA fallback：
 //   - GET /assets/*   → Vite 构建产物（文件名带内容 hash，设 immutable 长缓存）
 //   - GET /<文件>     → dist 根级文件（favicon.svg 等），存在即返回
 //   - GET 其它路径    → index.html（history 路由 fallback，支持 /projects 直达/刷新）
 //   - /api/*、/docs、/openapi.json 的未命中**不走 fallback**，按 404 处理——
 //     否则 API 打错路径会拿到 HTML 200，错误被吞成莫名的解析失败
-func registerStaticRoutes(mux *http.ServeMux) {
+func (h *staticHandler) Register(api huma.API, mux *http.ServeMux) {
 	indexFile, err := fs.ReadFile(uiFS, "ui/index.html")
 	if err != nil {
 		slog.Error("ui assets 为空，无法挂载静态资源", "err", err)

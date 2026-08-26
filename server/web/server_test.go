@@ -23,7 +23,7 @@ import (
 // testHandler 框架自测用的最小 handler：一条 GET 路由，覆盖注册链路与 envelope。
 type testHandler struct{}
 
-func (testHandler) Register(api huma.API) {
+func (testHandler) Register(api huma.API, mux *http.ServeMux) {
 	ApiGet(api, "/api/test/ping", "测试探活", func(_ struct{}) (string, error) {
 		return "pong", nil
 	})

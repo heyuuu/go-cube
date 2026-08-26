@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -58,7 +59,7 @@ func NewOpenerHandler(service *opener.Service) *OpenerHandler {
 	}
 }
 
-func (h *OpenerHandler) Register(api huma.API) {
+func (h *OpenerHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
 	web.ApiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
 	web.ApiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)

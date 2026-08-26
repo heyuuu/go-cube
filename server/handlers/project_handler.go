@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -39,7 +40,7 @@ func NewProjectHandler(projectService *project.Service) *ProjectHandler {
 	}
 }
 
-func (h *ProjectHandler) Register(api huma.API) {
+func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/project/list", "获取项目列表", h.projectList)
 	web.ApiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
 	web.ApiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)

@@ -25,7 +25,7 @@ func NewWorkbenchHandler(workbenchService *workbench.Service) *WorkbenchHandler 
 	return &WorkbenchHandler{workbenchService: workbenchService}
 }
 
-func (h *WorkbenchHandler) Register(api huma.API) {
+func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
 	web.ApiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
 	web.ApiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
@@ -37,6 +37,9 @@ func (h *WorkbenchHandler) Register(api huma.API) {
 	web.ApiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
 	web.ApiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
 	web.ApiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
+
+	// 注册 WebSocket 路由（upgrade 不走 huma）
+	mux.HandleFunc("GET /api/workbench/pty", h.ptyWs)
 }
 
 func (h *WorkbenchHandler) info(input struct {
@@ -149,11 +152,6 @@ func (h *WorkbenchHandler) fileDiff(input struct {
 		return nil, err
 	}
 	return h.workbenchService.ReadFileDiff(input.Path, base, current, input.File, input.BaseFile)
-}
-
-// RegisterRaw 注册 WebSocket 路由（upgrade 不走 huma）
-func (h *WorkbenchHandler) RegisterRaw(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/workbench/pty", h.ptyWs)
 }
 
 func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {

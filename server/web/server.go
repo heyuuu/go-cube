@@ -20,12 +20,7 @@ import (
 
 // Handler 接口
 type Handler interface {
-	Register(api huma.API)
-}
-
-// RawHandler 可选接口：注册不走 huma 的原生路由（WebSocket upgrade 等）
-type RawHandler interface {
-	RegisterRaw(mux *http.ServeMux)
+	Register(api huma.API, mux *http.ServeMux)
 }
 
 // Server 服务器，响应 api 请求
@@ -38,6 +33,14 @@ type Server struct {
 }
 
 func NewServer(c config.ServerConfig, handlers []Handler) *Server {
+	// 添加默认 Handler
+	handlers = append(handlers,
+		// system 端点（whoami / shutdown）
+		newSystemHandler(),
+		// 静态前端资源路由（/assets/* 与 SPA fallback）
+		newStaticHandler(),
+	)
+
 	mux := http.NewServeMux()
 
 	cfg := huma.DefaultConfig("Cube API", version.Version())
@@ -49,21 +52,8 @@ func NewServer(c config.ServerConfig, handlers []Handler) *Server {
 
 	// 各 domain 注册自己的路由
 	for _, handler := range handlers {
-		handler.Register(api)
+		handler.Register(api, mux)
 	}
-
-	// system 端点（whoami / shutdown）
-	newSystemHandler().Register(api, mux)
-
-	// 支持 handler 注册非 huma 路由（WebSocket upgrade 等）
-	for _, handler := range handlers {
-		if rh, ok := handler.(RawHandler); ok {
-			rh.RegisterRaw(mux)
-		}
-	}
-
-	// 静态前端资源路由（/ 与 /ui/*）
-	registerStaticRoutes(mux)
 
 	return &Server{
 		// config
