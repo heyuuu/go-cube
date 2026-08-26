@@ -19,13 +19,13 @@
 基础设施  config / db / logger / version / runtime               所有层共享
 能力      opener / util(git / fuzzy / easycache / pathkit / slicekit / tui)  通用动作, 不含业务实体
 领域      project (含 gitcache / scan / clone) / history          业务 domain, 含实体和规则
-出口      cmd / web                                               把领域包成 CLI/Web
+出口      cmd / handlers / web                                     把领域包成 CLI/Web（handlers=业务 HTTP handler 层，web=服务端框架）
 装配      app / main                                              接线
 ```
 
-- 基础设施不依赖上层；能力层只依赖基础设施；领域层依赖能力+基础设施；**cmd 与 web 不互调**；`app` 是唯一接线点。
+- 基础设施不依赖上层；能力层只依赖基础设施；领域层依赖能力+基础设施；`handlers` 依赖领域层与 `web` 框架；**cmd 与 web 不互调**；`app` 是唯一接线点。
 - **App 装配是显式构造，不是懒初始化**：`app.New(cfg)` 一次性开 db + AutoMigrate + 构造各 service + 组装 web server（`server/app/app.go`）。`cmd.Execute()`（`server/cmd/root.go`）在 main 里调用，把 `*app.App` 显式传给所有命令工厂（`newXxxCmd(a *app.App)`）。**无全局单例、无 `app.Default()`、无包级 `init()` 反向依赖**。
-- 加一个新 domain = ①领域包 ②`cmd/<x>` 子命令组 ③`web.NewXxxHandler` ④config 加节 ⑤`app/app.go` 装配清单加构造。**五处都是加法，不碰现有 domain**。
+- 加一个新 domain = ①领域包 ②`cmd/<x>` 子命令组 ③`handlers/` 加 `<domain>_handler.go`（实现 `Handler.Register`，注册走 `web.ApiGet`/`web.ApiPost`） ④config 加节 ⑤`app/app.go` 装配清单加构造。**五处都是加法，不碰现有 domain**。
 
 ## 关键机制（改动前先理解）
 
@@ -33,7 +33,7 @@
 - **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
 - **opener：接口 + 唯一 exec 实现 + settings.json**：`Opener` 是接口（`opener/opener.go`），唯一实现 `execOpener`（`opener/exec.go`，cmd 模板 `$0/$1` 占位）——「打开工作台页」不设独立形态，配 exec cmd `["cube","web","ui","$0"]` 组合 cube 自身 CLI；能力由 `roles []Role` 声明（见 `opener/role.go`），`slotCount` 由 role 推导；`Open(role, slotArgs...)` 的 role 校验收敛在实现内；经 `Executor` 执行（`opener/executor.go`，测试注入 fake）。**opener 数据存 settings.json 的 openers 节**（`settings` 包节级 API，Service 直读不缓存、写侧领域校验；详见 现状.md 3.3）——改 opener 时同步看 `opener/opener.go`、`opener/exec.go`、`opener/role.go`、`opener/executor.go`、`settings/settings.go`。
 - **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
-- **Web 装配**：`web.NewServer(handlers ...Handler)`，每个 domain 实现 `Handler.Register(api huma.API)`；统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
+- **Web 出口分两层**：`web` 包是服务端框架（Server 装配 / envelope / 静态资源 / system 端点，`web.NewServer(handlers ...Handler)`）；业务 handler 在 `handlers` 包（`<domain>_handler.go` 同包分文件，不按 domain 分子包），实现 `Handler.Register(api huma.API)`，注册统一走 `web.ApiGet` / `web.ApiPost`。统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
 - **配置与双环境**：默认目录按环境分流——dev（源码直跑 / air / run.sh）→ `~/.config/cube-dev/`，prod（`make build` / `make install`，ldflags 注入了正式 version）→ `~/.config/cube/`；身份判定见 `version.IsDev()`，详见 [`docs/proposals/archived/1026-环境分离/`](./docs/proposals/archived/1026-环境分离/)。`config.json` 按 domain 分节，`server.port` 是端口唯一事实源（无 `-p` flag、不支持多实例）。`-c` 覆盖配置文件路径，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、`cube.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。
 
 ## 常用命令

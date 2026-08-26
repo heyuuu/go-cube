@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"errors"
@@ -12,6 +12,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/util/git"
+	"cube/web"
 )
 
 // md 渲染提案（docs/proposals/260811-md渲染）定稿：后端不做任何模板渲染，
@@ -38,8 +39,8 @@ func NewMdHandler() *MdHandler {
 }
 
 func (h *MdHandler) Register(api huma.API) {
-	apiGet(api, "/api/md/content", "读取 markdown 文件原文", h.mdContent)
-	apiGet(api, "/api/md/list", "列出目录下的 markdown 文件", h.mdList)
+	web.ApiGet(api, "/api/md/content", "读取 markdown 文件原文", h.mdContent)
+	web.ApiGet(api, "/api/md/list", "列出目录下的 markdown 文件", h.mdList)
 }
 
 func (h *MdHandler) mdContent(input struct {

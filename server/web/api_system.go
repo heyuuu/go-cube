@@ -29,7 +29,7 @@ func newSystemHandler() *SystemHandler {
 
 func (h *SystemHandler) Register(api huma.API, mux *http.ServeMux) {
 	// whoami：标准查询，进 huma 文档
-	apiGet(api, "/api/system/whoami", "服务身份探活", h.whoami)
+	ApiGet(api, "/api/system/whoami", "服务身份探活", h.whoami)
 
 	// shutdown：直接挂 mux，不走 huma（鉴权定制 + 不进文档）
 	mux.HandleFunc("POST /api/system/shutdown", h.handleShutdown)

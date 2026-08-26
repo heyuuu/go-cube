@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"encoding/base64"
@@ -12,6 +12,7 @@ import (
 	"cube/opener"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
+	"cube/web"
 )
 
 // --- dto ---
@@ -58,16 +59,16 @@ func NewOpenerHandler(service *opener.Service) *OpenerHandler {
 }
 
 func (h *OpenerHandler) Register(api huma.API) {
-	apiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
-	apiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
-	apiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
-	apiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
-	apiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
-	apiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
-	apiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
+	web.ApiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
+	web.ApiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
+	web.ApiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
+	web.ApiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
+	web.ApiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
+	web.ApiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
+	web.ApiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
 }
 
-func (h *OpenerHandler) openerList(_ struct{}) (ListResult[*OpenerDTO], error) {
+func (h *OpenerHandler) openerList(_ struct{}) (web.ListResult[*OpenerDTO], error) {
 	openers := h.service.AllOpeners()
 	list := slicekit.Map(openers, toOpenerDTO)
 	return listResult(list), nil

@@ -26,10 +26,6 @@ type ListResult[T any] struct {
 	List []T `json:"list"`
 }
 
-func listResult[T any](list []T) ListResult[T] {
-	return ListResult[T]{List: list}
-}
-
 // --- api register --
 
 type humaHandler[I, O any] = func(context.Context, *I) (*O, error)
@@ -122,7 +118,8 @@ func jsonHandler[I, O any](h func(I) (O, error)) humaHandler[I, ApiOutput[O]] {
 
 // --- api helpers 快捷方法 ---
 
-func apiGet[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
+// ApiGet 注册 GET 查询路由（参数走 query）。handler 只返回纯数据，envelope 包装在此完成。
+func ApiGet[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
 	apiRegister[I, ApiOutput[O]](api, huma.Operation{
 		Method:  http.MethodGet,
 		Path:    path,
@@ -130,7 +127,8 @@ func apiGet[I, O any](api huma.API, path string, summary string, handler func(I)
 	}, jsonHandler(handler))
 }
 
-func apiPost[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
+// ApiPost 注册 POST 动作路由（参数走 body）。
+func ApiPost[I, O any](api huma.API, path string, summary string, handler func(I) (O, error)) {
 	apiRegister[I, ApiOutput[O]](api, huma.Operation{
 		Method:  http.MethodPost,
 		Path:    path,

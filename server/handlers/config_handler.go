@@ -1,9 +1,10 @@
-package web
+package handlers
 
 import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/config"
+	"cube/web"
 )
 
 type ConfigHandler struct {
@@ -16,7 +17,7 @@ func NewConfigHandler(cfg *config.Config) *ConfigHandler {
 }
 
 func (h *ConfigHandler) Register(api huma.API) {
-	apiGet(api, "/api/config", "获取配置信息", h.getConfig)
+	web.ApiGet(api, "/api/config", "获取配置信息", h.getConfig)
 }
 
 func (h *ConfigHandler) getConfig(_ struct{}) (config.Config, error) {

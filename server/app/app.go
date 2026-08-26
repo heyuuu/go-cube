@@ -6,6 +6,7 @@ import (
 	"cube/config"
 	"cube/create"
 	"cube/db"
+	"cube/handlers"
 	"cube/history"
 	"cube/opener"
 	"cube/project"
@@ -57,11 +58,11 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// 组装 web server
-	configHandler := web.NewConfigHandler(cfg)
-	projectHandler := web.NewProjectHandler(projectService)
-	openerHandler := web.NewOpenerHandler(openerService)
-	mdHandler := web.NewMdHandler()
-	workbenchHandler := web.NewWorkbenchHandler(workbenchService)
+	configHandler := handlers.NewConfigHandler(cfg)
+	projectHandler := handlers.NewProjectHandler(projectService)
+	openerHandler := handlers.NewOpenerHandler(openerService)
+	mdHandler := handlers.NewMdHandler()
+	workbenchHandler := handlers.NewWorkbenchHandler(workbenchService)
 	server := web.NewServer(
 		cfg.Server,
 		[]web.Handler{

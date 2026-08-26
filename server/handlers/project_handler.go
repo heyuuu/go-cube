@@ -1,4 +1,4 @@
-package web
+package handlers
 
 import (
 	"time"
@@ -8,6 +8,7 @@ import (
 	"cube/project"
 	"cube/project/gitcache"
 	"cube/util/slicekit"
+	"cube/web"
 )
 
 // --- dto ---
@@ -39,10 +40,10 @@ func NewProjectHandler(projectService *project.Service) *ProjectHandler {
 }
 
 func (h *ProjectHandler) Register(api huma.API) {
-	apiGet(api, "/api/project/list", "获取项目列表", h.projectList)
-	apiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
-	apiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
-	apiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
+	web.ApiGet(api, "/api/project/list", "获取项目列表", h.projectList)
+	web.ApiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
+	web.ApiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
+	web.ApiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
 }
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
@@ -88,12 +89,12 @@ func (h *ProjectHandler) toProjectDTO(entity *project.Project) *ProjectDTO {
 	}
 }
 
-func (h *ProjectHandler) scanRules(_ struct{}) (ListResult[project.ScanRule], error) {
+func (h *ProjectHandler) scanRules(_ struct{}) (web.ListResult[project.ScanRule], error) {
 	rules := h.projectService.ScanRules()
 	return listResult(rules), nil
 }
 
-func (h *ProjectHandler) cloneRules(_ struct{}) (ListResult[project.CloneRule], error) {
+func (h *ProjectHandler) cloneRules(_ struct{}) (web.ListResult[project.CloneRule], error) {
 	rules := h.projectService.CloneRules()
 	return listResult(rules), nil
 }

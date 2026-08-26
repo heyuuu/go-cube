@@ -1,15 +1,15 @@
-package web
+package handlers
 
 import (
 	"log/slog"
 	"net/http"
-
 	"strconv"
 
 	"github.com/coder/websocket"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"cube/web"
 	"cube/workbench"
 )
 
@@ -26,17 +26,17 @@ func NewWorkbenchHandler(workbenchService *workbench.Service) *WorkbenchHandler 
 }
 
 func (h *WorkbenchHandler) Register(api huma.API) {
-	apiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
-	apiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
-	apiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
-	apiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
-	apiGet(api, "/api/workbench/worktrees", "全部工作副本的状态快照", h.worktrees)
-	apiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
-	apiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
-	apiPost(api, "/api/workbench/file/save", "保存工作副本文件（唯一写路径）", h.saveFile)
-	apiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
-	apiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
-	apiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
+	web.ApiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
+	web.ApiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
+	web.ApiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
+	web.ApiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
+	web.ApiGet(api, "/api/workbench/worktrees", "全部工作副本的状态快照", h.worktrees)
+	web.ApiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
+	web.ApiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
+	web.ApiPost(api, "/api/workbench/file/save", "保存工作副本文件（唯一写路径）", h.saveFile)
+	web.ApiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
+	web.ApiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
+	web.ApiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
 }
 
 func (h *WorkbenchHandler) info(input struct {
