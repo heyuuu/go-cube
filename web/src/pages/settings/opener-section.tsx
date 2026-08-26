@@ -32,17 +32,20 @@ interface Draft {
   title: string;
   cmd: string;
   roles: string[];
-  iconType: '' | 'lucide' | 'image';
+  iconType: 'lucide' | 'image';
   iconValue: string;
 }
+
+// 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
+const DEFAULT_LUCIDE = 'app-window-mac';
 
 const EMPTY_DRAFT: Draft = {
   name: '',
   title: '',
   cmd: '',
   roles: ['open-dir'],
-  iconType: '',
-  iconValue: '',
+  iconType: 'lucide',
+  iconValue: DEFAULT_LUCIDE,
 };
 
 function fromOpener(op: Opener): Draft {
@@ -52,8 +55,8 @@ function fromOpener(op: Opener): Draft {
     // summary 是命令模板的空格拼接展示，直接还原成编辑文本
     cmd: op.summary,
     roles: op.roles ?? [],
-    iconType: op.icon?.type === 'lucide' || op.icon?.type === 'image' ? op.icon.type : '',
-    iconValue: op.icon?.value ?? '',
+    iconType: op.icon?.type === 'image' ? 'image' : 'lucide',
+    iconValue: op.icon?.type === 'image' ? (op.icon.value ?? '') : op.icon?.value || DEFAULT_LUCIDE,
   };
 }
 
@@ -136,19 +139,20 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">icon（可选）</span>
+            <span className="text-xs text-muted-foreground">icon</span>
             <div className="flex gap-2">
-              {(['', 'lucide', 'image'] as const).map((t) => (
+              {(['lucide', 'image'] as const).map((t) => (
                 <Button
-                  key={t || 'none'}
+                  key={t}
                   size="sm"
                   variant={form.iconType === t ? 'default' : 'outline'}
                   onClick={() => {
                     set('iconType', t);
-                    set('iconValue', '');
+                    // 切换类型换图片来源；lucide 回落默认图，避免「未选择」态
+                    set('iconValue', t === 'lucide' ? DEFAULT_LUCIDE : '');
                   }}
                 >
-                  {t === '' ? '无' : t}
+                  {t}
                 </Button>
               ))}
             </div>
