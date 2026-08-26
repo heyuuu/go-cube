@@ -2,7 +2,7 @@
 
 > **状态**：📝 提案（2026-08-24，方向已与 owner 对齐）
 >
-> **依赖**：[`1016-opener改造`](../1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
+> **依赖**：[`1016-opener改造`](../archived/1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
 > **关联**：[`1024-projects筛选URL化`](../1024-projects筛选URL化/README.md)（无硬依赖，但其完成后「业务页 ↔ settings 往返无损」才成立）。
 
 ## 背景与目标

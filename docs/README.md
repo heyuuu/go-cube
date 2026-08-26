@@ -35,6 +35,7 @@
 
 已实现的需求总结（从 proposals 顶层移入，记录最终落地形态与方案演变）。
 
+- [`1016-opener改造/`](proposals/archived/1016-opener改造/) — opener 改造：数据迁 settings.json（节级 API + 直读）+ 接口化 + icon 全链路（lucide/base64/`.app` 提取）+ Web 增删改；web 形态最终拆除，收敛为 `cube web workbench` exec 组合
 - [`1009-模板引擎cube-create/`](proposals/archived/1009-模板引擎cube-create/) — `cube create` 模板引擎（template.yaml 协议 + glob 替换 + init 执行；本地目录/git 仓库/模板集收纳式；引擎是机制，模板是数据）
 - [`1001-server后台常驻与HTTP管理/`](proposals/archived/1001-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
 - [`1002-前端栈迁移/`](proposals/archived/1002-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口

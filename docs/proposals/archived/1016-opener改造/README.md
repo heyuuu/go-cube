@@ -1,6 +1,6 @@
 # opener 改造：icon + web 形态 + settings.json 与 Web 配置
 
-> **状态**：✅ 已实施（2026-08-26，待 owner 验收归档）
+> **状态**：✅ 已交付（2026-08-26 验收归档；实施定稿与偏差见文末「实施偏差备忘」）
 
 ## 背景与目标
 
@@ -8,7 +8,7 @@ opener 现状是纯「exec 命令模板」（`Opener{name, cmd, roles, slotCount
 
 1. **无 icon**：前端只能硬编码图标（`web/src/pages/projects/shared.tsx` 按 `finder`/`stree` 名字写死 lucide 图标）。
 2. **形态表达不了**：新的打开方式不是启动子进程——「打开 cube 工作台页面」也应是一种文件夹打开方式；`{name, cmd, roles}` 结构表达不了。
-3. **config.json 配置方式到顶了**：需要 Web 配置界面做增删改。把 opener 数据从 config.json 迁到**独立的 settings.json**（与 config.json 切割：无需启动时加载、可在运行中变更的用户可管理数据），Service **每次直接读文件、不做内存缓存**（openers 个数个位数，本地文件毫秒级；Web 改完立刻生效，CLI/Web 永远一致，省掉缓存失效逻辑）。settings.json 大部分时间由程序读写，相当于显化的一张表，且天然可 diff / 跨环境人工合并（曾评估落 sqlite 表，因跨环境人工合并困难而放弃，见 [1026-环境分离](../archived/1026-环境分离/README.md)）。
+3. **config.json 配置方式到顶了**：需要 Web 配置界面做增删改。把 opener 数据从 config.json 迁到**独立的 settings.json**（与 config.json 切割：无需启动时加载、可在运行中变更的用户可管理数据），Service **每次直接读文件、不做内存缓存**（openers 个数个位数，本地文件毫秒级；Web 改完立刻生效，CLI/Web 永远一致，省掉缓存失效逻辑）。settings.json 大部分时间由程序读写，相当于显化的一张表，且天然可 diff / 跨环境人工合并（曾评估落 sqlite 表，因跨环境人工合并困难而放弃，见 [1026-环境分离](../1026-环境分离/README.md)）。
 
 **本提案不做**：非 macOS 的 app 图标提取（darwin-only，其他平台留 TODO）；workbench 以外的 web target（target 是白名单枚举，后续加值是纯加法）；不做打开方式使用统计增强。
 
