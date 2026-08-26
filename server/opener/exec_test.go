@@ -1,6 +1,7 @@
 package opener
 
 import (
+	"os"
 	"reflect"
 	"testing"
 )
@@ -130,6 +131,58 @@ func TestBuildArgs(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------- cmd[0] 自引用替换（resolveBin） ----------
+
+func TestBuildArgsResolvesSelfCube(t *testing.T) {
+	self, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable 失败: %v", err)
+	}
+	cases := []struct {
+		name     string
+		cmd      []string
+		wantArgs []string
+	}{
+		{"裸名 cube", []string{"cube", "web", "workbench", "$0"}, []string{"web", "workbench", "/proj"}},
+		{"绝对路径 cube", []string{"/usr/local/bin/cube", "md"}, []string{"md", "/proj"}},
+		{"相对路径 cube", []string{"tmp/cube", "md"}, []string{"md", "/proj"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			o, err := InitExecOpener(Spec{Name: "t", Cmd: c.cmd, Roles: []string{"open-dir"}}, &fakeExecutor{})
+			if err != nil {
+				t.Fatalf("InitExecOpener 失败: %v", err)
+			}
+			bin, args, err := o.BuildArgs("/proj")
+			if err != nil {
+				t.Fatalf("BuildArgs 失败: %v", err)
+			}
+			if bin != self {
+				t.Fatalf("cmd[0]=%q 应替换为当前可执行文件 %q, got %q", c.cmd[0], self, bin)
+			}
+			if !reflect.DeepEqual(args, c.wantArgs) {
+				t.Fatalf("args = %v, want %v", args, c.wantArgs)
+			}
+		})
+	}
+
+	t.Run("近似名不替换", func(t *testing.T) {
+		for _, bin0 := range []string{"cubed", "cube-x", "mycube", "/bin/cubecase"} {
+			o, err := InitExecOpener(Spec{Name: "t", Cmd: []string{bin0}, Roles: []string{"open-dir"}}, &fakeExecutor{})
+			if err != nil {
+				t.Fatalf("InitExecOpener 失败: %v", err)
+			}
+			bin, _, err := o.BuildArgs("/proj")
+			if err != nil {
+				t.Fatalf("BuildArgs 失败: %v", err)
+			}
+			if bin != bin0 {
+				t.Fatalf("%q 不应被替换, got %q", bin0, bin)
+			}
+		}
+	})
 }
 
 // ---------- InitExecOpener cmd 校验 ----------

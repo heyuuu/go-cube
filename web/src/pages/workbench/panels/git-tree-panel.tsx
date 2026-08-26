@@ -16,7 +16,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { renderOpenerIcon } from '@/lib/opener-icon';
 import { cn } from '@/lib/utils';
-import { quickOpens } from '@/pages/projects/shared';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
   useWorkbenchCommits,
@@ -247,7 +246,10 @@ function WorktreeRow({
 }
 
 // 副本行尾的 opener 动作（与 projects 页行内动作同构）：已配置的快捷图标 + 全量下拉。
+// 快捷清单本面板自维护（不含 cube-workbench——已在工作台内，没必要再跳工作台）。
 // 须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
+const QUICK_OPENS = ['finder', 'stree'];
+
 function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
@@ -258,21 +260,23 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {quickOpens
-        .filter((q) => openerNames.has(q.opener))
-        .map((q) => (
+      {QUICK_OPENS.filter((openerName) => openerNames.has(openerName)).map((openerName) => {
+        const op = openerByName.get(openerName);
+        if (!op) return null;
+        return (
           <Button
-            key={q.opener}
+            key={openerName}
             variant="ghost"
             size="icon-sm"
-            title={openerByName.get(q.opener)?.title || q.title}
-            aria-label={`${q.title}（${name}）`}
-            disabled={open.isPending && open.variables?.opener === q.opener}
-            onClick={() => onOpen(q.opener)}
+            title={op.title}
+            aria-label={`${op.title}（${name}）`}
+            disabled={open.isPending && open.variables?.opener === openerName}
+            onClick={() => onOpen(openerName)}
           >
-            {renderOpenerIcon(openerByName.get(q.opener), q.fallbackIcon)}
+            {renderOpenerIcon(op, null)}
           </Button>
-        ))}
+        );
+      })}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${name}`} />}>
           <ChevronDown className="size-3.5" />
@@ -288,7 +292,8 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             <DropdownMenuLabel>打开方式</DropdownMenuLabel>
             {openerList.map((op) => (
               <DropdownMenuItem key={op.name} onClick={() => onOpen(op.name)}>
-                {op.name}
+                {renderOpenerIcon(op, null)}
+                {op.title}
               </DropdownMenuItem>
             ))}
             {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}

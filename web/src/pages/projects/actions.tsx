@@ -1,6 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { ChevronDown, SquareTerminal } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { ChevronDown } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -33,34 +32,27 @@ export function ProjectActions({
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
-  const navigate = useNavigate();
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       {quickOpens
-        .filter((q) => openerNames.has(q.opener))
-        .map((q) => (
-          <Button
-            key={q.opener}
-            variant="ghost"
-            size="icon-sm"
-            title={openerByName.get(q.opener)?.title || q.title}
-            aria-label={`${q.title}（${p.name}）`}
-            disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === q.opener}
-            onClick={() => onOpen(p.path, q.opener)}
-          >
-            {renderOpenerIcon(openerByName.get(q.opener), q.fallbackIcon)}
-          </Button>
-        ))}
-      {/* 工作台入口（非 opener）：应用内路由跳转，与快捷图标平齐 */}
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title="在工作台打开"
-        aria-label={`在工作台打开（${p.name}）`}
-        onClick={() => navigate(`/workbench?path=${encodeURIComponent(p.path)}`)}
-      >
-        <SquareTerminal className="size-3.5" />
-      </Button>
+        .filter((name) => openerNames.has(name))
+        .map((name) => {
+          const op = openerByName.get(name);
+          if (!op) return null;
+          return (
+            <Button
+              key={name}
+              variant="ghost"
+              size="icon-sm"
+              title={op.title}
+              aria-label={`${op.title}（${p.name}）`}
+              disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === name}
+              onClick={() => onOpen(p.path, name)}
+            >
+              {renderOpenerIcon(op, null)}
+            </Button>
+          );
+        })}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <ChevronDown className="size-3.5" />
@@ -75,7 +67,8 @@ export function ProjectActions({
                 onClick={() => onOpen(p.path, op.name)}
                 disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === op.name}
               >
-                {op.name}
+                {renderOpenerIcon(op, null)}
+                {op.title}
               </DropdownMenuItem>
             ))}
             {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}

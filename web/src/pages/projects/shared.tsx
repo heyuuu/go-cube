@@ -1,7 +1,5 @@
 // Projects 页共用常量：tag 徽标配色 + 行内快捷打开配置。
 // 独立成文件（不放 actions.tsx）是为满足 react/only-export-components 的 fast refresh 约束。
-import { FolderOpen, GitBranch } from 'lucide-react';
-import type { ReactNode } from 'react';
 
 // tag → badge 配色；未收录的 tag 落到 outline
 export const tagVariants: Record<string, 'default' | 'secondary' | 'outline'> = {
@@ -10,8 +8,7 @@ export const tagVariants: Record<string, 'default' | 'secondary' | 'outline'> = 
 };
 
 // 行内固定快捷打开（opener 名对应 /api/opener/list）；调整入口在此。
-// 图标取 opener 的 icon 声明（lucide/base64，见 lib/opener-icon），无声明时用 fallback。
-export const quickOpens: { opener: string; title: string; fallbackIcon: ReactNode }[] = [
-  { opener: 'finder', title: '打开所在目录', fallbackIcon: <FolderOpen className="size-3.5" /> },
-  { opener: 'stree', title: '打开 Git 信息', fallbackIcon: <GitBranch className="size-3.5" /> },
-];
+// title/icon 均取 opener 自身声明（后端保证恒有值），无需前端兜底。
+// cube-workbench 是「在工作台打开」的 opener 形态（exec cmd `cube web workbench`），
+// 未配置时快捷位自动隐藏。
+export const quickOpens: string[] = ['finder', 'stree', 'cube-workbench'];

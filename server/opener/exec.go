@@ -2,6 +2,8 @@ package opener
 
 import (
 	"fmt"
+	"log/slog"
+	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -79,7 +81,8 @@ func (o *execOpener) Summary() string {
 // BuildArgs 构造启动该 opener 的完整命令参数（bin + args）。
 //   - 参数个数必须等于 slotCount，否则报错；
 //   - cmd 中的 $0/$1... 占位符被对应路径替换；无占位符的参数原样保留；
-//   - 缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 ["code"] + path 形态。
+//   - 缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 ["code"] + path 形态；
+//   - bin 自引用替换（见 resolveBin）：cmd[0] 是 cube 时换成当前进程的可执行文件。
 //
 // 返回 (bin, args) 供调用方自行启动子进程。
 // Open() 是它的便捷封装（role 校验 + BuildArgs + executor.Run）。
@@ -95,9 +98,25 @@ func (o *execOpener) BuildArgs(slotArgs ...string) (bin string, args []string, e
 	if used == 0 {
 		rendered = append(rendered, slotArgs...)
 	}
-	bin = rendered[0]
+	bin = resolveBin(rendered[0])
 	args = rendered[1:]
 	return bin, args, nil
+}
+
+// resolveBin 自引用替换：bin 为 "cube" 或以 "/cube" 结尾时，换成当前进程的可执行文件。
+// opener 可组合 cube 自身 CLI（如 ["cube","web","workbench","$0"]），dev 环境（air/run.sh
+// 源码直跑）PATH 里未必有 cube、或装的是旧版本；替换后始终与当前进程同源。
+// os.Executable 失败时保留原值降级（交给 PATH 解析兜底）。
+func resolveBin(bin string) string {
+	if bin != "cube" && !strings.HasSuffix(bin, "/cube") {
+		return bin
+	}
+	self, err := os.Executable()
+	if err != nil {
+		slog.Debug("解析当前可执行文件失败，opener cmd[0] 保留原值", "err", err)
+		return bin
+	}
+	return self
 }
 
 // Open 用该 opener 以指定用途打开一个或多个路径：校验 role 后构造 args 并委托
@@ -111,6 +130,7 @@ func (o *execOpener) Open(role Role, slotArgs ...string) error {
 	if err != nil {
 		return err
 	}
+	slog.Debug("execOpener.Open", "bin", bin, "args", args)
 	return o.executor.Run(bin, args...)
 }
 
