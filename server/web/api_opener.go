@@ -18,7 +18,7 @@ import (
 
 type OpenerDTO struct {
 	Name    string         `json:"name"`
-	Summary string         `json:"summary"` // 命令模板展示串
+	Summary string         `json:"summary"`
 	Roles   []string       `json:"roles"`
 	Icon    *OpenerIconDTO `json:"icon,omitempty"` // 缺省无图标（前端 fallback 默认）
 }

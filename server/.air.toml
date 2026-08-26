@@ -14,7 +14,7 @@ tmp_dir = "tmp"
   post_cmd = []
   # 启动
   bin = "./tmp/main"
-  args_bin = ["--debug", "server"]
+  args_bin = ["--debug", "server", "start"]
   # 防抖(毫秒)
   delay = 1000
   exclude_dir = ["assets", "tmp", "vendor", "testdata", "frontend", "build", "runtime"]

@@ -13,23 +13,23 @@ import (
 	"cube/util/pathkit"
 )
 
-// newUICmd `cube web ui <path>` —— 打开项目的工作台（workbench）页面。
+// newWorkbenchCmd `cube web workbench <path>` —— 打开项目的工作台页面（与前端路由 /workbench 同名对齐）。
 //
 // 这是「打开工作台」这类 opener 的落地形态：opener 配置成 exec 命令
-// `["cube", "web", "ui", "$0"]` 即可，URL 拼接（端口/路由/转义）收敛在本命令。
-func newUICmd(a *app.App) *cobra.Command {
+// `["cube", "web", "workbench", "$0"]` 即可，URL 拼接（端口/路由/转义）收敛在本命令。
+func newWorkbenchCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ui <path>",
+		Use:   "workbench <path>",
 		Short: "打开工作台（workbench）页面",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runUI(a, args[0])
+			return runWorkbench(a, args[0])
 		},
 	}
 	return cmd
 }
 
-func runUI(a *app.App, rawPath string) error {
+func runWorkbench(a *app.App, rawPath string) error {
 	// 路径解析同 md：支持 ~ 与相对路径，统一转绝对路径（web API 只收绝对路径）
 	if rawPath[0] != '/' && rawPath[0] != '~' && rawPath[0] != '.' {
 		rawPath = "./" + rawPath

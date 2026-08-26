@@ -1,8 +1,7 @@
 package opener
 
 // Opener 一种「打开方式」的抽象（1016 接口化）。
-// 唯一实现是 execOpener（命令模板，见 exec.go）——「打开工作台页」这类需求
-// 通过 exec 命令组合 cube 自身 CLI（cube web ui）实现，不设独立 web 形态。
+// 目前唯一实现是 execOpener（命令模板，见 exec.go）
 type Opener interface {
 	Name() string
 	Roles() []Role

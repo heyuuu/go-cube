@@ -88,7 +88,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">
-              cmd（空格分隔，$0/$1 占位路径槽位；打开工作台可用 `cube web ui $0`）
+              cmd（空格分隔，$0/$1 占位路径槽位；打开工作台可用 `cube web workbench $0`）
             </span>
             <Input
               value={form.cmd}

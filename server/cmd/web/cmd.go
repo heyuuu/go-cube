@@ -2,7 +2,7 @@
 //
 //	cube web            # 打开首页
 //	cube web md <path>  # 以 Web 方式打开 markdown 文件
-//	cube web ui <path>  # 打开工作台（workbench）页面
+//	cube web workbench <path>  # 打开工作台页面
 //
 // server 不在跑时报错退出（不做 lazy 拉起，遵循「显式 start」的 server 管理模式）。
 package web
@@ -30,7 +30,7 @@ func NewCmd(a *app.App) *cobra.Command {
 	}
 
 	cmd.AddCommand(newMdCmd(a))
-	cmd.AddCommand(newUICmd(a))
+	cmd.AddCommand(newWorkbenchCmd(a))
 
 	return cmd
 }

@@ -68,7 +68,7 @@ type Opener interface {
 
 ## 实施偏差备忘（2026-08-26 回写）
 
-- **web 形态最终拆除（owner 评审决策）**：曾实现 `webOpener`（type=web + target 白名单 + 领域内拼 URL），评审后拆除——CLI 场景它与 exec 同为子进程拼参数，领域内重造命令构造器不如组合 cube 自身 CLI：新增 `cube web ui <path>` 命令承载 URL 知识（端口/路由/转义），opener 配置成 exec cmd `["cube","web","ui","$0"]` 即可；前端「在工作台打开」入口改为应用内路由跳转，独立于 opener 体系。随之删除接口 `Kind()`、Spec/DTO 的 type/target 字段。原提案的「Opener 接口化 exec/web 两实现」收敛为「接口 + 唯一 exec 实现」，接口保留是为后续形态留的纯加法扩展点。
+- **web 形态最终拆除（owner 评审决策）**：曾实现 `webOpener`（type=web + target 白名单 + 领域内拼 URL），评审后拆除——CLI 场景它与 exec 同为子进程拼参数，领域内重造命令构造器不如组合 cube 自身 CLI：新增 `cube web workbench <path>` 命令承载 URL 知识（端口/路由/转义），opener 配置成 exec cmd `["cube","web","ui","$0"]` 即可；前端「在工作台打开」入口改为应用内路由跳转，独立于 opener 体系。随之删除接口 `Kind()`、Spec/DTO 的 type/target 字段。原提案的「Opener 接口化 exec/web 两实现」收敛为「接口 + 唯一 exec 实现」，接口保留是为后续形态留的纯加法扩展点。
 
 - 接口面：`Open(role, slotArgs...)` + `Summary()`（跨实现统一展示串）/ `Kind()`（exec|web，前端据此前端路由跳转）；`RolesString` 是 `Roles()` 纯派生，降为包级函数不上接口。`Icon()` 按提案加入接口。
 - icon 提取（`util/iconkit`）：不解析二进制 Info.plist，直接扫 `Contents/Resources/*.icns` 取最大文件；容器内只取 PNG magic 命中的条目（老式 ARGB 位图条目跳过）；nearest 邻采样缩放（不引 x/image）。
