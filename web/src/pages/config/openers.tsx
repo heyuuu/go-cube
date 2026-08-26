@@ -17,9 +17,7 @@ const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 // 表单草稿：cmd 以空格分隔编辑（v1 约定：cmd 参数不含空格）
 interface Draft {
   name: string;
-  type: 'exec' | 'web';
   cmd: string;
-  target: string;
   roles: string[];
   iconType: '' | 'lucide' | 'image';
   iconValue: string;
@@ -27,9 +25,7 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = {
   name: '',
-  type: 'exec',
   cmd: '',
-  target: '',
   roles: ['open-dir'],
   iconType: '',
   iconValue: '',
@@ -38,10 +34,8 @@ const EMPTY_DRAFT: Draft = {
 function fromOpener(op: Opener): Draft {
   return {
     name: op.name,
-    type: op.type === 'web' ? 'web' : 'exec',
-    // summary 是展示串：exec 为命令模板空格拼接，直接还原成编辑文本
-    cmd: op.type === 'web' ? '' : op.summary,
-    target: op.type === 'web' ? op.summary : '',
+    // summary 是命令模板的空格拼接展示，直接还原成编辑文本
+    cmd: op.summary,
     roles: op.roles ?? [],
     iconType: op.icon?.type === 'lucide' || op.icon?.type === 'image' ? op.icon.type : '',
     iconValue: op.icon?.value ?? '',
@@ -59,9 +53,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
     save.mutate(
       {
         name: form.name.trim(),
-        type: form.type === 'web' ? 'web' : undefined,
-        cmd: form.type === 'exec' ? form.cmd.trim().split(/\s+/).filter(Boolean) : undefined,
-        target: form.type === 'web' ? form.target.trim() : undefined,
+        cmd: form.cmd.trim().split(/\s+/).filter(Boolean),
         roles: form.roles,
         icon: form.iconType && form.iconValue ? { type: form.iconType, value: form.iconValue } : undefined,
       },
@@ -94,35 +86,17 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
             <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="code" />
           </label>
 
-          <div className="flex gap-2">
-            {(['exec', 'web'] as const).map((t) => (
-              <Button
-                key={t}
-                size="sm"
-                variant={form.type === t ? 'default' : 'outline'}
-                onClick={() => set('type', t)}
-              >
-                {t === 'exec' ? 'exec（命令）' : 'web（工作台）'}
-              </Button>
-            ))}
-          </div>
-
-          {form.type === 'exec' ? (
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">cmd（空格分隔，$0/$1 占位路径槽位）</span>
-              <Input
-                value={form.cmd}
-                onChange={(e) => set('cmd', e.target.value)}
-                placeholder="code $0"
-                className="font-mono"
-              />
-            </label>
-          ) : (
-            <label className="flex flex-col gap-1">
-              <span className="text-xs text-muted-foreground">target（页面，目前支持 workbench）</span>
-              <Input value={form.target} onChange={(e) => set('target', e.target.value)} placeholder="workbench" />
-            </label>
-          )}
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">
+              cmd（空格分隔，$0/$1 占位路径槽位；打开工作台可用 `cube web ui $0`）
+            </span>
+            <Input
+              value={form.cmd}
+              onChange={(e) => set('cmd', e.target.value)}
+              placeholder="code $0"
+              className="font-mono"
+            />
+          </label>
 
           <div className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">roles（用途；slotCount 需一致）</span>
@@ -228,8 +202,7 @@ export function OpenersSection() {
           <TableHeader>
             <TableRow>
               <TableHead>name</TableHead>
-              <TableHead>type</TableHead>
-              <TableHead>cmd / target</TableHead>
+              <TableHead>cmd</TableHead>
               <TableHead>roles</TableHead>
               <TableHead>icon</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -238,7 +211,7 @@ export function OpenersSection() {
           <TableBody>
             {(openers.data?.list ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="text-xs text-muted-foreground">
+                <TableCell colSpan={5} className="text-xs text-muted-foreground">
                   暂无 opener
                 </TableCell>
               </TableRow>
@@ -246,7 +219,6 @@ export function OpenersSection() {
             {(openers.data?.list ?? []).map((op) => (
               <TableRow key={op.name}>
                 <TableCell className="font-medium">{op.name}</TableCell>
-                <TableCell className="text-xs">{op.type}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">

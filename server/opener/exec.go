@@ -64,7 +64,6 @@ func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
 func (o *execOpener) Name() string  { return o.name }
 func (o *execOpener) Roles() []Role { return o.roles }
 func (o *execOpener) Icon() Icon    { return o.icon }
-func (o *execOpener) Kind() string  { return SpecTypeExec }
 
 func (o *execOpener) Summary() string {
 	return strings.Join(o.cmd, " ")

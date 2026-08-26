@@ -18,8 +18,7 @@ import (
 
 type OpenerDTO struct {
 	Name    string         `json:"name"`
-	Type    string         `json:"type"`    // exec | web；web 时前端直接路由跳转，不发 open
-	Summary string         `json:"summary"` // 展示串：exec 为命令模板，web 为 target
+	Summary string         `json:"summary"` // 命令模板展示串
 	Roles   []string       `json:"roles"`
 	Icon    *OpenerIconDTO `json:"icon,omitempty"` // 缺省无图标（前端 fallback 默认）
 }
@@ -40,7 +39,6 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 	}
 	return &OpenerDTO{
 		Name:    entity.Name(),
-		Type:    entity.Kind(),
 		Summary: entity.Summary(),
 		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
 			return string(r)
@@ -121,22 +119,18 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 // OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
 type OpenerSaveInput struct {
 	Body struct {
-		Name   string         `json:"name" doc:"opener 名称（唯一标识）"`
-		Type   string         `json:"type,omitempty" doc:"exec（默认）| web"`
-		Cmd    []string       `json:"cmd,omitempty" doc:"exec：启动命令，$0/$1 占位路径槽位"`
-		Target string         `json:"target,omitempty" doc:"web：目标页面（workbench）"`
-		Roles  []string       `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
-		Icon   *OpenerIconDTO `json:"icon,omitempty" doc:"图标声明"`
+		Name  string         `json:"name" doc:"opener 名称（唯一标识）"`
+		Cmd   []string       `json:"cmd,omitempty" doc:"启动命令，$0/$1 占位路径槽位"`
+		Roles []string       `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
+		Icon  *OpenerIconDTO `json:"icon,omitempty" doc:"图标声明"`
 	}
 }
 
 func (h *OpenerHandler) openerSave(input OpenerSaveInput) (map[string]any, error) {
 	spec := opener.Spec{
-		Name:   input.Body.Name,
-		Type:   input.Body.Type,
-		Cmd:    input.Body.Cmd,
-		Target: input.Body.Target,
-		Roles:  input.Body.Roles,
+		Name:  input.Body.Name,
+		Cmd:   input.Body.Cmd,
+		Roles: input.Body.Roles,
 	}
 	if input.Body.Icon != nil {
 		spec.Icon = &opener.Icon{Type: input.Body.Icon.Type, Value: input.Body.Icon.Value}

@@ -129,7 +129,7 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 		return out
 	}
 
-	// 新增（带 icon），list 应可见且 DTO 带回 type/icon
+	// 新增（带 icon），list 应可见且 DTO 带回 icon
 	env1 := postSave(`{"name":"code","cmd":["code","$0"],"roles":["open-dir"],"icon":{"type":"lucide","value":"app-window"}}`)
 	if !env1.Ok {
 		t.Fatalf("保存应成功, message=%q", env1.Message)
@@ -138,7 +138,6 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	var got struct {
 		List []struct {
 			Name string `json:"name"`
-			Type string `json:"type"`
 			Icon *struct {
 				Type  string `json:"type"`
 				Value string `json:"value"`
@@ -151,7 +150,6 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	}
 	var code *struct {
 		Name string `json:"name"`
-		Type string `json:"type"`
 		Icon *struct {
 			Type  string `json:"type"`
 			Value string `json:"value"`
@@ -162,7 +160,7 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 			code = &got.List[i]
 		}
 	}
-	if code == nil || code.Type != "exec" || code.Icon == nil || code.Icon.Value != "app-window" {
+	if code == nil || code.Icon == nil || code.Icon.Value != "app-window" {
 		t.Fatalf("新增 opener 的 type/icon 不符: %+v", code)
 	}
 
@@ -170,16 +168,6 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	env2 := postSave(`{"name":"bad","cmd":[]}`)
 	if env2.Ok || !strings.Contains(env2.Message, "cmd") {
 		t.Fatalf("坏数据应报 cmd 错误, got ok=%v message=%q", env2.Ok, env2.Message)
-	}
-
-	// web 形态保存 + 校验 target 白名单
-	env3 := postSave(`{"name":"wb","type":"web","target":"workbench"}`)
-	if !env3.Ok {
-		t.Fatalf("web opener 保存应成功, message=%q", env3.Message)
-	}
-	env4 := postSave(`{"name":"wb2","type":"web","target":"nope"}`)
-	if env4.Ok || !strings.Contains(env4.Message, "target") {
-		t.Fatalf("未知 target 应报错, got message=%q", env4.Message)
 	}
 
 	// 删除

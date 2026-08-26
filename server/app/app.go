@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	"gorm.io/gorm"
 
 	"cube/config"
@@ -43,7 +41,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// 组装 services
 	projectService := project.NewService(cfg.Project, paths.CacheDir())
-	openerService := opener.NewService(paths.SettingsFile(), fmt.Sprintf("http://localhost:%d", cfg.Server.Port), nil)
+	openerService := opener.NewService(paths.SettingsFile(), nil)
 	historyService := history.NewService(dataDb)
 	workbenchService := workbench.NewService()
 	createService := create.NewService(cfg.Create)

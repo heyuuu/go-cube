@@ -18,7 +18,7 @@ func newServiceAt(t *testing.T, specs []Spec) (*Service, *fakeExecutor) {
 		}
 	}
 	fake := &fakeExecutor{}
-	return NewService(file, "http://localhost:6100", fake), fake
+	return NewService(file, fake), fake
 }
 
 func TestServiceDirectRead(t *testing.T) {
@@ -146,24 +146,11 @@ func TestServiceSaveDelete(t *testing.T) {
 		if err := s.SaveOpener(Spec{Name: "bad", Cmd: nil}); err == nil {
 			t.Fatal("缺 cmd 应报错")
 		}
-		if err := s.SaveOpener(Spec{Name: "bad", Type: "ftp"}); err == nil {
-			t.Fatal("未知 type 应报错")
-		}
 		if err := s.SaveOpener(Spec{Name: "", Cmd: []string{"x"}}); err == nil {
 			t.Fatal("空 name 应报错")
 		}
 		if got := s.AllOpeners(); len(got) != 0 {
 			t.Fatalf("坏数据不应落文件, got %d", len(got))
-		}
-	})
-
-	t.Run("web 形态经 save 校验", func(t *testing.T) {
-		s, _ := newServiceAt(t, nil)
-		if err := s.SaveOpener(Spec{Name: "wb", Type: "web", Target: "workbench"}); err != nil {
-			t.Fatalf("合法 web opener 保存失败: %v", err)
-		}
-		if err := s.SaveOpener(Spec{Name: "wb2", Type: "web", Target: "nope"}); err == nil {
-			t.Fatal("未知 target 应报错")
 		}
 	})
 

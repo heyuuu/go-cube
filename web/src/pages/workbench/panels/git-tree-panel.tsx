@@ -14,7 +14,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { openWithOpener } from '@/lib/opener';
 import { renderOpenerIcon } from '@/lib/opener-icon';
 import { cn } from '@/lib/utils';
 import { quickOpens } from '@/pages/projects/shared';
@@ -253,10 +252,9 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
   const openerList = openers.data?.list ?? [];
-  const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
-  const onOpen = (name: string) =>
-    openWithOpener(openerList, name, path, (p, opener) => open.mutate({ path: p, opener }));
+  const openerByName = new Map(openerList.map((op) => [op.name, op]));
+  const onOpen = (opener: string) => open.mutate({ path, opener });
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">

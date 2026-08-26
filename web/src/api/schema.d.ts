@@ -838,7 +838,6 @@ export interface components {
       name: string;
       roles: string[] | null;
       summary: string;
-      type: string;
     };
     OpenerDeleteInputBody: {
       /**
@@ -883,7 +882,7 @@ export interface components {
        * @example https://example.com/schemas/OpenerSaveInputBody.json
        */
       readonly $schema?: string;
-      /** @description exec：启动命令，$0/$1 占位路径槽位 */
+      /** @description 启动命令，$0/$1 占位路径槽位 */
       cmd?: string[] | null;
       /** @description 图标声明 */
       icon?: components['schemas']['OpenerIconDTO'];
@@ -891,10 +890,6 @@ export interface components {
       name: string;
       /** @description 业务用途枚举，缺省视为 open-dir */
       roles?: string[] | null;
-      /** @description web：目标页面（workbench） */
-      target?: string;
-      /** @description exec（默认）| web */
-      type?: string;
     };
     ProjectConfig: {
       clone: components['schemas']['CloneRuleConfig'][] | null;
