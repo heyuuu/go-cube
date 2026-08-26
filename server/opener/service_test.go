@@ -112,8 +112,8 @@ func TestServiceIconEndToEnd(t *testing.T) {
 	if o == nil || o.Icon().Value != "app-window" {
 		t.Fatalf("icon 未透传: %+v", o)
 	}
-	if p := s.FindByName("plain"); p.Icon() != (Icon{}) {
-		t.Fatalf("无 icon 应得零值, got %+v", p.Icon())
+	if p := s.FindByName("plain"); p.Icon().Value != "app-window-mac" {
+		t.Fatalf("无 icon 应得默认 app-window-mac, got %+v", p.Icon())
 	}
 }
 

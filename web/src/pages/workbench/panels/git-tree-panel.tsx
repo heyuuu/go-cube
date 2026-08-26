@@ -265,7 +265,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             key={q.opener}
             variant="ghost"
             size="icon-sm"
-            title={q.title}
+            title={openerByName.get(q.opener)?.title || q.title}
             aria-label={`${q.title}（${name}）`}
             disabled={open.isPending && open.variables?.opener === q.opener}
             onClick={() => onOpen(q.opener)}

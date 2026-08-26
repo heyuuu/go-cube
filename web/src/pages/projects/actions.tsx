@@ -43,7 +43,7 @@ export function ProjectActions({
             key={q.opener}
             variant="ghost"
             size="icon-sm"
-            title={q.title}
+            title={openerByName.get(q.opener)?.title || q.title}
             aria-label={`${q.title}（${p.name}）`}
             disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === q.opener}
             onClick={() => onOpen(p.path, q.opener)}

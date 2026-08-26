@@ -19,10 +19,11 @@ const (
 	IconTypeImage  = "image"
 )
 
-// InitIcon 校验 icon 声明。nil 视为未配置（合法）；type 非法或 value 为空报中文错误。
+// InitIcon 校验 icon 声明并解析默认值。nil 视为未配置（合法），按主 role 推导
+// 默认 icon——Opener 对外永远有 Icon，调用方无需处理缺省；type 非法或 value 为空报中文错误。
 func InitIcon(icon *Icon) (Icon, error) {
 	if icon == nil {
-		return Icon{}, nil
+		return defaultIcon(), nil
 	}
 	switch icon.Type {
 	case IconTypeLucide, IconTypeImage:
@@ -33,4 +34,9 @@ func InitIcon(icon *Icon) (Icon, error) {
 		return Icon{}, fmt.Errorf("icon value 不得为空（type=%s）", icon.Type)
 	}
 	return *icon, nil
+}
+
+// defaultIcon 未配置 icon 时按主 role 推导的 lucide 默认图（前端按名渲染）。
+func defaultIcon() Icon {
+	return Icon{Type: IconTypeLucide, Value: "app-window-mac"}
 }

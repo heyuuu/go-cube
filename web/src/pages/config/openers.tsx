@@ -17,6 +17,7 @@ const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 // 表单草稿：cmd 以空格分隔编辑（v1 约定：cmd 参数不含空格）
 interface Draft {
   name: string;
+  title: string;
   cmd: string;
   roles: string[];
   iconType: '' | 'lucide' | 'image';
@@ -25,6 +26,7 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = {
   name: '',
+  title: '',
   cmd: '',
   roles: ['open-dir'],
   iconType: '',
@@ -34,6 +36,7 @@ const EMPTY_DRAFT: Draft = {
 function fromOpener(op: Opener): Draft {
   return {
     name: op.name,
+    title: op.title === `用 ${op.name} 打开` ? '' : op.title,
     // summary 是命令模板的空格拼接展示，直接还原成编辑文本
     cmd: op.summary,
     roles: op.roles ?? [],
@@ -53,6 +56,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
     save.mutate(
       {
         name: form.name.trim(),
+        title: form.title.trim() || undefined,
         cmd: form.cmd.trim().split(/\s+/).filter(Boolean),
         roles: form.roles,
         icon: form.iconType && form.iconValue ? { type: form.iconType, value: form.iconValue } : undefined,
@@ -84,6 +88,11 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">name（唯一标识）</span>
             <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="code" />
+          </label>
+
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">title（展示文案，缺省生成「用 name 打开」）</span>
+            <Input value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="打开所在目录" />
           </label>
 
           <label className="flex flex-col gap-1">
@@ -202,6 +211,7 @@ export function OpenersSection() {
           <TableHeader>
             <TableRow>
               <TableHead>name</TableHead>
+              <TableHead>title</TableHead>
               <TableHead>cmd</TableHead>
               <TableHead>roles</TableHead>
               <TableHead>icon</TableHead>
@@ -211,7 +221,7 @@ export function OpenersSection() {
           <TableBody>
             {(openers.data?.list ?? []).length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="text-xs text-muted-foreground">
                   暂无 opener
                 </TableCell>
               </TableRow>
@@ -219,6 +229,7 @@ export function OpenersSection() {
             {(openers.data?.list ?? []).map((op) => (
               <TableRow key={op.name}>
                 <TableCell className="font-medium">{op.name}</TableCell>
+                <TableCell className="text-xs">{op.title}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">

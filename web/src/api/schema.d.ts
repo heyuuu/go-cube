@@ -834,10 +834,11 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
-      icon?: components['schemas']['OpenerIconDTO'];
+      icon: components['schemas']['OpenerIconDTO'];
       name: string;
       roles: string[] | null;
       summary: string;
+      title: string;
     };
     OpenerDeleteInputBody: {
       /**
@@ -890,6 +891,8 @@ export interface components {
       name: string;
       /** @description 业务用途枚举，缺省视为 open-dir */
       roles?: string[] | null;
+      /** @description 展示文案（如「打开所在目录」），缺省由 name 生成 */
+      title?: string;
     };
     ProjectConfig: {
       clone: components['schemas']['CloneRuleConfig'][] | null;

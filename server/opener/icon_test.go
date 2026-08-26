@@ -8,7 +8,6 @@ func TestInitIcon(t *testing.T) {
 		icon    *Icon
 		wantErr bool
 	}{
-		{"nil 视为未配置", nil, false},
 		{"lucide 合法", &Icon{Type: IconTypeLucide, Value: "folder-open"}, false},
 		{"image 合法", &Icon{Type: IconTypeImage, Value: "aGVsbG8="}, false},
 		{"未知 type 报错", &Icon{Type: "svg", Value: "x"}, true},
@@ -16,20 +15,20 @@ func TestInitIcon(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			got, err := InitIcon(c.icon)
-			if c.wantErr {
-				if err == nil {
-					t.Fatalf("期望报错, got %+v", got)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("意外报错: %v", err)
-			}
-			if c.icon == nil && got.Type != "" {
-				t.Fatalf("nil 应得零值, got %+v", got)
+			if _, err := InitIcon(c.icon); c.wantErr != (err != nil) {
+				t.Fatalf("wantErr=%v, err=%v", c.wantErr, err)
 			}
 		})
+	}
+}
+
+func TestInitIconDefault(t *testing.T) {
+	got, err := InitIcon(nil)
+	if err != nil {
+		t.Fatalf("意外报错: %v", err)
+	}
+	if got.Type != IconTypeLucide || got.Value != "app-window-mac" {
+		t.Fatalf("默认 icon 应为 lucide:app-window-mac, got %+v", got)
 	}
 }
 
@@ -47,13 +46,13 @@ func TestSpecIconThroughExec(t *testing.T) {
 		}
 	})
 
-	t.Run("无 icon 得零值", func(t *testing.T) {
+	t.Run("无 icon 得默认", func(t *testing.T) {
 		o, err := InitExecOpener(Spec{Name: "code", Cmd: []string{"code"}}, nil)
 		if err != nil {
 			t.Fatalf("构造失败: %v", err)
 		}
-		if got := o.Icon(); got != (Icon{}) {
-			t.Fatalf("应得零值, got %+v", got)
+		if got := o.Icon(); got.Type != IconTypeLucide || got.Value != "app-window-mac" {
+			t.Fatalf("应得默认 app-window-mac, got %+v", got)
 		}
 	})
 
@@ -65,4 +64,15 @@ func TestSpecIconThroughExec(t *testing.T) {
 			t.Fatal("坏 icon 应报错")
 		}
 	})
+}
+
+func TestTitleDefault(t *testing.T) {
+	o1, _ := InitExecOpener(Spec{Name: "code", Cmd: []string{"code"}}, nil)
+	if got := o1.Title(); got != "用 code 打开" {
+		t.Fatalf("缺省 title 应由 name 生成, got %q", got)
+	}
+	o2, _ := InitExecOpener(Spec{Name: "finder", Title: "打开所在目录", Cmd: []string{"open", "$0"}}, nil)
+	if got := o2.Title(); got != "打开所在目录" {
+		t.Fatalf("配置 title 应原样生效, got %q", got)
+	}
 }

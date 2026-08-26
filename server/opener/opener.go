@@ -4,6 +4,10 @@ package opener
 // 目前唯一实现是 execOpener（命令模板，见 exec.go）
 type Opener interface {
 	Name() string
+
+	// Title 展示文案（如「打开所在目录」「使用 VS Code 打开」），
+	// 缺省配置时由 name 生成，永远有值。
+	Title() string
 	Roles() []Role
 
 	// Icon 图标声明，零值表示未配置（前端 fallback 默认图标）。
