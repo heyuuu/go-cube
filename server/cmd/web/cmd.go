@@ -37,7 +37,7 @@ func NewCmd(a *app.App) *cobra.Command {
 
 // runWeb 打开 Web UI 首页。
 func runWeb(a *app.App) error {
-	if st, _ := serve.Status(a.Server().Port()); !st.Running {
+	if st := serve.Status(a.Server().Port()); !st.Running {
 		return errors.New("server 未运行，请先执行: cube server start")
 	}
 	openInBrowser(a.Server().ServerURL())

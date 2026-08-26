@@ -14,7 +14,7 @@ import (
 	"cube/util/tui"
 )
 
-const logFileName = "log/cube.log"
+const logFileName = "log/app.log"
 const logTimeFormat = "2006-01-02 15:04:05.000"
 const stdioLogTimeFormat = "15:04:05.000"
 

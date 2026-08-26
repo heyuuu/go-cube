@@ -26,7 +26,7 @@ func Fork() (int, error) {
 	// Setsid 让子进程新建会话、脱离父进程的控制终端：父进程退出时不会向子进程
 	// 传播 SIGHUP，子进程也不会因共享终端 fd 被父进程的退出拖死。
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
-	// stdio 全 nil：接 /dev/null。子进程自己调 logger.Init 写 slog 到 cube.log，
+	// stdio 全 nil：接 /dev/null。子进程自己调 logger.Init 写 slog 到日志文件，
 	// stdio 没有保留价值（不重定向到日志文件，那会和 slog 交错写花）。
 
 	if err := cmd.Start(); err != nil {

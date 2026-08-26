@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"cube/version"
 	"cube/web"
 )
 
@@ -22,19 +23,21 @@ type StatusInfo struct {
 	Version string // whoami 返回的版本号（Running=false 时为空）
 }
 
-// Status 通过 HTTP 探活：GET /api/system/whoami，验证返回 app=="cube"。
+// Status 通过 HTTP 探活：GET /api/system/whoami，验证返回 app==version.AppName。
 //
 // 只连端口不够——别的服务可能恰好监听同端口。验证 whoami 的 app 标记，
 // 才能确认端口上确实是 cube server。
-func Status(port int) (StatusInfo, error) {
+// 只区分「在跑/没在跑」：连不上、非 200、响应非法、身份不符一律降级为零值（未运行），
+// 不返回 error——调用方只关心二元状态。
+func Status(port int) StatusInfo {
 	url := fmt.Sprintf("http://127.0.0.1:%d/api/system/whoami", port)
 	resp, err := http.Get(url)
 	if err != nil {
-		return StatusInfo{}, nil // 连不上 = 没在跑，不报错（调用方据此判断）
+		return StatusInfo{} // 连不上 = 没在跑
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return StatusInfo{}, nil
+		return StatusInfo{}
 	}
 
 	// whoami 经 ApiOutput envelope 包装：{ok, message, data:{app, version}}
@@ -46,12 +49,12 @@ func Status(port int) (StatusInfo, error) {
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return StatusInfo{}, nil // 响应非 cube 格式 = 不是 cube server
+		return StatusInfo{} // 响应非 cube 格式 = 不是 cube server
 	}
-	if out.Data.App != "cube" {
-		return StatusInfo{}, nil // 端口上的服务不是 cube
+	if out.Data.App != version.AppName {
+		return StatusInfo{} // 端口上的服务不是 cube
 	}
-	return StatusInfo{Running: true, Version: out.Data.Version}, nil
+	return StatusInfo{Running: true, Version: out.Data.Version}
 }
 
 // Stop 触发 server graceful shutdown：POST /api/system/shutdown（带 HMAC 鉴权），
@@ -61,7 +64,7 @@ func Status(port int) (StatusInfo, error) {
 // 不向 stdout 输出——面向用户的文案由调用方（cmd 层）决定。
 func Stop(port int) (stopped bool, err error) {
 	// 先探活，没在跑直接返回
-	if st, _ := Status(port); !st.Running {
+	if st := Status(port); !st.Running {
 		return false, nil
 	}
 
@@ -94,7 +97,7 @@ func Stop(port int) (stopped bool, err error) {
 func waitDown(port int, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		if st, _ := Status(port); !st.Running {
+		if st := Status(port); !st.Running {
 			return nil
 		}
 		time.Sleep(probeInterval)

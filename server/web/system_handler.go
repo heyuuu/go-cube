@@ -42,7 +42,7 @@ type WhoamiResponse struct {
 }
 
 func (h *SystemHandler) whoami(_ struct{}) (WhoamiResponse, error) {
-	return WhoamiResponse{App: "cube", Version: version.Version()}, nil
+	return WhoamiResponse{App: version.AppName, Version: version.Version()}, nil
 }
 
 // handleShutdown 校验 X-Shutdown-Token 后给本进程发 SIGTERM 触发 graceful shutdown。

@@ -42,7 +42,7 @@ func runWorkbench(a *app.App, rawPath string) error {
 		return fmt.Errorf("路径不存在: %s", absPath)
 	}
 
-	if st, _ := serve.Status(a.Server().Port()); !st.Running {
+	if st := serve.Status(a.Server().Port()); !st.Running {
 		return errors.New("server 未运行，请先执行: cube server start")
 	}
 

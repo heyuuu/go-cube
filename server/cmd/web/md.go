@@ -44,7 +44,7 @@ func runMd(a *app.App, rawPath string) error {
 	}
 
 	// 前置：server 必须在跑（渲染页面由 server 的前端承载）
-	if st, _ := serve.Status(a.Server().Port()); !st.Running {
+	if st := serve.Status(a.Server().Port()); !st.Running {
 		return errors.New("server 未运行，请先执行: cube server start")
 	}
 

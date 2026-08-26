@@ -20,8 +20,8 @@ import (
 
 func newRootCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "cube",
-		Short: "cube " + version.Version(),
+		Use:   version.AppName,
+		Short: version.AppName + " " + version.Version(),
 		Long: `cube —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。
 
 命令按领域分组：
@@ -74,9 +74,9 @@ func newRootCmd(a *app.App) *cobra.Command {
 // 默认配置文件路径，区分开发环境、正式环境
 func defaultConfigPath() string {
 	if version.IsDev() {
-		return "~/.config/cube-dev/config.json"
+		return "~/.config/" + version.AppName + "-dev/config.json"
 	}
-	return "~/.config/cube/config.json"
+	return "~/.config/" + version.AppName + "/config.json"
 }
 
 // localMode 是 --local 全局 flag 的落点：query 缺省的命令（info/pull/push/open）

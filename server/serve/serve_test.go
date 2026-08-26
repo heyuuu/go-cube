@@ -42,10 +42,7 @@ func startMockCubeServer(t *testing.T, version string) (*httptest.Server, int) {
 
 func TestStatus_Running(t *testing.T) {
 	_, port := startMockCubeServer(t, "v9.9.9")
-	st, err := Status(port)
-	if err != nil {
-		t.Fatalf("Status 不应报错: %v", err)
-	}
+	st := Status(port)
 	if !st.Running {
 		t.Error("cube server 在跑应判 Running=true")
 	}
@@ -56,11 +53,7 @@ func TestStatus_Running(t *testing.T) {
 
 func TestStatus_NotRunning(t *testing.T) {
 	// 端口 1 几乎肯定没监听
-	st, err := Status(1)
-	if err != nil {
-		t.Errorf("连不上不应报错（视为没在跑）: %v", err)
-	}
-	if st.Running {
+	if st := Status(1); st.Running {
 		t.Error("连不上应判 Running=false")
 	}
 }
@@ -76,8 +69,7 @@ func TestStatus_NotCube(t *testing.T) {
 	var port int
 	fmt.Sscanf(srv.URL, "http://127.0.0.1:%d", &port)
 
-	st, _ := Status(port)
-	if st.Running {
+	if st := Status(port); st.Running {
 		t.Error("app!=cube 应判 Running=false（端口上的不是 cube）")
 	}
 }

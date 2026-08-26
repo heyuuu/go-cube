@@ -24,11 +24,7 @@ func newStatusCmd(a *app.App) *cobra.Command {
 }
 
 func runStatus(a *app.App) error {
-	st, err := serve.Status(a.Server().Port())
-	if err != nil {
-		return err
-	}
-	printStatus(a, st)
+	printStatus(a, serve.Status(a.Server().Port()))
 	return nil
 }
 

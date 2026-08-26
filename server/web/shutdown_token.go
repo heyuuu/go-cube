@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"cube/version"
 )
 
 // shutdownToken server 与 CLI 共享的鉴权密钥，编译进二进制。
@@ -16,7 +18,7 @@ import (
 // token（它不在任何前端资源里暴露），也就构造不出有效的 HMAC 签名。本机其他
 // 进程理论上能反编译二进制拿到 token，但那个威胁等级下它能直接 kill 进程，
 // token 已不是瓶颈——本端点防的是「跨进程的盲目/重放调用」，不防「有 token 的本机进程」。
-const shutdownToken = "cube-local-shutdown-v1"
+const shutdownToken = version.AppName + "-local-shutdown-v1"
 
 // shutdownTokenWindow shutdown 请求的时间戳有效窗口（秒）。
 // 本机调用毫秒级往返，5 秒窗口够宽裕又能防重放（抓包过 5 秒就作废）。
