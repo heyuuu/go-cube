@@ -21,7 +21,8 @@
 - [`1011-工作台git树面板/`](proposals/archived/1011-工作台git树面板/) — 工作台 git 树（commit 图 + 工作副本状态）
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
-- [`1006-history清理API/`](proposals/1006-history清理API/) — history 数据清理
+
+（当前无活动提案）
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 
@@ -35,12 +36,14 @@
 
 已实现的需求总结（从 proposals 顶层移入，记录最终落地形态与方案演变）。
 
+- [`1025-settings配置页/`](proposals/archived/1025-settings配置页/) — settings 配置页：`/settings` 分区导航（URL 记忆）+ ⌘,/rail 新 tab 入口；Config 过渡分区收编 `/config` 只读展示（默认分区，旧路由移除）；Opener 分区完整增删改（Sheet 抽屉 + 冻结列 + icon 渲染 + 拖拽排序 reorder API + lucide 搜索点选）
 - [`1016-opener改造/`](proposals/archived/1016-opener改造/) — opener 改造：数据迁 settings.json（节级 API + 直读）+ 接口化 + icon 全链路（lucide/base64/`.app` 提取）+ Web 增删改；web 形态最终拆除，收敛为 `cube web workbench` exec 组合
 - [`1009-模板引擎cube-create/`](proposals/archived/1009-模板引擎cube-create/) — `cube create` 模板引擎（template.yaml 协议 + glob 替换 + init 执行；本地目录/git 仓库/模板集收纳式；引擎是机制，模板是数据）
 - [`1001-server后台常驻与HTTP管理/`](proposals/archived/1001-server后台常驻与HTTP管理/) — server 后台常驻（`start -d`）+ 基于 HTTP API 的进程管理（whoami/shutdown）
 - [`1002-前端栈迁移/`](proposals/archived/1002-前端栈迁移/) — Alpine.js → Vite+React+TS（web/ 工程）整体迁移，三页落地 + 移除后端 tree 接口
 - [`1005-md渲染/`](proposals/archived/1005-md渲染/) — `cube md` Web 渲染 markdown：零模板渲染 + 目录浏览模式 + opener 打开归一
 - [`1003-web层测试补全/`](proposals/archived/1003-web层测试补全/) — httptest 集成测试基建 + 全部 handler 用例
+- [`1006-history清理API/`](proposals/archived/1006-history清理API/) — history 数据清理
 
 ### [references/](references/) — 参考文献目录
 

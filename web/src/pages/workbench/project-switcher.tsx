@@ -3,6 +3,7 @@ import { ChevronDown, Check } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuTrigger,
@@ -28,7 +29,9 @@ export function ProjectSwitcher({ current, onSwitch }: { current: string; onSwit
         <ChevronDown className="size-3 shrink-0" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-64">
-        <DropdownMenuLabel>切换项目</DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>切换项目</DropdownMenuLabel>
+        </DropdownMenuGroup>
         {projects.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">项目列表为空</div>}
         {projects.map((p) => (
           <DropdownMenuItem key={p.path} onClick={() => p.path !== current && onSwitch(p.path)}>

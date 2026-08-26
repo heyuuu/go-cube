@@ -1,10 +1,8 @@
 # settings 配置页
 
-> **交互偏差（2026-08-26 owner 评审）**：分区编辑交互从「页内二级视图」改回 **Sheet 抽屉表单**——二级视图收窄主区域与列表尺寸反差突兀；「不做内嵌 Modal」条款随之所指收窄为「不做居中 Dialog」，Sheet 抽屉可用。
-
-> **状态**：🚧 实施中（2026-08-26 骨架 + Opener 分区已交付：`/settings` 路由 + 分区导航 URL 记忆 + ⌘,/rail 新 tab 入口 + Opener 增删改迁入页内二级视图 + 删除确认；过渡决策（owner）：config.json 只读展示整体迁入 settings 的 **Config 分区**，`/config` 路由直接移除（无重定向）；待办：scan 规则分区、Config 过渡分区逐步收编为各域可编辑分区）
+> **状态**：✅ 已交付（2026-08-26 验收归档；实施偏差与超出提案的增强见文末「实施偏差备忘」）
 >
-> **依赖**：[`1016-opener改造`](../archived/1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
+> **依赖**：[`1016-opener改造`](../1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
 > **关联**：[`1024-projects筛选URL化`](../1024-projects筛选URL化/README.md)（无硬依赖，但其完成后「业务页 ↔ settings 往返无损」才成立）。
 
 ## 背景与目标
@@ -71,3 +69,11 @@
 2. 分区切换写 URL，刷新恢复当前分区；
 3. Opener 分区（依赖 1016）完成增删改后，`cube project list` 等读路径立即反映修改（无缓存不一致）；
 4. `pnpm -C web build`、`cd server && go vet ./... && go test ./...` 通过。
+
+## 实施偏差备忘（2026-08-26 回写）
+
+- **编辑交互改回 Sheet 抽屉（owner 评审）**：原方案「页内二级视图，不嵌 Modal」实施后二级表单收窄主区域，与列表尺寸反差突兀，改回右侧 Sheet 抽屉表单；「不做内嵌 Modal」条款所指收窄为「不做居中 Dialog」。
+- **Config 过渡分区替代「基础配置」占位（owner 决策）**：config.json 全量只读展示整体迁入 settings 的 **Config 分区**并作为默认分区（`/settings` 无参落点）；`/config` 路由直接移除（走 404，不做原方案的重定向）。原「基础配置」占位分区取消——其职责已由 Config 分区承担。
+- **Opener 分区超出提案基线的增强**：name/操作列冻结（sticky）、icon 列直接渲染并移至 title 前、grip 拖拽排序（新增 `POST /api/opener/reorder`，顺序即 settings.json 数组序、各端展示共用）、lucide 图标搜索点选（含当前值预览）、icon 必有值（类型只留 lucide/image，缺省 `lucide:app-window-mac` 与后端 defaultIcon 一致）。
+- **验收 3 补充**：增删改/排序即时生效由 opener.Service 直读 settings.json 保证，无缓存链路。
+- **留白（后续提案）**：scan 规则分区（project 域另立提案）、Config 过渡分区内容逐步收编为各域可编辑分区。
