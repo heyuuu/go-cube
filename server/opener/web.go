@@ -44,6 +44,8 @@ func InitWebOpener(spec Spec, baseURL string, executor Executor) (*webOpener, er
 	if err != nil {
 		return nil, fmt.Errorf("opener %q icon 解析失败: %w", spec.Name, err)
 	}
+
+	// executor 默认值
 	if executor == nil {
 		executor = NewDefaultExecutor()
 	}
