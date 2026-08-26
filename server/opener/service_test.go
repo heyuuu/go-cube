@@ -167,3 +167,47 @@ func TestServiceSaveDelete(t *testing.T) {
 		}
 	})
 }
+
+func TestServiceReorder(t *testing.T) {
+	newSpecs := []Spec{
+		{Name: "finder", Cmd: []string{"open", "-a", "Finder"}},
+		{Name: "code", Cmd: []string{"code"}},
+		{Name: "stree", Cmd: []string{"stree"}},
+	}
+
+	t.Run("按名单重排", func(t *testing.T) {
+		s, _ := newServiceAt(t, newSpecs)
+		if err := s.ReorderOpeners([]string{"stree", "code", "finder"}); err != nil {
+			t.Fatalf("重排失败: %v", err)
+		}
+		got := s.AllOpeners()
+		if len(got) != 3 || got[0].Name() != "stree" || got[1].Name() != "code" || got[2].Name() != "finder" {
+			t.Fatalf("顺序不符: %v", got)
+		}
+	})
+
+	t.Run("未列名条目保持原序排在末尾", func(t *testing.T) {
+		s, _ := newServiceAt(t, newSpecs)
+		if err := s.ReorderOpeners([]string{"code"}); err != nil {
+			t.Fatalf("重排失败: %v", err)
+		}
+		got := s.AllOpeners()
+		if len(got) != 3 || got[0].Name() != "code" || got[1].Name() != "finder" || got[2].Name() != "stree" {
+			t.Fatalf("未列名条目应原序殿后: %v", got)
+		}
+	})
+
+	t.Run("未知名与重复名报错且不落文件", func(t *testing.T) {
+		s, _ := newServiceAt(t, newSpecs)
+		if err := s.ReorderOpeners([]string{"code", "nope"}); err == nil {
+			t.Fatal("未知名应报错")
+		}
+		if err := s.ReorderOpeners([]string{"code", "code"}); err == nil {
+			t.Fatal("重复名应报错")
+		}
+		got := s.AllOpeners()
+		if len(got) != 3 || got[0].Name() != "finder" {
+			t.Fatalf("失败重排不应改动文件: %v", got)
+		}
+	})
+}

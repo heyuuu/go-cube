@@ -140,6 +140,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/opener/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按名重排 opener 顺序 */
+    post: operations['opener.reorder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/save': {
     parameters: {
       query?: never;
@@ -876,6 +893,16 @@ export interface components {
       /** @description 文件或目录绝对路径 */
       path: string;
     };
+    OpenerReorderInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerReorderInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 按目标顺序排列的 opener 名单 */
+      names: string[] | null;
+    };
     OpenerSaveInputBody: {
       /**
        * Format: uri
@@ -1207,6 +1234,39 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['OpenerOpenInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerReorderInputBody'];
       };
     };
     responses: {

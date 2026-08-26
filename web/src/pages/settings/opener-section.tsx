@@ -1,5 +1,6 @@
 // settings 页 Opener 分区：列表 + 抽屉（Sheet）编辑表单，删除前确认。
 // 数据源是 /api/opener/list（settings.json），保存即生效。
+import { GripVertical } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Opener } from '@/api/client';
@@ -11,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { renderOpenerIcon } from '@/lib/opener-icon';
-import { useIconExtract, useOpenerDelete, useOpenerSave } from '@/queries/opener';
+import { cn } from '@/lib/utils';
+import { useIconExtract, useOpenerDelete, useOpenerReorder, useOpenerSave } from '@/queries/opener';
 import { useOpenerList } from '@/queries/project';
 
 import { LucideIconPicker } from './lucide-icon-picker';
@@ -206,47 +208,121 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
 export function OpenerSection() {
   const openers = useOpenerList();
   const del = useOpenerDelete();
+  const reorder = useOpenerReorder();
   const [editing, setEditing] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+
+  // 拖拽排序：armed 记录「按住 grip 的行」——只有 grip 手柄能发起拖拽（整行 draggable 会
+  // 干扰按钮点击与文本选择）；order 是乐观顺序，与服务端名单集合不一致（增删后）即失效回落
+  const list = openers.data?.list ?? [];
+  const [order, setOrder] = useState<string[] | null>(null);
+  const [armed, setArmed] = useState<string | null>(null);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [overIdx, setOverIdx] = useState<number | null>(null);
+
+  // 个位数列表，重排计算不值得 useMemo（直接算还免去 list 引用不稳的依赖告警）
+  const rows = (() => {
+    if (order === null || order.length !== list.length) return list;
+    const byName = new Map(list.map((op) => [op.name, op] as const));
+    const sorted: typeof list = [];
+    for (const n of order) {
+      const hit = byName.get(n);
+      if (!hit) return list;
+      sorted.push(hit);
+    }
+    return sorted;
+  })();
+
+  const dropTo = (target: number) => {
+    if (dragIdx === null || dragIdx === target) return;
+    const names = rows.map((r) => r.name);
+    // 插入位语义：从上往下拖插到 target 之后、从下往上拖插到 target 之前（与高亮线一致）
+    const insertAt = dragIdx < target ? target + 1 : target;
+    const [moved] = names.splice(dragIdx, 1);
+    names.splice(insertAt, 0, moved);
+    setOrder(names);
+    reorder.mutate({ names });
+  };
 
   return (
     <section>
       <div className="mb-2 flex items-baseline gap-2">
         <h2 className="text-sm font-medium">打开工具（openers）</h2>
-        <span className="text-xs text-muted-foreground">settings.json，保存即生效</span>
+        <span className="text-xs text-muted-foreground">settings.json，保存即生效；拖动 ⠿ 排序</span>
         <Button size="sm" variant="outline" className="ml-auto" onClick={() => setEditing(EMPTY_DRAFT)}>
           新增
         </Button>
       </div>
       {openers.error && <ErrorBanner message={`加载失败：${openers.error.message}`} />}
       {del.error && <ErrorBanner message={`删除失败：${del.error.message}`} />}
+      {reorder.error && <ErrorBanner message={`排序失败：${reorder.error.message}`} />}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className={STICKY_LEFT}>name</TableHead>
+              <TableHead>icon</TableHead>
               <TableHead>title</TableHead>
               <TableHead>cmd</TableHead>
               <TableHead>roles</TableHead>
-              <TableHead>icon</TableHead>
               <TableHead className={`${STICKY_RIGHT} text-right`}>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(openers.data?.list ?? []).length === 0 && (
+            {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-xs text-muted-foreground">
                   暂无 opener
                 </TableCell>
               </TableRow>
             )}
-            {(openers.data?.list ?? []).map((op) => (
-              <TableRow key={op.name} className="group/row">
-                <TableCell className={`${STICKY_LEFT} font-medium`}>{op.name}</TableCell>
+            {rows.map((op, i) => (
+              <TableRow
+                key={op.name}
+                className={cn(
+                  'group/row',
+                  i === dragIdx && 'opacity-40',
+                  // 插入位高亮：inset 阴影画线，避免 border 变宽引起行高跳动
+                  dragIdx !== null &&
+                    i === overIdx &&
+                    i !== dragIdx &&
+                    (dragIdx < i ? 'shadow-[inset_0_-2px_0_var(--primary)]' : 'shadow-[inset_0_2px_0_var(--primary)]'),
+                )}
+                draggable={armed === op.name}
+                onDragStart={(e) => {
+                  setDragIdx(i);
+                  e.dataTransfer.effectAllowed = 'move';
+                  e.dataTransfer.setData('text/plain', op.name);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setOverIdx(i);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  dropTo(i);
+                }}
+                onDragEnd={() => {
+                  setArmed(null);
+                  setDragIdx(null);
+                  setOverIdx(null);
+                }}
+              >
+                <TableCell className={`${STICKY_LEFT} font-medium`}>
+                  <span className="flex items-center gap-1">
+                    <GripVertical
+                      className="size-3.5 shrink-0 cursor-grab text-muted-foreground/40"
+                      onPointerDown={() => setArmed(op.name)}
+                      onPointerUp={() => setArmed(null)}
+                      aria-label="拖动排序"
+                    />
+                    {op.name}
+                  </span>
+                </TableCell>
+                <TableCell>{renderOpenerIcon(op, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
                 <TableCell className="text-xs">{op.title}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>
-                <TableCell>{renderOpenerIcon(op, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
                 <TableCell className={`${STICKY_RIGHT} text-right`}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(fromOpener(op))}>
                     编辑

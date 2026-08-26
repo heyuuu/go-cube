@@ -63,6 +63,7 @@ func (h *OpenerHandler) Register(api huma.API) {
 	apiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
 	apiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
 	apiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
+	apiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
 	apiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
 }
 
@@ -151,6 +152,20 @@ type OpenerDeleteInput struct {
 
 func (h *OpenerHandler) openerDelete(input OpenerDeleteInput) (map[string]any, error) {
 	if err := h.service.DeleteOpener(input.Body.Name); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// OpenerReorderInput reorder 接口入参（整表按目标顺序提交名单）。
+type OpenerReorderInput struct {
+	Body struct {
+		Names []string `json:"names" doc:"按目标顺序排列的 opener 名单"`
+	}
+}
+
+func (h *OpenerHandler) openerReorder(input OpenerReorderInput) (map[string]any, error) {
+	if err := h.service.ReorderOpeners(input.Body.Names); err != nil {
 		return nil, err
 	}
 	return map[string]any{"ok": true}, nil

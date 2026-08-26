@@ -107,3 +107,40 @@ func (s *Service) DeleteOpener(name string) error {
 	}
 	return settings.SaveSection(s.settingsFile, settingsSection, rest)
 }
+
+// ReorderOpeners 按 names 顺序重排 openers 节。列表顺序即展示顺序（CLI/项目页快捷入口
+// 均按此序），前端拖拽排序落库走这里。未列名的条目（含坏条目，list 本就不可见）保持
+// 原相对顺序排在末尾，不丢数据；出现未知名或重复名返回中文错误。
+func (s *Service) ReorderOpeners(names []string) error {
+	var specs []Spec
+	settings.LoadSection(s.settingsFile, settingsSection, &specs)
+
+	byName := make(map[string]Spec, len(specs))
+	for _, spec := range specs {
+		byName[spec.Name] = spec
+	}
+	if len(byName) != len(specs) {
+		return fmt.Errorf("settings.json 存在重名 opener，无法按名重排")
+	}
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		if _, ok := byName[name]; !ok {
+			return fmt.Errorf("未找到指定 opener: %s", name)
+		}
+		if seen[name] {
+			return fmt.Errorf("重排名单存在重复 opener: %s", name)
+		}
+		seen[name] = true
+	}
+
+	ordered := make([]Spec, 0, len(specs))
+	for _, name := range names {
+		ordered = append(ordered, byName[name])
+	}
+	for _, spec := range specs {
+		if !seen[spec.Name] {
+			ordered = append(ordered, spec)
+		}
+	}
+	return settings.SaveSection(s.settingsFile, settingsSection, ordered)
+}

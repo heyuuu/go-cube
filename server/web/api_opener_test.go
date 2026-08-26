@@ -238,3 +238,48 @@ func TestOpenerExtractIcon(t *testing.T) {
 		t.Fatalf("value 应为合法 base64 PNG, err=%v len=%d", err, len(dec))
 	}
 }
+
+func TestOpenerReorder(t *testing.T) {
+	env := newTestEnv(t)
+	postJSON := func(path, body string) envelope {
+		resp, err := http.Post(env.url(path), "application/json", bytes.NewReader([]byte(body)))
+		if err != nil {
+			t.Fatalf("POST %s 失败: %v", path, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("POST %s 应为 200, got %d", path, resp.StatusCode)
+		}
+		var out envelope
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("响应解码失败: %v", err)
+		}
+		return out
+	}
+
+	// fixture 预置 finder；再存一条 code，reorder 后 list 顺序应随之变化
+	postJSON("/api/opener/save", `{"name":"code","cmd":["code","$0"],"roles":["open-dir"]}`)
+	postJSON("/api/opener/reorder", `{"names":["code","finder"]}`)
+
+	list := getJSON(t, env.url("/api/opener/list"))
+	var got struct {
+		List []struct {
+			Name string `json:"name"`
+		} `json:"list"`
+	}
+	decodeData(t, list, &got)
+	if len(got.List) != 2 || got.List[0].Name != "code" || got.List[1].Name != "finder" {
+		t.Fatalf("reorder 后顺序不符: %+v", got.List)
+	}
+
+	// 未知名返回中文错误、顺序不变
+	bad := postJSON("/api/opener/reorder", `{"names":["finder","nope"]}`)
+	if bad.Ok || !strings.Contains(bad.Message, "nope") {
+		t.Fatalf("未知名应报错, ok=%v message=%q", bad.Ok, bad.Message)
+	}
+	list2 := getJSON(t, env.url("/api/opener/list"))
+	decodeData(t, list2, &got)
+	if got.List[0].Name != "code" {
+		t.Fatalf("失败 reorder 不应改动顺序: %+v", got.List)
+	}
+}
