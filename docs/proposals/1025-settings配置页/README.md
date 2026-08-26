@@ -1,6 +1,8 @@
 # settings 配置页
 
-> **状态**：📝 提案（2026-08-24，方向已与 owner 对齐）
+> **交互偏差（2026-08-26 owner 评审）**：分区编辑交互从「页内二级视图」改回 **Sheet 抽屉表单**——二级视图收窄主区域与列表尺寸反差突兀；「不做内嵌 Modal」条款随之所指收窄为「不做居中 Dialog」，Sheet 抽屉可用。
+
+> **状态**：🚧 实施中（2026-08-26 骨架 + Opener 分区已交付：`/settings` 路由 + 分区导航 URL 记忆 + ⌘,/rail 新 tab 入口 + Opener 增删改迁入页内二级视图 + 删除确认；过渡决策（owner）：config.json 只读展示整体迁入 settings 的 **Config 分区**，`/config` 路由直接移除（无重定向）；待办：scan 规则分区、Config 过渡分区逐步收编为各域可编辑分区）
 >
 > **依赖**：[`1016-opener改造`](../archived/1016-opener改造/README.md)第 1-2 步（opener 迁 settings.json + save/delete API）——settings 首个分区「Opener」的编辑能力由它提供；骨架可先行，编辑能力等 1016。
 > **关联**：[`1024-projects筛选URL化`](../1024-projects筛选URL化/README.md)（无硬依赖，但其完成后「业务页 ↔ settings 往返无损」才成立）。

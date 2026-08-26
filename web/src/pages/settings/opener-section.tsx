@@ -1,18 +1,30 @@
-// 打开工具（openers）管理区块：列表 + 新增/编辑表单（Sheet）+ 删除。
-// 数据源是 /api/opener/list（settings.json），保存即生效——config 页其余区块仍读 config.json。
+// settings 页 Opener 分区：列表 + 抽屉（Sheet）编辑表单，删除前确认。
+// 数据源是 /api/opener/list（settings.json），保存即生效。
 import { useState } from 'react';
 
 import type { Opener } from '@/api/client';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { renderOpenerIcon } from '@/lib/opener-icon';
 import { useIconExtract, useOpenerDelete, useOpenerSave } from '@/queries/opener';
 import { useOpenerList } from '@/queries/project';
 
+import { LucideIconPicker } from './lucide-icon-picker';
+
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
+
+// 冻结列：name 贴左、操作贴右，水平滚动时始终可见。实心 bg 遮住下层滑过的单元格，
+// 分隔线用 inset 阴影而非 border（border-collapse 下 border 不随 sticky 单元格移动）；
+// 行 hover 靠 group 保持整行联动（sticky 单元格自身的 bg 会盖掉 tr 的 hover bg）
+const STICKY_LEFT =
+  'sticky left-0 z-10 bg-background group-hover/row:bg-muted/50 shadow-[inset_-1px_0_0_var(--border)]';
+const STICKY_RIGHT =
+  'sticky right-0 z-10 bg-background group-hover/row:bg-muted/50 shadow-[inset_1px_0_0_var(--border)]';
 
 // 表单草稿：cmd 以空格分隔编辑（v1 约定：cmd 参数不含空格）
 interface Draft {
@@ -45,6 +57,7 @@ function fromOpener(op: Opener): Draft {
   };
 }
 
+// 编辑表单（右侧抽屉）：关闭即放弃草稿，保存成功后自动关闭
 function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const [form, setForm] = useState<Draft>(draft);
   const save = useOpenerSave();
@@ -140,11 +153,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
               ))}
             </div>
             {form.iconType === 'lucide' && (
-              <Input
-                value={form.iconValue}
-                onChange={(e) => set('iconValue', e.target.value)}
-                placeholder="folder-open"
-              />
+              <LucideIconPicker value={form.iconValue} onChange={(v) => set('iconValue', v)} />
             )}
             {form.iconType === 'image' && (
               <div className="flex flex-col gap-2">
@@ -190,10 +199,11 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   );
 }
 
-export function OpenersSection() {
+export function OpenerSection() {
   const openers = useOpenerList();
   const del = useOpenerDelete();
   const [editing, setEditing] = useState<Draft | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   return (
     <section>
@@ -210,12 +220,12 @@ export function OpenersSection() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>name</TableHead>
+              <TableHead className={STICKY_LEFT}>name</TableHead>
               <TableHead>title</TableHead>
               <TableHead>cmd</TableHead>
               <TableHead>roles</TableHead>
               <TableHead>icon</TableHead>
-              <TableHead className="text-right">操作</TableHead>
+              <TableHead className={`${STICKY_RIGHT} text-right`}>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -227,24 +237,17 @@ export function OpenersSection() {
               </TableRow>
             )}
             {(openers.data?.list ?? []).map((op) => (
-              <TableRow key={op.name}>
-                <TableCell className="font-medium">{op.name}</TableCell>
+              <TableRow key={op.name} className="group/row">
+                <TableCell className={`${STICKY_LEFT} font-medium`}>{op.name}</TableCell>
                 <TableCell className="text-xs">{op.title}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>
-                <TableCell className="font-mono text-xs">
-                  {op.icon ? `${op.icon.type}:${op.icon.value.slice(0, 12)}` : '-'}
-                </TableCell>
-                <TableCell className="text-right">
+                <TableCell>{renderOpenerIcon(op, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
+                <TableCell className={`${STICKY_RIGHT} text-right`}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(fromOpener(op))}>
                     编辑
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    disabled={del.isPending}
-                    onClick={() => del.mutate({ name: op.name })}
-                  >
+                  <Button size="sm" variant="ghost" disabled={del.isPending} onClick={() => setDeleting(op.name)}>
                     删除
                   </Button>
                 </TableCell>
@@ -253,6 +256,18 @@ export function OpenersSection() {
           </TableBody>
         </Table>
       </div>
+      <ConfirmDialog
+        open={deleting !== null}
+        title="删除 opener"
+        message={`确定删除「${deleting}」吗？该操作立即生效且不可恢复。`}
+        confirmText="删除"
+        danger
+        onConfirm={() => {
+          if (deleting) del.mutate({ name: deleting });
+          setDeleting(null);
+        }}
+        onCancel={() => setDeleting(null)}
+      />
       {editing && (
         <OpenerForm
           key={editing === EMPTY_DRAFT ? 'new' : `edit:${editing.name}`}

@@ -1,8 +1,10 @@
 import { BookOpen, Box, FolderKanban, Moon, PanelsTopLeft, Settings, Sun } from 'lucide-react';
+import { useEffect } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { toggleTheme, useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
+
 import { HintTip } from './ui/tooltip';
 
 // 全局图标栏（提案 1023）：所有业务页面（含工作台）共用的 48px 细栏杆，
@@ -20,10 +22,27 @@ const railItemClass = ({ isActive }: { isActive: boolean }) =>
     isActive && 'bg-sidebar-accent text-sidebar-accent-foreground',
   );
 
+// settings 是全宽编辑界面，统一新 tab 打开（提案 1025）：业务 tab 原封不动，改完关 tab 即回
+function openSettings() {
+  window.open('/settings', '_blank');
+}
+
 export function Layout() {
   const theme = useTheme();
   const { pathname } = useLocation();
   const fullBleed = fullBleedPrefixes.some((p) => pathname.startsWith(p));
+
+  // ⌘,（Ctrl+,）全局快捷键打开 settings，与 rail 图标行为一致
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === ',' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        openSettings();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   return (
     <div className="flex h-dvh">
@@ -42,12 +61,17 @@ export function Layout() {
             </HintTip>
           ))}
         </nav>
-        {/* 底部固定区：Config 是整个工具的配置入口（非业务页面），与外部链接、主题切换归在一起 */}
+        {/* 底部固定区：Settings 是整个工具的配置入口（非业务页面），与外部链接、主题切换归在一起 */}
         <div className="mt-auto flex flex-col gap-1 px-1.5 pb-3">
-          <HintTip label="Config">
-            <NavLink to="/config" className={railItemClass} aria-label="Config">
+          <HintTip label="设置 (⌘,)">
+            <button
+              type="button"
+              onClick={openSettings}
+              className={railItemClass({ isActive: false })}
+              aria-label="设置"
+            >
               <Settings className="size-4" />
-            </NavLink>
+            </button>
           </HintTip>
           <HintTip label="API Docs">
             <a
@@ -61,7 +85,12 @@ export function Layout() {
             </a>
           </HintTip>
           <HintTip label="切换主题 (⌘D)">
-            <button type="button" onClick={toggleTheme} className={railItemClass({ isActive: false })} aria-label="切换主题">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={railItemClass({ isActive: false })}
+              aria-label="切换主题"
+            >
               {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
             </button>
           </HintTip>
