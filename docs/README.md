@@ -26,7 +26,8 @@
 
 - [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（进 git），CLI/Web 打开流程插入 workspace 选择；标准声明文件（pnpm-workspace.yaml 等）仅做候选探测不落盘（**出口接入待 1032 落地后实施**）
 - [`1031-worktree管理/`](proposals/1031-worktree管理/) — 工作台 worktree 写侧管理：新增（新建分支/检出已有/detached，默认同级 `<repo>--<branch>`）/ 删除 worktree + 删除分支，删除类统一 force 预检语义（被检出分支硬拒），写后定向刷新 gitcache；伴随定位修订「Web UI 优先，CLI 简单可行兜底」
-- [`1032-worktree归并为项目打开目标/`](proposals/1032-worktree归并为项目打开目标/) — worktree 从独立项目归并为主项目打开目标：scan 只收录 `.git` 为目录的主仓库，worktree 经 git 枚举进 gitcache 快照（任意位置可见），打开流程选目标，history 记「项目+目录」双字段，`worktree` tag 移除；确立「project → 打开目标」模型，1030 排其后
+- [`1032-worktree归并为项目打开目标/`](proposals/1032-worktree归并为项目打开目标/) — worktree 从独立项目归并为主项目打开目标：scan 只收录 `.git` 为目录的主仓库，worktree 经 git 枚举进 gitcache 快照（任意位置可见），打开流程选目标，usage 记「项目+目录」双维度（`dir` 字段已由 1034 预留），`worktree` tag 移除；确立「project → 打开目标」模型，1030 排其后
+- [`1034-最近使用排序与usage统一/`](proposals/1034-最近使用排序与usage统一/) — 统一项目使用记录（✅ 已实施待归档）：history 两表重写为 usage JSONL（`state/usage.jsonl`，O_APPEND 无锁追加 + 启动 compaction），三打开入口全接入，项目列表最近使用 10 条置顶 + 相对时间 badge，gorm/sqlite/data.db 整体移除
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 

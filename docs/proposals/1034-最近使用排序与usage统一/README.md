@@ -1,8 +1,14 @@
 # 最近使用排序与 usage 统一
 
-> **状态**：📝 待评审
+> **状态**：✅ 已实施（待归档）
 >
-> **关联**：[`1033-util-store文件存储`](../archived/1033-util-store文件存储/README.md)（前置需求，步骤 2 依赖其 JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 需带 `subPath`，见「格式演进约定」）。
+> **实施偏差备忘**（与原方案的差异）：
+> 1. `Record` 增加 `dir` 字段（实际打开目录绝对路径，主项目根打开时省略）——原「格式演进约定」预留给 1030 的 `subPath` 相对路径方案**废弃**：worktree 目标（1032）在主项目根之外，相对路径无意义，统一为单一 `dir` 恒记绝对路径；compaction 组合键随之为 `(project, opener, dir)`；
+> 2. `usage.jsonl` 落 `dataDir/state/`（新增运行期状态目录，与 cache 的「可整体删除」语义区分），不在配置目录根；
+> 3. Web `opener/open` 只在打开目标为**已收录项目**时记录（原方案未限定——非项目路径会造永不消亡的脏 key）；
+> 4. store 写原语统一自动递归创建父目录（`AppendJsonl` 补齐，与 `WriteFileAtomic`/`SaveJson` 一致）。
+>
+> **关联**：[`1033-util-store文件存储`](../archived/1033-util-store文件存储/README.md)（前置需求，JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 记 `dir` 绝对路径，见「格式演进约定」）。
 
 ## 背景与目标
 
@@ -17,17 +23,18 @@
 
 ## 方案
 
-### 1. 数据模型：一张记录，三字段
+### 1. 数据模型：一张记录，四字段
 
 一次「使用」= 一次 opener 打开事件。原两张表合并为一种记录，`ProjectSelectLog` 整体废弃（选中未打开对「最近使用」无信号价值），`Alfred` 字段删除：
 
 ```json
-{"time":"2026-08-27T21:03:14+08:00","project":"/Users/heyu/Code/heyuuu/cube","opener":"idea"}
+{"time":"2026-08-27T21:03:14+08:00","project":"/Users/heyu/Code/heyuuu/cube","opener":"idea","dir":"/Users/heyu/Code/heyuuu/cube--web/server"}
 ```
 
 - `time`：RFC3339，行序与它单调一致，承担原表自增 id 的排序职责；
-- `project`：**项目绝对路径**（不再是旧表的 name——name 跨 group 可撞名，path 是 project 的唯一标识，列表排序 join 用它）；
-- `opener`：opener 名（settings openers 节的 key）。
+- `project`：**主项目绝对路径**（不再是旧表的 name——path 是 project 的唯一标识，列表排序 join 用它；worktree / 子目录打开时也恒记主项目路径，归并键不分裂）；
+- `opener`：opener 名（settings openers 节的 key）；
+- `dir`：实际打开的目标目录**绝对路径**（主项目根打开时省略；worktree / monorepo workspace 子目录时为其绝对路径，1030/1032 落地后开始写入）。
 
 两个查询语义与原 SQL 等价，读侧全量读 + 内存去重（同 key 留更新行）：
 
@@ -48,7 +55,7 @@
 
 - 文件：配置目录下 `usage.jsonl`（**不放 `cache/`**——它参与排序语义，非可随意丢弃的缓存）；
 - 追加：`O_APPEND` 写一行，POSIX 小块 append 原子，CLI 短进程与常驻 server 并发追加安全，**无需 flock**；
-- 清理：server 启动时 compaction 一次（沿用现 `OnServerStart` 时机）——tmp+rename 整体重写，每个 `(project, opener)` 组合留最新一条 + 30 天内记录。重写瞬间并发 append 的极少数记录会丢，usage 是 best-effort 信号，接受；
+- 清理：server 启动时 compaction 一次（沿用现 `OnServerStart` 时机）——tmp+rename 整体重写，每个 `(project, opener, dir)` 组合留最新一条 + 30 天内记录。重写瞬间并发 append 的极少数记录会丢，usage 是 best-effort 信号，接受；
 - 历史数据**不迁移**：旧表只有 alfred 记录且 30 天轮转，价值低，新文件从空开始，排序数日内自然收敛。
 
 读写原语走 `util/store`（见前置提案）。
@@ -65,7 +72,7 @@ usage 落地后，`db` 包、gorm 依赖、`data.db` 运行期状态、`app.go` 
 
 ## 格式演进约定（给后续提案）
 
-行结构允许增量加字段，**读取方必须容忍缺失字段**（JSONL 无 schema，Go 侧加 `omitempty` 字段即前后向兼容，不预先预留无写入方的字段）。已知的第一个演进：1030 monorepo workspace 落地后，打开子目录时追加 `subPath`（相对项目根），`project` 恒为主项目路径——排序与 opener 偏好仍 keyed 于主项目。1030 实施步骤已补此接线义务。
+行结构允许增量加字段，**读取方必须容忍缺失字段**（JSONL 无 schema，Go 侧加 `omitempty` 字段即前后向兼容，不预先预留无写入方的字段）。~~原预想的第一个演进：1030 落地后追加 `subPath`（相对项目根）~~——**已修订并随本提案落地**：统一为 `dir` 字段恒记实际打开目录的**绝对路径**（主根打开省略），`project` 恒为主项目路径，排序与 opener 偏好仍 keyed 于主项目；1030/1032 的实施步骤已同步此接线义务（写入 `dir` 时只需传目标路径，存储零改动）。
 
 ## 不做的事
 

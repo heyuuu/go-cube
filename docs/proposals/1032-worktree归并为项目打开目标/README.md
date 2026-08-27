@@ -17,13 +17,13 @@ git 主仓库与它的 worktree 目前被 scan 当成**多个独立项目**管�
 1. scan 只收录 `.git` 为目录的主仓库项目，worktree 目录不再是项目；
 2. 主项目的 worktree 列表经 git 枚举动态推导（永不落盘，走 gitcache 快照），worktree 可位于任意位置（含 scan root 之外）；
 3. 打开流程（CLI / alfred / Web）支持目标选择；
-4. history 记录「项目 + 目录」两个维度，同时满足 worktree 与后续 monorepo workspace 的记账需求。
+4. usage 记录「项目 + 目录」两个维度，同时满足 worktree 与后续 monorepo workspace 的记账需求。
 
 ## 决策记录（讨论定稿）
 
 1. **扫描归并边界**：scan 只收录 `.git` 为**目录**的项目；`.git` 为**文件**的目录（linked worktree）跳过。规则：**主仓库必须在 scan-rule 之下，worktree 可以在任何位置**——worktree 可见性来自主项目枚举，不来自扫描。推论：主仓库不在任何 scan-rule 下的 worktree 整体不可见（接受，不做孤儿降级）。
 2. **worktree 无独立项目身份，全部归并无例外**：「把 worktree 当独立项目」（列表独立条目、独立 history、独立入口）无实际诉求；「直接打开 worktree 目录」的需求由「选主项目 → 选 worktree 目标」满足。不为少数场景加例外机制（cube.json 不声明 worktree 归并/独立）。
-3. **history 双字段**：`ProjectOpenLog` 增加 `dir` 字段——项目记主项目 name，目录记目标的**绝对路径**（根目录为空 / worktree 为其路径 / workspace 为其绝对路径，1030 落地后生效）。history 是流水记录而非配置，目录重命名后旧记录仅展示不全，不构成脏数据。`ProjectSelectLog` 不变（选择的对象是项目）。
+3. **usage 双维度**：usage 记录（[`1034`](../1034-最近使用排序与usage统一/README.md) 已落地的 JSONL `Record`）的 `dir` 字段承载目标维度——`project` 恒记主项目**绝对路径**（归并键），`dir` 记目标的**绝对路径**（主根打开省略 / worktree 为其路径 / workspace 为其绝对路径，1030 落地后生效）。usage 是流水信号而非配置，目录重命名后旧记录仅展示不全，不构成脏数据。~~原方案的 `ProjectOpenLog` 加列（sqlite AutoMigrate）已废弃~~——1034 已将 history 整体重写为 usage JSONL 并预留 `dir` 字段，本提案只负责打开入口写入时传目标路径。
 4. **`worktree` tag 移除**：归并后 tag 失去载体。
 
 ## 方案
@@ -67,7 +67,7 @@ open 链路（选主项目 → 选目标）是本提案的重心；其他命令�
 | `pickProject` / 项目反查 | 命中 worktree 目录时顺着 `.git` 文件定位主仓库，归并选中主项目（pull / push / info 等命令入口） |
 | `cmd/info.go` | 输出注明当前所属 worktree |
 | `cmd/open.go` / `cmd/alfred` | 插入目标选择步 |
-| `history` | `ProjectOpenLog` 加 `dir` 字段（AutoMigrate 增列，旧数据 dir 为空=根目录，天然兼容） |
+| `usage` | `Record.dir` 字段已由 1034 预留（无需存储改动），本提案在打开入口写入时传目标绝对路径 |
 | `gitcache` | 快照结构加 worktree 列表；worktree 目录不再作为独立项目采集，改由主项目采集时附带 |
 | `cmd/doctor.go` | 「指向已删除主仓库的 worktree 残骸」检查项语义变化：悬空 worktree 不再被收录，该项改为检查快照内 worktree 路径失联 |
 | `handlers/workbench_handler.go` | 「全部工作副本」端点数据源从扫描列表切换为主项目枚举 |
@@ -85,7 +85,7 @@ open 链路（选主项目 → 选目标）是本提案的重心；其他命令�
 1. `util/git.Worktrees` 封装 + 单测（testfixture 建 worktree）；
 2. gitcache 快照加 worktree 字段 + 采集/读取改造 + 单测；
 3. scan 收紧（跳过 `.git` 文件）+ `TagWorktree` 移除 + scan 单测更新；
-4. project 层目标查询 + history `dir` 字段（AutoMigrate）；
+4. project 层目标查询 + 打开入口记录 usage `dir`；
 5. CLI `cube open` / alfred 目标选择；
 6. Web API + 前端（projects 页 / workbench / doctor 语义切换）；
 7. `docs/spec/现状.md` 同步，验收后归档提案。
@@ -94,7 +94,7 @@ open 链路（选主项目 → 选目标）是本提案的重心；其他命令�
 
 1. worktree 目录（无论在 scan root 内外）不再出现在 `cube project list`，其主项目条目可展开选择 worktree 打开，alfred 可一步直达 worktree；
 2. 主仓库被删的悬空 worktree 不产生幽灵项目；doctor 的失联检查改为面向快照；
-3. history 记录含目标维度，旧记录（无 dir）兼容可查；
+3. usage 记录含目标维度（`dir` 为实际打开目录绝对路径，`project` 恒为主项目路径）；
 4. 普通 git 项目（无 worktree）全流程行为不变；
 5. `cd server && go vet ./... && go test ./...`、`pnpm -C web build` 通过；
 6. `docs/spec/现状.md` 已同步。
