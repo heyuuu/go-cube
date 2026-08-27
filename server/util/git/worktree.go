@@ -63,6 +63,15 @@ func WorktreeMain(dir string) string {
 	return ""
 }
 
+// WorktreePrune 清理主仓库 root 中目录已不存在的 worktree 元数据记录。
+// 幂等且无损：只删失效记录，不碰任何现存 worktree。doctor 的发现/修复共用。
+func WorktreePrune(root string) error {
+	if err := Run(root, "worktree", "prune"); err != nil {
+		return fmt.Errorf("git worktree prune 执行失败: %w", err)
+	}
+	return nil
+}
+
 // parseWorktreePorcelain 解析 `git worktree list --porcelain` 输出：
 // 每个工作副本一个块，块以 "worktree <path>" 起、空行止，属性行可选。
 func parseWorktreePorcelain(out string) []Worktree {

@@ -1,6 +1,7 @@
 package git
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -112,5 +113,29 @@ func TestWorktreeListFromWorktreeDir(t *testing.T) {
 		if fromMain[i] != fromWorktree[i] {
 			t.Errorf("第 %d 个副本两侧不一致: main=%+v worktree=%+v", i, fromMain[i], fromWorktree[i])
 		}
+	}
+}
+
+// WorktreePrune 清理目录已删的 worktree 元数据记录（幂等、不碰现存 worktree）。
+func TestWorktreePrune(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepo("repo")
+	ws.MakeWorktree(repo, "wt-hot", "hotfix")
+	ws.MakeWorktree(repo, "wt-gone", "gone")
+
+	if err := os.RemoveAll(ws.Join("wt-gone")); err != nil {
+		t.Fatalf("删除 worktree 目录失败: %v", err)
+	}
+
+	if err := WorktreePrune(repo); err != nil {
+		t.Fatalf("WorktreePrune 报错: %v", err)
+	}
+
+	list, err := WorktreeList(repo)
+	if err != nil {
+		t.Fatalf("WorktreeList 报错: %v", err)
+	}
+	if len(list) != 2 { // 主目录 + wt-hot；wt-gone 元数据应已被清
+		t.Fatalf("prune 后应剩 2 个工作副本, got %d (%+v)", len(list), list)
 	}
 }
