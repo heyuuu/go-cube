@@ -1,6 +1,6 @@
 # scan / clone 规则迁移 settings.json
 
-> **状态**：📝 待评审
+> **状态**：✅ 已交付（2026-08-27 验收归档；实施过程中的形态演变与超出提案的增强见文末「实施偏差与增强备忘」）
 >
 > **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（settings.json 节级 API + 领域 Service 直读模式的首个落地）；[`1025-settings配置页`](../archived/1025-settings配置页/README.md)（已预留「项目·扫描」分区占位，本提案即其注明的「project 域另立提案」）；[`1026-环境分离`](../archived/1026-环境分离/README.md)（settings.json 保持文本形态、可人工 diff 合并）。
 
