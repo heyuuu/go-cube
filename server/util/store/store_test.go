@@ -277,3 +277,37 @@ func TestWriteOpsCreateParentDir(t *testing.T) {
 		t.Fatalf("WriteFileAtomic 应自动建父目录: %v", err)
 	}
 }
+
+func TestWriteJsonl(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	path := ws.Join("a/b/usage.jsonl") // 父目录不存在，验证自动创建
+
+	items := []map[string]int{{"x": 1}, {"x": 2}}
+	if err := WriteJsonl(path, items); err != nil {
+		t.Fatalf("WriteJsonl 失败: %v", err)
+	}
+	got, err := LoadJsonl[map[string]int](path)
+	if err != nil {
+		t.Fatalf("LoadJsonl 失败: %v", err)
+	}
+	if len(got) != 2 || got[0]["x"] != 1 || got[1]["x"] != 2 {
+		t.Fatalf("写读不一致: %v", got)
+	}
+
+	// 整体重写语义：旧内容被替换而非追加
+	if err := WriteJsonl(path, []map[string]int{{"y": 9}}); err != nil {
+		t.Fatalf("WriteJsonl 重写失败: %v", err)
+	}
+	got, _ = LoadJsonl[map[string]int](path)
+	if len(got) != 1 || got[0]["y"] != 9 {
+		t.Fatalf("重写后应只剩新内容: %v", got)
+	}
+
+	// 空切片：整文件清空（0 行）
+	if err := WriteJsonl[map[string]int](path, nil); err != nil {
+		t.Fatalf("WriteJsonl 空切片失败: %v", err)
+	}
+	if got, _ := LoadJsonl[map[string]int](path); len(got) != 0 {
+		t.Fatalf("空切片应清空文件, got %v", got)
+	}
+}

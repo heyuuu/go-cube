@@ -25,10 +25,8 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 
 			// 若指定项目（路径为项目唯一标识口径），且该项目有 opener 使用偏好，则按最近使用排序
 			if len(projectPath) > 0 {
-				if proj := a.ProjectService().FindByPath(projectPath); proj != nil {
-					history := a.UsageService().LatestOpeners(proj.Path(), 3)
-					openers = sortOpeners(openers, history)
-				}
+				history := a.UsageService().LatestOpeners(projectPath, 3)
+				openers = sortOpeners(openers, history)
 			}
 
 			// 返回结果

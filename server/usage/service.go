@@ -6,7 +6,6 @@
 package usage
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -56,7 +55,7 @@ func (s *Service) LatestByProject() map[string]time.Time {
 }
 
 // LatestOpeners 限定 project 按 opener 去重取最新，返回按最近使用倒序的 opener 名。
-// 服务于 alfred 的 opener 排序偏好（原 LeastProjectOpenApps）。
+// 服务于 alfred 的 opener 排序偏好
 func (s *Service) LatestOpeners(project string, limit int) []string {
 	latest := map[string]time.Time{}
 	for _, rec := range s.load() {
@@ -128,16 +127,7 @@ func (s *Service) compact() (int, error) {
 		return 0, nil
 	}
 
-	var buf []byte
-	for _, rec := range kept {
-		line, err := json.Marshal(rec)
-		if err != nil {
-			return 0, fmt.Errorf("序列化 usage 记录失败: %w", err)
-		}
-		buf = append(buf, line...)
-		buf = append(buf, '\n')
-	}
-	if err := store.WriteFileAtomic(s.usageFilePath, buf, 0644); err != nil {
+	if err := store.WriteJsonl(s.usageFilePath, kept); err != nil {
 		return 0, fmt.Errorf("重写 usage 记录失败: %w", err)
 	}
 	return len(recs) - len(kept), nil

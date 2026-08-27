@@ -190,8 +190,6 @@ func TestFindByPathAndName(t *testing.T) {
 	if p := s.FindByPath("./proj"); p != nil {
 		t.Fatalf("相对路径应返回 nil，实际: %v", p)
 	}
-
-	// name 格式 = group:subpath，这里 = g1:proj
 }
 
 // TestScanRules_Getter ScanRules() 从 settings.json 读出规则（含路径校验）。

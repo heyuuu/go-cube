@@ -35,6 +35,25 @@ func AppendJsonl[T any](path string, v T) error {
 	return nil
 }
 
+// WriteJsonl 序列化 items 为逐行 JSON，整体原子重写 path（tmp+rename，父目录自动创建）。
+// 用于 compaction 类「全量重写」场景；常规追加走 AppendJsonl——重写瞬间并发 append 的记录会丢，
+// 调用方须自行接受该语义。
+func WriteJsonl[T any](path string, items []T) error {
+	var buf []byte
+	for _, item := range items {
+		line, err := json.Marshal(item)
+		if err != nil {
+			return fmt.Errorf("序列化 JSONL 行失败: %w", err)
+		}
+		buf = append(buf, line...)
+		buf = append(buf, '\n')
+	}
+	if err := WriteFileAtomic(path, buf, 0644); err != nil {
+		return fmt.Errorf("重写 JSONL 文件失败: %w", err)
+	}
+	return nil
+}
+
 // LoadJsonl 全量读取 path 的 JSONL 内容，按行反序列化。
 // 文件缺失返回 (nil, ErrFileMissing)；坏行跳过并 slog 记录（降级优先，不因个别脏数据丢弃整份文件）。
 func LoadJsonl[T any](path string) ([]T, error) {
