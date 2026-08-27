@@ -258,11 +258,8 @@ func (s *Service) GitUpdatedAt() time.Time {
 	return s.gitCache.UpdatedAt()
 }
 
-// defaultRefreshInterval 默认定时刷新间隔。
-// 主要受限于 git 采集（单次约数十秒级，取决于项目数）；扫描本身极快（毫秒级）。
-// 过短会让后台频繁读几十个仓库；过长则缓存陈旧。
-// StartRefreshTicker 传 interval <= 0 时用此默认值。
-const defaultRefreshInterval = 5 * time.Minute
+// maxExpireTime 可以容忍的最大过期时间
+const maxExpireTime = 5 * time.Minute
 
 // StartRefreshTicker 启动后台定时刷新 project 视图（项目列表 + git info）的 goroutine（仅常驻 server 调用）。
 //
@@ -272,12 +269,9 @@ const defaultRefreshInterval = 5 * time.Minute
 // 两个时间戳分开记录：扫描极快、git 采集慢，前端需据此分别判断「项目列表新鲜度」和「git 状态新鲜度」。
 //
 // CLI 不调用此方法（CLI 短命，只读启动时 Load 的快照）。
-func (s *Service) StartRefreshTicker(interval time.Duration) {
+func (s *Service) StartRefreshTicker() {
 	if s.gitCache == nil || s.stopCh != nil {
 		return // 无缓存或已在跑
-	}
-	if interval <= 0 {
-		interval = defaultRefreshInterval
 	}
 
 	stopCh := make(chan struct{})
@@ -290,21 +284,19 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 			}
 		}()
 
-		// 启动即刷一次，避免冷启动空窗。扫描（毫秒级）无条件执行；git 采集（数十秒级）
-		// 在磁盘缓存仍新鲜（距上次落盘 < interval）时跳过——开发期 air 等热重载场景
-		// 每次重启都全量重采上百个仓库，纯属浪费。
-		s.scanCache.Reload()
-		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
-			slog.Debug("git 缓存新鲜，跳过启动采集（仅重扫项目列表）", "上次落盘距今", since.Round(time.Second).String())
-		} else if _, _, err := s.collectGit(); err != nil {
-			slog.Warn("启动采集 git 缓存失败", "err", err)
-		}
-
-		ticker := time.NewTicker(interval)
-		defer ticker.Stop()
+		// 为了使缓存更新时间距今不超过 maxExpireTime
+		timer := time.NewTimer(0)
+		defer timer.Stop()
 		for {
+			// 计算下次刷新距今时间，按最早的 updatedAt 计算
+			now := time.Now()
+			expireTime := max(now.Sub(s.scanCache.UpdatedAt()), now.Sub(s.gitCache.UpdatedAt())) // 上次刷新距今时间
+			nextDuration := max(0, maxExpireTime-expireTime)
+
+			// 重置 timer
+			timer.Reset(nextDuration)
 			select {
-			case <-ticker.C:
+			case <-timer.C:
 				s.refresh()
 			case <-stopCh:
 				return
@@ -314,7 +306,9 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 }
 
 // OnServerStart 启动后台定时刷新（app 层钩子，仅常驻 server 调用）。等价于 StartRefreshTicker(0)。
-func (s *Service) OnServerStart() { s.StartRefreshTicker(0) }
+func (s *Service) OnServerStart() {
+	s.StartRefreshTicker()
+}
 
 // OnServerStop 停止后台定时刷新 goroutine（app 层钩子，server shutdown 时调）。
 func (s *Service) OnServerStop() { s.StopRefreshTicker() }
@@ -340,11 +334,15 @@ func (s *Service) refresh() {
 	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
 }
 
-// collectGit 按当前项目列表整表采集 git 信息（写内存 + 落盘 git.json），不触发重扫。
-// gitCache.Refresh 的唯一调用点：定时器（经 Refresh 组合）与启动时机（已单独重扫）共用。
-// 返回 (项目总数, 采集成功数, 错误)。
-func (s *Service) collectGit() (total int, collected int, err error) {
-	paths := slicekit.Map(s.Projects(), (*Project).Path)
+// Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息
+// （写内存 + 落盘 git.json）。返回 (项目总数, 采集成功数, 错误)。
+//
+// 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
+// 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
+func (s *Service) Refresh() (total int, collected int, err error) {
+	projects := s.scanCache.Reload()
+
+	paths := slicekit.Map(projects, (*Project).Path)
 	if s.gitCache == nil {
 		return len(paths), 0, errors.New("git 缓存未初始化")
 	}
@@ -352,14 +350,4 @@ func (s *Service) collectGit() (total int, collected int, err error) {
 		return len(paths), 0, err
 	}
 	return len(paths), s.gitCache.Size(), nil
-}
-
-// Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息。
-// 返回 (项目总数, 采集成功数, 错误)。
-//
-// 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
-// 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
-func (s *Service) Refresh() (total int, collected int, err error) {
-	s.scanCache.Reload()
-	return s.collectGit()
 }

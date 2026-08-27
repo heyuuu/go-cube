@@ -15,7 +15,7 @@ func TestStartRefreshTicker_FreshCacheSkippedStartupRefresh(t *testing.T) {
 	if err := s.gitCache.Save(); err != nil { // 预写一份「刚落盘」的新鲜缓存
 		t.Fatalf("预写缓存失败: %v", err)
 	}
-	s.StartRefreshTicker(time.Hour)
+	s.StartRefreshTicker()
 	defer s.StopRefreshTicker()
 
 	if !s.ScanUpdatedAt().IsZero() {
@@ -27,7 +27,7 @@ func TestStartRefreshTicker_FreshCacheSkippedStartupRefresh(t *testing.T) {
 // 启动仍应立即刷新一次，避免冷启动空窗。
 func TestStartRefreshTicker_StaleCacheTriggersStartupRefresh(t *testing.T) {
 	s := newServiceAt(t, testfixture.NewWorkspace(t).Dir, "g1", 1)
-	s.StartRefreshTicker(time.Hour)
+	s.StartRefreshTicker()
 	defer s.StopRefreshTicker()
 
 	deadline := time.Now().Add(2 * time.Second)
