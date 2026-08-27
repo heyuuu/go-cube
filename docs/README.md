@@ -23,6 +23,7 @@
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 
 - [`1029-scan-clone规则迁移settings/`](proposals/1029-scan-clone规则迁移settings/) — scan/clone 规则从 config.json 迁 settings.json `project` 节：Service 直读不缓存（保存即生效）+ 手动迁移（同 opener 先例）+ settings 页「项目·扫描」分区实装（增删改 + 拖拽排序）
+- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（进 git），CLI/Web 打开流程插入 workspace 选择；标准声明文件（pnpm-workspace.yaml 等）仅做候选探测不落盘
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 

@@ -30,6 +30,7 @@
 ## 关键机制（改动前先理解）
 
 - **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
+- **全量 project 列表永不落盘**：project 一切由 scan-rule 推导，持久化只有 cache（git.json）。因此**禁止在 settings.json / config 等全局配置里按项目路径记录具体 project 的内容**——项目目录会重命名/移动，按路径 keyed 的配置会失联留脏数据。需要「project 自身的配置」（如 monorepo workspace 声明，方向定为项目根 `.cube/cube.json`）时，放项目内跟仓库走，不放全局配置。
 - **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
 - **opener：接口 + 唯一 exec 实现 + settings.json**：`Opener` 是接口（`opener/opener.go`），唯一实现 `execOpener`（`opener/exec.go`，cmd 模板 `$0/$1` 占位）——「打开工作台页」不设独立形态，配 exec cmd `["cube","ui","workbench","$0"]` 组合 cube 自身 CLI；能力由 `roles []Role` 声明（见 `opener/role.go`），`slotCount` 由 role 推导；`Open(role, slotArgs...)` 的 role 校验收敛在实现内；经 `Executor` 执行（`opener/executor.go`，测试注入 fake）。**opener 数据存 settings.json 的 openers 节**（`settings` 包节级 API，Service 直读不缓存、写侧领域校验；详见 现状.md 3.3）——改 opener 时同步看 `opener/opener.go`、`opener/exec.go`、`opener/role.go`、`opener/executor.go`、`settings/settings.go`。
 - **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
