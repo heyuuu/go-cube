@@ -62,7 +62,7 @@ func newTestEnv(t *testing.T) *testEnv {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
 
-	projSvc := project.NewService(ws.Join("cache"), settingsFile)
+	projSvc := project.NewService(settingsFile, ws.Join("cache"))
 	exec := &fakeExecutor{}
 	openerSvc := opener.NewService(settingsFile, exec)
 	cfg := &config.Config{

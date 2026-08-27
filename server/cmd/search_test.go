@@ -22,7 +22,7 @@ func newCmdServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *projec
 	if err := settings.SaveSection(settingsFile, "scanRule", scanRules); err != nil {
 		t.Fatalf("写测试 settings.json 失败: %v", err)
 	}
-	return project.NewService(ws.Mkdir("cache"), settingsFile)
+	return project.NewService(settingsFile, ws.Mkdir("cache"))
 }
 
 // TestSearchProjects_PathQueryCwd 验证路径 query 的 cwd 解析发生在 cmd 层：

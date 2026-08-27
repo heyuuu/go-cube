@@ -26,7 +26,7 @@ type Service struct {
 	stopCh chan struct{} // nil = 未启用；非 nil = 定时器在跑
 }
 
-func NewService(cacheDir, settingsFile string) *Service {
+func NewService(settingsFile string, cacheDir string) *Service {
 	// 加载 git 信息缓存（降级优先：失败返回空缓存，不报错）
 	gitCache, err := gitcache.Load(cacheDir)
 	if err != nil {
@@ -52,8 +52,12 @@ func NewService(cacheDir, settingsFile string) *Service {
 
 // -- 规则（直读 settings.json，加载即转换校验） --
 
-func (s *Service) ScanRules() []ScanRule   { return loadScanRules(s.settingsFile) }
-func (s *Service) CloneRules() []CloneRule { return loadCloneRules(s.settingsFile) }
+func (s *Service) ScanRules() []ScanRule {
+	return loadScanRules(s.settingsFile)
+}
+func (s *Service) CloneRules() []CloneRule {
+	return loadCloneRules(s.settingsFile)
+}
 
 // --- project 读操作 ---
 
