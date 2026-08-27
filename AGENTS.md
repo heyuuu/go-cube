@@ -6,10 +6,10 @@
 
 ## 项目简介
 
-**cube** —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。Go 1.26 编写，module path `cube`（go.mod 第一行）。
+**cube** —— 面向个人开发者的本地多项目管理工具（Web UI 优先，CLI 简单可行兜底）。Go 1.26 编写，module path `cube`（go.mod 第一行）。
 
 - 历史有三代：v1 (php)、v2 (go)、**v3 (当前，按领域重构)**。
-- 出口：CLI（人用 / alfred）、本地 Web HTTP server（`cube server`，huma + 标准 ServeMux）。MCP 出口为后续规划。
+- 出口：本地 Web HTTP server（`cube server`，huma + 标准 ServeMux，主要交互形态）、CLI（人用 / alfred，web 不可用时兜底可行）。MCP 出口为后续规划。
 - 定位原则：不做云服务、不绑 AI（cube 可被 AI 编排，但自身不集成 AI）。
 - Go 源码根在 `server/`（不是仓库根）；`make build` / `make install` 都 `cd server` 再执行。
 
