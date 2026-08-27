@@ -50,15 +50,10 @@ func NewService(cacheDir, settingsFile string) *Service {
 	return s
 }
 
-// -- 规则（直读 settings.json，每次现读现转换） --
+// -- 规则（直读 settings.json，加载即转换校验） --
 
-func (s *Service) ScanRules() []ScanRule {
-	return makeScanRules(loadScanRules(s.settingsFile))
-}
-
-func (s *Service) CloneRules() []CloneRule {
-	return makeCloneRules(loadCloneRules(s.settingsFile))
-}
+func (s *Service) ScanRules() []ScanRule   { return loadScanRules(s.settingsFile) }
+func (s *Service) CloneRules() []CloneRule { return loadCloneRules(s.settingsFile) }
 
 // --- project 读操作 ---
 
