@@ -13,7 +13,7 @@ import (
 
 	"cube/opener"
 	"cube/project"
-	"cube/project/gitcache"
+	"cube/project/projcache"
 	"cube/usage"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
@@ -22,12 +22,12 @@ import (
 
 // --- dto ---
 type ProjectDTO struct {
-	Name       string          `json:"name"`
-	Group      string          `json:"group"`
-	Path       string          `json:"path"`
-	Tags       []string        `json:"tags"`
-	GitInfo    *gitcache.Entry `json:"gitInfo"`              // git 状态快照，可能为 nil（未采集）
-	LastUsedAt *time.Time      `json:"lastUsedAt,omitempty"` // 最近使用时间（置顶排序信号，未用过为 nil）
+	Name       string           `json:"name"`
+	Group      string           `json:"group"`
+	Path       string           `json:"path"`
+	Tags       []string         `json:"tags"`
+	GitInfo    *projcache.Entry `json:"gitInfo"`              // git 状态快照，可能为 nil（未采集）
+	LastUsedAt *time.Time       `json:"lastUsedAt,omitempty"` // 最近使用时间（置顶排序信号，未用过为 nil）
 }
 
 // ProjectListResult 列表接口返回结构：含项目列表 + 两类刷新时间。

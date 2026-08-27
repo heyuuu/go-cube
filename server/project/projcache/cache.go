@@ -1,4 +1,4 @@
-// Package gitcache 提供 git 信息的本地缓存。
+// Package projcache 提供项目状态快照的本地缓存（git 信息 + 打开目标元数据）。
 //
 // 对几十个 git 项目的全量采集是 IO 密集型操作，每次都跑会明显卡顿。
 // 本包把采集结果缓存到 ~/.config/cube/cache/git.json：
@@ -6,7 +6,8 @@
 //   - 常驻 server 进程内 goroutine 定时 Refresh 采集，写内存 + flush git.json。
 //
 // git.json 的角色是「跨重启持久化缓存」：server 重启后秒恢复，CLI 读最近一次落盘。
-package gitcache
+// 原名 gitcache，1030 起快照含 workspace 信息（非纯 git 信息）更名 projcache。
+package projcache
 
 import (
 	"encoding/json"
@@ -24,7 +25,8 @@ import (
 // 当前缓存文件格式版本；结构变更时递增，用于后续做兼容迁移。
 // v2：worktree 归并为项目打开目标（1032）——移除 WorktreeMain（worktree 不再是独立项目），
 // 新增 Worktrees（主项目附带枚举 linked worktree）。
-const cacheVersion = 2
+// v3：包更名 projcache（1030）——结构同 v2，版本号随更名递增标记语义边界；workspace 字段随后续步骤加入。
+const cacheVersion = 3
 
 // 缓存文件名（位于缓存目录 dir 下）。
 const cacheFileName = "git.json"
@@ -165,7 +167,7 @@ func (c *Cache) Save() error {
 // 刻意不保留失败项目的旧 entry：避免某个项目长期异常、旧快照却一直存在而不被发现。
 //
 // 入参用 []string（项目绝对路径）而非 []*project.Project，刻意解耦对 project 包的依赖，
-// 避免 project → gitcache → project 的循环 import。
+// 避免 project → projcache → project 的循环 import。
 //
 // 并发模型：固定 defaultWorkers 个 worker 从 tasks channel 抢活——worker 数即并发上限
 // （采集是子进程 + IO 密集型，过高并发会与系统其他 IO 抢资源），无需额外信号量。

@@ -10,18 +10,18 @@ import (
 	"time"
 
 	"cube/project"
-	"cube/project/gitcache"
+	"cube/project/projcache"
 )
 
 func TestProjectList(t *testing.T) {
 	env := newTestEnv(t)
 	var got struct {
 		List []struct {
-			Name    string          `json:"name"`
-			Group   string          `json:"group"`
-			Path    string          `json:"path"`
-			Tags    []string        `json:"tags"`
-			GitInfo *gitcache.Entry `json:"gitInfo"`
+			Name    string           `json:"name"`
+			Group   string           `json:"group"`
+			Path    string           `json:"path"`
+			Tags    []string         `json:"tags"`
+			GitInfo *projcache.Entry `json:"gitInfo"`
 		} `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/project/list")), &got)

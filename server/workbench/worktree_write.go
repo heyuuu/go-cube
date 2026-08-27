@@ -31,7 +31,7 @@ func (e *WorktreeRemoveDenied) Error() string {
 }
 
 // mainRootOf 返回 root 所属仓库的主目录（root 是 linked worktree 时定位主仓库，
-// 否则即自身）。gitcache 快照按主项目路径 key，写后定向刷新必须用它。
+// 否则即自身）。projcache 快照按主项目路径 key，写后定向刷新必须用它。
 func mainRootOf(root string) string {
 	if m := git.WorktreeMain(root); m != "" {
 		return m

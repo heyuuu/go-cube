@@ -1,12 +1,12 @@
 package project
 
 // 打开目标（提案 1032）：project = git 仓库身份，打开目标 = { 根目录, worktrees… }。
-// worktree 不再是独立项目，其可见性来自主项目 gitcache 快照的枚举（不现场跑 git）。
+// worktree 不再是独立项目，其可见性来自主项目 projcache 快照的枚举（不现场跑 git）。
 
 import (
 	"path/filepath"
 
-	"cube/project/gitcache"
+	"cube/project/projcache"
 )
 
 // OpenTarget 项目的一个打开目标：根目录或 linked worktree（1030 落地后加入 workspace）。
@@ -18,7 +18,7 @@ type OpenTarget struct {
 
 // worktreeTargets 由快照条目构造 worktree 目标列表（纯函数，便于单测）。
 // 展示名规则（提案 1032）：取分支名；分支为空（detached）或同分支被多个 worktree 检出时回退目录名。
-func worktreeTargets(info *gitcache.Entry) []OpenTarget {
+func worktreeTargets(info *projcache.Entry) []OpenTarget {
 	if info == nil {
 		return nil
 	}

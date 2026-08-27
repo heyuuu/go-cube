@@ -1,4 +1,4 @@
-package gitcache
+package projcache
 
 import (
 	"os"

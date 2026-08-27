@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"cube/internal/testfixture"
-	"cube/project/gitcache"
+	"cube/project/projcache"
 )
 
 // TestWorktreeTargets 展示名规则：分支名优先，detached（空分支）/ 同分支冲突回退目录名。
 func TestWorktreeTargets(t *testing.T) {
-	info := &gitcache.Entry{Worktrees: []gitcache.WorktreeInfo{
+	info := &projcache.Entry{Worktrees: []projcache.WorktreeInfo{
 		{Path: "/x/wt-hot", Branch: "hotfix"},
 		{Path: "/x/wt-detached", Branch: "", Detached: true},
 		{Path: "/x/wt-a", Branch: "feat"},

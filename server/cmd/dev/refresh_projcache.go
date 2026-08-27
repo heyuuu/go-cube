@@ -9,9 +9,9 @@ import (
 	"cube/app"
 )
 
-// cmd `cube dev refresh-gitcache`
+// cmd `cube dev refresh-projcache`
 //
-// 手动触发一次 gitcache 全量采集：重扫项目列表 → 并发采集全部项目的
+// 手动触发一次 projcache 全量采集：重扫项目列表 → 并发采集全部项目的
 // git 信息 → 覆盖写 ~/.config/cube/cache/git.json。
 //
 // CLI 平时只读缓存不写（单写者模型：server 是唯一写方），本命令是刻意的
@@ -19,8 +19,8 @@ import (
 // rename，与正在运行的 server 并发写也不会产生损坏文件（至多相互覆盖）。
 func newRefreshGitCacheCmd(a *app.App) *cobra.Command {
 	return &cobra.Command{
-		Use:   "refresh-gitcache",
-		Short: "手动触发 gitcache 全量采集（重扫项目 + 刷新 git.json，实测耗时）",
+		Use:   "refresh-projcache",
+		Short: "手动触发 projcache 全量采集（重扫项目 + 刷新 git.json，实测耗时）",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("开始采集全部项目 git 信息 ...")
 			start := time.Now()

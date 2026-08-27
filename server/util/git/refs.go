@@ -257,7 +257,7 @@ func ParentSha(path string, ref string) (string, error) {
 //   - behind = 远程有、本地没有的 commit 数（待拉取）
 //
 // 比较基准显式拆成 remote 名 + 分支名，便于比较非 origin 的远程分支；
-// gitcache 用它做「默认分支 vs origin/<默认分支>」的列表页 ahead/behind。
+// projcache 用它做「默认分支 vs origin/<默认分支>」的列表页 ahead/behind。
 // 任一 ref 缺失（如该 remote 没有这个分支）返回 (0, 0, nil)，不视为错误。
 // 基于本地已有 commit 比对（不 fetch），未 fetch 过的数据可能不准——
 // 与「缓存场景接受 stale」的整体策略一致。

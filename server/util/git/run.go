@@ -24,7 +24,7 @@ import (
 )
 
 // readCmdLogEnabled 控制「git 读命令」逐条日志的开关。
-// gitcache 全量采集时一次会跑几百条 git 子进程，逐条 Debug 日志会淹没其他输出；
+// projcache 全量采集时一次会跑几百条 git 子进程，逐条 Debug 日志会淹没其他输出；
 // 默认静默，仅设置 CUBE_GITCACHE_TRACE（任意非空值）时打印，级别保持 Debug。
 var readCmdLogEnabled = sync.OnceValue(func() bool {
 	return os.Getenv("CUBE_GITCACHE_TRACE") != ""

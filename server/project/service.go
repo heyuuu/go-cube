@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"cube/project/gitcache"
+	"cube/project/projcache"
 	"cube/util/easycache"
 	"cube/util/fuzzy"
 	"cube/util/git"
@@ -22,14 +22,14 @@ type Service struct {
 	// scan
 	scanCache *easycache.Item[[]*Project] // 项目扫描的缓存（新鲜度时间戳由缓存自身维护，见 UpdatedAt）
 	// git info cache
-	gitCache *gitcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
+	gitCache *projcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
 	// 定时刷新（仅常驻 server 启用，CLI 不启用）
 	stopCh chan struct{} // nil = 未启用；非 nil = 定时器在跑
 }
 
 func NewService(settingsFile string, cacheDir string) *Service {
 	// 加载 git 信息缓存（降级优先：失败返回空缓存，不报错）
-	gitCache, err := gitcache.Load(cacheDir)
+	gitCache, err := projcache.Load(cacheDir)
 	if err != nil {
 		log.Printf("加载 git 缓存失败: %v", err)
 	}
@@ -141,7 +141,7 @@ func (s *Service) SearchByName(query string) []*Project {
 }
 
 // OpenTargets 返回项目的打开目标列表（1032：根目录在前 + worktrees）。
-// 只读 gitcache 快照，不现场跑 git（遵守「读路径不得阻塞采集」）；项目未找到返回 nil。
+// 只读 projcache 快照，不现场跑 git（遵守「读路径不得阻塞采集」）；项目未找到返回 nil。
 func (s *Service) OpenTargets(path string) []OpenTarget {
 	proj := s.FindByPath(path)
 	if proj == nil {
@@ -229,7 +229,7 @@ func (s *Service) MatchCloneRule(repoUrl string) (rule CloneRule, localPath stri
 
 // GitInfo 读取项目的 git 信息缓存条目；未命中返回 (nil, false)。
 // 不阻塞、不触发采集 —— 调用方读取的是当前缓存快照（可能 stale）。
-func (s *Service) GitInfo(path string) (*gitcache.Entry, bool) {
+func (s *Service) GitInfo(path string) (*projcache.Entry, bool) {
 	if s.gitCache == nil {
 		return nil, false
 	}
