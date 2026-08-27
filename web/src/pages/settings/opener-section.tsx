@@ -6,17 +6,17 @@ import { useState } from 'react';
 import type { Opener } from '@/api/client';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
+import { IconField } from '@/components/icon-field';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { renderOpenerIcon } from '@/lib/opener-icon';
+import type { IconDecl } from '@/lib/icon';
+import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useIconExtract, useOpenerDelete, useOpenerReorder, useOpenerSave } from '@/queries/opener';
+import { useOpenerDelete, useOpenerReorder, useOpenerSave } from '@/queries/opener';
 import { useOpenerList } from '@/queries/project';
-
-import { LucideIconPicker } from './lucide-icon-picker';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 
@@ -28,26 +28,24 @@ const STICKY_LEFT =
 const STICKY_RIGHT =
   'sticky right-0 z-10 bg-background group-hover/row:bg-muted/50 shadow-[inset_1px_0_0_var(--border)]';
 
+// 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
+const DEFAULT_LUCIDE = 'app-window-mac';
+
 // 表单草稿：cmd 以空格分隔编辑（v1 约定：cmd 参数不含空格）
 interface Draft {
   name: string;
   title: string;
   cmd: string;
   roles: string[];
-  iconType: 'lucide' | 'image';
-  iconValue: string;
+  icon: IconDecl;
 }
-
-// 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
-const DEFAULT_LUCIDE = 'app-window-mac';
 
 const EMPTY_DRAFT: Draft = {
   name: '',
   title: '',
   cmd: '',
   roles: ['open-dir'],
-  iconType: 'lucide',
-  iconValue: DEFAULT_LUCIDE,
+  icon: { type: 'lucide', value: DEFAULT_LUCIDE },
 };
 
 function fromOpener(op: Opener): Draft {
@@ -57,8 +55,10 @@ function fromOpener(op: Opener): Draft {
     // summary 是命令模板的空格拼接展示，直接还原成编辑文本
     cmd: op.summary,
     roles: op.roles ?? [],
-    iconType: op.icon?.type === 'image' ? 'image' : 'lucide',
-    iconValue: op.icon?.type === 'image' ? (op.icon.value ?? '') : op.icon?.value || DEFAULT_LUCIDE,
+    icon:
+      op.icon?.type === 'image'
+        ? { type: 'image', value: op.icon.value ?? '' }
+        : { type: 'lucide', value: op.icon?.value || DEFAULT_LUCIDE },
   };
 }
 
@@ -66,9 +66,7 @@ function fromOpener(op: Opener): Draft {
 function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const [form, setForm] = useState<Draft>(draft);
   const save = useOpenerSave();
-  const extract = useIconExtract();
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const [appPath, setAppPath] = useState('');
 
   const submit = () => {
     save.mutate(
@@ -77,19 +75,10 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
         title: form.title.trim() || undefined,
         cmd: form.cmd.trim().split(/\s+/).filter(Boolean),
         roles: form.roles,
-        icon: form.iconType && form.iconValue ? { type: form.iconType, value: form.iconValue } : undefined,
+        icon: { type: form.icon.type, value: form.icon.value },
       },
       { onSuccess: onClose },
     );
-  };
-
-  const onUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      // dataURL 去掉前缀，存纯 base64
-      set('iconValue', String(reader.result).replace(/^data:[^,]*,/, ''));
-    };
-    reader.readAsDataURL(file);
   };
 
   return (
@@ -101,7 +90,6 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
         </SheetHeader>
         <div className="flex flex-col gap-4 p-4 text-sm">
           {save.error && <ErrorBanner message={`保存失败：${save.error.message}`} />}
-          {extract.error && <ErrorBanner message={`提取失败：${extract.error.message}`} />}
 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">name（唯一标识）</span>
@@ -141,54 +129,12 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">icon</span>
-            <div className="flex gap-2">
-              {(['lucide', 'image'] as const).map((t) => (
-                <Button
-                  key={t}
-                  size="sm"
-                  variant={form.iconType === t ? 'default' : 'outline'}
-                  onClick={() => {
-                    set('iconType', t);
-                    // 切换类型换图片来源；lucide 回落默认图，避免「未选择」态
-                    set('iconValue', t === 'lucide' ? DEFAULT_LUCIDE : '');
-                  }}
-                >
-                  {t}
-                </Button>
-              ))}
-            </div>
-            {form.iconType === 'lucide' && (
-              <LucideIconPicker value={form.iconValue} onChange={(v) => set('iconValue', v)} />
-            )}
-            {form.iconType === 'image' && (
-              <div className="flex flex-col gap-2">
-                {form.iconValue && (
-                  <img src={`data:image/png;base64,${form.iconValue}`} alt="icon 预览" className="size-8 rounded" />
-                )}
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={appPath}
-                    onChange={(e) => setAppPath(e.target.value)}
-                    placeholder="/Applications/Xxx.app"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!appPath || extract.isPending}
-                    onClick={() => extract.mutate(appPath, { onSuccess: (v) => set('iconValue', v) })}
-                  >
-                    提取
-                  </Button>
-                </div>
-                <input
-                  type="file"
-                  accept="image/png"
-                  onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])}
-                  className="text-xs"
-                />
-              </div>
-            )}
+            <span className="text-xs text-muted-foreground">icon（必有值，未选择时用默认图）</span>
+            <IconField
+              value={form.icon}
+              onChange={(v) => set('icon', v ?? { type: 'lucide', value: DEFAULT_LUCIDE })}
+              defaultLucide={DEFAULT_LUCIDE}
+            />
           </div>
 
           <div className="mt-2 flex justify-end gap-2">
@@ -319,7 +265,7 @@ export function OpenerSection() {
                     {op.name}
                   </span>
                 </TableCell>
-                <TableCell>{renderOpenerIcon(op, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
+                <TableCell>{renderIcon(op?.icon, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
                 <TableCell className="text-xs">{op.title}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
                 <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>

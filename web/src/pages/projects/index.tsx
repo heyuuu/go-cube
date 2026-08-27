@@ -11,11 +11,14 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { IconDecl } from '@/lib/icon';
+import { renderIcon } from '@/lib/icon';
 import { guessHome, prettyPath } from '@/lib/path';
 import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useOpenerOpen, useOpenerList, useProjectList } from '@/queries/project';
+import { useScanRules } from '@/queries/scan-rule';
 
 import { ProjectActions } from './actions';
 import { ProjectDrawer } from './drawer';
@@ -63,7 +66,7 @@ function FilterLabel({ label, mode }: { label: string; mode: '单选' | '多选'
 }
 
 // 筛选 chip（单选/多选由调用方控制 active）
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: string }) {
+function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
   return (
     <button
       type="button"
@@ -227,6 +230,7 @@ export function ProjectsPage() {
   const list = useProjectList();
   const openers = useOpenerList();
   const open = useOpenerOpen();
+  const scanRules = useScanRules();
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [openError, setOpenError] = useState('');
@@ -276,6 +280,12 @@ export function ProjectsPage() {
   const home = guessHome(projects.map((p) => p.path));
   // group 不排序：Set 去重保留首次出现序 = 项目列表序 = scanRules 规则序（settings 可拖拽调整）
   const groups = [...new Set(projects.map((p) => p.group))];
+  // group → icon 映射（来自扫描规则的可选配置；规则未配 icon 的 group 不进 map）
+  const groupIcons = new Map<string, IconDecl>(
+    (scanRules.data?.list ?? [])
+      .filter((r) => r.icon?.value)
+      .map((r) => [r.group, { type: r.icon!.type, value: r.icon!.value }]),
+  );
   const tags = [...new Set(projects.flatMap((p) => p.tags ?? []))].sort();
 
   const filtered = projects.filter((p) => {
@@ -444,7 +454,10 @@ export function ProjectsPage() {
           </Chip>
           {groups.map((g) => (
             <Chip key={g} active={groupFilter.includes(g)} onClick={() => toggleGroup(g)}>
-              {g}
+              <span className="flex items-center gap-1">
+                {renderIcon(groupIcons.get(g), null)}
+                {g}
+              </span>
             </Chip>
           ))}
         </div>
@@ -570,7 +583,10 @@ export function ProjectsPage() {
                         title={`筛选 group：${p.group}`}
                         onClick={() => toggleGroupSolo(p.group)}
                       >
-                        {p.group}
+                        <span className="flex items-center gap-1">
+                          {renderIcon(groupIcons.get(p.group), null)}
+                          {p.group}
+                        </span>
                       </ClickBadge>
                     </TableCell>
                     <TableCell>

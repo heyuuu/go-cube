@@ -14,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { renderOpenerIcon } from '@/lib/opener-icon';
+import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
@@ -273,7 +273,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             disabled={open.isPending && open.variables?.opener === openerName}
             onClick={() => onOpen(openerName)}
           >
-            {renderOpenerIcon(op, null)}
+            {renderIcon(op?.icon, null)}
           </Button>
         );
       })}
@@ -292,7 +292,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             <DropdownMenuLabel>打开方式</DropdownMenuLabel>
             {openerList.map((op) => (
               <DropdownMenuItem key={op.name} onClick={() => onOpen(op.name)}>
-                {renderOpenerIcon(op, null)}
+                {renderIcon(op?.icon, null)}
                 {op.title}
               </DropdownMenuItem>
             ))}

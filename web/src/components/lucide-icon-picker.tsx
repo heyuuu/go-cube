@@ -1,4 +1,4 @@
-// lucide 图标选择器：当前值预览 + 搜索过滤 + 网格点选（Opener 表单 icon 编辑用）。
+// lucide 图标选择器：当前值预览 + 搜索过滤 + 网格点选（icon 编辑表单用，见 IconField）。
 // icons 映射键是 PascalCase，存储值是 kebab-case，此处预计算双名做过滤与高亮。
 import { icons, type LucideIcon } from 'lucide-react';
 import { createElement, useMemo, useState } from 'react';

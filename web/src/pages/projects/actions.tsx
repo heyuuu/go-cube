@@ -12,7 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { renderOpenerIcon } from '@/lib/opener-icon';
+import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerOpen } from '@/queries/project';
 
@@ -49,7 +49,7 @@ export function ProjectActions({
               disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === name}
               onClick={() => onOpen(p.path, name)}
             >
-              {renderOpenerIcon(op, null)}
+              {renderIcon(op?.icon, null)}
             </Button>
           );
         })}
@@ -67,7 +67,7 @@ export function ProjectActions({
                 onClick={() => onOpen(p.path, op.name)}
                 disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === op.name}
               >
-                {renderOpenerIcon(op, null)}
+                {renderIcon(op?.icon, null)}
                 {op.title}
               </DropdownMenuItem>
             ))}

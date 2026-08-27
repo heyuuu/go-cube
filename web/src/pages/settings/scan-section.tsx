@@ -7,10 +7,13 @@ import { useState } from 'react';
 import type { ScanRule } from '@/api/client';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
+import { IconField } from '@/components/icon-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import type { IconDecl } from '@/lib/icon';
+import { renderIcon } from '@/lib/icon';
 import { useScanRuleDelete, useScanRuleReorder, useScanRuleSave, useScanRules } from '@/queries/scan-rule';
 
 import { STICKY_LEFT, STICKY_RIGHT, useDragOrder } from './drag-order';
@@ -19,6 +22,7 @@ interface ScanDraft {
   group: string;
   path: string;
   maxDepth: string;
+  icon?: IconDecl;
 }
 
 const EMPTY_SCAN_DRAFT: ScanDraft = { group: '', path: '', maxDepth: '3' };
@@ -34,7 +38,12 @@ function ScanRuleForm({ draft, onClose }: { draft: ScanDraft; onClose: () => voi
   const submit = () => {
     const newPath = form.path.trim();
     save.mutate(
-      { group: form.group.trim(), path: newPath, maxDepth: Number(form.maxDepth) || 0 },
+      {
+        group: form.group.trim(),
+        path: newPath,
+        maxDepth: Number(form.maxDepth) || 0,
+        icon: form.icon && form.icon.value ? { type: form.icon.type, value: form.icon.value } : undefined,
+      },
       {
         onSuccess: () => {
           // path 是规则唯一键：编辑改了 path 等价于删旧存新，补一步删旧
@@ -80,6 +89,11 @@ function ScanRuleForm({ draft, onClose }: { draft: ScanDraft; onClose: () => voi
               className="w-24"
             />
           </label>
+
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-muted-foreground">icon（可选，项目页 group 元素展示）</span>
+            <IconField allowEmpty value={form.icon} onChange={(v) => set('icon', v)} />
+          </div>
 
           <div className="mt-2 flex justify-end gap-2">
             <Button size="sm" variant="outline" onClick={onClose}>
@@ -127,7 +141,8 @@ export function ScanSection() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className={STICKY_LEFT}>group</TableHead>
+              <TableHead className={STICKY_LEFT}>icon</TableHead>
+              <TableHead>group</TableHead>
               <TableHead>path</TableHead>
               <TableHead>maxDepth</TableHead>
               <TableHead className={`${STICKY_RIGHT} text-right`}>操作</TableHead>
@@ -136,7 +151,7 @@ export function ScanSection() {
           <TableBody>
             {d.rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-xs text-muted-foreground">
+                <TableCell colSpan={5} className="text-xs text-muted-foreground">
                   暂无扫描规则
                 </TableCell>
               </TableRow>
@@ -146,6 +161,7 @@ export function ScanSection() {
                 <TableCell className={`${STICKY_LEFT} font-medium`}>
                   <span className="flex items-center gap-1">
                     <GripVertical {...d.gripProps(r)} />
+                    {renderIcon(r.icon ? { type: r.icon.type, value: r.icon.value } : undefined, null)}
                     {r.group}
                   </span>
                 </TableCell>
@@ -155,7 +171,14 @@ export function ScanSection() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => setEditing({ group: r.group, path: r.path, maxDepth: String(r.maxDepth) })}
+                    onClick={() =>
+                      setEditing({
+                        group: r.group,
+                        path: r.path,
+                        maxDepth: String(r.maxDepth),
+                        icon: r.icon ? { type: r.icon.type, value: r.icon.value } : undefined,
+                      })
+                    }
                   >
                     编辑
                   </Button>
