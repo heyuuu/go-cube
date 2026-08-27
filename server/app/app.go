@@ -41,7 +41,7 @@ func New(cfg *config.Config) (*App, error) {
 	}
 
 	// 组装 services
-	projectService := project.NewService(cfg.Project, paths.CacheDir())
+	projectService := project.NewService(paths.CacheDir(), paths.SettingsFile())
 	openerService := opener.NewService(paths.SettingsFile(), nil)
 	historyService := history.NewService(dataDb)
 	workbenchService := workbench.NewService()

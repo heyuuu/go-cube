@@ -4,10 +4,8 @@ import (
 	"errors"
 	"log"
 	"log/slog"
-	"os"
 	"time"
 
-	"cube/config"
 	"cube/project/gitcache"
 	"cube/util/easycache"
 	"cube/util/fuzzy"
@@ -16,11 +14,10 @@ import (
 )
 
 type Service struct {
+	// settings
+	settingsFile string // settings.json 路径，scan/clone 规则每次现读（直读不缓存，改完即生效）
 	// scan
-	scanRules []ScanRule                  // 项目扫描规则
 	scanCache *easycache.Item[[]*Project] // 项目扫描的缓存
-	// clone
-	cloneRules []CloneRule // 项目 clone 规则
 	// git info cache
 	gitCache *gitcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
 	// 刷新时间戳（供前端展示数据新鲜度；零值 = 未刷新过）
@@ -29,41 +26,7 @@ type Service struct {
 	stopCh chan struct{} // nil = 未启用；非 nil = 定时器在跑
 }
 
-func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
-	// scan 规则：展开 ~/ 为绝对路径，校验目录存在（不存在的规则降级跳过，不阻断）
-	var scanRules []ScanRule
-	for _, r := range cfg.Scan {
-		absPath, err := pathkit.StaticAbsPath(r.Path)
-		if err != nil {
-			slog.Warn("scan 规则路径配置错误，跳过", "group", r.Group, "path", r.Path, "err", err)
-			continue
-		}
-		if info, err := os.Stat(absPath); err != nil || !info.IsDir() {
-			slog.Warn("scan 规则路径不存在或非目录，跳过", "group", r.Group, "path", r.Path, "abs", absPath, "err", err)
-			continue
-		}
-		scanRules = append(scanRules, ScanRule{
-			Group:    r.Group,
-			Path:     absPath,
-			MaxDepth: r.MaxDepth,
-		})
-	}
-
-	// clone 规则：LocalPath 展开 ~/ 为绝对路径（不校验存在——clone 时会自动创建）
-	var cloneRules []CloneRule
-	for _, r := range cfg.Clone {
-		absLocalPath, err := pathkit.StaticAbsPath(r.LocalPath)
-		if err != nil {
-			slog.Warn("clone 本地路径配置错误", "localPath", r.LocalPath, "err", err)
-			continue
-		}
-		cloneRules = append(cloneRules, CloneRule{
-			RepoHost:   r.RepoHost,
-			RepoPrefix: r.RepoPrefix,
-			LocalPath:  absLocalPath,
-		})
-	}
-
+func NewService(cacheDir, settingsFile string) *Service {
 	// 加载 git 信息缓存（降级优先：失败返回空缓存，不报错）
 	gitCache, err := gitcache.Load(cacheDir)
 	if err != nil {
@@ -71,26 +34,31 @@ func NewService(cfg config.ProjectConfig, cacheDir string) *Service {
 	}
 
 	s := &Service{
-		scanRules: scanRules,
-		scanCache: easycache.NewItem(func() []*Project {
-			projects, err := scan(scanRules)
-			if err != nil {
-				slog.Error("扫描项目失败", "err", err)
-				return nil
-			}
-			slog.Info("scan 项目完成", "count", len(projects))
-			return projects
-		}),
-		gitCache:   gitCache,
-		cloneRules: cloneRules,
+		settingsFile: settingsFile,
+		gitCache:     gitCache,
 	}
+	// 扫描时现读规则（规则直读 settings.json，外部修改后 Reload 即可反映）
+	s.scanCache = easycache.NewItem(func() []*Project {
+		projects, err := scan(s.ScanRules())
+		if err != nil {
+			slog.Error("扫描项目失败", "err", err)
+			return nil
+		}
+		slog.Info("scan 项目完成", "count", len(projects))
+		return projects
+	})
 	return s
 }
 
-// -- getter --
+// -- 规则（直读 settings.json，每次现读现转换） --
 
-func (s *Service) ScanRules() []ScanRule   { return s.scanRules }
-func (s *Service) CloneRules() []CloneRule { return s.cloneRules }
+func (s *Service) ScanRules() []ScanRule {
+	return makeScanRules(loadSettingsSpec(s.settingsFile).Scan)
+}
+
+func (s *Service) CloneRules() []CloneRule {
+	return makeCloneRules(loadSettingsSpec(s.settingsFile).Clone)
+}
 
 // --- project 读操作 ---
 
@@ -160,13 +128,13 @@ func (s *Service) SearchByPath(path string, up bool) []*Project {
 // MatchScanRule 判断 absPath（git init 后）能否被 scan 收录为新项目（供 init 命令预检）。
 // 返回匹配的规则与项目名；不满足收录条件时 ok=false。
 func (s *Service) MatchScanRule(absPath string) (rule ScanRule, name string, ok bool) {
-	return MatchScanRule(absPath, s.scanRules)
+	return MatchScanRule(absPath, s.ScanRules())
 }
 
 // --- clone 相关 ---
 
 func (s *Service) MatchCloneRule(repoUrl string) (rule CloneRule, localPath string, ok bool) {
-	return MatchCloneRule(repoUrl, s.cloneRules)
+	return MatchCloneRule(repoUrl, s.CloneRules())
 }
 
 // --- git 缓存相关 ---

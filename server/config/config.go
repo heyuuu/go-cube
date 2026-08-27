@@ -11,11 +11,10 @@ import (
 )
 
 type Config struct {
-	DataDir string        `json:"dataDir"` // 数据目录
-	Log     LogConfig     `json:"log"`
-	Server  ServerConfig  `json:"server"`
-	Project ProjectConfig `json:"project"`
-	Create  CreateConfig  `json:"create"`
+	DataDir string       `json:"dataDir"` // 数据目录
+	Log     LogConfig    `json:"log"`
+	Server  ServerConfig `json:"server"`
+	Create  CreateConfig `json:"create"`
 }
 
 type CreateConfig struct {
@@ -30,23 +29,6 @@ type LogConfig struct {
 
 type ServerConfig struct {
 	Port int `json:"port"`
-}
-
-type ProjectConfig struct {
-	Scan  []ScanRuleConfig  `json:"scan"`
-	Clone []CloneRuleConfig `json:"clone"`
-}
-
-type ScanRuleConfig struct {
-	Group    string `json:"group"`
-	Path     string `json:"path"`
-	MaxDepth int    `json:"maxDepth"`
-}
-
-type CloneRuleConfig struct {
-	RepoHost   string `json:"repoHost"`
-	RepoPrefix string `json:"repoPrefix"`
-	LocalPath  string `json:"localPath"`
 }
 
 // Load 从 path 读取 JSON 配置。

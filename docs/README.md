@@ -22,7 +22,7 @@
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 
-（当前无活动提案）
+- [`1029-scan-clone规则迁移settings/`](proposals/1029-scan-clone规则迁移settings/) — scan/clone 规则从 config.json 迁 settings.json `project` 节：Service 直读不缓存（保存即生效）+ 手动迁移（同 opener 先例）+ settings 页「项目·扫描」分区实装（增删改 + 拖拽排序）
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 

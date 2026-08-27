@@ -43,12 +43,14 @@ func newTestEnv(t *testing.T) *testEnv {
 	ws.MakeProjectDir("g1/proj1")
 	ws.MakeProjectDir("g2/proj2", testfixture.WithGodot())
 
-	scanCfg := []config.ScanRuleConfig{
-		{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
-		{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
-	}
-	cloneCfg := []config.CloneRuleConfig{
-		{RepoHost: "github.com", LocalPath: ws.Join("repo")},
+	projSpec := project.SettingsSpec{
+		Scan: []project.ScanRuleSpec{
+			{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
+			{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
+		},
+		Clone: []project.CloneRuleSpec{
+			{RepoHost: "github.com", LocalPath: ws.Join("repo")},
+		},
 	}
 	settingsFile := ws.Join("settings.json")
 	if err := settings.SaveSection(settingsFile, "openers", []opener.Spec{
@@ -57,13 +59,15 @@ func newTestEnv(t *testing.T) *testEnv {
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
+	if err := settings.SaveSection(settingsFile, "project", projSpec); err != nil {
+		t.Fatalf("写入测试 settings.json 失败: %v", err)
+	}
 
-	projSvc := project.NewService(config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg}, ws.Join("cache"))
+	projSvc := project.NewService(ws.Join("cache"), settingsFile)
 	exec := &fakeExecutor{}
 	openerSvc := opener.NewService(settingsFile, exec)
 	cfg := &config.Config{
 		DataDir: ws.Join("data"),
-		Project: config.ProjectConfig{Scan: scanCfg, Clone: cloneCfg},
 	}
 
 	srv := web.NewServer(
