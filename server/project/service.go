@@ -77,8 +77,13 @@ func (s *Service) DeleteScanRule(path string) error {
 	return nil
 }
 
+// ReorderScanRules 重排也影响项目列表展示序（scan 按规则序遍历），成功后同样立即重扫。
 func (s *Service) ReorderScanRules(paths []string) error {
-	return reorderScanRules(s.settingsFile, paths)
+	if err := reorderScanRules(s.settingsFile, paths); err != nil {
+		return err
+	}
+	s.scanCache.Reload()
+	return nil
 }
 
 func (s *Service) SaveCloneRule(rule CloneRule) error {

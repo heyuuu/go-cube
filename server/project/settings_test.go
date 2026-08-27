@@ -98,9 +98,12 @@ func TestDeleteScanRule(t *testing.T) {
 }
 
 // TestReorderScanRules 按路径重排；未知/重复路径报错且顺序不变，未列出的排在末尾。
+// 重排同时改变项目列表展示序（scan 按规则序遍历），保存后立即重扫。
 func TestReorderScanRules(t *testing.T) {
 	s, ws := newWriteService(t)
 	r1, r2, r3 := ws.Mkdir("r1"), ws.Mkdir("r2"), ws.Mkdir("r3")
+	ws.MakeProjectDir(path.Join("r1", "a"))
+	ws.MakeProjectDir(path.Join("r3", "b"))
 	for i, r := range []string{r1, r2, r3} {
 		if err := s.SaveScanRule(ScanRule{Group: string(rune('a' + i)), Path: r, MaxDepth: 3}); err != nil {
 			t.Fatalf("保存失败: %v", err)
@@ -114,6 +117,11 @@ func TestReorderScanRules(t *testing.T) {
 	rules := s.ScanRules()
 	if len(rules) != 3 || rules[0].Path != r3 || rules[1].Path != r1 || rules[2].Path != r2 {
 		t.Fatalf("重排后顺序不符: %v", rules)
+	}
+	// 项目列表立即反映新顺序（r3 下的项目排最前）
+	projs := s.Projects()
+	if len(projs) != 2 || !strings.HasSuffix(projs[0].Path(), path.Join("r3", "b")) {
+		t.Fatalf("重排后项目列表应即时重扫，实际: %v", projs)
 	}
 
 	// 未知路径：报错且不改原顺序
