@@ -298,6 +298,11 @@ func collectWorktrees(path string) []WorktreeInfo {
 	}
 	worktrees := make([]WorktreeInfo, 0, len(list))
 	for _, wt := range list[1:] { // 第 1 项是主目录自身
+		// 目录已删但 git 元数据未 prune 的 worktree 仍会被列出，按存在性过滤，
+		// 避免失联路径进快照成为打不开的幽灵目标
+		if _, err := os.Stat(wt.Path); err != nil {
+			continue
+		}
 		worktrees = append(worktrees, WorktreeInfo{Path: wt.Path, Branch: wt.Branch, Detached: wt.Detached})
 	}
 	return worktrees

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"log/slog"
+	"os"
 	"path/filepath"
 	"time"
 
@@ -150,7 +151,14 @@ func (s *Service) OpenTargets(path string) []OpenTarget {
 	}
 	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录"}}
 	info, _ := s.GitInfo(proj.Path())
-	return append(targets, worktreeTargets(info)...)
+	// 存在性兜底过滤：采集侧已过滤，但目录在两次采集之间被删时快照仍残留，
+	// 打开目标必须是真实可打开的目录（os.Stat 廉价，不违反读路径不跑 git 的纪律）
+	for _, t := range worktreeTargets(info) {
+		if _, err := os.Stat(t.Path); err == nil {
+			targets = append(targets, t)
+		}
+	}
+	return targets
 }
 
 // ResolveProject 把目标目录归并到所属主项目：项目根本身直接命中，否则走 worktree

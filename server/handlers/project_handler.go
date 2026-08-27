@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
 	"slices"
 	"time"
 
@@ -128,6 +129,10 @@ func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, er
 		if !slices.ContainsFunc(h.projectService.OpenTargets(proj.Path()), func(t project.OpenTarget) bool {
 			return t.Path == input.Body.Dir
 		}) {
+			// OpenTargets 已按存在性过滤：命中这里的目标目录多半是快照过期残留
+			if _, err := os.Stat(input.Body.Dir); err != nil {
+				return nil, errors.New("目标目录已不存在（快照过期，等下次采集刷新后重试）: " + input.Body.Dir)
+			}
 			return nil, errors.New("目标目录不属于该项目: " + input.Body.Dir)
 		}
 		target = input.Body.Dir

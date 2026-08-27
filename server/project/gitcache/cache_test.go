@@ -178,6 +178,30 @@ func TestCollectEntry_WorktreesDegraded(t *testing.T) {
 	}
 }
 
+// TestCollectEntry_WorktreePruned 目录已删但 git 元数据未 prune 的 worktree 不进快照（幽灵目标）。
+func TestCollectEntry_WorktreePruned(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
+	ws.MakeWorktree(repo, "wt-hot", "hotfix")
+	ws.MakeWorktree(repo, "wt-gone", "gone")
+
+	// 删除 wt-gone 目录但不跑 git worktree prune——git 仍会列出它
+	if err := os.RemoveAll(ws.Join("wt-gone")); err != nil {
+		t.Fatalf("删除 worktree 目录失败: %v", err)
+	}
+
+	e, err := collectEntry(repo)
+	if err != nil {
+		t.Fatalf("collectEntry 不应返回 error: %v", err)
+	}
+	if len(e.Worktrees) != 1 {
+		t.Fatalf("失联 worktree 应被过滤，只留 1 个, got %+v", e.Worktrees)
+	}
+	if e.Worktrees[0].Branch != "hotfix" {
+		t.Fatalf("留下的应是 hotfix: %+v", e.Worktrees[0])
+	}
+}
+
 // TestRefresh_RealRepo Refresh 真实仓库后能读到采集结果。
 func TestRefresh_RealRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
