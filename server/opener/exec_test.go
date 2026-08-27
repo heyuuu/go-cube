@@ -145,7 +145,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 		cmd      []string
 		wantArgs []string
 	}{
-		{"裸名 cube", []string{"cube", "web", "workbench", "$0"}, []string{"web", "workbench", "/proj"}},
+		{"裸名 cube", []string{"cube", "ui", "workbench", "$0"}, []string{"ui", "workbench", "/proj"}},
 		{"绝对路径 cube", []string{"/usr/local/bin/cube", "md"}, []string{"md", "/proj"}},
 		{"相对路径 cube", []string{"tmp/cube", "md"}, []string{"md", "/proj"}},
 	}

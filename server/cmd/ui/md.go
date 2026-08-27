@@ -1,4 +1,4 @@
-package web
+package ui
 
 import (
 	"errors"
@@ -13,7 +13,7 @@ import (
 	"cube/util/pathkit"
 )
 
-// newMdCmd `cube web md <path>` —— 以 Web 方式打开 markdown 文件（原一级命令 `cube md` 迁入）。
+// newMdCmd `cube ui md <path>` —— 以 Web 方式打开 markdown 文件（原一级命令 `cube md` 迁入）。
 //
 // 页面与渲染归前端工程（/md?path=<abs>），本命令只负责拼 URL 并开浏览器。
 func newMdCmd(a *app.App) *cobra.Command {
