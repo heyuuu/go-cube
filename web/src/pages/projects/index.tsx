@@ -128,12 +128,20 @@ function SortableHead({
         type="button"
         className={cn(
           'flex items-center gap-1 hover:text-foreground',
-          active ? 'text-foreground' : 'text-muted-foreground',
+          active ? 'font-medium text-foreground' : 'text-muted-foreground',
         )}
         onClick={() => onSet(!active ? k : desc ? 'default' : `${k}-desc`)}
       >
         {label}
-        <Icon className="size-3" />
+        {/* 激活态：主题色箭头 + 圆形底（类似选中态），与未激活的灰色双向箭头一眼区分。
+            圆 20px / 图标 12px——留足四周 padding，视觉上箭头才在圆心 */}
+        {active ? (
+          <span className="flex size-5 items-center justify-center rounded-full bg-primary/15">
+            <Icon className="size-3 text-primary" />
+          </span>
+        ) : (
+          <Icon className="size-3" />
+        )}
       </button>
     </TableHead>
   );
