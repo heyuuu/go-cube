@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -38,9 +37,6 @@ type ProjectListResult struct {
 
 // --- handler ---
 
-// recentPinnedLimit 项目列表最近使用置顶的条数。
-const recentPinnedLimit = 10
-
 type ProjectHandler struct {
 	projectService *project.Service
 	openerService  *opener.Service
@@ -70,10 +66,9 @@ func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 }
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
+	// 返回原始扫描序 + lastUsedAt；排序是视图偏好，由前端做（CLI/alfred 出口用 project.SortByRecentUsage）
 	projects := h.projectService.Projects()
-	// 最近使用的项目置顶（按最近使用倒序，最多 10 条），其余保持原序
 	latest := h.usageService.LatestByProject()
-	projects = sortProjectsByUsage(projects, latest, recentPinnedLimit)
 	list := slicekit.Map(projects, func(p *project.Project) *ProjectDTO {
 		dto := h.toProjectDTO(p)
 		if t, ok := latest[p.Path()]; ok {
@@ -87,35 +82,6 @@ func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
 		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
 		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
 	}, nil
-}
-
-// sortProjectsByUsage 最近使用的项目置顶（按最近使用倒序，最多 limit 条），其余保持原序。
-// 排序键是项目路径（usage 记录的 project 字段）。
-func sortProjectsByUsage(projects []*project.Project, latest map[string]time.Time, limit int) []*project.Project {
-	pinned := make([]string, 0, len(latest))
-	for path := range latest {
-		pinned = append(pinned, path)
-	}
-	slices.SortFunc(pinned, func(a, b string) int {
-		return latest[b].Compare(latest[a])
-	})
-	if len(pinned) > limit {
-		pinned = pinned[:limit]
-	}
-
-	weights := make(map[string]int, len(projects))
-	for i, proj := range projects {
-		weights[proj.Path()] = i + len(pinned)
-	}
-	for i, path := range pinned {
-		weights[path] = i
-	}
-
-	slices.SortFunc(projects, func(a, b *project.Project) int {
-		return weights[a.Path()] - weights[b.Path()]
-	})
-
-	return projects
 }
 
 // ProjectInfoResult 详情接口返回结构：含项目 DTO + 两类刷新时间。

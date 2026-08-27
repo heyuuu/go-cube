@@ -26,6 +26,14 @@ import { tagVariants } from './shared';
 
 type GitStatus = 'clean' | 'dirty' | 'ahead' | 'behind' | 'none';
 
+type SortMode = 'recent' | 'default' | 'name';
+
+const sortModes: { value: SortMode; label: string }[] = [
+  { value: 'recent', label: '最近使用' },
+  { value: 'default', label: '默认' },
+  { value: 'name', label: '名称' },
+];
+
 const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
   { value: 'all', label: '全部' },
   { value: 'clean', label: 'clean' },
@@ -34,6 +42,12 @@ const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
   { value: 'behind', label: 'behind' },
   { value: 'none', label: '未采集' },
 ];
+
+function timeOf(iso: string | null | undefined): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isNaN(t) || t <= 0 ? 0 : t;
+}
 
 // 谓词式匹配（非互斥分桶）：项目可能同时 dirty + ahead，
 // 筛 ahead 应包含所有 ahead > 0 的项目，而不是被 dirty 优先级吞掉。
@@ -302,6 +316,18 @@ export function ProjectsPage() {
     return true;
   });
 
+  // 排序是视图偏好（后端返回原始扫描序 + lastUsedAt）：先筛选后排序，与筛选同侧
+  const sortMode: SortMode = sortModes.some((s) => s.value === searchParams.get('sort'))
+    ? (searchParams.get('sort') as SortMode)
+    : 'recent';
+  const sorted = [...filtered];
+  if (sortMode === 'recent') {
+    // 全量按最近使用倒序，未用过的（无 lastUsedAt）保持原序垫底；Array.sort 稳定排序保证并列项不动
+    sorted.sort((a, b) => timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt));
+  } else if (sortMode === 'name') {
+    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
   function toggleGroup(g: string) {
     updateParams({
       group: groupFilter.includes(g)
@@ -333,7 +359,7 @@ export function ProjectsPage() {
 
   function resetFilters() {
     setKeywordInput('');
-    updateParams({ q: null, group: null, git: null, tag: null });
+    updateParams({ q: null, group: null, git: null, tag: null, sort: null });
   }
 
   function toggleSelect(path: string) {
@@ -367,7 +393,7 @@ export function ProjectsPage() {
   const openerList = openers.data?.list ?? [];
 
   // 树模式：从当前筛选结果前端构建（根恒展开，其余按 treeExpanded）
-  const treeRoot = mode === 'tree' ? buildProjectTree(filtered) : null;
+  const treeRoot = mode === 'tree' ? buildProjectTree(sorted) : null;
   const treeRows = treeRoot ? flattenTree(treeRoot, (path) => treeExpanded.has(path)) : [];
 
   function expandAllTree() {
@@ -474,6 +500,18 @@ export function ProjectsPage() {
             </Chip>
           ))}
         </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterLabel label="排序" mode="单选" />
+          {sortModes.map((s) => (
+            <Chip
+              key={s.value}
+              active={sortMode === s.value}
+              onClick={() => updateParams({ sort: s.value === 'recent' ? null : s.value })}
+            >
+              {s.label}
+            </Chip>
+          ))}
+        </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             <FilterLabel label="tag" mode="单选" />
@@ -545,7 +583,7 @@ export function ProjectsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((p) => (
+                {sorted.map((p) => (
                   <TableRow
                     key={p.path}
                     className={cn('cursor-pointer', selected.has(p.path) && 'bg-muted/50')}

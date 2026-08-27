@@ -280,7 +280,7 @@ func TestProjectOpen(t *testing.T) {
 	}
 }
 
-func TestProjectList_UsagePinned(t *testing.T) {
+func TestProjectList_LastUsedAt(t *testing.T) {
 	env := newTestEnv(t)
 
 	// 打开 proj2（原序列第二位），应产生 usage 记录
@@ -302,14 +302,14 @@ func TestProjectList_UsagePinned(t *testing.T) {
 	if len(got.List) != 2 {
 		t.Fatalf("应扫描到 2 个项目, got %d", len(got.List))
 	}
-	// 最近使用的 proj2 置顶（原序 proj1 在前），且带 lastUsedAt；proj1 无
-	if got.List[0].Name != "g2:proj2" {
-		t.Fatalf("最近使用的 g2:proj2 应置顶, got %v", got.List)
+	// list 保持原始扫描序（排序是前端视图偏好），只补 lastUsedAt：proj2 有、proj1 无
+	if got.List[0].Name != "g1:proj1" || got.List[1].Name != "g2:proj2" {
+		t.Fatalf("list 应保持扫描原序, got %v", got.List)
 	}
-	if got.List[0].LastUsedAt == nil {
-		t.Error("g2:proj2 应带 lastUsedAt")
+	if got.List[1].LastUsedAt == nil {
+		t.Error("打开过的 g2:proj2 应带 lastUsedAt")
 	}
-	if got.List[1].Name != "g1:proj1" || got.List[1].LastUsedAt != nil {
-		t.Errorf("g1:proj1 应保持原序且无 lastUsedAt, got %v", got.List[1])
+	if got.List[0].LastUsedAt != nil {
+		t.Errorf("未打开过的 g1:proj1 不应有 lastUsedAt, got %v", got.List[0])
 	}
 }
