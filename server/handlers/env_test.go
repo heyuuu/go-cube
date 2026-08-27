@@ -74,8 +74,8 @@ func newTestEnv(t *testing.T) *testEnv {
 	srv := web.NewServer(
 		config.ServerConfig{Port: 6101},
 		[]web.Handler{
-			NewProjectHandler(projSvc, usageSvc),
-			NewOpenerHandler(openerSvc, projSvc, usageSvc),
+			NewProjectHandler(projSvc, openerSvc, usageSvc),
+			NewOpenerHandler(openerSvc),
 			NewConfigHandler(cfg),
 			NewMdHandler(),
 			NewWorkbenchHandler(workbench.NewService()),

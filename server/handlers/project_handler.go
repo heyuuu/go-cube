@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
+	"log/slog"
 	"net/http"
 	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"cube/opener"
 	"cube/project"
 	"cube/project/gitcache"
 	"cube/usage"
@@ -39,12 +43,14 @@ const recentPinnedLimit = 10
 
 type ProjectHandler struct {
 	projectService *project.Service
+	openerService  *opener.Service
 	usageService   *usage.Service
 }
 
-func NewProjectHandler(projectService *project.Service, usageService *usage.Service) *ProjectHandler {
+func NewProjectHandler(projectService *project.Service, openerService *opener.Service, usageService *usage.Service) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: projectService,
+		openerService:  openerService,
 		usageService:   usageService,
 	}
 }
@@ -52,6 +58,7 @@ func NewProjectHandler(projectService *project.Service, usageService *usage.Serv
 func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/project/list", "获取项目列表", h.projectList)
 	web.ApiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
+	web.ApiPost(api, "/api/project/open", "用指定 opener 打开已收录项目（记 usage；目标目录选择为 1030/1032 预留）", h.projectOpen)
 	web.ApiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
 	web.ApiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
 	web.ApiPost(api, "/api/project/scan-rule/save", "新增或按 path 替换扫描规则", h.scanRuleSave)
@@ -127,6 +134,39 @@ func (h *ProjectHandler) projectInfo(input struct {
 		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
 		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
 	}, nil
+}
+
+// ProjectOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。
+// path 是项目绝对路径（项目唯一标识口径）；后续 1030/1032 落地后可扩展目标目录选择字段。
+type ProjectOpenInput struct {
+	Body struct {
+		Path   string `json:"path" doc:"项目绝对路径"`
+		Opener string `json:"opener" doc:"opener 名称"`
+	}
+}
+
+// projectOpen 用指定 opener 打开已收录项目，成功后记 usage（best-effort：失败不影响打开结果）。
+// 区别于 opener/open（打开任意路径，不产生使用信号）。
+func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, error) {
+	proj := h.projectService.FindByPath(input.Body.Path)
+	if proj == nil {
+		return nil, errors.New("未找到指定项目: " + input.Body.Path)
+	}
+
+	o := h.openerService.FindByName(input.Body.Opener)
+	if o == nil {
+		return nil, errors.New("未找到指定 opener: " + input.Body.Opener)
+	}
+
+	if err := o.Open(opener.RoleOpenDir, proj.Path()); err != nil {
+		return nil, fmt.Errorf("打开失败: %w", err)
+	}
+
+	// 打开主项目根，dir 为空（worktree/workspace 目标选择为 1030/1032 预留）
+	if err := h.usageService.RecordOpen(proj.Path(), o.Name(), ""); err != nil {
+		slog.Warn("记录 usage 失败", "err", err)
+	}
+	return map[string]any{"ok": true}, nil
 }
 
 func (h *ProjectHandler) toProjectDTO(entity *project.Project) *ProjectDTO {

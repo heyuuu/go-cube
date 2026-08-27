@@ -276,6 +276,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/project/open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 用指定 opener 打开已收录项目（记 usage；目标目录选择为 1030/1032 预留） */
+    post: operations['project.open'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/project/scan-rule/delete': {
     parameters: {
       query?: never;
@@ -1084,6 +1101,18 @@ export interface components {
       /** Format: date-time */
       scanUpdatedAt: string;
     };
+    ProjectOpenInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ProjectOpenInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description opener 名称 */
+      opener: string;
+      /** @description 项目绝对路径 */
+      path: string;
+    };
     Refs: {
       head: string;
       locals: string[] | null;
@@ -1670,6 +1699,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputProjectListResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ProjectOpenInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

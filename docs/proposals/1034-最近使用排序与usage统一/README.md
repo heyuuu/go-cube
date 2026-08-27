@@ -5,7 +5,7 @@
 > **实施偏差备忘**（与原方案的差异）：
 > 1. `Record` 增加 `dir` 字段（实际打开目录绝对路径，主项目根打开时省略）——原「格式演进约定」预留给 1030 的 `subPath` 相对路径方案**废弃**：worktree 目标（1032）在主项目根之外，相对路径无意义，统一为单一 `dir` 恒记绝对路径；compaction 组合键随之为 `(project, opener, dir)`；
 > 2. `usage.jsonl` 落 `dataDir/state/`（新增运行期状态目录，与 cache 的「可整体删除」语义区分），不在配置目录根；
-> 3. Web `opener/open` 只在打开目标为**已收录项目**时记录（原方案未限定——非项目路径会造永不消亡的脏 key）；
+> 3. Web 记录入口后定为独立接口 `POST /api/project/open`（打开已收录项目，成功即记 usage）；`opener/open` 回归纯「打开任意路径」不记录（原方案「opener/open 在目标是项目时记录」被此取代，项目打开与通用路径打开的语义彻底分离，也为 1030/1032 目标选择扩展留了口）；
 > 4. store 写原语统一自动递归创建父目录（`AppendJsonl` 补齐，与 `WriteFileAtomic`/`SaveJson` 一致）。
 >
 > **关联**：[`1033-util-store文件存储`](../archived/1033-util-store文件存储/README.md)（前置需求，JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 记 `dir` 绝对路径，见「格式演进约定」）。

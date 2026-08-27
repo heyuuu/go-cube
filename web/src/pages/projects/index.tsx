@@ -17,7 +17,7 @@ import { guessHome, prettyPath } from '@/lib/path';
 import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
-import { useOpenerOpen, useOpenerList, useProjectList } from '@/queries/project';
+import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
 import { ProjectActions } from './actions';
@@ -157,7 +157,7 @@ function TreeRowView({
   row: TreeRow;
   home: string;
   openerList: Opener[];
-  open: ReturnType<typeof useOpenerOpen>;
+  open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string) => void;
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
@@ -234,7 +234,7 @@ function TreeRowView({
 export function ProjectsPage() {
   const list = useProjectList();
   const openers = useOpenerList();
-  const open = useOpenerOpen();
+  const open = useProjectOpen();
   const scanRules = useScanRules();
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());

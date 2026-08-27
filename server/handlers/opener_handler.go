@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -12,8 +11,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/opener"
-	"cube/project"
-	"cube/usage"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
 	"cube/web"
@@ -54,16 +51,12 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 // --- handler ---
 
 type OpenerHandler struct {
-	service        *opener.Service
-	projectService *project.Service
-	usageService   *usage.Service
+	service *opener.Service
 }
 
-func NewOpenerHandler(service *opener.Service, projectService *project.Service, usageService *usage.Service) *OpenerHandler {
+func NewOpenerHandler(service *opener.Service) *OpenerHandler {
 	return &OpenerHandler{
-		service:        service,
-		projectService: projectService,
-		usageService:   usageService,
+		service: service,
 	}
 }
 
@@ -98,7 +91,7 @@ type OpenerOpenInput struct {
 	}
 }
 
-// openerOpen 用指定 opener 打开任意文件/目录（项目打开也走这里：传项目路径即可）。
+// openerOpen 用指定 opener 打开任意文件/目录（项目打开走 project/open，那里记 usage；此处不产生使用信号）。
 // role 按路径实际类型校验：目录须 open-dir、文件须 open-file。
 func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error) {
 	if !filepath.IsAbs(input.Body.Path) {
@@ -121,19 +114,6 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 	// role 是否支持由实现内校验（Open 首步），这里只透传错误
 	if err := o.Open(role, input.Body.Path); err != nil {
 		return nil, fmt.Errorf("打开失败: %w", err)
-	}
-
-	// 打开目标是已收录项目时记录使用信号（best-effort：失败不影响打开结果）。
-	// 非项目路径不记——脏 key 永不过期，会污染排序信号。
-	// dir 记实际打开目录：等于主项目根时省略；worktree / workspace 子目录（1030/1032 落地后）记其绝对路径。
-	if proj := h.projectService.FindByPath(input.Body.Path); proj != nil {
-		dir := ""
-		if input.Body.Path != proj.Path() {
-			dir = input.Body.Path
-		}
-		if err := h.usageService.RecordOpen(proj.Path(), o.Name(), dir); err != nil {
-			slog.Warn("记录 usage 失败", "err", err)
-		}
 	}
 	return map[string]any{"ok": true}, nil
 }

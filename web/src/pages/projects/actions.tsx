@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useOpenerOpen } from '@/queries/project';
+import { useProjectOpen } from '@/queries/project';
 
 import { quickOpens, tagVariants } from './shared';
 
@@ -27,7 +27,7 @@ export function ProjectActions({
 }: {
   p: Project;
   openerList: Opener[];
-  open: ReturnType<typeof useOpenerOpen>;
+  open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string) => void;
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));

@@ -239,14 +239,55 @@ func TestCloneRuleWrite(t *testing.T) {
 	}
 }
 
+func TestProjectOpen(t *testing.T) {
+	env := newTestEnv(t)
+
+	post := func(body string) envelope {
+		resp, err := http.Post(env.url("/api/project/open"), "application/json", strings.NewReader(body))
+		if err != nil {
+			t.Fatalf("POST project/open 失败: %v", err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("POST project/open 应为 200, got %d", resp.StatusCode)
+		}
+		var env2 envelope
+		if err := json.NewDecoder(resp.Body).Decode(&env2); err != nil {
+			t.Fatalf("project/open 响应解析失败: %v", err)
+		}
+		return env2
+	}
+
+	// 打开项目成功：fakeExecutor 收到组装后的命令
+	env1 := post(fmt.Sprintf(`{"path":%q,"opener":"finder"}`, env.proj1Path()))
+	if !env1.Ok {
+		t.Fatalf("打开项目应成功, message=%q", env1.Message)
+	}
+	if env.exec.callCount() != 1 || env.exec.lastCall()[0] != "/usr/bin/open" {
+		t.Errorf("executor 应收到 finder 命令, calls=%v", env.exec.calls)
+	}
+
+	// 非收录项目路径
+	env2 := post(`{"path":"/nonexistent/proj","opener":"finder"}`)
+	if env2.Ok || !strings.Contains(env2.Message, "未找到指定项目") {
+		t.Errorf("非收录路径应报错, got ok=%v message=%q", env2.Ok, env2.Message)
+	}
+
+	// 不存在的 opener
+	env3 := post(fmt.Sprintf(`{"path":%q,"opener":"nope"}`, env.proj1Path()))
+	if env3.Ok || !strings.Contains(env3.Message, "未找到指定 opener") {
+		t.Errorf("未知 opener 应报错, got ok=%v message=%q", env3.Ok, env3.Message)
+	}
+}
+
 func TestProjectList_UsagePinned(t *testing.T) {
 	env := newTestEnv(t)
 
 	// 打开 proj2（原序列第二位），应产生 usage 记录
 	body := fmt.Sprintf(`{"path":%q,"opener":"finder"}`, env.ws.Join("g2", "proj2"))
-	resp, err := http.Post(env.url("/api/opener/open"), "application/json", strings.NewReader(body))
+	resp, err := http.Post(env.url("/api/project/open"), "application/json", strings.NewReader(body))
 	if err != nil {
-		t.Fatalf("POST opener/open 失败: %v", err)
+		t.Fatalf("POST project/open 失败: %v", err)
 	}
 	resp.Body.Close()
 
