@@ -15,7 +15,7 @@ const SECTIONS = [
   { key: 'config', label: 'Config' },
   { key: 'opener', label: 'Opener' },
   { key: 'scan', label: '项目·扫描' },
-  { key: 'clone', label: 'Clone 路由' },
+  { key: 'clone', label: '项目·Clone' },
 ] as const;
 
 const DEFAULT_SECTION = SECTIONS[0].key;

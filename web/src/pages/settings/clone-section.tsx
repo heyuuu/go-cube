@@ -1,4 +1,4 @@
-// settings 页「Clone 路由」分区：clone 规则的增删改与拖拽排序。
+// settings 页「项目·Clone」分区：clone 规则的增删改与拖拽排序。
 // 数据源是 /api/project/clone-rules（settings.json cloneRules 节），保存即生效。
 // 交互模板沿用 Opener 分区（提案 1025 定型）：Sheet 抽屉编辑、删除前确认、grip 拖拽排序。
 import { GripVertical } from 'lucide-react';
