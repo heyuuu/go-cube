@@ -2,7 +2,7 @@
 
 > **状态**：📝 待评审
 >
-> **关联**：[`1033-util-store文件存储`](../1033-util-store文件存储/README.md)（前置需求，步骤 2 依赖其 JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 需带 `subPath`，见「格式演进约定」）。
+> **关联**：[`1033-util-store文件存储`](../archived/1033-util-store文件存储/README.md)（前置需求，步骤 2 依赖其 JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 需带 `subPath`，见「格式演进约定」）。
 
 ## 背景与目标
 

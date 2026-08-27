@@ -1,13 +1,12 @@
 package config
 
 import (
-	"encoding/json"
+	"errors"
 	"fmt"
-	"math/rand"
-	"os"
 	"path/filepath"
 
 	"cube/util/pathkit"
+	"cube/util/store"
 )
 
 type Config struct {
@@ -40,23 +39,14 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("解析配置路径失败: path=%s err=%w", path, err)
 	}
 
-	cfg := &Config{}
-
-	raw, err := os.ReadFile(absPath)
-	if err != nil {
-		// 文件不存在（或权限等不可读问题）→ 降级为默认值，不报错。
-		if os.IsNotExist(err) {
-			return applyDefaults(cfg, absPath), nil
-		}
-		return nil, fmt.Errorf("读取配置文件失败: path=%s err=%w", absPath, err)
+	cfg, err := store.LoadJson[Config](absPath)
+	if errors.Is(err, store.ErrFileMissing) {
+		cfg = Config{} // 文件不存在 → 降级为默认值，不报错
+	} else if err != nil {
+		return nil, err // 读失败/解析失败（store 已包装中文错误）
 	}
 
-	// 反序列化
-	if err := json.Unmarshal(raw, cfg); err != nil {
-		return nil, fmt.Errorf("解析配置文件失败: path=%s err=%w", absPath, err)
-	}
-
-	return applyDefaults(cfg, absPath), nil
+	return applyDefaults(&cfg, absPath), nil
 }
 
 func applyDefaults(cfg *Config, path string) *Config {
@@ -72,25 +62,10 @@ func applyDefaults(cfg *Config, path string) *Config {
 	return cfg
 }
 
-// Save 把 cfg 原子写入 path：先写临时文件（同目录，随机后缀），再 os.Rename 替换。
+// Save 把 cfg 原子写入 path（缩进 JSON + tmp/rename 原子写，见 store.SaveJson）。
 func Save(path string, cfg *Config) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("创建配置父目录失败: dir=%s err=%w", filepath.Dir(path), err)
-	}
-
-	data, err := json.MarshalIndent(cfg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("序列化 config 失败: %w", err)
-	}
-	data = append(data, '\n')
-	// 临时文件同目录（保证 rename 同文件系统原子），带随机后缀避免并发写互相覆盖。
-	tmp := fmt.Sprintf("%s.tmp.%d", path, rand.Int31())
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return fmt.Errorf("写临时配置文件失败: tmp=%s err=%w", tmp, err)
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		_ = os.Remove(tmp) // 清理临时文件（best-effort）
-		return fmt.Errorf("替换配置文件失败: path=%s err=%w", path, err)
+	if err := store.SaveJson(path, cfg); err != nil {
+		return fmt.Errorf("写入配置文件失败: path=%s err=%w", path, err)
 	}
 	return nil
 }

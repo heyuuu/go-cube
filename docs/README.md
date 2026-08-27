@@ -40,6 +40,7 @@
 
 已实现的需求总结（从 proposals 顶层移入，记录最终落地形态与方案演变）。
 
+- [`1033-util-store文件存储/`](proposals/archived/1033-util-store文件存储/) — util/store 文件存储原语包（WriteFileAtomic 原子写 / SaveJson·LoadJson 缩进 JSON + ErrFileMissing 哨兵 / JSONL 追加·全量读·正向逆向流式迭代 iter.Seq2）；gitcache·config·settings 三处手写原子写全部收敛；1034 usage JSONL 的地基
 - [`1029-scan-clone规则迁移settings/`](proposals/archived/1029-scan-clone规则迁移settings/) — scan/clone 规则迁 settings.json（`scanRules`/`cloneRules` 分节，Service 直读不缓存、写侧校验、保存即重扫）；settings 页「项目·扫描」+「项目·Clone」两分区（增删改 + 拖拽）；超额增强：scanRule 可选 icon + icon 语义下沉 util/iconkit + 前端 renderIcon/IconField 共享件；group 筛选改规则序
 - [`1025-settings配置页/`](proposals/archived/1025-settings配置页/) — settings 配置页：`/settings` 分区导航（URL 记忆）+ ⌘,/rail 新 tab 入口；Config 过渡分区收编 `/config` 只读展示（默认分区，旧路由移除）；Opener 分区完整增删改（Sheet 抽屉 + 冻结列 + icon 渲染 + 拖拽排序 reorder API + lucide 搜索点选）
 - [`1016-opener改造/`](proposals/archived/1016-opener改造/) — opener 改造：数据迁 settings.json（节级 API + 直读）+ 接口化 + icon 全链路（lucide/base64/`.app` 提取）+ Web 增删改；web 形态最终拆除，收敛为 `cube web workbench` exec 组合

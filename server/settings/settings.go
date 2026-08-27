@@ -8,12 +8,12 @@ package settings
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
-	"math/rand"
-	"os"
-	"path/filepath"
 	"sync"
+
+	"cube/util/store"
 )
 
 // doc 文档内存形态：节名 → 原始 JSON。非目标节语义级透传——值原样保留不解析，
@@ -73,42 +73,24 @@ func SaveSection(file, section string, src any) error {
 	return saveDoc(file, d)
 }
 
-// readDoc 读入并解析文档。文件不存在是正常态（首次运行）→ 空 doc；
+// readDoc 读入并解析文档（store.LoadJson）。文件不存在是正常态（首次运行）→ 空 doc；
 // 坏 JSON 是异常态 → 返回错误（读侧由调用方降级，写侧用于拒写）。
 func readDoc(file string) (doc, error) {
-	data, err := os.ReadFile(file)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return doc{}, nil
-		}
-		return nil, fmt.Errorf("读取文件失败: file=%s err=%w", file, err)
+	d, err := store.LoadJson[doc](file)
+	if errors.Is(err, store.ErrFileMissing) {
+		return doc{}, nil
 	}
-	var d doc
-	if err := json.Unmarshal(data, &d); err != nil {
-		return nil, fmt.Errorf("settings.json 格式损坏: file=%s err=%w", file, err)
+	if err != nil {
+		return nil, fmt.Errorf("settings.json 读取/解析失败: file=%s err=%w", file, err)
 	}
 	return d, nil
 }
 
-// saveDoc 原子写入：先写临时文件（同目录保证 rename 同文件系统原子），再替换。
+// saveDoc 原子写入（store.SaveJson：缩进 + tmp/rename）。
 // 顶层键序由 json.Marshal 的 map 字典序决定——稳定且 diff 友好，不引入 OrderedMap。
 func saveDoc(file string, d doc) error {
-	dir := filepath.Dir(file)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return fmt.Errorf("创建配置父目录失败: dir=%s err=%w", dir, err)
-	}
-	data, err := json.MarshalIndent(d, "", "  ")
-	if err != nil {
-		return fmt.Errorf("序列化 settings.json 失败: err=%w", err)
-	}
-	data = append(data, '\n')
-	tmp := fmt.Sprintf("%s.tmp.%d", file, rand.Int31())
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
-		return fmt.Errorf("写临时文件失败: tmp=%s err=%w", tmp, err)
-	}
-	if err := os.Rename(tmp, file); err != nil {
-		_ = os.Remove(tmp) // 清理临时文件（best-effort）
-		return fmt.Errorf("替换文件失败: path=%s err=%w", file, err)
+	if err := store.SaveJson(file, d); err != nil {
+		return fmt.Errorf("写入 settings.json 失败: file=%s err=%w", file, err)
 	}
 	return nil
 }

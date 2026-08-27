@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"cube/util/git"
+	"cube/util/store"
 )
 
 // 当前缓存文件格式版本；结构变更时递增，用于后续做兼容迁移。
@@ -123,9 +124,7 @@ func (c *Cache) Size() int {
 	return len(c.entries)
 }
 
-// Save 原子写入 git.json。
-// 流程：序列化 → 写 git.json.tmp → rename 覆盖 git.json。
-// rename 保证原子性（同文件系统下）；tmp 与目标同目录以满足这一前提。
+// Save 原子写入 git.json（store.WriteFileAtomic 的 tmp + rename）。
 func (c *Cache) Save() error {
 	c.mu.Lock()
 	now := time.Now()
@@ -142,13 +141,8 @@ func (c *Cache) Save() error {
 		return fmt.Errorf("序列化 cache 失败: %w", err)
 	}
 
-	path := c.path()
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("写入 cache 临时文件失败: %w", err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		return fmt.Errorf("重命名 cache 临时文件失败: %w", err)
+	if err := store.WriteFileAtomic(c.path(), data, 0644); err != nil {
+		return fmt.Errorf("写入 cache 文件失败: %w", err)
 	}
 	return nil
 }
