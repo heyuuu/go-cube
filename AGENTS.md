@@ -31,11 +31,11 @@
 
 - **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
 - **全量 project 列表永不落盘**：project 一切由 scan-rule 推导，持久化只有 cache（git.json）。因此**禁止在 settings.json / config 等全局配置里按项目路径记录具体 project 的内容**——项目目录会重命名/移动，按路径 keyed 的配置会失联留脏数据。需要「project 自身的配置」（如 monorepo workspace 声明，方向定为项目根 `.cube/cube.json`）时，放项目内跟仓库走，不放全局配置。
-- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；后台 fork 子进程异步采集回写，TTL 1 分钟内不重复，跨进程 flock 串行化。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
+- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；**单写者模型**——常驻 server 是 git.json 的唯一写方（后台异步采集回写），CLI 只读不写，落盘靠原子写（tmp + rename），无跨进程锁。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
 - **opener：接口 + 唯一 exec 实现 + settings.json**：`Opener` 是接口（`opener/opener.go`），唯一实现 `execOpener`（`opener/exec.go`，cmd 模板 `$0/$1` 占位）——「打开工作台页」不设独立形态，配 exec cmd `["cube","ui","workbench","$0"]` 组合 cube 自身 CLI；能力由 `roles []Role` 声明（见 `opener/role.go`），`slotCount` 由 role 推导；`Open(role, slotArgs...)` 的 role 校验收敛在实现内；经 `Executor` 执行（`opener/executor.go`，测试注入 fake）。**opener 数据存 settings.json 的 openers 节**（`settings` 包节级 API，Service 直读不缓存、写侧领域校验；详见 现状.md 3.3）——改 opener 时同步看 `opener/opener.go`、`opener/exec.go`、`opener/role.go`、`opener/executor.go`、`settings/settings.go`。
 - **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
 - **Web 出口分两层**：`web` 包是服务端框架（Server 装配 / envelope / 静态资源 / system 端点，`web.NewServer(handlers ...Handler)` 自动追加内置 system 与 static handler）；业务 handler 在 `handlers` 包（`<domain>_handler.go` 同包分文件，不按 domain 分子包），实现 `Handler.Register(api huma.API, mux *http.ServeMux)`——注册统一走 `web.ApiGet` / `web.ApiPost`，WebSocket 等原生路由直接挂 mux（不经 huma）。统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
-- **配置与双环境**：默认目录按环境分流——dev（源码直跑 / air / run.sh）→ `~/.config/cube-dev/`，prod（`make build` / `make install`，ldflags 注入了正式 version）→ `~/.config/cube/`；身份判定见 `version.IsDev()`，详见 [`docs/proposals/archived/1026-环境分离/`](./docs/proposals/archived/1026-环境分离/)。`config.json` 按 domain 分节，`server.port` 是端口唯一事实源（无 `-p` flag、不支持多实例）。`-c` 覆盖配置文件路径，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、`app.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。应用标识（`AppName`/`AppTitle`）收敛在 `version/name.go`：whoami 身份 / 进程探测 / shutdown token / 默认配置目录路径均由 `version.AppName` 派生；日志文件名是通用的 `app.log`，不含应用名。
+- **配置与双环境**：默认目录按环境分流——dev（源码直跑 / air / run.sh）→ `~/.config/cube-dev/`，prod（`make build` / `make install`，ldflags 注入了正式 version）→ `~/.config/cube/`；身份判定见 `version.IsDev()`，详见 [`docs/proposals/archived/1026-环境分离/`](./docs/proposals/archived/1026-环境分离/)。`config.json` 按 domain 分节，`server.port` 是端口唯一事实源（无 `-p` flag、不支持多实例）。`-c` 覆盖配置文件路径，`-d` 开 debug（只影响 logger 初始化）。配置解析失败/缺失不阻断启动（降级优先，见 `opener.NewService` 跳过坏配置）。**无热 reload**（已移除，转向命令式改 config）。配置目录下的运行期状态（sqlite `data.db`、`cache/git.json`、`app.log`）由 `app.Paths`（`server/app/paths.go`）统一计算，不要在调用方硬拼路径。应用标识（`AppName`/`AppTitle`）收敛在 `version/name.go`：whoami 身份 / 进程探测 / shutdown token / 默认配置目录路径均由 `version.AppName` 派生；日志文件名是通用的 `app.log`，不含应用名。
 
 ## 常用命令
 
@@ -91,7 +91,6 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **web 层**：httptest 拉起真实 `Server.Handler()` 打真实 HTTP 请求（见 `web/server_test.go` 的 newTestEnv 基建），断言路由 / DTO / envelope / nil 序列化 / 静态资源契约。新增 handler 时在此模式上补用例。
 - **不写单测的（靠手动/集成验证）**：
   - `git.Run`/`git.Clone`/`git.Push`（透传 stdio 到 `os.Stdout`，无法捕获输出；且本质是组装 git 参数）
-  - `gitcache.TryAsyncRefresh`（fork 自身可执行文件跑子命令，进程编排非逻辑）
   - `opener.Open` 的真实进程启动（已用 Executor 隔离，但默认实现的真启动仍靠手动验证）
   - `config`/`db`（全局单例无 setter，测试无法隔离）
   - `cmd/*`（cobra 命令编排）
@@ -131,7 +130,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - 虽名为 `GetXxx`/`SetXxx` 但方法体不是属性的直接读/写——例如 `return s.cache.Get()`、`return strings.Join(o.cmd, " ")`、`Projects()`（委托、计算、聚合等）。
 
    getter/setter 的书写约定：
-   - **建议不加注释**（建议性，非强制）——struct 属性的行尾注释通常已足够说明，方法上再写只会重复。参考 `project.Project`：属性 `path string // 项目路径，唯一标识`，getter `Path()` 不写注释。**但如果注释包含超出属性说明本身的内容**（如跨文件调用指引、设计意图、注意事项等），则应当保留。参考 `gitcache.Cache.Dir()`：除说明返回值外，还注明「供 refresh.go 的 TTL/flock 等调度逻辑使用」。
+   - **建议不加注释**（建议性，非强制）——struct 属性的行尾注释通常已足够说明，方法上再写只会重复。参考 `project.Project`：属性 `path string // 项目路径，唯一标识`，getter `Path()` 不写注释。**但如果注释包含超出属性说明本身的内容**（如跨文件调用指引、设计意图、注意事项等），则应当保留。参考 `gitcache` 系列的 getter：除说明返回值外，还注明其调度用途（如「供 TTL 调度逻辑使用」）。
    - **多个 getter（或多个 setter）连写在一起，不加空行**；顺序与对应属性在 struct 内的声明顺序一致。参考 `project.Project` 的 `Group/Name/Path/Tags/GitInfo`。
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
@@ -174,5 +173,5 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 - **module path 是 `cube`**（不是 `github.com/heyuuu/cube`——README 里写的旧值，以 go.mod 为准）。import 路径写 `cube/...`。
 - `logger` 包用 `runtime.Callers` 在 `init()` 里推算项目绝对路径（`relativeProjPath = "../../"`），移动/重命名 logger 源文件位置会让日志里的 `file` 相对路径错位。
 - `.gitignore` 忽略：`tmp/`、`runtime/`（测试产物）、`server/web/ui`（`make build-ui` 从 `web/dist` 复制而来，go:embed 嵌入）、`openapi.json`、`.zcode/plans` / `.claude/plans` / `.cursor/plans`。不要提交这些。
-- 默认配置目录按环境分流：dev `~/.config/cube-dev/`、prod `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、`cache/git.lock`、日志）落在对应配置目录。两环境数据不互通（history 各自积累、config 人工 diff 合并）。
+- 默认配置目录按环境分流：dev `~/.config/cube-dev/`、prod `~/.config/cube/`（非项目目录），运行期状态（sqlite `data.db`、`cache/git.json`、日志）落在对应配置目录。两环境数据不互通（history 各自积累、config 人工 diff 合并）。
 - **前端源码在 `web/`（仓库根）**，`make build-ui` 时 `pnpm -C web build` 后把 `web/dist` 拷到 `server/web/ui` 供 go:embed 嵌入。改前端改 `web/`，不要直接改 `server/web/ui/`（会被覆盖）；旧版 vanilla 前端 `ui/` 已删除。
