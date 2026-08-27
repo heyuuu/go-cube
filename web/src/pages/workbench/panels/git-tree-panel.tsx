@@ -1,4 +1,16 @@
-import { Check, ChevronDown, Cloud, Copy, ExternalLink, Eye, EyeOff, GitBranch, Monitor } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Cloud,
+  Copy,
+  ExternalLink,
+  Eye,
+  EyeOff,
+  GitBranch,
+  Monitor,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -39,6 +51,8 @@ import {
 } from '../params';
 import { useWorktreeVisibility } from '../worktree-visibility';
 
+import { BranchDeleteDialog, WorktreeAddDialog, WorktreeRemoveDialog } from './worktree-write';
+
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
 // 下段 = commit 图（前端本地 active-lanes 布局 + SVG 拓扑 + 无限滚动；
@@ -56,6 +70,13 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   // 持久化按 path 隔离存 localStorage（见 worktree-visibility.ts）
   const { hiddenWorktrees, toggleWorktree } = useWorktreeVisibility(path);
 
+  // 写侧对话框（1031）：面板内多个入口（副本区 + / 分支行 / commit 行）共用
+  const [addPrefill, setAddPrefill] = useState<{ branch?: string; commitish?: string } | null>(null);
+  const [removeTarget, setRemoveTarget] = useState<WorktreeStatus | null>(null);
+  const [deleteBranchName, setDeleteBranchName] = useState<string | null>(null);
+  const worktreesForDialogs = useWorkbenchWorktrees(path);
+  const mainPath = worktreesForDialogs.data?.[0]?.path ?? path; // 副本列表主目录在前
+
   if (info.isPending) {
     return <div className="p-3 text-xs text-muted-foreground">加载中…</div>;
   }
@@ -72,9 +93,25 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
           onBranchPicked={() => setFocusTick((n) => n + 1)}
           hiddenWorktrees={hiddenWorktrees}
           onToggleWorktree={toggleWorktree}
+          onAddWorktree={setAddPrefill}
+          onRemoveWorktree={setRemoveTarget}
+          onDeleteBranch={(name) => setDeleteBranchName(name)}
         />
       </div>
-      <CommitGraphSection path={path} params={params} focusTick={focusTick} hiddenWorktrees={hiddenWorktrees} />
+      <CommitGraphSection
+        path={path}
+        params={params}
+        focusTick={focusTick}
+        hiddenWorktrees={hiddenWorktrees}
+        onAddWorktree={setAddPrefill}
+      />
+      {addPrefill ? <WorktreeAddDialog path={path} prefill={addPrefill} onClose={() => setAddPrefill(null)} /> : null}
+      {removeTarget ? (
+        <WorktreeRemoveDialog path={path} wt={removeTarget} mainPath={mainPath} onClose={() => setRemoveTarget(null)} />
+      ) : null}
+      {deleteBranchName ? (
+        <BranchDeleteDialog path={path} branch={deleteBranchName} onClose={() => setDeleteBranchName(null)} />
+      ) : null}
     </div>
   );
 }
@@ -87,19 +124,39 @@ function WorktreeSection({
   onBranchPicked,
   hiddenWorktrees,
   onToggleWorktree,
+  onAddWorktree,
+  onRemoveWorktree,
+  onDeleteBranch,
 }: {
   path: string;
   params: WorkbenchParams;
   onBranchPicked: () => void;
   hiddenWorktrees: Set<string>;
   onToggleWorktree: (wtPath: string) => void;
+  onAddWorktree: (prefill: { branch?: string; commitish?: string }) => void;
+  onRemoveWorktree: (wt: WorktreeStatus) => void;
+  onDeleteBranch: (name: string) => void;
 }) {
   const refs = useWorkbenchRefs(path);
   const worktrees = useWorkbenchWorktrees(path);
 
   return (
     <>
-      <Section title="工作副本" icon={<Monitor className="size-3.5" />}>
+      <Section
+        title="工作副本"
+        icon={<Monitor className="size-3.5" />}
+        action={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            title="新建 worktree"
+            aria-label="新建 worktree"
+            onClick={() => onAddWorktree({})}
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        }
+      >
         {(worktrees.data ?? []).map((wt) => (
           <WorktreeRow
             key={wt.path}
@@ -108,19 +165,21 @@ function WorktreeSection({
             afterSelect={onBranchPicked}
             hidden={hiddenWorktrees.has(wt.path)}
             onToggle={() => onToggleWorktree(wt.path)}
+            onRemove={() => onRemoveWorktree(wt)}
           />
         ))}
       </Section>
       <RemoteSection path={path} />
       <Section title="分支" icon={<GitBranch className="size-3.5" />}>
         {(refs.data?.locals ?? []).map((b) => (
-          <SelectableRow
+          <BranchRow
             key={b}
-            label={refShortName(b)}
-            source={{ type: 'ref', id: b }}
+            refName={b}
+            isHead={b === refs.data?.head}
             params={params}
-            badge={b === refs.data?.head ? '当前' : undefined}
             afterSelect={onBranchPicked}
+            onAddWorktree={() => onAddWorktree({ branch: refShortName(b) })}
+            onDeleteBranch={() => onDeleteBranch(refShortName(b))}
           />
         ))}
       </Section>
@@ -183,18 +242,71 @@ function RemoteRow({ remote }: { remote: RemoteEntry }) {
   );
 }
 
+// 分支行：可选中主体 + 尾部 hover 动作（在此新建 worktree / 删除分支）。
+// 与工作副本行同构：动作按钮与 SelectableRow（button）并列，不能嵌套
+function BranchRow({
+  refName,
+  isHead,
+  params,
+  afterSelect,
+  onAddWorktree,
+  onDeleteBranch,
+}: {
+  refName: string;
+  isHead: boolean;
+  params: WorkbenchParams;
+  afterSelect?: () => void;
+  onAddWorktree: () => void;
+  onDeleteBranch: () => void;
+}) {
+  return (
+    <div className="group flex items-center hover:bg-accent">
+      <SelectableRow
+        label={refShortName(refName)}
+        source={{ type: 'ref', id: refName }}
+        params={params}
+        badge={isHead ? '当前' : undefined}
+        afterSelect={afterSelect}
+        bare
+      />
+      <div className="flex shrink-0 items-center opacity-0 transition-opacity group-hover:opacity-100">
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="在此分支新建 worktree"
+          aria-label={`在 ${refShortName(refName)} 新建 worktree`}
+          onClick={onAddWorktree}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title="删除分支"
+          aria-label={`删除分支 ${refShortName(refName)}`}
+          onClick={onDeleteBranch}
+        >
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function WorktreeRow({
   wt,
   params,
   afterSelect,
   hidden,
   onToggle,
+  onRemove,
 }: {
   wt: WorktreeStatus;
   params: WorkbenchParams;
   afterSelect?: () => void;
   hidden: boolean;
   onToggle: () => void;
+  onRemove: () => void;
 }) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
@@ -204,7 +316,7 @@ function WorktreeRow({
   return (
     <div
       className={cn(
-        'flex items-center transition-colors hover:bg-accent',
+        'group flex items-center transition-colors hover:bg-accent',
         selected && 'bg-primary/15',
         hidden && 'opacity-50',
       )}
@@ -240,6 +352,11 @@ function WorktreeRow({
           </>
         }
       />
+      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100">
+        <Button variant="ghost" size="icon-sm" title="删除该 worktree" aria-label={`删除 ${name}`} onClick={onRemove}>
+          <Trash2 className="size-3.5" />
+        </Button>
+      </div>
       <WorktreeOpenActions path={wt.path} name={name} />
     </div>
   );
@@ -316,11 +433,13 @@ function CommitGraphSection({
   params,
   focusTick,
   hiddenWorktrees,
+  onAddWorktree,
 }: {
   path: string;
   params: WorkbenchParams;
   focusTick: number;
   hiddenWorktrees: Set<string>;
+  onAddWorktree: (prefill: { branch?: string; commitish?: string }) => void;
 }) {
   const commits = useWorkbenchCommits(path);
   const sentinelRef = useRef<HTMLDivElement>(null);
@@ -463,6 +582,7 @@ function CommitGraphSection({
           virtualLaneEnd={virtualLaneEnd}
           params={params}
           active={c.sha === focusSha}
+          onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
         />
       ))}
       <div ref={sentinelRef} className="h-8" />
@@ -482,6 +602,7 @@ function CommitRow({
   virtualLaneEnd,
   params,
   active,
+  onAddWorktree,
 }: {
   c: RowCommit;
   laneWidth: number;
@@ -489,13 +610,14 @@ function CommitRow({
   virtualLaneEnd: Map<number, number>;
   params: WorkbenchParams;
   active?: boolean; // 选中的是 ref/worktree 时，其 tip/HEAD 所在行
+  onAddWorktree: () => void;
 }) {
   const isVirtual = 'worktree' in c && !!c.worktree;
   const nodeColor = isVirtual ? VIRTUAL_COLOR : LANE_PALETTE[(c.color ?? 0) % LANE_PALETTE.length];
   return (
     // 行高用固定 px（与 svg 的 ROW_H 同源）：根字号随视口 clamp 缩放，
     // rem 行高会与大屏下的 svg px 几何错位
-    <div data-sha={c.sha} className="flex items-stretch" style={{ height: ROW_H }}>
+    <div data-sha={c.sha} className="group/commit flex items-stretch hover:bg-accent" style={{ height: ROW_H }}>
       {/* 泳道列：本行 svg 画「上一节点中心 → 本节点中心」的连线段（Row = rowIndex-1）+ 本行节点。
           节点圆心在行高中点，线段纵向须跨 -ROW_H/2 ~ +ROW_H/2（上一行圆心到本行圆心），
           svg 设 overflow visible 允许向上越界绘制 */}
@@ -566,6 +688,18 @@ function CommitRow({
           </>
         }
       />
+      {!('worktree' in c && c.worktree) ? (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          className="mr-1 shrink-0 opacity-0 transition-opacity group-hover/commit:opacity-100"
+          title="在此 commit 新建 worktree"
+          aria-label="在此 commit 新建 worktree"
+          onClick={onAddWorktree}
+        >
+          <Plus className="size-3.5" />
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -677,12 +811,23 @@ function SelectableRow({
   );
 }
 
-function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
+function Section({
+  title,
+  icon,
+  action,
+  children,
+}: {
+  title: string;
+  icon: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <section className="p-2">
       <div className="flex items-center gap-1.5 px-1 pb-1.5 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">
         {icon}
         {title}
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
       <div className="flex flex-col gap-0.5">{children}</div>
     </section>

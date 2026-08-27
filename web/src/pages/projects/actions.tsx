@@ -41,12 +41,17 @@ export function ProjectActions({
   const targets = projectTargets(p);
   const multiTarget = targets.length > 1;
 
-  const isPending = (name: string) => open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
+  const isPending = (name: string) =>
+    open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
 
   const targetMenuItems = (openerName: string) =>
     targets.map((t) => (
-      <DropdownMenuItem key={t.dir || '/'} onClick={() => openTarget(openerName, t.dir)} disabled={isPending(openerName)}>
+      <DropdownMenuItem
+        key={t.dir || '/'}
+        onClick={() => openTarget(openerName, t.dir)}
+        disabled={isPending(openerName)}
+      >
         {renderIcon(openerByName.get(openerName)?.icon, undefined)}
         {t.label}
       </DropdownMenuItem>
@@ -86,9 +91,7 @@ export function ProjectActions({
         <DropdownMenuTrigger render={button} />
         <DropdownMenuContent align="end" className="min-w-48">
           <DropdownMenuGroup>
-            <DropdownMenuLabel>
-              {op.title} · 选择目标
-            </DropdownMenuLabel>
+            <DropdownMenuLabel>{op.title} · 选择目标</DropdownMenuLabel>
             {targetMenuItems(name)}
           </DropdownMenuGroup>
         </DropdownMenuContent>

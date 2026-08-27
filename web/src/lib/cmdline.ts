@@ -38,7 +38,5 @@ export function tokenizeCmdLine(line: string): string[] {
 
 /** 还原为编辑文本：仅对含空格/引号的 token 加双引号（内部 " 转义为 \"），其余原样。 */
 export function joinCmdLine(tokens: string[]): string {
-  return tokens
-    .map((t) => (/[\s"]/.test(t) ? `"${t.replaceAll('"', '\\"')}"` : t))
-    .join(' ');
+  return tokens.map((t) => (/[\s"]/.test(t) ? `"${t.replaceAll('"', '\\"')}"` : t)).join(' ');
 }

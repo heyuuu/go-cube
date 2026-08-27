@@ -378,6 +378,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/branch/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 删除本地分支 */
+    post: operations['workbench.branchDelete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/changes': {
     parameters: {
       query?: never;
@@ -542,6 +559,40 @@ export interface paths {
     get: operations['workbench.tree'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/worktree/add': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新增 worktree */
+    post: operations['workbench.worktreeAdd'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/workbench/worktree/remove': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 删除 worktree（非 force 预检拒绝返回 denied+reasons） */
+    post: operations['workbench.worktreeRemove'];
     delete?: never;
     options?: never;
     head?: never;
@@ -790,6 +841,39 @@ export interface components {
       data: components['schemas']['WhoamiResponse'];
       message: string;
       ok: boolean;
+    };
+    ApiOutputWorktreeCreatedBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputWorktreeCreatedBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['WorktreeCreated'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputWorktreeRemoveResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputWorktreeRemoveResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['WorktreeRemoveResult'];
+      message: string;
+      ok: boolean;
+    };
+    BranchDeleteRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/BranchDeleteRequest.json
+       */
+      readonly $schema?: string;
+      branch: string;
+      force?: boolean;
+      path: string;
     };
     CloneRule: {
       localPath: string;
@@ -1184,10 +1268,42 @@ export interface components {
       app: string;
       version: string;
     };
+    WorktreeAddRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/WorktreeAddRequest.json
+       */
+      readonly $schema?: string;
+      branch?: string;
+      commitish?: string;
+      path: string;
+      targetPath?: string;
+    };
+    WorktreeCreated: {
+      branch: string;
+      detached: boolean;
+      path: string;
+    };
     WorktreeInfo: {
       branch: string;
       detached: boolean;
       path: string;
+    };
+    WorktreeRemoveRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/WorktreeRemoveRequest.json
+       */
+      readonly $schema?: string;
+      force?: boolean;
+      path: string;
+      targetPath: string;
+    };
+    WorktreeRemoveResult: {
+      denied: boolean;
+      reasons: string[] | null;
     };
     WorktreeStatus: {
       /** Format: int64 */
@@ -1910,6 +2026,39 @@ export interface operations {
       };
     };
   };
+  'workbench.branchDelete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BranchDeleteRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'workbench.changes': {
     parameters: {
       query: {
@@ -2221,6 +2370,72 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputTreeListResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.worktreeAdd': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorktreeAddRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputWorktreeCreatedBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.worktreeRemove': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorktreeRemoveRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputWorktreeRemoveResultBody'];
         };
       };
       /** @description Error */

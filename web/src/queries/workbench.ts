@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiGet, apiPost } from '@/api/client';
 import type { components } from '@/api/schema';
@@ -158,3 +158,48 @@ export function useWorkbenchChanges(path: string, src: TreeSource, enabled: bool
     refetchInterval: src?.type === 'worktree' ? 30_000 : false,
   });
 }
+
+// --- worktree / 分支写侧（提案 1031）---
+// 写成功后统一失效 workbench 全部查询（副本/refs/commits/tree 都可能变化）+
+// 项目列表（后端已定向刷新 gitcache 快照，前端重取即可见新目标）
+
+function useInvalidateWorkbench(path: string) {
+  const qc = useQueryClient();
+  return () => {
+    void qc.invalidateQueries({ queryKey: ['workbench'] });
+    void qc.invalidateQueries({ queryKey: ['project', 'list'] });
+    void path;
+  };
+}
+
+// 新增 worktree：branch/commitish/targetPath 均可空（服务端定形态与预填路径）
+export function useWorktreeAdd(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: (input: { branch?: string; commitish?: string; targetPath?: string }) =>
+      apiPost('/api/workbench/worktree/add', { path, ...input }),
+    onSuccess: invalidate,
+  });
+}
+
+// 删除 worktree：非 force 被预检拒绝时返回 denied=true + reasons（由 UI 二次确认升级 force）
+export function useWorktreeRemove(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: (input: { targetPath: string; force?: boolean }) =>
+      apiPost('/api/workbench/worktree/remove', { path, ...input }),
+    onSuccess: invalidate,
+  });
+}
+
+export function useBranchDelete(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: (input: { branch: string; force?: boolean }) =>
+      apiPost('/api/workbench/branch/delete', { path, ...input }),
+    onSuccess: invalidate,
+  });
+}
+
+export type WorktreeCreated = components['schemas']['WorktreeCreated'];
+export type WorktreeRemoveResult = components['schemas']['WorktreeRemoveResult'];

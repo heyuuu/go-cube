@@ -1,4 +1,14 @@
-import { ArrowDown, ArrowDownWideNarrow, ArrowUp, ArrowUpDown, ChevronRight, Folder, FolderGit2, RefreshCw, RotateCcw } from 'lucide-react';
+import {
+  ArrowDown,
+  ArrowDownWideNarrow,
+  ArrowUp,
+  ArrowUpDown,
+  ChevronRight,
+  Folder,
+  FolderGit2,
+  RefreshCw,
+  RotateCcw,
+} from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -9,7 +19,12 @@ import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { IconDecl } from '@/lib/icon';
@@ -386,7 +401,9 @@ export function ProjectsPage() {
   const desc = sortMode.endsWith('-desc');
   if (key === 'recent') {
     // 未用过的（无 lastUsedAt）靠稳定排序保持原序垫底
-    sorted.sort((a, b) => (desc ? timeOf(a.lastUsedAt) - timeOf(b.lastUsedAt) : timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt)));
+    sorted.sort((a, b) =>
+      desc ? timeOf(a.lastUsedAt) - timeOf(b.lastUsedAt) : timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt),
+    );
   } else if (key === 'name') {
     sorted.sort((a, b) => (desc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
   } else if (key === 'group') {
@@ -528,7 +545,10 @@ export function ProjectsPage() {
                 <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
                   <ArrowDownWideNarrow data-icon="inline-start" />
                   排序：
-                  {sortMode === 'default' ? '默认' : (sortKeys.find((k) => sortMode === k.value || sortMode === `${k.value}-desc`)?.label ?? '') + (sortMode.endsWith('-desc') ? ' ↓' : '')}
+                  {sortMode === 'default'
+                    ? '默认'
+                    : (sortKeys.find((k) => sortMode === k.value || sortMode === `${k.value}-desc`)?.label ?? '') +
+                      (sortMode.endsWith('-desc') ? ' ↓' : '')}
                 </Button>
               }
             />
@@ -542,9 +562,7 @@ export function ProjectsPage() {
                 </DropdownMenuItem>,
               ])}
               {/* sort 缺省即「最近使用 ↓」（默认排序），扫描原序需显式选择 */}
-              <DropdownMenuItem onClick={() => updateParams({ sort: 'default' })}>
-                扫描原序
-              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => updateParams({ sort: 'default' })}>扫描原序</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )}
@@ -670,10 +688,27 @@ export function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-9" />
-                  <SortableHead k="name" label="name" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} />
-                  <SortableHead k="group" label="group" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} className="w-24" />
+                  <SortableHead
+                    k="name"
+                    label="name"
+                    mode={sortMode}
+                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                  />
+                  <SortableHead
+                    k="group"
+                    label="group"
+                    mode={sortMode}
+                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                    className="w-24"
+                  />
                   <TableHead className="w-64">git</TableHead>
-                  <SortableHead k="recent" label="最近使用" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} className="w-32" />
+                  <SortableHead
+                    k="recent"
+                    label="最近使用"
+                    mode={sortMode}
+                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                    className="w-32"
+                  />
                   <TableHead className="w-32" />
                 </TableRow>
               </TableHeader>
