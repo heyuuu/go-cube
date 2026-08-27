@@ -24,7 +24,7 @@
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 
-- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（进 git），CLI/Web 打开流程插入 workspace 选择；标准声明文件（pnpm-workspace.yaml 等）仅做候选探测不落盘（**出口接入的地基 1032 已归档，可实施**）
+- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（`workspaces` 显式声明优先，无声明时按 `workspaceScanRule`/默认规则探测 pnpm/npm 标准声明文件为正选），workspace 作为第三来源进 `OpenTargets`（采集侧组合进快照，gitcache 顺势更名 projcache）；CLI/Web 选择复用 1032 泛化链路，另增 `cube workspace init` 固化声明（**已讨论定稿，待实施**）
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 
