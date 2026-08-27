@@ -131,12 +131,17 @@ export function ProjectActions({
   );
 }
 
-// worktree 计数徽标（多目标项目的行内提示，1032）
+// worktree 计数徽标（多目标项目的行内提示，1032）。
+// 紫罗兰专属配色：与 tag 徽标（default/outline）和 git 状态徽标视觉区分
 export function WorktreeCountBadge({ p }: { p: Project }) {
   const n = p.gitInfo?.worktrees?.length ?? 0;
   if (n === 0) return null;
   return (
-    <Badge variant="outline" title={`${n} 个 worktree（打开时可选目标）`}>
+    <Badge
+      variant="outline"
+      title={`${n} 个 worktree（打开时可选目标）`}
+      className="border-violet-500/40 bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400"
+    >
       ⎇ {n}
     </Badge>
   );
