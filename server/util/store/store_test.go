@@ -262,3 +262,18 @@ func TestIterJsonlReverse(t *testing.T) {
 		}
 	}
 }
+
+// 统一契约：所有写操作自动递归创建父目录
+func TestWriteOpsCreateParentDir(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+
+	if err := AppendJsonl(ws.Join("a/b/c/usage.jsonl"), map[string]int{"x": 1}); err != nil {
+		t.Fatalf("AppendJsonl 应自动建父目录: %v", err)
+	}
+	if err := SaveJson(ws.Join("d/e/config.json"), map[string]int{"x": 1}); err != nil {
+		t.Fatalf("SaveJson 应自动建父目录: %v", err)
+	}
+	if err := WriteFileAtomic(ws.Join("f/g/raw.bin"), []byte("x"), 0644); err != nil {
+		t.Fatalf("WriteFileAtomic 应自动建父目录: %v", err)
+	}
+}

@@ -15,8 +15,6 @@ require (
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/term v0.43.0
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/driver/sqlite v1.6.0
-	gorm.io/gorm v1.31.2
 )
 
 require (
@@ -35,11 +33,8 @@ require (
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/lucasb-eyer/go-colorful v1.3.0 // indirect
 	github.com/mattn/go-runewidth v0.0.23 // indirect
-	github.com/mattn/go-sqlite3 v1.14.48 // indirect
 	github.com/mitchellh/hashstructure/v2 v2.0.2 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
@@ -47,5 +42,4 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.45.0 // indirect
-	golang.org/x/text v0.40.0 // indirect
 )

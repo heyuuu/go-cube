@@ -20,6 +20,7 @@ import (
 	"cube/opener"
 	"cube/project"
 	"cube/settings"
+	"cube/usage"
 	"cube/web"
 	"cube/workbench"
 )
@@ -65,6 +66,7 @@ func newTestEnv(t *testing.T) *testEnv {
 	projSvc := project.NewService(settingsFile, ws.Join("cache"))
 	exec := &fakeExecutor{}
 	openerSvc := opener.NewService(settingsFile, exec)
+	usageSvc := usage.NewService(ws.Join("usage.jsonl"))
 	cfg := &config.Config{
 		DataDir: ws.Join("data"),
 	}
@@ -72,8 +74,8 @@ func newTestEnv(t *testing.T) *testEnv {
 	srv := web.NewServer(
 		config.ServerConfig{Port: 6101},
 		[]web.Handler{
-			NewProjectHandler(projSvc),
-			NewOpenerHandler(openerSvc),
+			NewProjectHandler(projSvc, usageSvc),
+			NewOpenerHandler(openerSvc, projSvc, usageSvc),
 			NewConfigHandler(cfg),
 			NewMdHandler(),
 			NewWorkbenchHandler(workbench.NewService()),

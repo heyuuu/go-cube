@@ -2,12 +2,14 @@ package handlers
 
 import (
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/project"
 	"cube/project/gitcache"
+	"cube/usage"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
 	"cube/web"
@@ -15,11 +17,12 @@ import (
 
 // --- dto ---
 type ProjectDTO struct {
-	Name    string          `json:"name"`
-	Group   string          `json:"group"`
-	Path    string          `json:"path"`
-	Tags    []string        `json:"tags"`
-	GitInfo *gitcache.Entry `json:"gitInfo"` // git 状态快照，可能为 nil（未采集）
+	Name       string          `json:"name"`
+	Group      string          `json:"group"`
+	Path       string          `json:"path"`
+	Tags       []string        `json:"tags"`
+	GitInfo    *gitcache.Entry `json:"gitInfo"`              // git 状态快照，可能为 nil（未采集）
+	LastUsedAt *time.Time      `json:"lastUsedAt,omitempty"` // 最近使用时间（置顶排序信号，未用过为 nil）
 }
 
 // ProjectListResult 列表接口返回结构：含项目列表 + 两类刷新时间。
@@ -31,13 +34,18 @@ type ProjectListResult struct {
 
 // --- handler ---
 
+// recentPinnedLimit 项目列表最近使用置顶的条数。
+const recentPinnedLimit = 10
+
 type ProjectHandler struct {
 	projectService *project.Service
+	usageService   *usage.Service
 }
 
-func NewProjectHandler(projectService *project.Service) *ProjectHandler {
+func NewProjectHandler(projectService *project.Service, usageService *usage.Service) *ProjectHandler {
 	return &ProjectHandler{
 		projectService: projectService,
+		usageService:   usageService,
 	}
 }
 
@@ -56,12 +64,51 @@ func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 
 func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
 	projects := h.projectService.Projects()
-	list := slicekit.Map(projects, h.toProjectDTO)
+	// 最近使用的项目置顶（按最近使用倒序，最多 10 条），其余保持原序
+	latest := h.usageService.LatestByProject()
+	projects = sortProjectsByUsage(projects, latest, recentPinnedLimit)
+	list := slicekit.Map(projects, func(p *project.Project) *ProjectDTO {
+		dto := h.toProjectDTO(p)
+		if t, ok := latest[p.Path()]; ok {
+			tt := t
+			dto.LastUsedAt = &tt
+		}
+		return dto
+	})
 	return ProjectListResult{
 		List:          list,
 		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
 		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
 	}, nil
+}
+
+// sortProjectsByUsage 最近使用的项目置顶（按最近使用倒序，最多 limit 条），其余保持原序。
+// 排序键是项目路径（usage 记录的 project 字段）。
+func sortProjectsByUsage(projects []*project.Project, latest map[string]time.Time, limit int) []*project.Project {
+	pinned := make([]string, 0, len(latest))
+	for path := range latest {
+		pinned = append(pinned, path)
+	}
+	slices.SortFunc(pinned, func(a, b string) int {
+		return latest[b].Compare(latest[a])
+	})
+	if len(pinned) > limit {
+		pinned = pinned[:limit]
+	}
+
+	weights := make(map[string]int, len(projects))
+	for i, proj := range projects {
+		weights[proj.Path()] = i + len(pinned)
+	}
+	for i, path := range pinned {
+		weights[path] = i
+	}
+
+	slices.SortFunc(projects, func(a, b *project.Project) int {
+		return weights[a.Path()] - weights[b.Path()]
+	})
+
+	return projects
 }
 
 // ProjectInfoResult 详情接口返回结构：含项目 DTO + 两类刷新时间。

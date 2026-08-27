@@ -3,6 +3,7 @@ package alfred
 import (
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -22,9 +23,9 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 			// 项目列表
 			projects := a.ProjectService().SearchByName(query)
 
-			// 最近打开日志
-			history := a.HistoryService().LeastSelectedProjects(10, true)
-			sortProjectsWithHistory(projects, history)
+			// 最近使用的项目置顶
+			latest := a.UsageService().LatestByProject()
+			projects = sortProjectsByUsage(projects, latest, 10)
 
 			// 返回结果
 			return PrintResult(projects, func(proj *project.Project) Item {
@@ -39,18 +40,30 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 	return cmd
 }
 
-// 优先将 history 排在前面，保持其他顺序不变
-func sortProjectsWithHistory(projects []*project.Project, history []string) []*project.Project {
-	weights := make(map[string]int, len(history))
-	for i, proj := range projects {
-		weights[proj.Name()] = i + len(history)
+// sortProjectsByUsage 最近使用的项目置顶（按最近使用倒序，最多 limit 条），其余保持原序。
+// 排序键是项目路径（usage 记录的 project 字段）。
+func sortProjectsByUsage(projects []*project.Project, latest map[string]time.Time, limit int) []*project.Project {
+	pinned := make([]string, 0, len(latest))
+	for path := range latest {
+		pinned = append(pinned, path)
 	}
-	for i, proj := range history {
-		weights[proj] = i
+	slices.SortFunc(pinned, func(a, b string) int {
+		return latest[b].Compare(latest[a])
+	})
+	if len(pinned) > limit {
+		pinned = pinned[:limit]
+	}
+
+	weights := make(map[string]int, len(projects))
+	for i, proj := range projects {
+		weights[proj.Path()] = i + len(pinned)
+	}
+	for i, path := range pinned {
+		weights[path] = i
 	}
 
 	slices.SortFunc(projects, func(a, b *project.Project) int {
-		return weights[a.Name()] - weights[b.Name()]
+		return weights[a.Path()] - weights[b.Path()]
 	})
 
 	return projects

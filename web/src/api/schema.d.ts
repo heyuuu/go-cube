@@ -1064,6 +1064,8 @@ export interface components {
     ProjectDTO: {
       gitInfo: components['schemas']['Entry'];
       group: string;
+      /** Format: date-time */
+      lastUsedAt?: string;
       name: string;
       path: string;
       tags: string[] | null;

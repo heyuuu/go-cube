@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"cube/project"
 	"cube/project/gitcache"
@@ -235,5 +236,39 @@ func TestCloneRuleWrite(t *testing.T) {
 	r2 := postJSON(t, env.url("/api/project/clone-rule/delete"), `{"repoHost":"nope.com","repoPrefix":""}`)
 	if r2.Ok || !strings.Contains(r2.Message, "未找到") {
 		t.Fatalf("删除不存在应报中文错误, message=%q", r2.Message)
+	}
+}
+
+func TestProjectList_UsagePinned(t *testing.T) {
+	env := newTestEnv(t)
+
+	// 打开 proj2（原序列第二位），应产生 usage 记录
+	body := fmt.Sprintf(`{"path":%q,"opener":"finder"}`, env.ws.Join("g2", "proj2"))
+	resp, err := http.Post(env.url("/api/opener/open"), "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("POST opener/open 失败: %v", err)
+	}
+	resp.Body.Close()
+
+	var got struct {
+		List []struct {
+			Name       string     `json:"name"`
+			LastUsedAt *time.Time `json:"lastUsedAt"`
+		} `json:"list"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/list")), &got)
+
+	if len(got.List) != 2 {
+		t.Fatalf("应扫描到 2 个项目, got %d", len(got.List))
+	}
+	// 最近使用的 proj2 置顶（原序 proj1 在前），且带 lastUsedAt；proj1 无
+	if got.List[0].Name != "g2:proj2" {
+		t.Fatalf("最近使用的 g2:proj2 应置顶, got %v", got.List)
+	}
+	if got.List[0].LastUsedAt == nil {
+		t.Error("g2:proj2 应带 lastUsedAt")
+	}
+	if got.List[1].Name != "g1:proj1" || got.List[1].LastUsedAt != nil {
+		t.Errorf("g1:proj1 应保持原序且无 lastUsedAt, got %v", got.List[1])
 	}
 }

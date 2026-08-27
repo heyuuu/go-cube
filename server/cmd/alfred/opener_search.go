@@ -20,18 +20,15 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := args
 
-			// sticky: alfred 选择项目后会以空参数调用此命令
-			if len(query) == 0 && len(projectName) > 0 {
-				a.HistoryService().AddProjectSelectLog(projectName, true)
-			}
-
 			// 获取匹配的命令列表
 			openers := a.OpenerService().SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
-			// 若指定项目，且对应空间有指定命令优先级，则按优先级排序
+			// 若指定项目，且该项目有 opener 使用偏好，则按最近使用排序
 			if len(projectName) > 0 {
-				history := a.HistoryService().LeastProjectOpenApps(projectName, 3, true)
-				openers = sortOpeners(openers, history)
+				if proj := a.ProjectService().FindByName(projectName); proj != nil {
+					history := a.UsageService().LatestOpeners(proj.Path(), 3)
+					openers = sortOpeners(openers, history)
+				}
 			}
 
 			// 返回结果

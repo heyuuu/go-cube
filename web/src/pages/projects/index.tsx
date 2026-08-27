@@ -216,6 +216,11 @@ function TreeRowView({
               {t}
             </ClickBadge>
           ))}
+          {p.lastUsedAt && (
+            <Badge variant="secondary" title={`最近使用：${formatDateTime(p.lastUsedAt)}`}>
+              {prettyTime(p.lastUsedAt)}
+            </Badge>
+          )}
           <GitCell p={p} onFilter={onFilterGit} />
           <div className="ml-auto">
             <ProjectActions p={p} openerList={openerList} open={open} onOpen={onOpen} />
@@ -572,6 +577,11 @@ export function ProjectsPage() {
                             {t}
                           </ClickBadge>
                         ))}
+                        {p.lastUsedAt && (
+                          <Badge variant="secondary" title={`最近使用：${formatDateTime(p.lastUsedAt)}`}>
+                            {prettyTime(p.lastUsedAt)}
+                          </Badge>
+                        )}
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
                         {prettyPath(p.path, home)}

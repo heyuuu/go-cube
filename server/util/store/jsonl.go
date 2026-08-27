@@ -11,14 +11,18 @@ import (
 	"iter"
 	"log/slog"
 	"os"
+	"path/filepath"
 )
 
-// AppendJsonl 序列化 v 为单行 JSON 追加写入 path（不存在则创建）。
+// AppendJsonl 序列化 v 为单行 JSON 追加写入 path（不存在则创建，父目录自动递归创建）。
 // O_APPEND 小块写由 POSIX 保证原子，无需跨进程锁（单写者追加语义）。
 func AppendJsonl[T any](path string, v T) error {
 	data, err := json.Marshal(v)
 	if err != nil {
 		return fmt.Errorf("序列化 JSONL 行失败: %w", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+		return fmt.Errorf("创建目标目录失败: %w", err)
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {

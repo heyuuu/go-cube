@@ -11,7 +11,8 @@ import (
 // 子项相对根的文件/目录名。
 const (
 	settingsFileName = "settings.json"
-	dbFileName       = "data.db"
+	stateDirName     = "state"
+	usageFileName    = "usage.jsonl"
 	cacheDirName     = "cache"
 )
 
@@ -36,5 +37,11 @@ func NewPaths(dataDir string) *Paths {
 
 func (p *Paths) DataDir() string      { return p.dataDir }
 func (p *Paths) SettingsFile() string { return filepath.Join(p.dataDir, settingsFileName) }
-func (p *Paths) DataDbFile() string   { return filepath.Join(p.dataDir, dbFileName) }
-func (p *Paths) CacheDir() string     { return filepath.Join(p.dataDir, cacheDirName) }
+
+// StateDir 运行期状态目录（如 usage.jsonl）：由日常使用产生、非配置非缓存——
+// 丢了可接受但不理想，区别于 cache/ 的「可整体删除且行为不变差」。
+func (p *Paths) StateDir() string  { return filepath.Join(p.dataDir, stateDirName) }
+func (p *Paths) UsageFile() string { return filepath.Join(p.dataDir, stateDirName, usageFileName) }
+
+// CacheDir 纯缓存目录（如 git.json）：可整体删除且 cube 行为不变差，随时可重建。
+func (p *Paths) CacheDir() string { return filepath.Join(p.dataDir, cacheDirName) }

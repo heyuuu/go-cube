@@ -3,6 +3,7 @@ package alfred
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -21,9 +22,6 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			projectName := args[0]
 
-			// history: 记录打开项目的程序
-			a.HistoryService().AddProjectOpenLog(projectName, openerName, true)
-
 			// 匹配项目
 			proj := a.ProjectService().FindByName(projectName)
 			if proj == nil {
@@ -40,6 +38,11 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 			err := o.Open(opener.RoleOpenDir, proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
+			}
+
+			// 记录使用信号（best-effort：失败不影响打开结果）；打开主项目根，dir 为空
+			if err := a.UsageService().RecordOpen(proj.Path(), o.Name(), ""); err != nil {
+				slog.Warn("记录 usage 失败", "err", err)
 			}
 
 			return nil

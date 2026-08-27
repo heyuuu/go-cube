@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/opener"
+	"cube/project"
+	"cube/usage"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
 	"cube/web"
@@ -51,12 +54,16 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 // --- handler ---
 
 type OpenerHandler struct {
-	service *opener.Service
+	service        *opener.Service
+	projectService *project.Service
+	usageService   *usage.Service
 }
 
-func NewOpenerHandler(service *opener.Service) *OpenerHandler {
+func NewOpenerHandler(service *opener.Service, projectService *project.Service, usageService *usage.Service) *OpenerHandler {
 	return &OpenerHandler{
-		service: service,
+		service:        service,
+		projectService: projectService,
+		usageService:   usageService,
 	}
 }
 
@@ -114,6 +121,19 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 	// role 是否支持由实现内校验（Open 首步），这里只透传错误
 	if err := o.Open(role, input.Body.Path); err != nil {
 		return nil, fmt.Errorf("打开失败: %w", err)
+	}
+
+	// 打开目标是已收录项目时记录使用信号（best-effort：失败不影响打开结果）。
+	// 非项目路径不记——脏 key 永不过期，会污染排序信号。
+	// dir 记实际打开目录：等于主项目根时省略；worktree / workspace 子目录（1030/1032 落地后）记其绝对路径。
+	if proj := h.projectService.FindByPath(input.Body.Path); proj != nil {
+		dir := ""
+		if input.Body.Path != proj.Path() {
+			dir = input.Body.Path
+		}
+		if err := h.usageService.RecordOpen(proj.Path(), o.Name(), dir); err != nil {
+			slog.Warn("记录 usage 失败", "err", err)
+		}
 	}
 	return map[string]any{"ok": true}, nil
 }

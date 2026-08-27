@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/cobra"
 
@@ -40,6 +41,11 @@ query 支持项目名和项目列表模糊搜索，具体规则同 info 命令�
 			err = o.Open(role, proj.Path())
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
+			}
+
+			// 记录使用信号（best-effort：失败不影响打开结果）；打开主项目根，dir 为空
+			if err := a.UsageService().RecordOpen(proj.Path(), o.Name(), ""); err != nil {
+				slog.Warn("记录 usage 失败", "err", err)
 			}
 
 			return nil
