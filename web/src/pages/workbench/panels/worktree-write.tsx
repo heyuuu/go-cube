@@ -43,6 +43,7 @@ export function WorktreeAddDialog({
   const [, setSearchParams] = useSearchParams();
 
   const submit = () => {
+    if (add.isPending) return; // 回车与按钮共用入口，防 pending 期间重复提交
     add.mutate(
       {
         branch: branch.trim() || undefined,
@@ -92,6 +93,7 @@ export function BranchAddDialog({ path, onClose }: { path: string; onClose: () =
   const [, setSearchParams] = useSearchParams();
 
   const submit = () => {
+    if (add.isPending || branch.trim() === '') return; // 回车与按钮共用入口
     add.mutate(
       { branch: branch.trim(), commitish: commitish.trim() || undefined },
       {
@@ -113,14 +115,29 @@ export function BranchAddDialog({ path, onClose }: { path: string; onClose: () =
 
   return (
     <WriteDialogShell title="新建分支" onClose={onClose}>
-      <Field label="分支名" hint="不会切 HEAD，只创建引用；要「建并切过去」用新建 worktree">
-        <Input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="feat/xxx" autoFocus />
-      </Field>
-      <Field label="基点" hint="commit / 分支 / tag，留空 = HEAD">
-        <Input value={commitish} onChange={(e) => setCommitish(e.target.value)} placeholder="HEAD" />
-      </Field>
-      {add.isError ? <ErrorLine message={add.error.message} /> : null}
-      <DialogActions confirmText="创建" pending={add.isPending} onConfirm={submit} onCancel={onClose} />
+      <form
+        className="flex flex-col gap-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <Field label="分支名" hint="不会切 HEAD，只创建引用；要「建并切过去」用新建 worktree">
+          <Input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="feat/xxx" autoFocus />
+        </Field>
+        <Field label="基点" hint="commit / 分支 / tag，留空 = HEAD">
+          <Input value={commitish} onChange={(e) => setCommitish(e.target.value)} placeholder="HEAD" />
+        </Field>
+        {add.isError ? <ErrorLine message={add.error.message} /> : null}
+        <DialogActions
+          confirmType="submit"
+          confirmDisabled={branch.trim() === ''}
+          confirmText="创建"
+          pending={add.isPending}
+          onConfirm={submit}
+          onCancel={onClose}
+        />
+      </form>
     </WriteDialogShell>
   );
 }
@@ -328,21 +345,32 @@ function DialogActions({
   confirmText,
   danger,
   pending,
+  confirmDisabled,
+  confirmType = 'button',
   onConfirm,
   onCancel,
 }: {
   confirmText: string;
   danger?: boolean;
   pending?: boolean;
+  confirmDisabled?: boolean;
+  confirmType?: 'button' | 'submit'; // form 内的回车提交依赖 submit 型按钮
   onConfirm: () => void;
   onCancel: () => void;
 }) {
   return (
     <div className="mt-1 flex justify-end gap-2">
-      <Button variant="outline" size="sm" onClick={onCancel}>
+      {/* form 内默认 type=submit，取消必须显式 button */}
+      <Button type="button" variant="outline" size="sm" onClick={onCancel}>
         取消
       </Button>
-      <Button variant={danger ? 'destructive' : 'default'} size="sm" disabled={pending} onClick={onConfirm}>
+      <Button
+        type={confirmType}
+        variant={danger ? 'destructive' : 'default'}
+        size="sm"
+        disabled={pending || confirmDisabled}
+        onClick={onConfirm}
+      >
         {confirmText}
       </Button>
     </div>
