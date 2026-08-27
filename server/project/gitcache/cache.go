@@ -193,6 +193,21 @@ func (c *Cache) Refresh(paths []string) error {
 	return nil
 }
 
+// RefreshOne 定向刷新单个项目的快照条目并落盘（提案 1031：worktree/分支写操作
+// 成功后即时可见，不等 TTL 整表重建）。与 Refresh 的整表重建语义不同：只覆盖
+// 该路径的 entry，其余项目保持原样。采集失败不落盘、保留旧 entry，返回错误
+// 由调用方决定是否上抛（写操作本身已成功，通常 Warn 后依赖 TTL 自愈即可）。
+func (c *Cache) RefreshOne(path string) error {
+	entry, err := collectEntry(path)
+	if err != nil {
+		return fmt.Errorf("定向刷新 git 缓存失败: %w", err)
+	}
+	c.mu.Lock()
+	c.entries[path] = entry
+	c.mu.Unlock()
+	return c.Save()
+}
+
 // defaultWorkers 默认并发数。
 // 偏保守：采集是子进程 + IO 密集型，过高并发会与系统其他 IO 抢资源。
 const defaultWorkers = 8

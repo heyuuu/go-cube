@@ -234,3 +234,39 @@ func TestRefresh_EmptyPaths(t *testing.T) {
 		t.Fatalf("空 Refresh 不应报错: %v", err)
 	}
 }
+
+// RefreshOne 定向刷新单项目：新建 worktree 后即时进快照，不影响其他条目。
+func TestRefreshOne(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepo("repo")
+	other := ws.MakeGitRepo("other")
+	c, _ := Load(ws.Mkdir("cache"))
+
+	if err := c.RefreshOne(repo); err != nil {
+		t.Fatalf("RefreshOne 报错: %v", err)
+	}
+	e, ok := c.Get(repo)
+	if !ok || e.CurrentBranch == "" {
+		t.Fatalf("刷新后应有该项目的 entry: %+v", e)
+	}
+	if _, ok := c.Get(other); ok {
+		t.Fatalf("定向刷新不应影响其他项目")
+	}
+
+	ws.MakeWorktree(repo, "wt-hot", "hotfix")
+	if err := c.RefreshOne(repo); err != nil {
+		t.Fatalf("二次刷新报错: %v", err)
+	}
+	e, _ = c.Get(repo)
+	if len(e.Worktrees) != 1 || e.Worktrees[0].Branch != "hotfix" {
+		t.Fatalf("worktree 应已进快照: %+v", e.Worktrees)
+	}
+
+	// 非 git 目录与整表 Refresh 语义一致：零值 entry 成功写入，不报错
+	if err := c.RefreshOne(ws.Join("plain")); err != nil {
+		t.Fatalf("非仓库按约定应写入零值 entry: %v", err)
+	}
+	if e, ok := c.Get(repo); !ok || e.CurrentBranch == "" {
+		t.Fatalf("其他条目不受影响: %+v", e)
+	}
+}
