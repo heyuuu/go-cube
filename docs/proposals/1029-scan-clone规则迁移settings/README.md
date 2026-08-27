@@ -86,3 +86,11 @@ reorder 的顺序即 settings.json 数组序，与 opener 分区拖拽排序语�
 2. settings 页「项目·扫描」分区完成 scan/clone 两组规则的增删改 + 拖拽排序，保存后 `cube project list --status` / `cube clone` 匹配立即反映新规则（无重启、无缓存不一致）；
 3. `pnpm -C web build`、`cd server && go vet ./... && go test ./...` 通过；
 4. `docs/spec/现状.md` 已同步。
+
+## 实施偏差与增强备忘（2026-08-27 回写）
+
+- **节形态演变（owner 评审）**：单一 `project` 节先拆为 `scanRule`/`cloneRule` 两节（分节独立读写），再更名 `scanRules`/`cloneRules`（数组节复数）；`makeScanRules` 等转换函数并入 `loadScanRules`（加载即转换校验），`ScanRuleSpec`/`CloneRuleSpec` 与领域类型合并。
+- **前端分区拆分（owner 评审）**：原方案「项目·扫描」一分区装两组规则，实装后拆为「项目·扫描」与「项目·Clone」两个分区；共用拖拽 hook 与冻结列样式抽到 `drag-order.ts`。
+- **group 筛选排序语义**：projects 页 group 筛选 chips 由字母序改为 scanRules 规则序（settings 拖拽排序的可见消费方）。
+- **超出提案的增强：scanRules icon 字段 + icon 能力下沉**（后续提案方向，先落于此）：icon 声明语义（`Icon{type,value}` + `ValidateIcon`，nil=可选）从 opener 域下沉 `util/iconkit`，opener 保留「未配置填默认图」特有策略；scanRule 加可选 `icon` 字段（settings 编辑、projects 页 group chips/列表 group 列消费）；前端 `renderIcon`/`IconField`/`LucideIconPicker` 泛化为共享件。`/api/opener/extract-icon` 端点语义通用但路由未迁，属后续议题。
+- **修复**：`ReorderScanRules` 成功后补立即重扫（save/delete 均有，初版遗漏，导致重排后列表与 group 筛选停留旧序）。
