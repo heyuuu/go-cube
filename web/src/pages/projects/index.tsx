@@ -1,4 +1,4 @@
-import { ChevronRight, Folder, FolderGit2, RefreshCw, RotateCcw } from 'lucide-react';
+import { ArrowDown, ArrowDownWideNarrow, ArrowUp, ArrowUpDown, ChevronRight, Folder, FolderGit2, RefreshCw, RotateCcw } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router';
 
@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { IconDecl } from '@/lib/icon';
@@ -26,13 +27,20 @@ import { tagVariants } from './shared';
 
 type GitStatus = 'clean' | 'dirty' | 'ahead' | 'behind' | 'none';
 
-type SortMode = 'recent' | 'default' | 'name';
+// 排序键：default=原始扫描序；其余为 键 / 键-desc（点击表头循环 default → 键 → 键-desc → default）
+type SortKey = 'name' | 'group' | 'recent';
+type SortMode = 'default' | SortKey | `${SortKey}-desc`;
 
-const sortModes: { value: SortMode; label: string }[] = [
+const sortKeys: { value: SortKey; label: string }[] = [
   { value: 'recent', label: '最近使用' },
-  { value: 'default', label: '默认' },
   { value: 'name', label: '名称' },
+  { value: 'group', label: '分组' },
 ];
+
+function isSortMode(v: string | null): v is SortMode {
+  if (v === 'default') return true;
+  return sortKeys.some((k) => v === k.value || v === `${k.value}-desc`);
+}
 
 const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
   { value: 'all', label: '全部' },
@@ -94,6 +102,40 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     >
       {children}
     </button>
+  );
+}
+
+// 可点击表头：循环 默认(无箭头) → 升序 → 降序 → 默认。排序与筛选分离，不进 chips 区
+function SortableHead({
+  k,
+  label,
+  mode,
+  onSet,
+  className,
+}: {
+  k: SortKey;
+  label: string;
+  mode: SortMode;
+  onSet: (m: SortMode) => void;
+  className?: string;
+}) {
+  const active = mode === k || mode === `${k}-desc`;
+  const desc = mode === `${k}-desc`;
+  const Icon = !active ? ArrowUpDown : desc ? ArrowDown : ArrowUp;
+  return (
+    <TableHead className={className}>
+      <button
+        type="button"
+        className={cn(
+          'flex items-center gap-1 hover:text-foreground',
+          active ? 'text-foreground' : 'text-muted-foreground',
+        )}
+        onClick={() => onSet(!active ? k : desc ? 'default' : `${k}-desc`)}
+      >
+        {label}
+        <Icon className="size-3" />
+      </button>
+    </TableHead>
   );
 }
 
@@ -324,16 +366,20 @@ export function ProjectsPage() {
     return true;
   });
 
-  // 排序是视图偏好（后端返回原始扫描序 + lastUsedAt）：先筛选后排序，与筛选同侧
-  const sortMode: SortMode = sortModes.some((s) => s.value === searchParams.get('sort'))
-    ? (searchParams.get('sort') as SortMode)
-    : 'recent';
+  // 排序是视图偏好（后端返回原始扫描序 + lastUsedAt）：先筛选后排序，与筛选同侧。
+  // 默认最近使用（进入页面即有置顶信号），用户点表头/下拉可切换并持久在 URL
+  const sortParam = searchParams.get('sort');
+  const sortMode: SortMode = isSortMode(sortParam) ? sortParam : 'recent';
   const sorted = [...filtered];
-  if (sortMode === 'recent') {
-    // 全量按最近使用倒序，未用过的（无 lastUsedAt）保持原序垫底；Array.sort 稳定排序保证并列项不动
-    sorted.sort((a, b) => timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt));
-  } else if (sortMode === 'name') {
-    sorted.sort((a, b) => a.name.localeCompare(b.name));
+  const key = sortMode.replace(/-desc$/, '') as SortKey | '';
+  const desc = sortMode.endsWith('-desc');
+  if (key === 'recent') {
+    // 未用过的（无 lastUsedAt）靠稳定排序保持原序垫底
+    sorted.sort((a, b) => (desc ? timeOf(a.lastUsedAt) - timeOf(b.lastUsedAt) : timeOf(b.lastUsedAt) - timeOf(a.lastUsedAt)));
+  } else if (key === 'name') {
+    sorted.sort((a, b) => (desc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name)));
+  } else if (key === 'group') {
+    sorted.sort((a, b) => (desc ? b.group.localeCompare(a.group) : a.group.localeCompare(b.group)));
   }
 
   function toggleGroup(g: string) {
@@ -459,6 +505,34 @@ export function ProjectsPage() {
             </button>
           </span>
         )}
+        {/* 排序：列表模式走表头点击（SortableHead），树模式无表头、此处提供下拉 */}
+        {mode === 'tree' && (
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground">
+                  <ArrowDownWideNarrow data-icon="inline-start" />
+                  排序：
+                  {sortMode === 'default' ? '默认' : (sortKeys.find((k) => sortMode === k.value || sortMode === `${k.value}-desc`)?.label ?? '') + (sortMode.endsWith('-desc') ? ' ↓' : '')}
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="start">
+              {sortKeys.flatMap((k) => [
+                <DropdownMenuItem key={k.value} onClick={() => updateParams({ sort: k.value })}>
+                  {k.label} ↑
+                </DropdownMenuItem>,
+                <DropdownMenuItem key={`${k.value}-desc`} onClick={() => updateParams({ sort: `${k.value}-desc` })}>
+                  {k.label} ↓
+                </DropdownMenuItem>,
+              ])}
+              {/* sort 缺省即「最近使用 ↓」（默认排序），扫描原序需显式选择 */}
+              <DropdownMenuItem onClick={() => updateParams({ sort: 'default' })}>
+                扫描原序
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
         {/* 显示模式切换：列表 / 树 */}
         <div className="ml-auto flex items-center gap-0.5 rounded-md border p-0.5">
           <button
@@ -504,18 +578,6 @@ export function ProjectsPage() {
           <FilterLabel label="git" mode="单选" />
           {gitFilters.map((s) => (
             <Chip key={s.value} active={gitFilter === s.value} onClick={() => setGitFilterValue(s.value)}>
-              {s.label}
-            </Chip>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterLabel label="排序" mode="单选" />
-          {sortModes.map((s) => (
-            <Chip
-              key={s.value}
-              active={sortMode === s.value}
-              onClick={() => updateParams({ sort: s.value === 'recent' ? null : s.value })}
-            >
               {s.label}
             </Chip>
           ))}
@@ -584,9 +646,10 @@ export function ProjectsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-9" />
-                  <TableHead>name</TableHead>
-                  <TableHead className="w-24">group</TableHead>
+                  <SortableHead k="name" label="name" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} />
+                  <SortableHead k="group" label="group" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} className="w-24" />
                   <TableHead className="w-64">git</TableHead>
+                  <SortableHead k="recent" label="最近使用" mode={sortMode} onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })} className="w-32" />
                   <TableHead className="w-32" />
                 </TableRow>
               </TableHeader>
@@ -623,11 +686,6 @@ export function ProjectsPage() {
                             {t}
                           </ClickBadge>
                         ))}
-                        {p.lastUsedAt && (
-                          <span className="ml-auto pr-1">
-                            <LastUsedTime iso={p.lastUsedAt} />
-                          </span>
-                        )}
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
                         {prettyPath(p.path, home)}
@@ -648,6 +706,7 @@ export function ProjectsPage() {
                     <TableCell>
                       <GitCell p={p} onFilter={toggleGitSolo} />
                     </TableCell>
+                    <TableCell>{p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <div className="flex justify-end">
                         <ProjectActions p={p} openerList={openerList} open={open} onOpen={openProject} />
