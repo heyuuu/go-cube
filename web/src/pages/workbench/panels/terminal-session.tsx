@@ -193,12 +193,7 @@ export function TerminalSession({
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-black">
       <div className="flex h-6 shrink-0 items-center gap-2 px-2 text-[10px] text-muted-foreground">
-        <span
-          className={cn(
-            phase === 'open' && 'text-green-500',
-            phase === 'error' && 'text-destructive',
-          )}
-        >
+        <span className={cn(phase === 'open' && 'text-green-500', phase === 'error' && 'text-destructive')}>
           {phase === 'exited' && exitCode !== null ? `已退出（${exitCode}）` : PHASE_TEXT[phase]}
         </span>
         <div className="ml-auto flex items-center gap-0.5">

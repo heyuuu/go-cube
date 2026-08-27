@@ -241,7 +241,9 @@ export function FileTree({
                       type="button"
                       className={cn(
                         'px-1.5 py-0.5 transition-colors',
-                        scope === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
+                        scope === m
+                          ? 'bg-primary/15 font-medium text-primary'
+                          : 'text-muted-foreground hover:bg-accent',
                       )}
                       onClick={() => onScope(m)}
                       title={m === 'diff' ? '只看变更文件' : '查看全部文件'}

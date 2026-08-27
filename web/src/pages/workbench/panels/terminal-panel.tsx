@@ -10,8 +10,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { PanelSplitter } from '@/pages/workbench/splitter';
 import { cn } from '@/lib/utils';
+import { PanelSplitter } from '@/pages/workbench/splitter';
 
 import { TerminalSession } from './terminal-session';
 import {
@@ -41,8 +41,7 @@ export function TerminalPanel({ path }: { path: string }) {
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [activeTabId, setActiveTabId] = useState<number | null>(null);
   const [activePaneId, setActivePaneId] = useState<number | null>(null);
-  const { fontId, setFontId, fontFamily, fontSize, setFontSize, height, setHeight } =
-    useTerminalPrefs();
+  const { fontId, setFontId, fontFamily, fontSize, setFontSize, height, setHeight } = useTerminalPrefs();
   const contentRef = useRef<HTMLDivElement>(null);
 
   // tab 清空 → 面板视为折叠（派生态，不做级联 setState）；active 指向已删 id 时回落首个 tab
@@ -76,10 +75,7 @@ export function TerminalPanel({ path }: { path: string }) {
         if (t.id !== tabId) return t;
         const idx = afterPaneId ? t.panes.findIndex((p) => p.id === afterPaneId) : -1;
         const pane = { id: paneId, flex: 1 };
-        const panes =
-          idx >= 0
-            ? [...t.panes.slice(0, idx + 1), pane, ...t.panes.slice(idx + 1)]
-            : [...t.panes, pane];
+        const panes = idx >= 0 ? [...t.panes.slice(0, idx + 1), pane, ...t.panes.slice(idx + 1)] : [...t.panes, pane];
         return { ...t, panes };
       }),
     );
@@ -209,10 +205,7 @@ export function TerminalPanel({ path }: { path: string }) {
         </button>
         <div onClick={stop} onDoubleClick={stop}>
           <DropdownMenu>
-            <DropdownMenuTrigger
-              className="rounded p-1 hover:bg-accent hover:text-accent-foreground"
-              title="终端设置"
-            >
+            <DropdownMenuTrigger className="rounded p-1 hover:bg-accent hover:text-accent-foreground" title="终端设置">
               <Settings2 className="size-3.5" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-56">
@@ -239,15 +232,9 @@ export function TerminalPanel({ path }: { path: string }) {
       </div>
       {/* 折叠不卸载：内容常驻（隐藏），会话保持连接；tab 为空时整个内容区不渲染 */}
       {tabs.length > 0 && (
-        <div
-          ref={contentRef}
-          className={cn('relative flex min-h-0 flex-1 flex-col', !open && 'hidden')}
-        >
+        <div ref={contentRef} className={cn('relative flex min-h-0 flex-1 flex-col', !open && 'hidden')}>
           {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              className={cn('flex min-h-0 flex-1', tab.id !== activeTab?.id && 'hidden')}
-            >
+            <div key={tab.id} className={cn('flex min-h-0 flex-1', tab.id !== activeTab?.id && 'hidden')}>
               {tab.panes.map((pane, i) => (
                 <Fragment key={pane.id}>
                   {i > 0 && <PanelSplitter onDelta={(dx) => adjustFlex(tab.id, i - 1, dx)} />}

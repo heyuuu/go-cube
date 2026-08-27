@@ -8,8 +8,8 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useProjectList } from '@/queries/project';
 import { cn } from '@/lib/utils';
+import { useProjectList } from '@/queries/project';
 
 // 工作台顶栏项目切换（提案 1023）：复用 projects 列表数据源，下拉直达其他项目的工作台，
 // 不必退回项目列表再下钻。当前目录不在项目列表时（任意 git 目录入口）仅展示路径，菜单仍可跳。
