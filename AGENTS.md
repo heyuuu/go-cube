@@ -163,7 +163,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 改动敏感区域前先读：
 
 - [`docs/spec/现状.md`](./docs/spec/现状.md) —— 项目现状（定位/架构/命令/API/数据/配置）。改架构边界或加 domain 前必读。**与代码冲突时以代码为准**。
-- [`docs/proposals/`](./docs/proposals/) —— 待办需求提案（按 `日期-主题/` 目录组织，每个提案含 README.md，部分含 alternatives.md / design/）。
+- [`docs/proposals/`](./docs/proposals/) —— 待办需求提案（按 `1xxx-主题/` 目录组织，每个提案含 README.md，部分含 alternatives.md / design/）。**新建提案必须先 `make last-proposal` 取最大 ID，新 ID = 最大 ID + 1，不得重复或凭猜测取号**（详见 docs/README.md 的「ID 分配规则」）。
 - [`docs/references/`](./docs/references/) —— 竞品分析（mani / gitbatch，做批量操作前必读 gitbatch 避坑点）。
 - `README.md` —— 项目主要变更总览。
 

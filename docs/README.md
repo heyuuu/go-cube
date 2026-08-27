@@ -12,7 +12,9 @@
 
 ### [proposals/](proposals/) — 提案
 
-未来需求的提案，每个提案一个目录（`YYMMDD-提案名/`）。活动提案摊平在顶层；挂起的进 `parked/`，完成的进 `archived/`。
+未来需求的提案，每个提案一个目录（`1xxx-提案名/`，ID 为四位递增数字）。活动提案摊平在顶层；挂起的进 `parked/`，完成的进 `archived/`。
+
+**ID 分配规则（硬约束）**：提案 ID 全局唯一、不得重复，三个目录（顶层 / `parked/` / `archived/`）共用一套编号空间。**新建提案前必须先执行 `make last-proposal` 获取当前最大 ID，新提案 ID = 最大 ID + 1**，不得凭记忆或猜测取号。
 
 - [`1015-工作台面板组装/`](proposals/archived/1015-工作台面板组装/) — 工作台自定义布局（面板组装，最后做）
 - [`1014-工作台PTY面板/`](proposals/archived/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）

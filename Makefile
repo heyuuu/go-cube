@@ -66,6 +66,10 @@ tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0
 	git tag -a "$$new_tag" -m "release $$new_tag"; \
 	echo "==> 已打 tag $$new_tag, 如需推送: git push origin $$new_tag"
 
+last-proposal:
+	@ls -d docs/proposals/*/ docs/proposals/archived/*/ docs/proposals/parked/*/ 2>/dev/null \
+		| awk -F/ '/\/1[0-9]{3}-/ {print $$(NF-1)}' | sort | tail -1
+
 # -------
 
 # 起动前清掉 6001 上的残留监听：air 被异常退出后孤儿 server 会一直占着端口，
