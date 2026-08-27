@@ -85,7 +85,7 @@ cube 自身这类 monorepo 常有「用 goland 开 `server/`、用 cursor 开 `w
 
 1. `.cube/cube.json` 解析 + project 层 workspace 查询 + 单测（testfixture 建含子目录的工程）；
 2. 标准声明文件探测（候选生成）+ 单测；
-3. CLI `cube open` 插入 workspace 选择步骤；打开记录 usage 时带 `subPath`（相对项目根），`project` 恒记主项目路径（格式见 [`1027-最近使用排序与usage统一`](../1027-最近使用排序与usage统一/README.md) 的「格式演进约定」）；
+3. CLI `cube open` 插入 workspace 选择步骤；打开记录 usage 时带 `subPath`（相对项目根），`project` 恒记主项目路径（格式见 [`1034-最近使用排序与usage统一`](../1034-最近使用排序与usage统一/README.md) 的「格式演进约定」）；
 4. Web API + 打开入口接入 + cube.json 可视化编辑（usage 记录同样带 `subPath`）；
 5. `docs/spec/现状.md` 同步，验收后归档提案。
 
