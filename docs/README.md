@@ -24,9 +24,8 @@
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 
-- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（进 git），CLI/Web 打开流程插入 workspace 选择；标准声明文件（pnpm-workspace.yaml 等）仅做候选探测不落盘（**出口接入待 1032 落地后实施**）
+- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（进 git），CLI/Web 打开流程插入 workspace 选择；标准声明文件（pnpm-workspace.yaml 等）仅做候选探测不落盘（**出口接入的地基 1032 已归档，可实施**）
 - [`1031-worktree管理/`](proposals/1031-worktree管理/) — 工作台 worktree 写侧管理：新增（新建分支/检出已有/detached，默认同级 `<repo>--<branch>`）/ 删除 worktree + 删除分支，删除类统一 force 预检语义（被检出分支硬拒），写后定向刷新 gitcache；伴随定位修订「Web UI 优先，CLI 简单可行兜底」
-- [`1032-worktree归并为项目打开目标/`](proposals/1032-worktree归并为项目打开目标/) — worktree 从独立项目归并为主项目打开目标：scan 只收录 `.git` 为目录的主仓库，worktree 经 git 枚举进 gitcache 快照（任意位置可见），打开流程选目标，usage 记「项目+目录」双维度（`dir` 字段已由 1034 预留），`worktree` tag 移除；确立「project → 打开目标」模型，1030 排其后
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 
@@ -40,6 +39,7 @@
 
 已实现的需求总结（从 proposals 顶层移入，记录最终落地形态与方案演变）。
 
+- [`1032-worktree归并为项目打开目标/`](proposals/archived/1032-worktree归并为项目打开目标/) — worktree 从独立项目归并为主项目打开目标：scan 只收录 `.git` 为目录的主仓库（`.git` 文件 SkipDir），worktree 经 `git.WorktreeList` 枚举进 gitcache 快照（`Entry.Worktrees`，任意位置可见，存在性三处防护）；打开流程三入口选目标（CLI tui / alfred 平铺直达 / Web 子菜单），usage 记「项目+目录」双维度；`pickProject` 归并链路（pull/push/info 在 worktree 内=操作主仓库）；doctor worktree-lost + `--fix` 自动 prune；`worktree` tag 移除
 - [`1034-最近使用排序与usage统一/`](proposals/archived/1034-最近使用排序与usage统一/) — 统一项目使用记录：history 两表重写为 usage JSONL（`state/usage.jsonl`，O_APPEND 无锁追加 + 启动 compaction，`dir` 字段为 1030/1032 预留）；打开入口收口到 `POST /api/project/open`（三入口全接入）；列表排序前端化（表头点击 + 最近使用列）；gorm/sqlite/data.db 整体移除；伴随项目查询键统一为 path（FindByName 删除）
 - [`1033-util-store文件存储/`](proposals/archived/1033-util-store文件存储/) — util/store 文件存储原语包（WriteFileAtomic 原子写 / SaveJson·LoadJson 缩进 JSON + ErrFileMissing 哨兵 / JSONL 追加·全量读·全量重写·正向逆向流式迭代 iter.Seq2）；gitcache·config·settings 三处手写原子写全部收敛；1034 usage JSONL 的地基
 - [`1029-scan-clone规则迁移settings/`](proposals/archived/1029-scan-clone规则迁移settings/) — scan/clone 规则迁 settings.json（`scanRules`/`cloneRules` 分节，Service 直读不缓存、写侧校验、保存即重扫）；settings 页「项目·扫描」+「项目·Clone」两分区（增删改 + 拖拽）；超额增强：scanRule 可选 icon + icon 语义下沉 util/iconkit + 前端 renderIcon/IconField 共享件；group 筛选改规则序

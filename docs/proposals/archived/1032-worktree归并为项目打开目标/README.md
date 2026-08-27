@@ -1,6 +1,15 @@
 # worktree 归并为项目打开目标
 
-> **状态**：✅ 已实施（待验收）——全部 7 步落地，`go vet` / `go test`（17 包）/ `pnpm build` / 前端 35 测试全通过；验收通过后归档
+}> **状态**：✅ 已实施（已归档，2026-08-28）
+>
+> **实施偏差备忘**（与原方案的差异）：
+> 1. `util/git` 未新增封装——1011 已落地的 `WorktreeList` 直接够用，仅新增 `WorktreeMain`（worktree → 主仓库探测，归并链路原语）与 `WorktreePrune`（doctor --fix 用）；testfixture 补 `MakeWorktree` 建真实 linked worktree；
+> 2. **worktree 存在性三处防护**（原方案未提，验收实测补强）：git 元数据未 prune 前会一直列出已删目录（幽灵目标，open 报 exit 1）——采集侧 `collectWorktrees` 按存在性过滤、查询侧 `OpenTargets` 同样过滤（覆盖两次采集间的窗口期）、Web `project/open` 失联目标报明确中文错误；
+> 3. **doctor 超出原方案**：worktree-lost 检查升级为现场跑 `git.WorktreeList` 探测（不受快照滞后影响）+ 每条 finding 附 prune 建议命令 + 新增 `--fix`（自动对主仓库跑 `git worktree prune`，幂等无损，修复后复核）；
+> 4. **workbench `/worktrees` 端点维持现状**（现场跑 git）——重构面表格里的待定项决策为不统一切 gitcache 快照，工作台与项目解耦不动；
+> 5. 前端附随增强：`⎇ n` 计数徽标（紫罗兰专属配色）、worktree 筛选 chips（`?wt=1`，与 group/git/tag 同侧）、多目标打开走 Base UI 原生子菜单（SubmenuRoot）、详情抽屉 worktrees 独立分组 table 展示（抽屉同步加宽至 40rem）；
+> 6. alfred `project-search` 定为**平铺直达**：每项目展开「根目录 + `name (branch)`」多条目，Arg 传目标目录路径，一步打开体验不变；`opener-search --project` 归一到主项目路径查偏好；
+> 7. 伴随重构（验收驱动）：`easycache.Item` 自记计算时间戳（`UpdatedAt`，TTL 预留），`project.Service` 删平行字段 `scanUpdatedAt`；后台刷新改「保证缓存距今不超过 maxExpireTime（5 分钟）」单节奏（冷启动立即刷/热重载整周期等待/失败整周期退避）——「区分启动刷新与定时刷新」的前提随单节奏模型消失。
 >
 > **关联**：[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（**顺序依赖：本提案先行**，1030 的「打开流程接入」以本提案确立的「project → 打开目标」模型为地基）；[`1004-gitcache常驻化重构`](../archived/1004-gitcache常驻化重构/README.md)（git.json 快照体系，worktree 列表将作为推导数据进入快照）；[`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md)（workbench 已有「全部工作副本」端点，数据源随本提案切换）。
 

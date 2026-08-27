@@ -2,7 +2,7 @@
 
 > **状态**：📝 待评审
 >
-> **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（opener 接口化 + role 体系，本提案不改 opener，仅消费其 open-dir 语义）；[`1008-workspace工作台`](../archived/1008-workspace工作台/README.md)（名字撞车但概念无关：那是 Web 工作台面板，本提案是 monorepo 子目录打开入口）；[`1029-scan-clone规则迁移settings`](../1029-scan-clone规则迁移settings/README.md)（同为 settings/配置边界相关，见「不做的事」）；[`1032-worktree归并为项目打开目标`](../1032-worktree归并为项目打开目标/README.md)（**顺序依赖：1032 先行**——它确立「project → 打开目标」模型，本提案实施顺序 3/4（打开流程接入）待其落地后实施，地基部分（cube.json 解析 / 候选探测）可并行）。
+> **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（opener 接口化 + role 体系，本提案不改 opener，仅消费其 open-dir 语义）；[`1008-workspace工作台`](../archived/1008-workspace工作台/README.md)（名字撞车但概念无关：那是 Web 工作台面板，本提案是 monorepo 子目录打开入口）；[`1029-scan-clone规则迁移settings`](../1029-scan-clone规则迁移settings/README.md)（同为 settings/配置边界相关，见「不做的事」）；[`1032-worktree归并为项目打开目标`](../archived/1032-worktree归并为项目打开目标/README.md)（**顺序依赖：1032 已落地归档**——「project → 打开目标」模型已确立（`Service.OpenTargets`，根目录 + worktrees 两来源），本提案实施顺序 3/4（打开流程接入）以 workspace 为第三个来源纯增量插入，可实施）。
 
 ## 背景与目标
 
