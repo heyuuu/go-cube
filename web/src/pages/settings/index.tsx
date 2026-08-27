@@ -3,17 +3,19 @@ import { useSearchParams } from 'react-router';
 import { PageHeader } from '@/components/page-header';
 import { cn } from '@/lib/utils';
 
+import { CloneSection } from './clone-section';
 import { ConfigSection } from './config-section';
 import { OpenerSection } from './opener-section';
 import { ScanSection } from './scan-section';
 
 // settings 分区清单（提案 1025）：Config（config.json 只读展示的过渡分区）为默认分区，
-// Opener / 项目·扫描 可编辑；各域配置管理能力到位后逐步把 Config 内容收编为可编辑分区。
+// 其余分区可编辑（settings.json）；各域配置管理能力到位后逐步把 Config 内容收编为可编辑分区。
 // key 同时是 ?section= 的取值与内容区分发键。
 const SECTIONS = [
   { key: 'config', label: 'Config' },
   { key: 'opener', label: 'Opener' },
   { key: 'scan', label: '项目·扫描' },
+  { key: 'clone', label: 'Clone 路由' },
 ] as const;
 
 const DEFAULT_SECTION = SECTIONS[0].key;
@@ -51,6 +53,7 @@ export function SettingsPage() {
           {current.key === 'config' && <ConfigSection />}
           {current.key === 'opener' && <OpenerSection />}
           {current.key === 'scan' && <ScanSection />}
+          {current.key === 'clone' && <CloneSection />}
         </div>
       </div>
     </div>
