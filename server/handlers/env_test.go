@@ -50,13 +50,13 @@ func newTestEnv(t *testing.T) *testEnv {
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
-	if err := settings.SaveSection(settingsFile, "scanRule", []project.ScanRule{
+	if err := settings.SaveSection(settingsFile, "scanRules", []project.ScanRule{
 		{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
 		{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
-	if err := settings.SaveSection(settingsFile, "cloneRule", []project.CloneRule{
+	if err := settings.SaveSection(settingsFile, "cloneRules", []project.CloneRule{
 		{RepoHost: "github.com", LocalPath: ws.Join("repo")},
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)

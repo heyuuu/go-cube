@@ -19,7 +19,7 @@ func newCmdServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *projec
 	scanRules := []project.ScanRule{
 		{Group: group, Path: scanRoot, MaxDepth: maxDepth},
 	}
-	if err := settings.SaveSection(settingsFile, "scanRule", scanRules); err != nil {
+	if err := settings.SaveSection(settingsFile, "scanRules", scanRules); err != nil {
 		t.Fatalf("写测试 settings.json 失败: %v", err)
 	}
 	return project.NewService(settingsFile, ws.Mkdir("cache"))

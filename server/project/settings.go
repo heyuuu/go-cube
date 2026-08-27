@@ -11,8 +11,8 @@ import (
 
 // settings.json 中 project 域的两个规则节：分节存储，可独立读取与写入。
 const (
-	scanRuleSection  = "scanRule"
-	cloneRuleSection = "cloneRule"
+	scanRulesSection  = "scanRules"
+	cloneRulesSection = "cloneRules"
 )
 
 // loadScanRules 现读 settings.json 的 scanRule 节并转换为生效规则（直读不缓存，改完即生效）：
@@ -20,7 +20,7 @@ const (
 // settings 包已把文件级/节级坏数据降级为零值。
 func loadScanRules(settingsFile string) []ScanRule {
 	var specs []ScanRule
-	settings.LoadSection(settingsFile, scanRuleSection, &specs)
+	settings.LoadSection(settingsFile, scanRulesSection, &specs)
 
 	var rules []ScanRule
 	for _, r := range specs {
@@ -42,7 +42,7 @@ func loadScanRules(settingsFile string) []ScanRule {
 // 展开 localPath 的 ~/ 为绝对路径（不校验存在——clone 时会自动创建）；相对路径是配置错误，跳过。
 func loadCloneRules(settingsFile string) []CloneRule {
 	var specs []CloneRule
-	settings.LoadSection(settingsFile, cloneRuleSection, &specs)
+	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
 
 	var rules []CloneRule
 	for _, r := range specs {
@@ -82,7 +82,7 @@ func saveScanRule(settingsFile string, rule ScanRule) error {
 	}
 
 	var specs []ScanRule
-	settings.LoadSection(settingsFile, scanRuleSection, &specs)
+	settings.LoadSection(settingsFile, scanRulesSection, &specs)
 	replaced := false
 	for i, cur := range specs {
 		if cur.Path == rule.Path {
@@ -94,13 +94,13 @@ func saveScanRule(settingsFile string, rule ScanRule) error {
 	if !replaced {
 		specs = append(specs, rule)
 	}
-	return settings.SaveSection(settingsFile, scanRuleSection, specs)
+	return settings.SaveSection(settingsFile, scanRulesSection, specs)
 }
 
 // deleteScanRule 按 path 删除一条 scan 规则；不存在时返回中文错误。
 func deleteScanRule(settingsFile, path string) error {
 	var specs []ScanRule
-	settings.LoadSection(settingsFile, scanRuleSection, &specs)
+	settings.LoadSection(settingsFile, scanRulesSection, &specs)
 	rest := make([]ScanRule, 0, len(specs))
 	for _, cur := range specs {
 		if cur.Path != path {
@@ -110,14 +110,14 @@ func deleteScanRule(settingsFile, path string) error {
 	if len(rest) == len(specs) {
 		return fmt.Errorf("未找到指定 scan 规则: %s", path)
 	}
-	return settings.SaveSection(settingsFile, scanRuleSection, rest)
+	return settings.SaveSection(settingsFile, scanRulesSection, rest)
 }
 
 // reorderScanRules 按 paths 顺序重排 scanRule 节（顺序即项目列表展示序）。
 // 未列出的条目保持原相对顺序排在末尾，不丢数据；未知或重复路径返回中文错误。
 func reorderScanRules(settingsFile string, paths []string) error {
 	var specs []ScanRule
-	settings.LoadSection(settingsFile, scanRuleSection, &specs)
+	settings.LoadSection(settingsFile, scanRulesSection, &specs)
 
 	byPath := make(map[string]ScanRule, len(specs))
 	for _, spec := range specs {
@@ -146,7 +146,7 @@ func reorderScanRules(settingsFile string, paths []string) error {
 			ordered = append(ordered, spec)
 		}
 	}
-	return settings.SaveSection(settingsFile, scanRuleSection, ordered)
+	return settings.SaveSection(settingsFile, scanRulesSection, ordered)
 }
 
 // saveCloneRule 新增或按 host+prefix 替换一条 clone 规则（二者组合是规则唯一键）。
@@ -162,7 +162,7 @@ func saveCloneRule(settingsFile string, rule CloneRule) error {
 	}
 
 	var specs []CloneRule
-	settings.LoadSection(settingsFile, cloneRuleSection, &specs)
+	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
 	replaced := false
 	for i, cur := range specs {
 		if cur.RepoHost == rule.RepoHost && cur.RepoPrefix == rule.RepoPrefix {
@@ -174,13 +174,13 @@ func saveCloneRule(settingsFile string, rule CloneRule) error {
 	if !replaced {
 		specs = append(specs, rule)
 	}
-	return settings.SaveSection(settingsFile, cloneRuleSection, specs)
+	return settings.SaveSection(settingsFile, cloneRulesSection, specs)
 }
 
 // deleteCloneRule 按 host+prefix 删除一条 clone 规则；不存在时返回中文错误。
 func deleteCloneRule(settingsFile string, key CloneRuleKey) error {
 	var specs []CloneRule
-	settings.LoadSection(settingsFile, cloneRuleSection, &specs)
+	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
 	rest := make([]CloneRule, 0, len(specs))
 	for _, cur := range specs {
 		if cur.RepoHost != key.RepoHost || cur.RepoPrefix != key.RepoPrefix {
@@ -190,14 +190,14 @@ func deleteCloneRule(settingsFile string, key CloneRuleKey) error {
 	if len(rest) == len(specs) {
 		return fmt.Errorf("未找到指定 clone 规则: %s%s", key.RepoHost, key.RepoPrefix)
 	}
-	return settings.SaveSection(settingsFile, cloneRuleSection, rest)
+	return settings.SaveSection(settingsFile, cloneRulesSection, rest)
 }
 
 // reorderCloneRules 按键顺序重排 cloneRule 节（顺序即展示序；匹配语义按 prefix
 // 最长优先，顺序不影响路由结果）。语义约束同 reorderScanRules。
 func reorderCloneRules(settingsFile string, keys []CloneRuleKey) error {
 	var specs []CloneRule
-	settings.LoadSection(settingsFile, cloneRuleSection, &specs)
+	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
 
 	keyOf := func(r CloneRule) CloneRuleKey { return CloneRuleKey{r.RepoHost, r.RepoPrefix} }
 	byKey := make(map[CloneRuleKey]CloneRule, len(specs))
@@ -228,5 +228,5 @@ func reorderCloneRules(settingsFile string, keys []CloneRuleKey) error {
 			ordered = append(ordered, spec)
 		}
 	}
-	return settings.SaveSection(settingsFile, cloneRuleSection, ordered)
+	return settings.SaveSection(settingsFile, cloneRulesSection, ordered)
 }

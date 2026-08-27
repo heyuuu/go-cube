@@ -29,12 +29,12 @@ func newServiceWithRules(t *testing.T, ws *testfixture.Workspace, scan []ScanRul
 func saveRules(t *testing.T, settingsFile string, scan []ScanRule, clone []CloneRule) {
 	t.Helper()
 	if scan != nil {
-		if err := settings.SaveSection(settingsFile, scanRuleSection, scan); err != nil {
+		if err := settings.SaveSection(settingsFile, scanRulesSection, scan); err != nil {
 			t.Fatalf("写测试 settings.json scanRule 节失败: %v", err)
 		}
 	}
 	if clone != nil {
-		if err := settings.SaveSection(settingsFile, cloneRuleSection, clone); err != nil {
+		if err := settings.SaveSection(settingsFile, cloneRulesSection, clone); err != nil {
 			t.Fatalf("写测试 settings.json cloneRule 节失败: %v", err)
 		}
 	}

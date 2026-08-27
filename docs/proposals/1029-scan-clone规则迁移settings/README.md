@@ -12,7 +12,7 @@
 
 目标：
 
-1. scan / clone 规则数据源从 config.json 迁到 settings.json 的 `scanRule`/`cloneRule` 节；
+1. scan / clone 规则数据源从 config.json 迁到 settings.json 的 `scanRules`/`cloneRules` 节；
 2. `project.Service` 对规则改为**直读不缓存**（同 opener.Service 模式），Web 保存即生效，无缓存不一致；
 3. settings 页「项目·扫描」分区实装（扫描 + 克隆两组规则的增删改）；
 4. 存量数据自动迁移，用户无感。
@@ -26,12 +26,12 @@
 ```json
 {
   "openers": [ ... ],
-  "scanRule":  [ { "group": "work", "path": "~/Code/work", "maxDepth": 3 } ],
-  "cloneRule": [ { "repoHost": "github.com", "repoPrefix": "heyuuu", "localPath": "~/Code/gh/heyuuu" } ]
+  "scanRules":  [ { "group": "work", "path": "~/Code/work", "maxDepth": 3 } ],
+  "cloneRules": [ { "repoHost": "github.com", "repoPrefix": "heyuuu", "localPath": "~/Code/gh/heyuuu" } ]
 }
 ```
 
-- 节名常量归领域包（`scanRuleSection` / `cloneRuleSection`），读写走 settings 节级 API（`LoadSection` / `SaveSection`），一次保存写一节；
+- 节名常量归领域包（`scanRulesSection` / `cloneRulesSection`），读写走 settings 节级 API（`LoadSection` / `SaveSection`），一次保存写一节；
 - 存储形态与领域形态同构（`ScanRule` / `CloneRule` 同一 struct），条目字段不变（group/path/maxDepth 与 repoHost/repoPrefix/localPath）；读侧转换做 `~/` 展开与降级校验。`config.ProjectConfig` 等类型删除。
 
 ### 2. project.Service 直读化
@@ -55,9 +55,9 @@ reorder 的顺序即 settings.json 数组序，与 opener 分区拖拽排序语�
 
 ### 4. 存量迁移（手动，同 opener 先例）
 
-不做代码迁移。上线后由用户手动把 config.json 的 `project` 节拆成 `scanRule` 与 `cloneRule` 两个数组搬到 settings.json 顶层（jq / 编辑器均可），再从 config.json 删除 `project` 节——与 1016 opener 迁移同先例（「迁移未做代码，用户手动 jq 迁移」）。dev/prod 双环境（1026）各搬一次。
+不做代码迁移。上线后由用户手动把 config.json 的 `project` 节拆成 `scanRules` 与 `cloneRules` 两个数组搬到 settings.json 顶层（jq / 编辑器均可），再从 config.json 删除 `project` 节——与 1016 opener 迁移同先例（「迁移未做代码，用户手动 jq 迁移」）。dev/prod 双环境（1026）各搬一次。
 
-代码侧行为：settings.json 的 `scanRule`/`cloneRule` 节是唯一数据源；config.json 残留的 `project` 节不再被读取（`config.ProjectConfig` 已删），留着无害。
+代码侧行为：settings.json 的 `scanRules`/`cloneRules` 节是唯一数据源；config.json 残留的 `project` 节不再被读取（`config.ProjectConfig` 已删），留着无害。
 
 ### 5. settings 页「项目·扫描」分区实装
 
@@ -82,7 +82,7 @@ reorder 的顺序即 settings.json 数组序，与 opener 分区拖拽排序语�
 
 ## 验收标准
 
-1. 用户手动迁移后，settings.json 的 `scanRule`/`cloneRule` 节生效，`cube project list` / `cube check` / `cube clone` 行为与迁移前一致；config.json 残留 `project` 节不被读取；
+1. 用户手动迁移后，settings.json 的 `scanRules`/`cloneRules` 节生效，`cube project list` / `cube check` / `cube clone` 行为与迁移前一致；config.json 残留 `project` 节不被读取；
 2. settings 页「项目·扫描」分区完成 scan/clone 两组规则的增删改 + 拖拽排序，保存后 `cube project list --status` / `cube clone` 匹配立即反映新规则（无重启、无缓存不一致）；
 3. `pnpm -C web build`、`cd server && go vet ./... && go test ./...` 通过；
 4. `docs/spec/现状.md` 已同步。
