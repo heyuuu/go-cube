@@ -28,3 +28,20 @@ export function useProjectOpen() {
     mutationFn: (input: { path: string; opener: string; dir?: string }) => apiPost('/api/project/open', input),
   });
 }
+
+// 项目 workspace 声明状态（1030）：生效清单 / 显式声明 / 探测候选（编辑视图用）
+export function useWorkspaceState(path: string | null) {
+  return useQuery({
+    queryKey: ['project', 'workspace', path],
+    queryFn: () => apiGet('/api/project/workspace/get', { path: path! }),
+    enabled: !!path,
+  });
+}
+
+// 保存显式 workspaces 声明（写入项目内 .cube/cube.json，后端即时重采集）
+export function useWorkspaceSave() {
+  return useMutation({
+    mutationFn: (input: { path: string; workspaces: { name: string; path: string }[] }) =>
+      apiPost('/api/project/workspace/save', input),
+  });
+}

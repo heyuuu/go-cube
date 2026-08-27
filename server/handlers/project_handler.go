@@ -14,6 +14,7 @@ import (
 	"cube/opener"
 	"cube/project"
 	"cube/project/projcache"
+	"cube/project/workspace"
 	"cube/usage"
 	"cube/util/iconkit"
 	"cube/util/slicekit"
@@ -57,6 +58,8 @@ func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/project/list", "获取项目列表", h.projectList)
 	web.ApiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
 	web.ApiPost(api, "/api/project/open", "用指定 opener 打开已收录项目（记 usage；目标目录选择为 1030/1032 预留）", h.projectOpen)
+	web.ApiGet(api, "/api/project/workspace/get", "获取项目 workspace 状态（生效清单 / 显式声明 / 探测候选）", h.workspaceGet)
+	web.ApiPost(api, "/api/project/workspace/save", "保存显式 workspaces 声明（.cube/cube.json）并即时重采集", h.workspaceSave)
 	web.ApiGet(api, "/api/project/scan-rules", "获取扫描规则", h.scanRules)
 	web.ApiGet(api, "/api/project/clone-rules", "获取 clone 规则", h.cloneRules)
 	web.ApiPost(api, "/api/project/scan-rule/save", "新增或按 path 替换扫描规则", h.scanRuleSave)
@@ -277,6 +280,88 @@ type CloneRuleReorderInput struct {
 func (h *ProjectHandler) cloneRuleReorder(input CloneRuleReorderInput) (map[string]any, error) {
 	if err := h.projectService.ReorderCloneRules(input.Body.Rules); err != nil {
 		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// --- workspace 声明（1030）---
+
+// WorkspaceMemberDTO workspace 成员（显示名 + 相对所属根路径）。
+type WorkspaceMemberDTO struct {
+	Name string `json:"name"`
+	Path string `json:"path"`
+}
+
+// WorkspaceStateResult workspace/get 返回：编辑视图所需的三块信息。
+// Effective 读 projcache 快照（读路径不读声明文件、不探测）；Declared/Detected 是
+// 编辑场景的一次性现算（编辑场景可以严格，与「读路径纯快照」纪律不冲突）。
+type WorkspaceStateResult struct {
+	Effective   []WorkspaceMemberDTO `json:"effective"`   // 当前生效清单（显式声明或探测结果）
+	DeclaredSet bool                 `json:"declaredSet"` // cube.json 是否有显式 workspaces 字段
+	Declared    []WorkspaceMemberDTO `json:"declared"`    // 显式声明原文（declaredSet=false 时为空）
+	ScanRule    string               `json:"scanRule"`    // cube.json 的 workspaceScanRule（空=用默认规则）
+	Detected    []WorkspaceMemberDTO `json:"detected"`    // 探测候选（「导入为候选」入口用；未命中为空）
+}
+
+func (h *ProjectHandler) workspaceGet(input struct {
+	Path string `query:"path" required:"true"`
+}) (WorkspaceStateResult, error) {
+	proj := h.projectService.FindByPath(input.Path)
+	if proj == nil {
+		return WorkspaceStateResult{}, errors.New("未找到指定项目: " + input.Path)
+	}
+	root := proj.Path()
+	result := WorkspaceStateResult{Effective: []WorkspaceMemberDTO{}, Declared: []WorkspaceMemberDTO{}, Detected: []WorkspaceMemberDTO{}}
+	if info, ok := h.projectService.GitInfo(root); ok && info != nil {
+		result.Effective = slicekit.Map(info.Workspaces, func(w workspace.Workspace) WorkspaceMemberDTO {
+			return WorkspaceMemberDTO(w)
+		})
+	}
+	if cf, ok := workspace.LoadCubeFile(root); ok {
+		result.DeclaredSet = cf.WorkspacesSet
+		result.Declared = slicekit.Map(cf.Workspaces, func(d workspace.Declared) WorkspaceMemberDTO {
+			return WorkspaceMemberDTO(d)
+		})
+		result.ScanRule = cf.WorkspaceScanRule
+	}
+	// 探测候选独立于 cube.json 是否存在（无声明项目的「导入为候选」入口同样要工作）
+	result.Detected = slicekit.Map(workspace.Detect(root, workspace.EffectiveScanRule(root)), func(w workspace.Workspace) WorkspaceMemberDTO {
+		return WorkspaceMemberDTO(w)
+	})
+	return result, nil
+}
+
+// WorkspaceSaveInput workspace/save 接口入参。workspaces 至少一条（清除声明直接删 .cube/cube.json，不开 API）。
+type WorkspaceSaveInput struct {
+	Body struct {
+		Path       string               `json:"path" doc:"项目绝对路径"`
+		Workspaces []WorkspaceMemberDTO `json:"workspaces" doc:"显式声明的成员清单（name + 相对项目根路径）"`
+	}
+}
+
+// workspaceSave 写侧校验严格（坏条目整体拒绝，静默跳过是采集侧的降级语义），
+// 成功后定向重采集让打开目标即刻反映。
+func (h *ProjectHandler) workspaceSave(input WorkspaceSaveInput) (map[string]any, error) {
+	proj := h.projectService.FindByPath(input.Body.Path)
+	if proj == nil {
+		return nil, errors.New("未找到指定项目: " + input.Body.Path)
+	}
+	if len(input.Body.Workspaces) == 0 {
+		return nil, errors.New("workspaces 不能为空（清除声明请删除项目内 .cube/cube.json）")
+	}
+	root := proj.Path()
+	declared := slicekit.Map(input.Body.Workspaces, func(m WorkspaceMemberDTO) workspace.Declared {
+		return workspace.Declared(m)
+	})
+	validated := workspace.ValidateDeclared(root, declared)
+	if len(validated) != len(declared) {
+		return nil, errors.New("存在无效条目（path 须相对项目根、目录存在且不逃逸），请修正后重试")
+	}
+	if err := workspace.Save(root, validated); err != nil {
+		return nil, err
+	}
+	if err := h.projectService.RefreshGitInfo(root); err != nil {
+		slog.Warn("workspace 保存后刷新快照失败（等下次采集自愈）", "err", err)
 	}
 	return map[string]any{"ok": true}, nil
 }

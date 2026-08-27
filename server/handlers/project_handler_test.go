@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"os"
 	"sort"
 	"strings"
 	"testing"
@@ -311,5 +313,71 @@ func TestProjectList_LastUsedAt(t *testing.T) {
 	}
 	if got.List[0].LastUsedAt != nil {
 		t.Errorf("未打开过的 g1:proj1 不应有 lastUsedAt, got %v", got.List[0])
+	}
+}
+
+// TestWorkspaceGetSave workspace/get 三块信息（生效/声明/候选）+ save 全链路（写盘 + 即时重采集）。
+func TestWorkspaceGetSave(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.proj1Path()
+
+	// 建子目录 + pnpm 声明：未写 cube.json 时探测生效
+	env.ws.Mkdir("g1/proj1/apps/web")
+	if err := os.WriteFile(env.ws.Join("g1", "proj1", "pnpm-workspace.yaml"), []byte("packages:\n  - 'apps/*'\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := env.projSvc.Refresh(); err != nil {
+		t.Fatal(err)
+	}
+
+	var state struct {
+		Effective   []struct{ Name, Path string } `json:"effective"`
+		DeclaredSet bool                          `json:"declaredSet"`
+		Detected    []struct{ Name, Path string } `json:"detected"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/workspace/get?path="+url.QueryEscape(repo))), &state)
+	if state.DeclaredSet {
+		t.Fatal("未写 cube.json 时 declaredSet 应为 false")
+	}
+	if len(state.Effective) != 1 || state.Effective[0].Path != "apps/web" {
+		t.Fatalf("探测应生效于生效清单, got %+v", state.Effective)
+	}
+	if len(state.Detected) != 1 {
+		t.Fatalf("探测候选应可得, got %+v", state.Detected)
+	}
+
+	// save 固化显式声明 → get 反映 declaredSet，且 effective 即时刷新（不等 TTL）
+	body := fmt.Sprintf(`{"path":%q,"workspaces":[{"name":"前端","path":"apps/web"}]}`, repo)
+	resp, err := http.Post(env.url("/api/project/workspace/save"), "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var saved envelope
+	if err := json.NewDecoder(resp.Body).Decode(&saved); err != nil || !saved.Ok {
+		t.Fatalf("save 应成功: err=%v env=%+v", err, saved)
+	}
+
+	decodeData(t, getJSON(t, env.url("/api/project/workspace/get?path="+url.QueryEscape(repo))), &state)
+	if !state.DeclaredSet {
+		t.Fatal("save 后 declaredSet 应为 true")
+	}
+	if len(state.Effective) != 1 || state.Effective[0].Name != "前端" {
+		t.Fatalf("save 后 effective 应即时反映显式声明, got %+v", state.Effective)
+	}
+
+	// 坏条目整体拒绝（写侧严格语义，区别于采集侧静默跳过）
+	bad := fmt.Sprintf(`{"path":%q,"workspaces":[{"name":"逃逸","path":"../outside"}]}`, repo)
+	resp2, err := http.Post(env.url("/api/project/workspace/save"), "application/json", strings.NewReader(bad))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	var rejected envelope
+	if err := json.NewDecoder(resp2.Body).Decode(&rejected); err != nil {
+		t.Fatal(err)
+	}
+	if rejected.Ok {
+		t.Fatal("坏条目应整体拒绝")
 	}
 }

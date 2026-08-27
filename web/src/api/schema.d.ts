@@ -361,6 +361,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/project/workspace/get': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取项目 workspace 状态（生效清单 / 显式声明 / 探测候选） */
+    get: operations['project.workspaceGet'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/workspace/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 保存显式 workspaces 声明（.cube/cube.json）并即时重采集 */
+    post: operations['project.workspaceSave'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/system/whoami': {
     parameters: {
       query?: never;
@@ -859,6 +893,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputWorkspaceStateResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputWorkspaceStateResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['WorkspaceStateResult'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputWorktreeCreatedBody: {
       /**
        * Format: uri
@@ -1007,6 +1052,7 @@ export interface components {
       defaultBranch: string;
       dirty: boolean;
       repoUrl: string;
+      workspaces: components['schemas']['Workspace'][] | null;
       worktrees: components['schemas']['WorktreeInfo'][] | null;
     };
     ErrorDetail: {
@@ -1296,6 +1342,33 @@ export interface components {
       app: string;
       version: string;
     };
+    Workspace: {
+      name: string;
+      path: string;
+    };
+    WorkspaceMemberDTO: {
+      name: string;
+      path: string;
+    };
+    WorkspaceSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/WorkspaceSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 项目绝对路径 */
+      path: string;
+      /** @description 显式声明的成员清单（name + 相对项目根路径） */
+      workspaces: components['schemas']['WorkspaceMemberDTO'][] | null;
+    };
+    WorkspaceStateResult: {
+      declared: components['schemas']['WorkspaceMemberDTO'][] | null;
+      declaredSet: boolean;
+      detected: components['schemas']['WorkspaceMemberDTO'][] | null;
+      effective: components['schemas']['WorkspaceMemberDTO'][] | null;
+      scanRule: string;
+    };
     WorktreeAddRequest: {
       /**
        * Format: uri
@@ -1317,6 +1390,7 @@ export interface components {
       branch: string;
       detached: boolean;
       path: string;
+      workspaces: components['schemas']['Workspace'][] | null;
     };
     WorktreeRemoveRequest: {
       /**
@@ -2012,6 +2086,70 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultScanRuleBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.workspaceGet': {
+    parameters: {
+      query: {
+        path: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputWorkspaceStateResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.workspaceSave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorkspaceSaveInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

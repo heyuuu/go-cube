@@ -19,7 +19,7 @@ import (
 func Resolve(root string) []Workspace {
 	if cf, ok := LoadCubeFile(root); ok {
 		if cf.WorkspacesSet {
-			return validateDeclared(root, cf.Workspaces)
+			return ValidateDeclared(root, cf.Workspaces)
 		}
 		return Detect(root, cf.WorkspaceScanRule)
 	}
@@ -41,9 +41,9 @@ func LoadCubeFile(root string) (*CubeFile, bool) {
 	return &cf, true
 }
 
-// validateDeclared 校验显式声明并构造成员列表：路径须相对、不逃逸出根、目录存在；
+// ValidateDeclared 校验显式声明并构造成员列表：路径须相对、不逃逸出根、目录存在；
 // 坏条目跳过（记日志），name 缺省取路径末段。
-func validateDeclared(root string, declared []Declared) []Workspace {
+func ValidateDeclared(root string, declared []Declared) []Workspace {
 	result := make([]Workspace, 0, len(declared))
 	for _, d := range declared {
 		w, ok := validateOne(root, d)

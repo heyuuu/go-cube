@@ -8,9 +8,10 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { prettyPath } from '@/lib/path';
 import { formatDateTime } from '@/lib/time';
-import { useProjectOpen } from '@/queries/project';
+import { useProjectOpen, useWorkspaceState } from '@/queries/project';
 
 import { ProjectActions, TagBadges } from './actions';
+import { WorkspaceDialog } from './workspace-dialog';
 
 function KV({ k, children }: { k: string; children: ReactNode }) {
   return (
@@ -46,6 +47,8 @@ export function ProjectDrawer({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const [wsEditOpen, setWsEditOpen] = useState(false);
+  const wsState = useWorkspaceState(project?.path ?? null);
 
   function copyPath(path: string) {
     navigator.clipboard.writeText(path).then(() => {
@@ -110,6 +113,32 @@ export function ProjectDrawer({
               </div>
             </DrawerSection>
 
+            <DrawerSection title="workspace 声明（1030）">
+              <div className="flex items-center gap-2 text-sm">
+                {wsState.data?.declaredSet ? (
+                  <Badge variant="default">显式声明</Badge>
+                ) : (wsState.data?.effective?.length ?? 0) > 0 ? (
+                  <Badge variant="secondary">探测生效</Badge>
+                ) : (
+                  <span className="text-muted-foreground">无</span>
+                )}
+                <span className="text-xs text-muted-foreground">{wsState.data?.effective?.length ?? 0} 个成员</span>
+                <Button variant="outline" size="sm" className="ml-auto" onClick={() => setWsEditOpen(true)}>
+                  编辑
+                </Button>
+              </div>
+              {(wsState.data?.effective?.length ?? 0) > 0 && (
+                <div className="mt-2 space-y-1">
+                  {wsState.data!.effective!.map((w) => (
+                    <div key={w.path} className="flex items-baseline gap-2 text-xs">
+                      <span className="font-medium">{w.name}</span>
+                      <span className="font-mono text-muted-foreground">{w.path}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </DrawerSection>
+
             {(g?.worktrees?.length ?? 0) > 0 && (
               <DrawerSection title={`worktrees（${g!.worktrees!.length}）`}>
                 <Table>
@@ -133,6 +162,7 @@ export function ProjectDrawer({
               </DrawerSection>
             )}
           </div>
+          {wsEditOpen && <WorkspaceDialog project={project} onClose={() => setWsEditOpen(false)} />}
         </SheetContent>
       )}
     </Sheet>
