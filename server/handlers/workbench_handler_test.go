@@ -637,3 +637,93 @@ func TestWorkbenchChanges(t *testing.T) {
 		t.Errorf("commit 差异应含 2 个文件: %+v", c.List)
 	}
 }
+
+// --- 提案 1031：worktree / 分支写侧 ---
+
+func TestWorkbenchWorktreeAdd(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+
+	var created struct {
+		Path   string `json:"path"`
+		Branch string `json:"branch"`
+	}
+	body := fmt.Sprintf(`{"path":%q,"branch":"feat/api"}`, repo)
+	decodeData(t, postJSON(t, env.url("/api/workbench/worktree/add"), body), &created)
+	if created.Path == "" || created.Branch != "feat/api" {
+		t.Fatalf("新增结果不符: %+v", created)
+	}
+	if _, err := os.Stat(created.Path); err != nil {
+		t.Fatalf("worktree 目录应存在: %v", err)
+	}
+
+	// 被检出分支 → ok=false + 中文错误
+	def := git.CurrentBranch(repo)
+	r := postJSON(t, env.url("/api/workbench/worktree/add"), fmt.Sprintf(`{"path":%q,"branch":%q}`, repo, def))
+	if r.Ok {
+		t.Error("检出主目录当前分支应被拒绝")
+	}
+}
+
+func TestWorkbenchWorktreeRemove(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	wtDir := env.ws.MakeWorktree(repo, "wt-rm", "rm-test")
+
+	// 非 force：干净副本直接删，denied=false
+	var res struct {
+		Denied  bool     `json:"denied"`
+		Reasons []string `json:"reasons"`
+	}
+	decodeData(t, postJSON(t, env.url("/api/workbench/worktree/remove"),
+		fmt.Sprintf(`{"path":%q,"targetPath":%q}`, repo, wtDir)), &res)
+	if res.Denied {
+		t.Fatalf("干净副本不应被拒绝: %+v", res)
+	}
+	if _, err := os.Stat(wtDir); !os.IsNotExist(err) {
+		t.Fatalf("目录应已删除")
+	}
+
+	// 脏副本：denied=true + 结构化原因；force 后删除成功
+	wtDirty := env.ws.MakeWorktree(repo, "wt-dirty", "rm-dirty")
+	env.ws.WriteFile("wt-dirty/x.txt", []byte("uncommitted"))
+	decodeData(t, postJSON(t, env.url("/api/workbench/worktree/remove"),
+		fmt.Sprintf(`{"path":%q,"targetPath":%q}`, repo, wtDirty)), &res)
+	if !res.Denied || len(res.Reasons) == 0 {
+		t.Fatalf("脏副本应 denied=true 且带原因: %+v", res)
+	}
+	decodeData(t, postJSON(t, env.url("/api/workbench/worktree/remove"),
+		fmt.Sprintf(`{"path":%q,"targetPath":%q,"force":true}`, repo, wtDirty)), &res)
+	if res.Denied {
+		t.Fatalf("force 删除不应拒绝: %s", res.Reasons)
+	}
+
+	// 主目录删除无论 force 均报错
+	r := postJSON(t, env.url("/api/workbench/worktree/remove"),
+		fmt.Sprintf(`{"path":%q,"targetPath":%q,"force":true}`, repo, repo))
+	if r.Ok {
+		t.Error("删除主仓库目录应被拒绝")
+	}
+}
+
+func TestWorkbenchBranchDelete(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	wtDir := env.ws.MakeWorktree(repo, "wt-bd", "bd-test")
+
+	// 被检出 → ok=false
+	r := postJSON(t, env.url("/api/workbench/branch/delete"),
+		fmt.Sprintf(`{"path":%q,"branch":"bd-test","force":true}`, repo))
+	if r.Ok {
+		t.Error("被检出分支应被拒绝")
+	}
+
+	// 删副本后删分支成功
+	postJSON(t, env.url("/api/workbench/worktree/remove"),
+		fmt.Sprintf(`{"path":%q,"targetPath":%q}`, repo, wtDir))
+	r = postJSON(t, env.url("/api/workbench/branch/delete"),
+		fmt.Sprintf(`{"path":%q,"branch":"bd-test"}`, repo))
+	if !r.Ok {
+		t.Fatalf("未检出分支删除应成功: %s", r.Message)
+	}
+}

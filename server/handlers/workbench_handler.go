@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -37,6 +38,9 @@ func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/workbench/diff", "双 TreeSource 目录级对比", h.diff)
 	web.ApiGet(api, "/api/workbench/file-diff", "双 TreeSource 单文件 diff", h.fileDiff)
 	web.ApiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
+	web.ApiPost(api, "/api/workbench/worktree/add", "新增 worktree", h.worktreeAdd)
+	web.ApiPost(api, "/api/workbench/worktree/remove", "删除 worktree（非 force 预检拒绝返回 denied+reasons）", h.worktreeRemove)
+	web.ApiPost(api, "/api/workbench/branch/delete", "删除本地分支", h.branchDelete)
 
 	// 注册 WebSocket 路由（upgrade 不走 huma）
 	mux.HandleFunc("GET /api/workbench/pty", h.ptyWs)
@@ -152,6 +156,57 @@ func (h *WorkbenchHandler) fileDiff(input struct {
 		return nil, err
 	}
 	return h.workbenchService.ReadFileDiff(input.Path, base, current, input.File, input.BaseFile)
+}
+
+// worktreeAdd 参数平铺在 body（POST 动作惯例）。branch 支持规范全名或短名；
+// targetPath 为空时服务端按 <repoName>.worktrees/<分支名>/ 预填。
+func (h *WorkbenchHandler) worktreeAdd(input struct {
+	Body struct {
+		Path       string `json:"path"`
+		Branch     string `json:"branch,omitempty"`     // 留空 = detached
+		Commitish  string `json:"commitish,omitempty"`  // 基点（commit/分支/tag），留空 = HEAD
+		TargetPath string `json:"targetPath,omitempty"` // 目标目录，留空 = 服务端预填
+	}
+}) (*workbench.WorktreeCreated, error) {
+	return h.workbenchService.WorktreeAdd(input.Body.Path, input.Body.Branch, input.Body.Commitish, input.Body.TargetPath)
+}
+
+// worktreeRemoveResult 非 force 预检拒绝时 denied=true，reasons 供 UI 二次确认
+// 升级 force；denied=false 表示已删除。
+type worktreeRemoveResult struct {
+	Denied  bool     `json:"denied"`
+	Reasons []string `json:"reasons"`
+}
+
+func (h *WorkbenchHandler) worktreeRemove(input struct {
+	Body struct {
+		Path       string `json:"path"`
+		TargetPath string `json:"targetPath"`
+		Force      bool   `json:"force,omitempty"`
+	}
+}) (*worktreeRemoveResult, error) {
+	err := h.workbenchService.WorktreeRemove(input.Body.Path, input.Body.TargetPath, input.Body.Force)
+	var denied *workbench.WorktreeRemoveDenied
+	if errors.As(err, &denied) {
+		return &worktreeRemoveResult{Denied: true, Reasons: denied.Reasons}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &worktreeRemoveResult{}, nil
+}
+
+func (h *WorkbenchHandler) branchDelete(input struct {
+	Body struct {
+		Path   string `json:"path"`
+		Branch string `json:"branch"`
+		Force  bool   `json:"force,omitempty"`
+	}
+}) (map[string]any, error) {
+	if err := h.workbenchService.BranchDelete(input.Body.Path, input.Body.Branch, input.Body.Force); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
 }
 
 func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {
