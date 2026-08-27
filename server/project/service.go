@@ -258,15 +258,20 @@ func (s *Service) GitUpdatedAt() time.Time {
 	return s.gitCache.UpdatedAt()
 }
 
-// maxExpireTime 可以容忍的最大过期时间
+// maxExpireTime 缓存可容忍的最大过期时间：任一时间戳（scanCache / gitCache 的
+// UpdatedAt）距今超过它就触发刷新。定性约束「数据最多旧 5 分钟」，取代固定周期。
 const maxExpireTime = 5 * time.Minute
 
-// StartRefreshTicker 启动后台定时刷新 project 视图（项目列表 + git info）的 goroutine（仅常驻 server 调用）。
+// StartRefreshTicker 启动后台刷新 goroutine（仅常驻 server 调用）。重复调用安全：已在跑则直接返回。
 //
-// interval <= 0 时用 defaultRefreshInterval。重复调用安全：已在跑则直接返回。
-// 启动后立即刷新一次（避免冷启动空窗；磁盘缓存距上次落盘 < interval 时跳过），之后按 interval 定时刷新。
-// 刷新动作：重扫项目列表（毫秒级，时间戳由 scanCache 自记）→ 用最新列表采集 git 信息（数十秒级，时间戳由 gitCache 自记）。
-// 两个时间戳分开记录：扫描极快、git 采集慢，前端需据此分别判断「项目列表新鲜度」和「git 状态新鲜度」。
+// 刷新节奏由数据新旧决定：每轮取两类时间戳（scanCache / gitCache 的 UpdatedAt）
+// 中更过期者计算下次时机，保证距今不超过 maxExpireTime——
+//   - 冷启动（从未扫描/采集）：时间戳零值，立即刷新一次，避免空窗；
+//   - 热重载（两时间戳均新鲜，如 air 重启进程）：自然算出整周期等待，不重复全量重采；
+//   - 刷新失败（时间戳不推进）：按整周期退避重试，避免 delay 恒为 0 热循环。
+//
+// 刷新动作 = Refresh（重扫毫秒级 + git 采集数十秒级，各自时间戳由缓存自记），
+// 前端据两个时间戳分别判断「项目列表新鲜度」和「git 状态新鲜度」。
 //
 // CLI 不调用此方法（CLI 短命，只读启动时 Load 的快照）。
 func (s *Service) StartRefreshTicker() {
@@ -280,24 +285,22 @@ func (s *Service) StartRefreshTicker() {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				slog.Error("project 视图刷新 ticker panic", "err", r)
+				slog.Error("project 视图刷新 goroutine panic", "err", r)
 			}
 		}()
 
-		// 为了使缓存更新时间距今不超过 maxExpireTime
-		timer := time.NewTimer(0)
-		defer timer.Stop()
+		failed := false // 上轮刷新是否失败（失败退避整周期）
 		for {
-			// 计算下次刷新距今时间，按最早的 updatedAt 计算
 			now := time.Now()
-			expireTime := max(now.Sub(s.scanCache.UpdatedAt()), now.Sub(s.gitCache.UpdatedAt())) // 上次刷新距今时间
-			nextDuration := max(0, maxExpireTime-expireTime)
-
-			// 重置 timer
-			timer.Reset(nextDuration)
+			staleness := max(now.Sub(s.scanCache.UpdatedAt()), now.Sub(s.gitCache.UpdatedAt()))
+			delay := max(maxExpireTime-staleness, 0)
+			if failed {
+				delay = maxExpireTime
+			}
+			// time.After 每轮新建：Timer.Reset 在已触发的 timer 上有未读陈旧值陷阱
 			select {
-			case <-timer.C:
-				s.refresh()
+			case <-time.After(delay):
+				failed = s.refresh() != nil
 			case <-stopCh:
 				return
 			}
@@ -305,7 +308,7 @@ func (s *Service) StartRefreshTicker() {
 	}()
 }
 
-// OnServerStart 启动后台定时刷新（app 层钩子，仅常驻 server 调用）。等价于 StartRefreshTicker(0)。
+// OnServerStart 启动后台刷新（app 层钩子，仅常驻 server 调用）。
 func (s *Service) OnServerStart() {
 	s.StartRefreshTicker()
 }
@@ -323,15 +326,16 @@ func (s *Service) StopRefreshTicker() {
 	s.stopCh = nil
 }
 
-// refresh 完整刷新 project 视图（定时器周期任务）：重扫 + git 采集。
-// 采集异常不抛出（降级优先）：失败只 slog 记录，不影响 server 进程。
-func (s *Service) refresh() {
+// refresh 完整刷新 project 视图（后台刷新循环调用）：重扫 + git 采集。
+// 异常不抛出（降级优先）：失败记日志并返回错误，由调用方决定退避策略。
+func (s *Service) refresh() error {
 	total, collected, err := s.Refresh()
 	if err != nil {
 		slog.Warn("刷新 git 缓存失败", "err", err, "projects", total)
-		return
+		return err
 	}
 	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
+	return nil
 }
 
 // Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息
