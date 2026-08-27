@@ -53,11 +53,11 @@ func NewService(cacheDir, settingsFile string) *Service {
 // -- 规则（直读 settings.json，每次现读现转换） --
 
 func (s *Service) ScanRules() []ScanRule {
-	return makeScanRules(loadSettingsSpec(s.settingsFile).Scan)
+	return makeScanRules(loadScanRules(s.settingsFile))
 }
 
 func (s *Service) CloneRules() []CloneRule {
-	return makeCloneRules(loadSettingsSpec(s.settingsFile).Clone)
+	return makeCloneRules(loadCloneRules(s.settingsFile))
 }
 
 // --- project 读操作 ---

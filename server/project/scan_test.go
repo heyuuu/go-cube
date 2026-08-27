@@ -13,19 +13,31 @@ import (
 // 就地写而非放进 testfixture，是因为 testfixture 不能 import project（会导致 git 等底层包测试循环依赖）。
 func newServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *Service {
 	t.Helper()
-	return newServiceWithSpec(t, testfixture.NewWorkspace(t), SettingsSpec{
-		Scan: []ScanRule{{Group: group, Path: scanRoot, MaxDepth: maxDepth}},
-	})
+	return newServiceWithRules(t, testfixture.NewWorkspace(t),
+		[]ScanRule{{Group: group, Path: scanRoot, MaxDepth: maxDepth}}, nil)
 }
 
-// newServiceWithSpec 把规则写进工作区的 settings.json 再构造 Service（规则数据源即 settings 节）。
-func newServiceWithSpec(t *testing.T, ws *testfixture.Workspace, spec SettingsSpec) *Service {
+// newServiceWithRules 把 scan/clone 规则写进工作区的 settings.json 再构造 Service（规则数据源即 settings 节）。
+func newServiceWithRules(t *testing.T, ws *testfixture.Workspace, scan []ScanRule, clone []CloneRule) *Service {
 	t.Helper()
 	settingsFile := ws.Join("settings.json")
-	if err := settings.SaveSection(settingsFile, settingsSection, spec); err != nil {
-		t.Fatalf("写测试 settings.json 失败: %v", err)
-	}
+	saveRules(t, settingsFile, scan, clone)
 	return NewService(ws.Mkdir("cache"), settingsFile)
+}
+
+// saveRules 分节写 scanRule / cloneRule 两个 settings 节（nil 的部分跳过不写）。
+func saveRules(t *testing.T, settingsFile string, scan []ScanRule, clone []CloneRule) {
+	t.Helper()
+	if scan != nil {
+		if err := settings.SaveSection(settingsFile, scanRuleSection, scan); err != nil {
+			t.Fatalf("写测试 settings.json scanRule 节失败: %v", err)
+		}
+	}
+	if clone != nil {
+		if err := settings.SaveSection(settingsFile, cloneRuleSection, clone); err != nil {
+			t.Fatalf("写测试 settings.json cloneRule 节失败: %v", err)
+		}
+	}
 }
 
 // TestScan_SingleProject 单个 git 项目被识别。
@@ -188,9 +200,7 @@ func TestFindByPathAndName(t *testing.T) {
 // TestScanRules_Getter ScanRules() 从 settings.json 读出规则（含路径校验）。
 func TestScanRules_Getter(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Scan: []ScanRule{{Group: "g", Path: ws.Mkdir("root"), MaxDepth: 3}},
-	})
+	s := newServiceWithRules(t, ws, []ScanRule{{Group: "g", Path: ws.Mkdir("root"), MaxDepth: 3}}, nil)
 	rules := s.ScanRules()
 	if len(rules) != 1 || rules[0].Group != "g" {
 		t.Fatalf("ScanRules 异常: %v", rules)
@@ -268,9 +278,7 @@ func TestScan_HomePathExpansion(t *testing.T) {
 	testfixture.BuildGitRepo(ws.TB, repoDir, testfixture.GitRepoSpec{})
 
 	// settings 里写 ~/Code（相对 home 展开）
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Scan: []ScanRule{{Group: "g", Path: "~/Code", MaxDepth: 3}},
-	})
+	s := newServiceWithRules(t, ws, []ScanRule{{Group: "g", Path: "~/Code", MaxDepth: 3}}, nil)
 
 	// 规则路径应被展开为绝对路径
 	rules := s.ScanRules()
@@ -294,12 +302,10 @@ func TestScan_InvalidPathSkipped(t *testing.T) {
 	goodRoot := ws.Mkdir("real-root")
 	ws.MakeProjectDir(path.Join("real-root", "proj"))
 
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Scan: []ScanRule{
-			{Group: "bad", Path: "/this/does/not/exist/xyz", MaxDepth: 3},
-			{Group: "good", Path: goodRoot, MaxDepth: 3},
-		},
-	})
+	s := newServiceWithRules(t, ws, []ScanRule{
+		{Group: "bad", Path: "/this/does/not/exist/xyz", MaxDepth: 3},
+		{Group: "good", Path: goodRoot, MaxDepth: 3},
+	}, nil)
 
 	rules := s.ScanRules()
 	if len(rules) != 1 {
@@ -320,10 +326,8 @@ func TestCloneRule_LocalPathExpansion(t *testing.T) {
 	t.Setenv("HOME", home)
 
 	ws := testfixture.NewWorkspace(t)
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Clone: []CloneRule{
-			{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "~/src"},
-		},
+	s := newServiceWithRules(t, ws, nil, []CloneRule{
+		{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "~/src"},
 	})
 
 	rules := s.CloneRules()
@@ -339,11 +343,9 @@ func TestCloneRule_LocalPathExpansion(t *testing.T) {
 // 配置路径不得依赖执行目录，相对路径是配置错误。
 func TestCloneRule_InvalidLocalPathSkipped(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Clone: []CloneRule{
-			{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "relative/src"}, // 相对路径，跳过
-			{RepoHost: "gitee.com", RepoPrefix: "/heyuuu", LocalPath: ws.Dir},          // 绝对路径，保留
-		},
+	s := newServiceWithRules(t, ws, nil, []CloneRule{
+		{RepoHost: "github.com", RepoPrefix: "/heyuuu", LocalPath: "relative/src"}, // 相对路径，跳过
+		{RepoHost: "gitee.com", RepoPrefix: "/heyuuu", LocalPath: ws.Dir},          // 绝对路径，保留
 	})
 
 	rules := s.CloneRules()
@@ -363,9 +365,7 @@ func TestService_SettingsDirectRead(t *testing.T) {
 	ws.MakeProjectDir(path.Join("root1", "p1"))
 
 	// 初始：只 root1 一条规则
-	s := newServiceWithSpec(t, ws, SettingsSpec{
-		Scan: []ScanRule{{Group: "g1", Path: root1, MaxDepth: 5}},
-	})
+	s := newServiceWithRules(t, ws, []ScanRule{{Group: "g1", Path: root1, MaxDepth: 5}}, nil)
 	if len(s.Projects()) != 1 {
 		t.Fatalf("初始应扫到 1 个项目，实际 %d", len(s.Projects()))
 	}
@@ -374,11 +374,7 @@ func TestService_SettingsDirectRead(t *testing.T) {
 	root2 := ws.Mkdir("root2")
 	ws.MakeProjectDir(path.Join("root2", "a"))
 	ws.MakeProjectDir(path.Join("root2", "b"))
-	if err := settings.SaveSection(ws.Join("settings.json"), settingsSection, SettingsSpec{
-		Scan: []ScanRule{{Group: "g2", Path: root2, MaxDepth: 5}},
-	}); err != nil {
-		t.Fatalf("重写 settings.json 失败: %v", err)
-	}
+	saveRules(t, ws.Join("settings.json"), []ScanRule{{Group: "g2", Path: root2, MaxDepth: 5}}, nil)
 
 	// 规则立即更新（直读不缓存）
 	rules := s.ScanRules()

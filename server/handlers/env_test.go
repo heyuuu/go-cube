@@ -43,15 +43,6 @@ func newTestEnv(t *testing.T) *testEnv {
 	ws.MakeProjectDir("g1/proj1")
 	ws.MakeProjectDir("g2/proj2", testfixture.WithGodot())
 
-	projSpec := project.SettingsSpec{
-		Scan: []project.ScanRule{
-			{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
-			{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
-		},
-		Clone: []project.CloneRule{
-			{RepoHost: "github.com", LocalPath: ws.Join("repo")},
-		},
-	}
 	settingsFile := ws.Join("settings.json")
 	if err := settings.SaveSection(settingsFile, "openers", []opener.Spec{
 		{Name: "finder", Cmd: []string{"/usr/bin/open", "$0"}, Roles: []string{"open-dir"}},
@@ -59,7 +50,15 @@ func newTestEnv(t *testing.T) *testEnv {
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
-	if err := settings.SaveSection(settingsFile, "project", projSpec); err != nil {
+	if err := settings.SaveSection(settingsFile, "scanRule", []project.ScanRule{
+		{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
+		{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
+	}); err != nil {
+		t.Fatalf("写入测试 settings.json 失败: %v", err)
+	}
+	if err := settings.SaveSection(settingsFile, "cloneRule", []project.CloneRule{
+		{RepoHost: "github.com", LocalPath: ws.Join("repo")},
+	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
 

@@ -8,23 +8,25 @@ import (
 	"cube/util/pathkit"
 )
 
-// settingsSection settings.json 中 project 域的节名（scan/clone 规则数据源）。
-const settingsSection = "project"
+// settings.json 中 project 域的两个规则节：分节存储，可独立读取与写入。
+const (
+	scanRuleSection  = "scanRule"
+	cloneRuleSection = "cloneRule"
+)
 
-// SettingsSpec settings.json `project` 节的 DTO。
-// scan/clone 规则的存储形态与领域形态同构（同一 struct）：存储时 Path/localPath
-// 可写 ~/，转换为生效规则时由 makeScanRules/makeCloneRules 展开+校验。
-type SettingsSpec struct {
-	Scan  []ScanRule  `json:"scan"`
-	Clone []CloneRule `json:"clone"`
+// loadScanRules 现读 settings.json 的 scanRule 节（直读不缓存，改完即生效）。
+// settings 包已把文件级/节级坏数据降级为零值。
+func loadScanRules(settingsFile string) []ScanRule {
+	var specs []ScanRule
+	settings.LoadSection(settingsFile, scanRuleSection, &specs)
+	return specs
 }
 
-// loadSettingsSpec 现读 settings.json 的 project 节（直读不缓存，改完即生效）。
-// settings 包已把文件级/节级坏数据降级为零值。
-func loadSettingsSpec(settingsFile string) SettingsSpec {
-	var spec SettingsSpec
-	settings.LoadSection(settingsFile, settingsSection, &spec)
-	return spec
+// loadCloneRules 现读 settings.json 的 cloneRule 节（直读不缓存，改完即生效）。
+func loadCloneRules(settingsFile string) []CloneRule {
+	var specs []CloneRule
+	settings.LoadSection(settingsFile, cloneRuleSection, &specs)
+	return specs
 }
 
 // makeScanRules 展开规则路径的 ~/ 为绝对路径，校验目录存在

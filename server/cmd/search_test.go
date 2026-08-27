@@ -16,12 +16,10 @@ func newCmdServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *projec
 	t.Helper()
 	ws := testfixture.NewWorkspace(t)
 	settingsFile := ws.Join("settings.json")
-	spec := project.SettingsSpec{
-		Scan: []project.ScanRule{
-			{Group: group, Path: scanRoot, MaxDepth: maxDepth},
-		},
+	scanRules := []project.ScanRule{
+		{Group: group, Path: scanRoot, MaxDepth: maxDepth},
 	}
-	if err := settings.SaveSection(settingsFile, "project", spec); err != nil {
+	if err := settings.SaveSection(settingsFile, "scanRule", scanRules); err != nil {
 		t.Fatalf("写测试 settings.json 失败: %v", err)
 	}
 	return project.NewService(ws.Mkdir("cache"), settingsFile)
