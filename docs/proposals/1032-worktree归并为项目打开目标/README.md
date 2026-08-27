@@ -23,7 +23,7 @@ git 主仓库与它的 worktree 目前被 scan 当成**多个独立项目**管�
 
 1. **扫描归并边界**：scan 只收录 `.git` 为**目录**的项目；`.git` 为**文件**的目录（linked worktree）跳过。规则：**主仓库必须在 scan-rule 之下，worktree 可以在任何位置**——worktree 可见性来自主项目枚举，不来自扫描。推论：主仓库不在任何 scan-rule 下的 worktree 整体不可见（接受，不做孤儿降级）。
 2. **worktree 无独立项目身份，全部归并无例外**：「把 worktree 当独立项目」（列表独立条目、独立 history、独立入口）无实际诉求；「直接打开 worktree 目录」的需求由「选主项目 → 选 worktree 目标」满足。不为少数场景加例外机制（cube.json 不声明 worktree 归并/独立）。
-3. **history 双字段**：`ProjectOpenLog` 增加 `dir` 字段——项目记主项目 name，目录记具体目标标识（根目录为空 / worktree 为分支名 / workspace 为其 name，1030 落地后生效）。`ProjectSelectLog` 不变（选择的对象是项目）。
+3. **history 双字段**：`ProjectOpenLog` 增加 `dir` 字段——项目记主项目 name，目录记目标的**绝对路径**（根目录为空 / worktree 为其路径 / workspace 为其绝对路径，1030 落地后生效）。history 是流水记录而非配置，目录重命名后旧记录仅展示不全，不构成脏数据。`ProjectSelectLog` 不变（选择的对象是项目）。
 4. **`worktree` tag 移除**：归并后 tag 失去载体。
 
 ## 方案
@@ -46,18 +46,26 @@ git 主仓库与它的 worktree 目前被 scan 当成**多个独立项目**管�
 ### 4. 打开流程（CLI / alfred / Web）
 
 - `cube open`：选定项目后，若有多目标则 `tui.SelectItem` 选目标（含「根目录」），再走 opener 选择；单目标项目流程不变；
-- alfred：列表交互形态（项目层级展开 vs 目标平铺 `cube: repo (branch)`）实装时定，倾向平铺直达以保留现有一步打开体验；
+- alfred：列表交互形态（项目层级展开 vs 目标平铺 `cube: repo (branch)`）执行过程中边改边实测手感再定，倾向平铺直达以保留现有一步打开体验；
 - Web 项目页 / workbench 打开入口同构接入。
 
-### 5. 作用域边界：仅 open 链路
+### 5. 作用域边界与路径归并
 
-pull / push / diff / info 等命令**默认作用于主仓库根目录**，不引入目标选择（worktree 上的 git 操作仍可在其目录内直接跑 git，或后续提案扩展）。本提案只重塑「项目身份与打开」。
+非 open 命令不引入目标选择，但需要一条**路径归并链路**——`pickProject` / 项目反查在命中 worktree 目录（`.git` 为文件）时，顺着 git 元数据定位主仓库并选中主项目（worktree 内跑 pull / push 等同于在主目录操作）。分命令语义：
+
+- **pull / push**：pickProject 归并到主项目，作用于主仓库根目录；
+- **info**：同上归并，但输出**注明当前所属 worktree**（分支/路径）；
+- **diff**：纯目录对比操作（参数是两个路径），与项目身份无关，不归并不变。
+
+open 链路（选主项目 → 选目标）是本提案的重心；其他命令的目标化留待后续提案。
 
 ## 重构面盘点（影响清单）
 
 | 位置 | 变化 |
 |---|---|
 | `project/scan.go` | `.git` 为文件跳过；`TagWorktree` 删除 |
+| `pickProject` / 项目反查 | 命中 worktree 目录时顺着 `.git` 文件定位主仓库，归并选中主项目（pull / push / info 等命令入口） |
+| `cmd/info.go` | 输出注明当前所属 worktree |
 | `cmd/open.go` / `cmd/alfred` | 插入目标选择步 |
 | `history` | `ProjectOpenLog` 加 `dir` 字段（AutoMigrate 增列，旧数据 dir 为空=根目录，天然兼容） |
 | `gitcache` | 快照结构加 worktree 列表；worktree 目录不再作为独立项目采集，改由主项目采集时附带 |
