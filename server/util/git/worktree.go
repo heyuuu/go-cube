@@ -63,6 +63,104 @@ func WorktreeMain(dir string) string {
 	return ""
 }
 
+// WorktreeAdd 在 dir 仓库的 targetPath 处创建新工作副本，基点 commitish 为
+// commit / 分支 / tag（空串 = HEAD）。branch 决定形态：
+//   - 空串：detached（--detach，不创建分支）；
+//   - 分支不存在：以 commitish 为起点新建分支（-b）；
+//   - 分支已存在：检出该分支。
+//
+// 分支已被任一工作副本（含主目录）检出时 git 会拒绝，这里基于 WorktreeList
+// 预检并直接给出中文错误（指明检出位置），避免依赖 stderr 文案。
+// targetPath 已存在且非空同样由 git 拒绝，调用方（workbench Service）负责预校验。
+// 成功后返回新副本的信息（含 Head / Branch），供上层直接发起 open。
+func WorktreeAdd(dir string, targetPath string, branch string, commitish string) (*Worktree, error) {
+	if branch != "" {
+		if at, err := branchCheckedOutAt(dir, branch); err != nil {
+			return nil, err
+		} else if at != "" {
+			return nil, fmt.Errorf("分支 %s 已被工作副本检出，不能重复检出: %s", branch, at)
+		}
+	}
+
+	args := []string{"worktree", "add"}
+	switch {
+	case branch == "":
+		args = append(args, "--detach")
+	case branchExists(dir, branch):
+		// 检出已有分支，无附加 flag
+	default:
+		args = append(args, "-b", branch)
+	}
+	args = append(args, targetPath)
+	if commitish != "" {
+		args = append(args, commitish)
+	}
+	if _, err := runOut(dir, args...); err != nil {
+		return nil, fmt.Errorf("git worktree add 执行失败: %w", err)
+	}
+
+	// 从列表回读新副本信息；git 输出的路径经符号链接规范化，比较前同样求值
+	canonicalTarget, err := filepath.EvalSymlinks(targetPath)
+	if err != nil {
+		canonicalTarget = targetPath
+	}
+	list, err := WorktreeList(dir)
+	if err != nil {
+		return nil, err
+	}
+	for i, wt := range list {
+		if wt.Path == canonicalTarget {
+			return &list[i], nil
+		}
+	}
+	return nil, fmt.Errorf("worktree 已创建但未出现在副本列表中: %s", targetPath)
+}
+
+// WorktreeRemove 删除 dir 仓库中 targetPath 处的工作副本（git worktree remove）。
+// 非 force 时 git 自身拒绝删除含未提交改动/未跟踪文件的副本，错误经本包包装上抛；
+// 上层（workbench Service）另有基于快照的中文预检，这里的拒绝只作兜底。
+// 删除后的元数据清理由调用方统一 WorktreePrune 收尾。
+func WorktreeRemove(dir string, targetPath string, force bool) error {
+	args := []string{"worktree", "remove"}
+	if force {
+		args = append(args, "--force")
+	}
+	args = append(args, targetPath)
+	if _, err := runOut(dir, args...); err != nil {
+		return fmt.Errorf("git worktree remove 执行失败: %w", err)
+	}
+	return nil
+}
+
+// branchExists 判断分支是否已存在于本地 refs（不区分是否检出）。
+// 判定失败按不存在降级——真正的冲突交由 git worktree add 报错兜底。
+func branchExists(dir string, branch string) bool {
+	refs, err := Refs(dir)
+	if err != nil {
+		return false
+	}
+	for _, r := range refs.Locals {
+		if r.Branch == branch {
+			return true
+		}
+	}
+	return false
+}
+
+// branchCheckedOutAt 返回检出 branch 的工作副本路径（含主目录），未检出返回空串。
+func branchCheckedOutAt(dir string, branch string) (string, error) {
+	list, err := WorktreeList(dir)
+	if err != nil {
+		return "", fmt.Errorf("枚举工作副本失败: %w", err)
+	}
+	for _, wt := range list {
+		if wt.Branch == branch {
+			return wt.Path, nil
+		}
+	}
+	return "", nil
+}
+
 // WorktreePrune 清理主仓库 root 中目录已不存在的 worktree 元数据记录。
 // 幂等且无损：只删失效记录，不碰任何现存 worktree。doctor 的发现/修复共用。
 func WorktreePrune(root string) error {

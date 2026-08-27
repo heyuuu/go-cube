@@ -32,29 +32,41 @@ var readCmdLogEnabled = sync.OnceValue(func() bool {
 
 // runOut 在 dir 下执行 git 读命令并捕获 stdout（不透传终端）。
 // 与 Run 的差异：输出面向程序解析而非人，因此注入与用户配置无关的稳定环境：
-//   - LC_ALL=C：统一 locale（porcelain 格式本身不受 locale 影响，防御性兜底）；
+//   - LC_ALL=C：统一 locale（porcelain 格式本身不受 locale 影响，防御性兜底；
+//     stderr 文案在 C locale 下同样稳定为英文，供写侧函数翻译错误语义）；
 //   - GIT_PAGER=cat：禁用分页器，避免极端配置下进程等待交互翻页挂起；
 //   - --no-optional-locks：后台读不碰 index.lock，不与用户正在进行的 git 操作抢锁；
 //   - -c core.quotePath=false：非 ASCII 路径（如中文文件名）不转义成八进制串。
 //
 // stderr 不做解析（文案随 locale 翻译，不可依赖），只作为错误信息附带给日志。
 func runOut(dir string, args ...string) (string, error) {
+	stdout, stderr, err := runOutRaw(dir, args...)
+	if err != nil {
+		return "", fmt.Errorf("git %s 执行失败: %w；stderr: %s",
+			strings.Join(args, " "), err, stderr)
+	}
+	return stdout, nil
+}
+
+// runOutRaw 是 runOut 的底层形态，额外分出 stderr 原文——供写侧函数（BranchDelete 等）
+// 依据 C locale 下稳定的英文 stderr 识别拒绝原因（not fully merged / checked out 等），
+// 翻译成中文错误上抛。只在本包内使用。
+func runOutRaw(dir string, args ...string) (stdout, stderrText string, err error) {
 	args = append([]string{"--no-optional-locks", "-c", "core.quotePath=false"}, args...)
 	cmd := exec.Command("git", args...)
 	cmd.Dir = dir
 	cmd.Env = append(os.Environ(), "LC_ALL=C", "GIT_PAGER=cat")
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	var stdoutBuf, stderrBuf bytes.Buffer
+	cmd.Stdout = &stdoutBuf
+	cmd.Stderr = &stderrBuf
 
 	if readCmdLogEnabled() {
 		slog.Debug("git 读命令", "cmd", cmd.String())
 	}
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("git %s 执行失败: %w；stderr: %s",
-			strings.Join(args, " "), err, strings.TrimSpace(stderr.String()))
+		return "", strings.TrimSpace(stderrBuf.String()), err
 	}
-	return stdout.String(), nil
+	return stdoutBuf.String(), "", nil
 }
 
 // isGitRepo 判断 path 自身是否为 git 仓库根（存在 .git 文件或目录，worktree 的

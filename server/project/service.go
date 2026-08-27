@@ -287,8 +287,8 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 		s.scanCache.Reload()
 		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
 			slog.Debug("git 缓存新鲜，跳过启动采集（仅重扫项目列表）", "上次落盘距今", since.Round(time.Second).String())
-		} else {
-			s.collectGit()
+		} else if _, _, err := s.collectGit(); err != nil {
+			slog.Warn("启动采集 git 缓存失败", "err", err)
 		}
 
 		ticker := time.NewTicker(interval)
@@ -331,28 +331,11 @@ func (s *Service) refresh() {
 	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
 }
 
-// collectGit 按当前项目列表整表采集 git 信息，不触发重扫——启动时机（已重扫）
-// 与定时器共用。异常降级只记日志。
-func (s *Service) collectGit() {
-	if s.gitCache == nil {
-		slog.Warn("git 缓存未初始化，跳过采集")
-		return
-	}
+// collectGit 按当前项目列表整表采集 git 信息（写内存 + 落盘 git.json），不触发重扫。
+// gitCache.Refresh 的唯一调用点：定时器（经 Refresh 组合）与启动时机（已单独重扫）共用。
+// 返回 (项目总数, 采集成功数, 错误)。
+func (s *Service) collectGit() (total int, collected int, err error) {
 	paths := slicekit.Map(s.Projects(), (*Project).Path)
-	if err := s.gitCache.Refresh(paths); err != nil {
-		slog.Warn("刷新 git 缓存失败", "err", err)
-	}
-}
-
-// Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息
-// （写内存 + 落盘 git.json）。返回 (项目总数, 采集成功数, 错误)。
-//
-// 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
-// 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
-func (s *Service) Refresh() (total int, collected int, err error) {
-	projects := s.scanCache.Reload()
-
-	paths := slicekit.Map(projects, (*Project).Path)
 	if s.gitCache == nil {
 		return len(paths), 0, errors.New("git 缓存未初始化")
 	}
@@ -360,4 +343,14 @@ func (s *Service) Refresh() (total int, collected int, err error) {
 		return len(paths), 0, err
 	}
 	return len(paths), s.gitCache.Size(), nil
+}
+
+// Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息。
+// 返回 (项目总数, 采集成功数, 错误)。
+//
+// 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
+// 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
+func (s *Service) Refresh() (total int, collected int, err error) {
+	s.scanCache.Reload()
+	return s.collectGit()
 }

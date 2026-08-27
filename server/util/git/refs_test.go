@@ -4,6 +4,7 @@ package git
 import (
 	"os/exec"
 	"reflect"
+	"strings"
 	"testing"
 
 	"cube/internal/testfixture"
@@ -362,5 +363,33 @@ func TestParentSha(t *testing.T) {
 	// EmptyCommitCount=2 时 parent 已是根提交：再取父应报错
 	if _, err := ParentSha(dir, parent); err == nil {
 		t.Error("根提交再取父应报错")
+	}
+}
+
+// BranchDelete：未合并非 force 拒绝（中文原因）、force 成功；已合并分支直接删。
+func TestBranchDelete(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+
+	// 在第一个 commit 上建分支，其后再有 commit → 该分支相对 HEAD 未合并
+	out, err := runOut(repo, "rev-list", "--max-parents=0", "HEAD")
+	if err != nil {
+		t.Fatalf("取首个 commit 失败: %v", err)
+	}
+	runGit(t, repo, "branch", "old", strings.TrimSpace(out))
+
+	if err := BranchDelete(repo, "old", false); err == nil {
+		t.Fatalf("未合并分支非 force 删除应被拒绝")
+	} else if !strings.Contains(err.Error(), "尚未合并") {
+		t.Errorf("错误应为中文未合并提示, got: %v", err)
+	}
+	if err := BranchDelete(repo, "old", true); err != nil {
+		t.Fatalf("未合并分支 force 删除应成功: %v", err)
+	}
+
+	// 指向 HEAD 的分支视为已合并，-d 直接删
+	runGit(t, repo, "branch", "merged")
+	if err := BranchDelete(repo, "merged", false); err != nil {
+		t.Fatalf("已合并分支删除应成功: %v", err)
 	}
 }

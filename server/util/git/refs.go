@@ -5,6 +5,7 @@ package git
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"strings"
 )
@@ -171,6 +172,31 @@ func DefaultBranch(path string) (string, error) {
 		}
 	}
 	return "", nil
+}
+
+// BranchDelete 删除 path 仓库的本地分支。force 决定语义：
+//   - false：git 原生 -d（分支已合并到上游或 HEAD 才允许）；
+//   - true：-D 强删（丢弃未合并提交）。
+//
+// 「分支被任一工作副本检出」是硬约束（-D 也删不掉），由 workbench Service 基于
+// WorktreeList 预检并指明检出位置；此处只把 git 的英文 stderr 拒绝原因翻译成中文
+// 上抛（stderr 在 runOutRaw 的 C locale 注入下稳定为英文）。
+func BranchDelete(path string, branch string, force bool) error {
+	flag := "-d"
+	if force {
+		flag = "-D"
+	}
+	_, stderr, err := runOutRaw(path, "branch", flag, branch)
+	if err != nil {
+		if strings.Contains(stderr, "not fully merged") {
+			return errors.New("分支 " + branch + " 尚未合并，非 force 删除被拒绝（可勾选 force 后重试）")
+		}
+		if strings.Contains(stderr, "checked out") {
+			return errors.New("分支 " + branch + " 正被检出，无法删除")
+		}
+		return fmt.Errorf("git branch "+flag+" 执行失败: %w", err)
+	}
+	return nil
 }
 
 // HeadSha 返回 path 仓库 HEAD 指向 commit 的完整 sha（detached HEAD 同样适用）。
