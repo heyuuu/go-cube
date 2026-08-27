@@ -64,7 +64,7 @@ export function ProjectDrawer({
       }}
     >
       {project && (
-        <SheetContent className="w-full gap-0 sm:max-w-md">
+        <SheetContent className="w-full gap-0 sm:max-w-[40rem]">
           <SheetHeader>
             <SheetTitle>{project.name}</SheetTitle>
             <SheetDescription className="font-mono" title={project.path}>
