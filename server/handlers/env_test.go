@@ -44,11 +44,11 @@ func newTestEnv(t *testing.T) *testEnv {
 	ws.MakeProjectDir("g2/proj2", testfixture.WithGodot())
 
 	projSpec := project.SettingsSpec{
-		Scan: []project.ScanRuleSpec{
+		Scan: []project.ScanRule{
 			{Group: "g1", Path: ws.Join("g1"), MaxDepth: 1},
 			{Group: "g2", Path: ws.Join("g2"), MaxDepth: 1},
 		},
-		Clone: []project.CloneRuleSpec{
+		Clone: []project.CloneRule{
 			{RepoHost: "github.com", LocalPath: ws.Join("repo")},
 		},
 	}

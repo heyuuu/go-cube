@@ -17,7 +17,7 @@ func newCmdServiceAt(t *testing.T, scanRoot, group string, maxDepth int) *projec
 	ws := testfixture.NewWorkspace(t)
 	settingsFile := ws.Join("settings.json")
 	spec := project.SettingsSpec{
-		Scan: []project.ScanRuleSpec{
+		Scan: []project.ScanRule{
 			{Group: group, Path: scanRoot, MaxDepth: maxDepth},
 		},
 	}
