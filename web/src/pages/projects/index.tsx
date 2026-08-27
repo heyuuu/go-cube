@@ -156,6 +156,18 @@ function GitCell({ p, onFilter }: { p: Project; onFilter: (s: GitStatus) => void
   );
 }
 
+// 最近使用时间：muted 等宽小字（刻意区别于 tag badge 的样式语言），悬停见绝对时间
+function LastUsedTime({ iso }: { iso: string }) {
+  return (
+    <span
+      className="shrink-0 font-mono text-[0.6875rem] text-muted-foreground/70"
+      title={`最近使用：${formatDateTime(iso)}`}
+    >
+      {prettyTime(iso)}
+    </span>
+  );
+}
+
 // 树行：目录行整行点击折叠/展开；项目行带 tags / git 信息与打开动作（根行显示 ~ 缩写路径）
 function TreeRowView({
   row,
@@ -230,13 +242,9 @@ function TreeRowView({
               {t}
             </ClickBadge>
           ))}
-          {p.lastUsedAt && (
-            <Badge variant="secondary" title={`最近使用：${formatDateTime(p.lastUsedAt)}`}>
-              {prettyTime(p.lastUsedAt)}
-            </Badge>
-          )}
           <GitCell p={p} onFilter={onFilterGit} />
-          <div className="ml-auto">
+          <div className="ml-auto flex items-center gap-2">
+            {p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}
             <ProjectActions p={p} openerList={openerList} open={open} onOpen={onOpen} />
           </div>
         </>
@@ -616,9 +624,9 @@ export function ProjectsPage() {
                           </ClickBadge>
                         ))}
                         {p.lastUsedAt && (
-                          <Badge variant="secondary" title={`最近使用：${formatDateTime(p.lastUsedAt)}`}>
-                            {prettyTime(p.lastUsedAt)}
-                          </Badge>
+                          <span className="ml-auto pr-1">
+                            <LastUsedTime iso={p.lastUsedAt} />
+                          </span>
                         )}
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
