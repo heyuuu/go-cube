@@ -1,8 +1,18 @@
 # worktree 管理（工作台写侧）
 
-> **状态**：✅ 已实施（待验收）——5 步全部落地，go vet / go test（17 包）/ pnpm build / 前端 44 测试全通过；验收通过后归档
+> **状态**：✅ 已实施（已归档，2026-08-28）
 >
-> **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（打开 worktree 复用 RoleOpenDir，本提案不改 opener）；[`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md)（worktree 作为 TreeSource 的读侧已就绪）；[`1032-worktree归并为项目打开目标`](../1032-worktree归并为项目打开目标/README.md)（**已实施**：worktree 不再是独立项目，是主项目的打开目标，可见性来自 gitcache 快照的 `worktrees` 枚举；本提案已按此口径修订——验收 1 的「项目列表」改为主项目打开目标，目录位置决策的 maxDepth 论据失效（worktree 可放任意位置），写后定向刷新快照更加必要）。
+> **实施偏差备忘**（与原方案的差异）：
+> 1. **新建分支（`branch/add`）为验收前补充**：原方案「只做删除这一个动作」，讨论后补齐 `util/git.BranchAdd`（不检出不切 HEAD，重名/非法名/基点不存在中文拒绝），增删两动作使分支管理初步完整——「建分支并切过去」仍由 worktree 新建覆盖；
+> 2. **删除预检拒绝走结构化返回而非 error**：`worktree/remove` 非 force 被拒时 envelope `ok=true` + `denied/reasons` 字段（`*WorktreeRemoveDenied` 在 handler 层转换），前端内联展示原因、勾 force 一步重试；
+> 3. **前端默认分支名 `worktree-%02d`**（验收优化）：从 01 取第一个不与现有分支冲突的编号（独立纯函数模块 `branch-name.ts` + 单测），未手改时随 refs 加载自动填入；
+> 4. **回车提交**（验收优化）：新建 worktree / 新建分支对话框 form 包裹 + submit 型确认按钮，取消钮显式 `type=button`；
+> 5. **stderr 匹配小写化**：git 各版本对 "Not a valid object name" 大小写不一致，`BranchAdd` 的拒绝翻译按小写化匹配；
+> 6. **刷新落点定稿**：`gitcache.Cache.RefreshOne` 定向刷新 + app 装配回调注入 `project.RefreshGitInfo`（workbench 不反向依赖 project），写后即时可见不等 TTL；
+> 7. **`/api/workbench/worktrees` 维持现场跑 git**（1032 已决策）：预检「被检出分支冲突」在 `util/git.WorktreeAdd` 内基于 `WorktreeList` 预检（中文错误指明检出位置），Service 不再单独预检；
+> 8. 定位修订（决策 5）未随实施提交，单独先行落地（9800314）。
+>
+> **关联**：[`1016-opener改造`](../1016-opener改造/README.md)（打开 worktree 复用 RoleOpenDir，本提案不改 opener）；[`1011-工作台git树面板`](../1011-工作台git树面板/README.md)（worktree 作为 TreeSource 的读侧已就绪）；[`1032-worktree归并为项目打开目标`](../1032-worktree归并为项目打开目标/README.md)（**已实施**：worktree 不再是独立项目，是主项目的打开目标，可见性来自 gitcache 快照的 `worktrees` 枚举；本提案已按此口径修订——验收 1 的「项目列表」改为主项目打开目标，目录位置决策的 maxDepth 论据失效（worktree 可放任意位置），写后定向刷新快照更加必要）。
 
 ## 背景与目标
 
