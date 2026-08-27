@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { joinCmdLine, tokenizeCmdLine } from '@/lib/cmdline';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
@@ -31,7 +32,7 @@ const STICKY_RIGHT =
 // 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
 const DEFAULT_LUCIDE = 'app-window-mac';
 
-// 表单草稿：cmd 以空格分隔编辑（v1 约定：cmd 参数不含空格）
+// 表单草稿：cmd 以 shell 风格编辑——空格分隔，含空格的 token 用引号包裹（如 "/Applications/Visual Studio Code.app/..."）
 interface Draft {
   name: string;
   title: string;
@@ -52,8 +53,8 @@ function fromOpener(op: Opener): Draft {
   return {
     name: op.name,
     title: op.title === `用 ${op.name} 打开` ? '' : op.title,
-    // summary 是命令模板的空格拼接展示，直接还原成编辑文本
-    cmd: op.summary,
+    // cmd 是模板原文数组，joinCmdLine 对含空格 token 加引号，保证编辑无损回显
+    cmd: joinCmdLine(op.cmd?.length ? op.cmd : op.summary.split(/\s+/).filter(Boolean)),
     roles: op.roles ?? [],
     icon:
       op.icon?.type === 'image'
@@ -73,7 +74,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
       {
         name: form.name.trim(),
         title: form.title.trim() || undefined,
-        cmd: form.cmd.trim().split(/\s+/).filter(Boolean),
+        cmd: tokenizeCmdLine(form.cmd),
         roles: form.roles,
         icon: { type: form.icon.type, value: form.icon.value },
       },
@@ -103,7 +104,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
 
           <label className="flex flex-col gap-1">
             <span className="text-xs text-muted-foreground">
-              cmd（空格分隔，$0/$1 占位路径槽位；打开工作台可用 `cube ui workbench $0`）
+              cmd（空格分隔，含空格的路径用引号包裹；$0/$1 占位路径槽位；打开工作台可用 `cube ui workbench $0`）
             </span>
             <Input
               value={form.cmd}

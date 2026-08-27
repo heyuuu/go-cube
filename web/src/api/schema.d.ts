@@ -1012,6 +1012,7 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
+      cmd: string[] | null;
       icon: components['schemas']['IconDTO'];
       name: string;
       roles: string[] | null;

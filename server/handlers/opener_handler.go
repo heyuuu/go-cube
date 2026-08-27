@@ -22,6 +22,7 @@ type OpenerDTO struct {
 	Name    string   `json:"name"`
 	Title   string   `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
 	Summary string   `json:"summary"` // 命令模板展示串
+	Cmd     []string `json:"cmd"`     // 命令模板原文（编辑表单回显用，token 可含空格）
 	Roles   []string `json:"roles"`
 	Icon    IconDTO  `json:"icon"` // 恒有值（未配置时后端按主 role 填默认 lucide 图）
 }
@@ -41,6 +42,7 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 		Name:    entity.Name(),
 		Title:   entity.Title(),
 		Summary: entity.Summary(),
+		Cmd:     entity.Cmd(),
 		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
 			return string(r)
 		}),

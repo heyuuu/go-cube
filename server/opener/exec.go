@@ -74,6 +74,8 @@ func (o *execOpener) Title() string { return o.title }
 func (o *execOpener) Roles() []Role { return o.roles }
 func (o *execOpener) Icon() Icon    { return o.icon }
 
+func (o *execOpener) Cmd() []string { return o.cmd }
+
 func (o *execOpener) Summary() string {
 	return strings.Join(o.cmd, " ")
 }

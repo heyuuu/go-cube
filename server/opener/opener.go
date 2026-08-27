@@ -17,6 +17,10 @@ type Opener interface {
 	// exec 显示命令模板，web 显示 target。
 	Summary() string
 
+	// Cmd 启动命令模板原文（cmd[0]=可执行文件），供 Web 编辑表单无损回显——
+	// Summary 是空格拼接的展示串，token 含空格时不可逆。
+	Cmd() []string
+
 	// Open 以指定用途打开路径。role 校验收敛在实现内——不支持该 role 时返回
 	// 中文错误，调用方无需再自行核对 HasRole。
 	Open(role Role, slotArgs ...string) error
