@@ -59,6 +59,40 @@ func (s *Service) CloneRules() []CloneRule {
 	return loadCloneRules(s.settingsFile)
 }
 
+// SaveScanRule 新增或按 path 替换一条 scan 规则（校验在写侧，坏数据返回中文错误）。
+// 成功后立即重扫项目列表（毫秒级），保证 Web 保存后列表即时反映。
+func (s *Service) SaveScanRule(rule ScanRule) error {
+	if err := saveScanRule(s.settingsFile, rule); err != nil {
+		return err
+	}
+	s.scanCache.Reload()
+	return nil
+}
+
+func (s *Service) DeleteScanRule(path string) error {
+	if err := deleteScanRule(s.settingsFile, path); err != nil {
+		return err
+	}
+	s.scanCache.Reload()
+	return nil
+}
+
+func (s *Service) ReorderScanRules(paths []string) error {
+	return reorderScanRules(s.settingsFile, paths)
+}
+
+func (s *Service) SaveCloneRule(rule CloneRule) error {
+	return saveCloneRule(s.settingsFile, rule)
+}
+
+func (s *Service) DeleteCloneRule(key CloneRuleKey) error {
+	return deleteCloneRule(s.settingsFile, key)
+}
+
+func (s *Service) ReorderCloneRules(keys []CloneRuleKey) error {
+	return reorderCloneRules(s.settingsFile, keys)
+}
+
 // --- project 读操作 ---
 
 func (s *Service) Projects() []*Project {

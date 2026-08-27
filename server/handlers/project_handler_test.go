@@ -1,9 +1,14 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"sort"
+	"strings"
 	"testing"
 
+	"cube/project"
 	"cube/project/gitcache"
 )
 
@@ -118,5 +123,107 @@ func TestProjectCloneRules(t *testing.T) {
 	}
 	if got.List[0].RepoHost != "github.com" || got.List[0].LocalPath != env.ws.Join("repo") {
 		t.Errorf("clone 规则字段不符: %+v", got.List[0])
+	}
+}
+
+// TestScanRuleWrite scan-rule 的 save/delete/reorder 出口契约（含坏数据中文错误）。
+func TestScanRuleWrite(t *testing.T) {
+	env := newTestEnv(t)
+	root := env.ws.Mkdir("g3")
+
+	// save 新增
+	r := postJSON(t, env.url("/api/project/scan-rule/save"), fmt.Sprintf(`{"group":"g3","path":%q,"maxDepth":2}`, root))
+	if !r.Ok {
+		t.Fatalf("save 应成功, message=%q", r.Message)
+	}
+	// save 坏数据：中文错误、不落文件
+	bad := postJSON(t, env.url("/api/project/scan-rule/save"), `{"group":"","path":"/x","maxDepth":2}`)
+	if bad.Ok || !strings.Contains(bad.Message, "group") {
+		t.Fatalf("坏数据应报中文错误, ok=%v message=%q", bad.Ok, bad.Message)
+	}
+
+	list := getJSON(t, env.url("/api/project/scan-rules"))
+	var got struct {
+		List []project.ScanRule `json:"list"`
+	}
+	decodeData(t, list, &got)
+	if len(got.List) != 3 { // fixture 预置 g1/g2 + 新增 g3
+		t.Fatalf("应返回 3 条规则, got %d: %+v", len(got.List), got.List)
+	}
+
+	// reorder：把 g3 提到最前
+	paths := make([]string, 0, len(got.List))
+	for _, r := range got.List {
+		paths = append(paths, r.Path)
+	}
+	sort.Strings(paths)
+	ordered := append([]string{root}, paths[0:len(paths)-1]...)
+	body, _ := json.Marshal(map[string]any{"paths": ordered})
+	if r := postJSON(t, env.url("/api/project/scan-rule/reorder"), string(body)); !r.Ok {
+		t.Fatalf("reorder 应成功, message=%q", r.Message)
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/scan-rules")), &got)
+	if got.List[0].Group != "g3" {
+		t.Fatalf("reorder 后 g3 应在最前: %+v", got.List)
+	}
+
+	// delete
+	if r := postJSON(t, env.url("/api/project/scan-rule/delete"), fmt.Sprintf(`{"path":%q}`, root)); !r.Ok {
+		t.Fatalf("delete 应成功, message=%q", r.Message)
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/scan-rules")), &got)
+	if len(got.List) != 2 {
+		t.Fatalf("删除后应剩 2 条, got %d", len(got.List))
+	}
+	// delete 不存在：中文错误
+	r2 := postJSON(t, env.url("/api/project/scan-rule/delete"), `{"path":"/no/such"}`)
+	if r2.Ok || !strings.Contains(r2.Message, "未找到") {
+		t.Fatalf("删除不存在应报中文错误, message=%q", r2.Message)
+	}
+}
+
+// TestCloneRuleWrite clone-rule 的 save/delete/reorder 出口契约。
+func TestCloneRuleWrite(t *testing.T) {
+	env := newTestEnv(t)
+
+	// save 新增（prefix 须以 / 开头）
+	if r := postJSON(t, env.url("/api/project/clone-rule/save"), fmt.Sprintf(`{"repoHost":"gitee.com","repoPrefix":"/heyuuu","localPath":%q}`, env.ws.Dir)); !r.Ok {
+		t.Fatalf("save 应成功, message=%q", r.Message)
+	}
+	// save 坏数据
+	bad := postJSON(t, env.url("/api/project/clone-rule/save"), `{"repoHost":"gitee.com","repoPrefix":"bad","localPath":"/x"}`)
+	if bad.Ok || !strings.Contains(bad.Message, "repoPrefix") {
+		t.Fatalf("坏数据应报中文错误, ok=%v message=%q", bad.Ok, bad.Message)
+	}
+
+	var got struct {
+		List []project.CloneRule `json:"list"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/clone-rules")), &got)
+	if len(got.List) != 2 { // fixture 预置 github.com + 新增 gitee
+		t.Fatalf("应返回 2 条规则, got %d: %+v", len(got.List), got.List)
+	}
+
+	// reorder：gitee 提前
+	if r := postJSON(t, env.url("/api/project/clone-rule/reorder"), `{"rules":[{"repoHost":"gitee.com","repoPrefix":"/heyuuu"},{"repoHost":"github.com","repoPrefix":""}]}`); !r.Ok {
+		t.Fatalf("reorder 应成功, message=%q", r.Message)
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/clone-rules")), &got)
+	if got.List[0].RepoHost != "gitee.com" {
+		t.Fatalf("reorder 后 gitee 应在最前: %+v", got.List)
+	}
+
+	// delete
+	if r := postJSON(t, env.url("/api/project/clone-rule/delete"), `{"repoHost":"gitee.com","repoPrefix":"/heyuuu"}`); !r.Ok {
+		t.Fatalf("delete 应成功, message=%q", r.Message)
+	}
+	decodeData(t, getJSON(t, env.url("/api/project/clone-rules")), &got)
+	if len(got.List) != 1 {
+		t.Fatalf("删除后应剩 1 条, got %d", len(got.List))
+	}
+	// delete 不存在
+	r2 := postJSON(t, env.url("/api/project/clone-rule/delete"), `{"repoHost":"nope.com","repoPrefix":""}`)
+	if r2.Ok || !strings.Contains(r2.Message, "未找到") {
+		t.Fatalf("删除不存在应报中文错误, message=%q", r2.Message)
 	}
 }
