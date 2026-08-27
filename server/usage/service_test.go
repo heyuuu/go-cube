@@ -73,14 +73,14 @@ func TestCompact(t *testing.T) {
 	now := time.Now()
 	old := now.AddDate(0, 0, -40)
 	// /p/old：两条超出保留期，compact 后只留组合最新一条（排序信号不随保留期消失）
-	writeRecord(t, s.path, Record{Time: old.Add(-time.Hour), Project: "/p/old", Opener: "code"})
-	writeRecord(t, s.path, Record{Time: old, Project: "/p/old", Opener: "code"})
+	writeRecord(t, s.usageFilePath, Record{Time: old.Add(-time.Hour), Project: "/p/old", Opener: "code"})
+	writeRecord(t, s.usageFilePath, Record{Time: old, Project: "/p/old", Opener: "code"})
 	// /p/recent：组合旧记录超出保留期（被删），最新一条在保留期内（留）
-	writeRecord(t, s.path, Record{Time: old.Add(time.Second), Project: "/p/recent", Opener: "vim"})
-	writeRecord(t, s.path, Record{Time: now.Add(-time.Hour), Project: "/p/recent", Opener: "vim"})
+	writeRecord(t, s.usageFilePath, Record{Time: old.Add(time.Second), Project: "/p/recent", Opener: "vim"})
+	writeRecord(t, s.usageFilePath, Record{Time: now.Add(-time.Hour), Project: "/p/recent", Opener: "vim"})
 	// /p/mid：保留期内的中间记录不删（保留期内全留）
-	writeRecord(t, s.path, Record{Time: now.Add(-2 * time.Hour), Project: "/p/mid", Opener: "vim"})
-	writeRecord(t, s.path, Record{Time: now.Add(-3 * time.Hour), Project: "/p/mid", Opener: "vim"})
+	writeRecord(t, s.usageFilePath, Record{Time: now.Add(-2 * time.Hour), Project: "/p/mid", Opener: "vim"})
+	writeRecord(t, s.usageFilePath, Record{Time: now.Add(-3 * time.Hour), Project: "/p/mid", Opener: "vim"})
 
 	removed, err := s.compact()
 	if err != nil {
@@ -89,7 +89,7 @@ func TestCompact(t *testing.T) {
 	if removed != 2 {
 		t.Fatalf("应删除 2 条（old 组合旧记录 + recent 组合旧记录），实际 %d", removed)
 	}
-	recs, _ := store.LoadJsonl[Record](s.path)
+	recs, _ := store.LoadJsonl[Record](s.usageFilePath)
 	if len(recs) != 4 {
 		t.Fatalf("compaction 后应剩 4 条，实际 %v", recs)
 	}
@@ -126,9 +126,9 @@ func TestRecordOpen_Dir(t *testing.T) {
 
 	// 超期旧记录先写（追加不变量：行序 = 时间序，旧记录必须在文件前部）
 	old := time.Now().AddDate(0, 0, -40)
-	writeRecord(t, s.path, Record{Time: old, Project: "/p/cube", Opener: "idea", Dir: "/p/cube--web/server"})
-	writeRecord(t, s.path, Record{Time: old, Project: "/p/cube", Opener: "idea", Dir: "/p/cube--web"})
-	writeRecord(t, s.path, Record{Time: old, Project: "/p/cube", Opener: "idea"}) // 主根
+	writeRecord(t, s.usageFilePath, Record{Time: old, Project: "/p/cube", Opener: "idea", Dir: "/p/cube--web/server"})
+	writeRecord(t, s.usageFilePath, Record{Time: old, Project: "/p/cube", Opener: "idea", Dir: "/p/cube--web"})
+	writeRecord(t, s.usageFilePath, Record{Time: old, Project: "/p/cube", Opener: "idea"}) // 主根
 
 	s.RecordOpen("/p/cube", "idea", "")                    // 主根
 	s.RecordOpen("/p/cube", "idea", "/p/cube--web/server") // worktree 内子目录
@@ -145,7 +145,7 @@ func TestRecordOpen_Dir(t *testing.T) {
 	if removed, err := s.compact(); err != nil || removed != 2 {
 		t.Fatalf("compact 应删除 2 条超期旧记录，实际 removed=%d err=%v", removed, err)
 	}
-	recs, _ := store.LoadJsonl[Record](s.path)
+	recs, _ := store.LoadJsonl[Record](s.usageFilePath)
 	if len(recs) != 5 {
 		t.Fatalf("compaction 后应剩 5 条（4 条新记录 + 超期组合最新 1 条），实际 %v", recs)
 	}

@@ -22,11 +22,11 @@ import (
 const retentionDays = 30
 
 type Service struct {
-	path string // usage.jsonl 路径
+	usageFilePath string // usage.jsonl 文件路径
 }
 
-func NewService(path string) *Service {
-	return &Service{path: path}
+func NewService(usageFilePath string) *Service {
+	return &Service{usageFilePath: usageFilePath}
 }
 
 // RecordOpen 追加一条打开记录（打开成功后由出口层调用）。
@@ -38,7 +38,7 @@ func NewService(path string) *Service {
 // 或 workspace 子目录时传其绝对路径（1030/1032 落地后生效）。
 func (s *Service) RecordOpen(project string, opener string, dir string) error {
 	rec := Record{Time: time.Now(), Project: project, Opener: opener, Dir: dir}
-	if err := store.AppendJsonl(s.path, rec); err != nil {
+	if err := store.AppendJsonl(s.usageFilePath, rec); err != nil {
 		return fmt.Errorf("写入 usage 记录失败: %w", err)
 	}
 	return nil
@@ -82,10 +82,10 @@ func (s *Service) LatestOpeners(project string, limit int) []string {
 
 // load 全量读取记录。文件缺失视为空（新环境/首次启动），坏行由 store 层跳过。
 func (s *Service) load() []Record {
-	recs, err := store.LoadJsonl[Record](s.path)
+	recs, err := store.LoadJsonl[Record](s.usageFilePath)
 	if err != nil {
 		if !errors.Is(err, store.ErrFileMissing) {
-			slog.Warn("读取 usage 记录失败", "path", s.path, "err", err)
+			slog.Warn("读取 usage 记录失败", "path", s.usageFilePath, "err", err)
 		}
 		return nil
 	}
@@ -137,7 +137,7 @@ func (s *Service) compact() (int, error) {
 		buf = append(buf, line...)
 		buf = append(buf, '\n')
 	}
-	if err := store.WriteFileAtomic(s.path, buf, 0644); err != nil {
+	if err := store.WriteFileAtomic(s.usageFilePath, buf, 0644); err != nil {
 		return 0, fmt.Errorf("重写 usage 记录失败: %w", err)
 	}
 	return len(recs) - len(kept), nil
