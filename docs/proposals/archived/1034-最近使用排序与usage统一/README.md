@@ -1,14 +1,17 @@
 # 最近使用排序与 usage 统一
 
-> **状态**：✅ 已实施（待归档）
+> **状态**：✅ 已实施（已归档，2026-08-27）
 >
 > **实施偏差备忘**（与原方案的差异）：
 > 1. `Record` 增加 `dir` 字段（实际打开目录绝对路径，主项目根打开时省略）——原「格式演进约定」预留给 1030 的 `subPath` 相对路径方案**废弃**：worktree 目标（1032）在主项目根之外，相对路径无意义，统一为单一 `dir` 恒记绝对路径；compaction 组合键随之为 `(project, opener, dir)`；
 > 2. `usage.jsonl` 落 `dataDir/state/`（新增运行期状态目录，与 cache 的「可整体删除」语义区分），不在配置目录根；
 > 3. Web 记录入口后定为独立接口 `POST /api/project/open`（打开已收录项目，成功即记 usage）；`opener/open` 回归纯「打开任意路径」不记录（原方案「opener/open 在目标是项目时记录」被此取代，项目打开与通用路径打开的语义彻底分离，也为 1030/1032 目标选择扩展留了口）；
-> 4. store 写原语统一自动递归创建父目录（`AppendJsonl` 补齐，与 `WriteFileAtomic`/`SaveJson` 一致）。
+> 4. store 写原语统一自动递归创建父目录（`AppendJsonl` 补齐，与 `WriteFileAtomic`/`SaveJson` 一致）；
+> 5. 列表排序最终落为**前端排序**（原方案在 handler 层排）：「排序与筛选同侧」——list 接口返回原始扫描序 + `lastUsedAt`，Web 在前端排序（列表模式表头点击循环 默认→↑→↓、树模式排序下拉，`?sort=` 持久化，badge 演为独立「最近使用」列的相对时间文本）；CLI `projects` 与 alfred `project-search` 共用纯函数 `project.SortByRecentUsage`（最近 10 条置顶、其余原序）；
+> 6. 伴随把项目查询键统一为 path：`project/info?path=`、alfred 跨命令传 Arg 改传 path、`project.Service.FindByName` 删除——name 回归纯展示名 + 名称态模糊搜索索引；
+> 7. store 新增 `WriteJsonl` 全量原子重写原语，compaction 的写入逻辑收敛于此。
 >
-> **关联**：[`1033-util-store文件存储`](../archived/1033-util-store文件存储/README.md)（前置需求，JSONL 原语）；[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（其打开子目录时 usage 记 `dir` 绝对路径，见「格式演进约定」）。
+> **关联**：[`1033-util-store文件存储`](../1033-util-store文件存储/README.md)（前置需求，JSONL 原语）；[`1030-monorepo-workspace`](../../1030-monorepo-workspace/README.md)（其打开子目录时 usage 记 `dir` 绝对路径，见「格式演进约定」）。
 
 ## 背景与目标
 

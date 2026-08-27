@@ -23,7 +23,7 @@ git 主仓库与它的 worktree 目前被 scan 当成**多个独立项目**管�
 
 1. **扫描归并边界**：scan 只收录 `.git` 为**目录**的项目；`.git` 为**文件**的目录（linked worktree）跳过。规则：**主仓库必须在 scan-rule 之下，worktree 可以在任何位置**——worktree 可见性来自主项目枚举，不来自扫描。推论：主仓库不在任何 scan-rule 下的 worktree 整体不可见（接受，不做孤儿降级）。
 2. **worktree 无独立项目身份，全部归并无例外**：「把 worktree 当独立项目」（列表独立条目、独立 history、独立入口）无实际诉求；「直接打开 worktree 目录」的需求由「选主项目 → 选 worktree 目标」满足。不为少数场景加例外机制（cube.json 不声明 worktree 归并/独立）。
-3. **usage 双维度**：usage 记录（[`1034`](../1034-最近使用排序与usage统一/README.md) 已落地的 JSONL `Record`）的 `dir` 字段承载目标维度——`project` 恒记主项目**绝对路径**（归并键），`dir` 记目标的**绝对路径**（主根打开省略 / worktree 为其路径 / workspace 为其绝对路径，1030 落地后生效）。usage 是流水信号而非配置，目录重命名后旧记录仅展示不全，不构成脏数据。~~原方案的 `ProjectOpenLog` 加列（sqlite AutoMigrate）已废弃~~——1034 已将 history 整体重写为 usage JSONL 并预留 `dir` 字段，本提案只负责打开入口写入时传目标路径。
+3. **usage 双维度**：usage 记录（[`1034`](../archived/1034-最近使用排序与usage统一/README.md) 已落地的 JSONL `Record`）的 `dir` 字段承载目标维度——`project` 恒记主项目**绝对路径**（归并键），`dir` 记目标的**绝对路径**（主根打开省略 / worktree 为其路径 / workspace 为其绝对路径，1030 落地后生效）。usage 是流水信号而非配置，目录重命名后旧记录仅展示不全，不构成脏数据。~~原方案的 `ProjectOpenLog` 加列（sqlite AutoMigrate）已废弃~~——1034 已将 history 整体重写为 usage JSONL 并预留 `dir` 字段，本提案只负责打开入口写入时传目标路径。
 4. **`worktree` tag 移除**：归并后 tag 失去载体。
 
 ## 方案
