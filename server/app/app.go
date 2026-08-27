@@ -34,7 +34,7 @@ func New(cfg *config.Config) (*App, error) {
 	projectService := project.NewService(paths.SettingsFile(), paths.CacheDir())
 	openerService := opener.NewService(paths.SettingsFile(), nil)
 	usageService := usage.NewService(paths.UsageFile())
-	workbenchService := workbench.NewService()
+	workbenchService := workbench.NewService(projectService.RefreshGitInfo)
 	createService := create.NewService(cfg.Create)
 	services := []any{projectService, openerService, usageService, workbenchService, createService}
 

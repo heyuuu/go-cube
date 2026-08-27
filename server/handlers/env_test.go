@@ -78,7 +78,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			NewOpenerHandler(openerSvc),
 			NewConfigHandler(cfg),
 			NewMdHandler(),
-			NewWorkbenchHandler(workbench.NewService()),
+			NewWorkbenchHandler(workbench.NewService(nil)),
 		},
 	)
 	ts := httptest.NewServer(srv.Handler())

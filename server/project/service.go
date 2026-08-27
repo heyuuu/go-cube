@@ -236,6 +236,15 @@ func (s *Service) GitInfo(path string) (*gitcache.Entry, bool) {
 	return s.gitCache.Get(path)
 }
 
+// RefreshGitInfo 定向刷新单个项目的 git 快照并落盘（workbench 写操作后即时可见，
+// 提案 1031）。经 app 装配点以方法值注入 workbench，避免 workbench 反向依赖 project。
+func (s *Service) RefreshGitInfo(path string) error {
+	if s.gitCache == nil {
+		return nil
+	}
+	return s.gitCache.RefreshOne(path)
+}
+
 // ScanUpdatedAt 返回项目列表最近一次扫描完成时间；从未扫描过返回零值。
 // 委托缓存的计算时间戳——数据与新鲜度由 scanCache 单点维护（对称：GitUpdatedAt 委托 gitCache）。
 func (s *Service) ScanUpdatedAt() time.Time { return s.scanCache.UpdatedAt() }

@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 
 	"cube/util/git"
@@ -21,15 +22,29 @@ import (
 )
 
 // Service 工作台领域服务。git 读路径无状态（每次调用直接调 git）；
-// 唯一的运行期状态是 PTY 会话注册表（server 停机时统一回收，见 pty.go）。
+// 运行期状态是 PTY 会话注册表（server 停机时统一回收，见 pty.go）与写侧
+// gitcache 定向刷新回调（app 装配点注入 project 域实现，本包不依赖 project）。
 type Service struct {
+	cacheRefresh func(path string) error // 写操作成功后定向刷新 gitcache（nil = 无刷新能力，跳过）
+
 	ptyMu      sync.Mutex
 	ptySeq     int
 	ptyCancels map[int]context.CancelFunc
 }
 
-func NewService() *Service {
-	return &Service{ptyCancels: map[int]context.CancelFunc{}}
+func NewService(cacheRefresh func(path string) error) *Service {
+	return &Service{cacheRefresh: cacheRefresh, ptyCancels: map[int]context.CancelFunc{}}
+}
+
+// refreshCache 写操作成功后定向刷新主项目快照。刷新失败只 Warn（写操作本身已
+// 成功，不应因此报错回滚用户视角），快照等 TTL 整表重建自愈。
+func (s *Service) refreshCache(mainRoot string) {
+	if s.cacheRefresh == nil {
+		return
+	}
+	if err := s.cacheRefresh(mainRoot); err != nil {
+		slog.Warn("写操作后定向刷新 git 缓存失败，等待 TTL 自愈", "path", mainRoot, "err", err)
+	}
 }
 
 // --- git 面板（info / 分支与 tag / commit 日志 / 工作副本快照）---
@@ -148,6 +163,88 @@ func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+// --- worktree / 分支写侧（提案 1031；主题逻辑见 worktree_write.go）---
+
+// WorktreeAdd 新增 worktree。branch / commitish 决定形态（新建分支 / 检出已有 /
+// detached，语义见 git.WorktreeAdd）；branch 为规范全名时剥 refs/heads/ 前缀。
+// targetPath 为空时按决策 1 预填 <repoName>.worktrees/<分支名>/。成功后返回新副本
+// 信息（供 UI 直接发起 open），并定向刷新主项目快照。
+func (s *Service) WorktreeAdd(path string, branch string, commitish string, targetPath string) (*WorktreeCreated, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	branch = strings.TrimPrefix(branch, "refs/heads/")
+
+	mainRoot := mainRootOf(root)
+	if targetPath == "" {
+		targetPath = prefillWorktreePath(mainRoot, branch, commitish)
+	}
+	if err := checkTargetDir(targetPath); err != nil {
+		return nil, err
+	}
+	wt, err := git.WorktreeAdd(root, targetPath, branch, commitish)
+	if err != nil {
+		return nil, err
+	}
+	s.refreshCache(mainRoot)
+	return &WorktreeCreated{Path: wt.Path, Branch: wt.Branch, Detached: wt.Detached}, nil
+}
+
+// WorktreeRemove 删除 worktree（删目录 + prune 收尾）。非 force 先预检
+// （未提交改动 / 未跟踪 / 未推送），有风险项返回 *WorktreeRemoveDenied 由 UI
+// 二次确认升级 force；主仓库工作目录无论 force 均拒绝（那是删仓库本身）。
+func (s *Service) WorktreeRemove(path string, targetPath string, force bool) error {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	mainRoot := mainRootOf(root)
+	if targetPath == mainRoot {
+		return fmt.Errorf("主仓库工作目录不能删除: %s", mainRoot)
+	}
+	if !force {
+		reasons, err := worktreeRemoveBlockers(targetPath)
+		if err != nil {
+			return err
+		}
+		if len(reasons) > 0 {
+			return &WorktreeRemoveDenied{Reasons: reasons}
+		}
+	}
+	if err := git.WorktreeRemove(root, targetPath, force); err != nil {
+		return err
+	}
+	if err := git.WorktreePrune(mainRoot); err != nil {
+		return err
+	}
+	s.refreshCache(mainRoot)
+	return nil
+}
+
+// BranchDelete 删除本地分支。被任一工作副本（含主目录）检出的分支是硬约束，
+// 无论 force 均拒绝并说明检出位置；其余走 force 开关语义（见 git.BranchDelete）。
+func (s *Service) BranchDelete(path string, branch string, force bool) error {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	list, err := git.WorktreeList(root)
+	if err != nil {
+		return err
+	}
+	for _, wt := range list {
+		if wt.Branch == branch {
+			return fmt.Errorf("分支 %s 正被工作副本检出，无法删除: %s", branch, wt.Path)
+		}
+	}
+	if err := git.BranchDelete(root, branch, force); err != nil {
+		return err
+	}
+	s.refreshCache(mainRootOf(root))
+	return nil
 }
 
 // --- 文件树 / 文件读写 / diff（代码阅读面板与 diff 面板）---
