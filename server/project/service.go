@@ -68,7 +68,7 @@ func (s *Service) SaveScanRule(rule ScanRule) error {
 	if err := saveScanRule(s.settingsFile, rule); err != nil {
 		return err
 	}
-	s.scanCache.Reload()
+	s.rescan()
 	return nil
 }
 
@@ -76,7 +76,7 @@ func (s *Service) DeleteScanRule(path string) error {
 	if err := deleteScanRule(s.settingsFile, path); err != nil {
 		return err
 	}
-	s.scanCache.Reload()
+	s.rescan()
 	return nil
 }
 
@@ -85,7 +85,7 @@ func (s *Service) ReorderScanRules(paths []string) error {
 	if err := reorderScanRules(s.settingsFile, paths); err != nil {
 		return err
 	}
-	s.scanCache.Reload()
+	s.rescan()
 	return nil
 }
 
@@ -282,16 +282,14 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 			}
 		}()
 
-		// 启动即刷一次，避免冷启动空窗；但磁盘缓存仍新鲜（距上次落盘 < interval）时跳过 git 采集——
-		// 开发期 air 等热重载场景每次重启都全量重采上百个仓库，纯属浪费。
-		// 跳过的只是数十秒级的采集；扫描本身毫秒级照跑并记录 scanUpdatedAt，
-		// 否则该时间戳挂零值，前端「项目列表」新鲜度会一直显示 -
+		// 启动即刷一次，避免冷启动空窗。扫描（毫秒级）无条件执行；git 采集（数十秒级）
+		// 在磁盘缓存仍新鲜（距上次落盘 < interval）时跳过——开发期 air 等热重载场景
+		// 每次重启都全量重采上百个仓库，纯属浪费。
+		s.rescan()
 		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
 			slog.Debug("git 缓存新鲜，跳过启动采集（仅重扫项目列表）", "上次落盘距今", since.Round(time.Second).String())
-			s.scanCache.Reload()
-			s.scanUpdatedAt = time.Now()
 		} else {
-			s.refresh()
+			s.collectGit()
 		}
 
 		ticker := time.NewTicker(interval)
@@ -323,7 +321,15 @@ func (s *Service) StopRefreshTicker() {
 	s.stopCh = nil
 }
 
-// refresh 刷新 project 视图：先重扫项目列表（纳入新增/剔除已删），再用最新列表采集 git 信息。
+// rescan 重扫项目列表（纳入新增/剔除已删）并记录 scanUpdatedAt。
+// 毫秒级、独立于 git 采集——「项目列表新鲜度」与「git 状态新鲜度」是两条时间线。
+func (s *Service) rescan() []*Project {
+	projects := s.scanCache.Reload()
+	s.scanUpdatedAt = time.Now()
+	return projects
+}
+
+// refresh 完整刷新 project 视图（定时器周期任务）：重扫 + git 采集。
 // 采集异常不抛出（降级优先）：失败只 slog 记录，不影响 server 进程。
 func (s *Service) refresh() {
 	total, collected, err := s.Refresh()
@@ -334,14 +340,26 @@ func (s *Service) refresh() {
 	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
 }
 
-// Refresh 立即完整刷新 project 视图：重扫项目列表（纳入新增/剔除已删）→
-// 整表采集 git 信息（写内存 + 落盘 git.json）。返回 (项目总数, 采集成功数, 错误)。
+// collectGit 按当前项目列表整表采集 git 信息，不触发重扫——启动时机（已 rescan）
+// 与定时器共用。异常降级只记日志。
+func (s *Service) collectGit() {
+	if s.gitCache == nil {
+		slog.Warn("git 缓存未初始化，跳过采集")
+		return
+	}
+	paths := slicekit.Map(s.Projects(), (*Project).Path)
+	if err := s.gitCache.Refresh(paths); err != nil {
+		slog.Warn("刷新 git 缓存失败", "err", err)
+	}
+}
+
+// Refresh 立即完整刷新 project 视图：重扫项目列表 → 整表采集 git 信息
+// （写内存 + 落盘 git.json）。返回 (项目总数, 采集成功数, 错误)。
 //
 // 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
 // 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
 func (s *Service) Refresh() (total int, collected int, err error) {
-	projects := s.scanCache.Reload()
-	s.scanUpdatedAt = time.Now() // 记录项目列表刷新时间
+	projects := s.rescan()
 
 	paths := slicekit.Map(projects, (*Project).Path)
 	if s.gitCache == nil {
