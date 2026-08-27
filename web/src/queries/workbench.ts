@@ -192,6 +192,16 @@ export function useWorktreeRemove(path: string) {
   });
 }
 
+// 新建本地分支（不检出——「建分支并切过去」走 worktree 新建）
+export function useBranchAdd(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: (input: { branch: string; commitish?: string }) =>
+      apiPost('/api/workbench/branch/add', { path, ...input }),
+    onSuccess: invalidate,
+  });
+}
+
 export function useBranchDelete(path: string) {
   const invalidate = useInvalidateWorkbench(path);
   return useMutation({

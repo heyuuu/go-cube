@@ -51,7 +51,7 @@ import {
 } from '../params';
 import { useWorktreeVisibility } from '../worktree-visibility';
 
-import { BranchDeleteDialog, WorktreeAddDialog, WorktreeRemoveDialog } from './worktree-write';
+import { BranchAddDialog, BranchDeleteDialog, WorktreeAddDialog, WorktreeRemoveDialog } from './worktree-write';
 
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
@@ -74,6 +74,7 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
   const [addPrefill, setAddPrefill] = useState<{ branch?: string; commitish?: string } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<WorktreeStatus | null>(null);
   const [deleteBranchName, setDeleteBranchName] = useState<string | null>(null);
+  const [branchAddOpen, setBranchAddOpen] = useState(false);
   const worktreesForDialogs = useWorkbenchWorktrees(path);
   const mainPath = worktreesForDialogs.data?.[0]?.path ?? path; // 副本列表主目录在前
 
@@ -96,6 +97,7 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
           onAddWorktree={setAddPrefill}
           onRemoveWorktree={setRemoveTarget}
           onDeleteBranch={(name) => setDeleteBranchName(name)}
+          onAddBranch={() => setBranchAddOpen(true)}
         />
       </div>
       <CommitGraphSection
@@ -112,6 +114,7 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
       {deleteBranchName ? (
         <BranchDeleteDialog path={path} branch={deleteBranchName} onClose={() => setDeleteBranchName(null)} />
       ) : null}
+      {branchAddOpen ? <BranchAddDialog path={path} onClose={() => setBranchAddOpen(false)} /> : null}
     </div>
   );
 }
@@ -127,6 +130,7 @@ function WorktreeSection({
   onAddWorktree,
   onRemoveWorktree,
   onDeleteBranch,
+  onAddBranch,
 }: {
   path: string;
   params: WorkbenchParams;
@@ -136,6 +140,7 @@ function WorktreeSection({
   onAddWorktree: (prefill: { branch?: string; commitish?: string }) => void;
   onRemoveWorktree: (wt: WorktreeStatus) => void;
   onDeleteBranch: (name: string) => void;
+  onAddBranch: () => void;
 }) {
   const refs = useWorkbenchRefs(path);
   const worktrees = useWorkbenchWorktrees(path);
@@ -170,7 +175,15 @@ function WorktreeSection({
         ))}
       </Section>
       <RemoteSection path={path} />
-      <Section title="分支" icon={<GitBranch className="size-3.5" />}>
+      <Section
+        title="分支"
+        icon={<GitBranch className="size-3.5" />}
+        action={
+          <Button variant="ghost" size="icon-sm" title="新建分支" aria-label="新建分支" onClick={onAddBranch}>
+            <Plus className="size-3.5" />
+          </Button>
+        }
+      >
         {(refs.data?.locals ?? []).map((b) => (
           <BranchRow
             key={b}

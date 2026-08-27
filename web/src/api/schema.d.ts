@@ -378,6 +378,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/branch/add': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新建本地分支（不检出） */
+    post: operations['workbench.branchAdd'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/branch/delete': {
     parameters: {
       query?: never;
@@ -863,6 +880,17 @@ export interface components {
       data: components['schemas']['WorktreeRemoveResult'];
       message: string;
       ok: boolean;
+    };
+    BranchAddRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/BranchAddRequest.json
+       */
+      readonly $schema?: string;
+      branch: string;
+      commitish?: string;
+      path: string;
     };
     BranchDeleteRequest: {
       /**
@@ -2013,6 +2041,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputWhoamiResponseBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.branchAdd': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['BranchAddRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

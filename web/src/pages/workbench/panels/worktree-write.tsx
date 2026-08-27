@@ -6,7 +6,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { selectCurrent, writePathParam, type TreeSource } from '@/pages/workbench/params';
-import { useBranchDelete, useWorktreeAdd, useWorktreeRemove, type WorktreeStatus } from '@/queries/workbench';
+import {
+  useBranchAdd,
+  useBranchDelete,
+  useWorktreeAdd,
+  useWorktreeRemove,
+  type WorktreeStatus,
+} from '@/queries/workbench';
 
 // worktree / 分支写侧对话框（提案 1031）。风格沿用 ConfirmDialog 的轻量自绘 overlay；
 // 表单比确认场景复杂（输入 + 勾选 + 错误重试），单独成文件不复用那个两按钮壳。
@@ -62,6 +68,48 @@ export function WorktreeAddDialog({
       </Field>
       <Field label="目标目录" hint="留空 = 仓库同级 <仓库名>.worktrees/<分支名>/">
         <Input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} placeholder="/绝对路径" />
+      </Field>
+      {add.isError ? <ErrorLine message={add.error.message} /> : null}
+      <DialogActions confirmText="创建" pending={add.isPending} onConfirm={submit} onCancel={onClose} />
+    </WriteDialogShell>
+  );
+}
+
+// --- 新建分支（不检出，与删除分支对应）---
+
+export function BranchAddDialog({ path, onClose }: { path: string; onClose: () => void }) {
+  const [branch, setBranch] = useState('');
+  const [commitish, setCommitish] = useState('');
+  const add = useBranchAdd(path);
+  const [, setSearchParams] = useSearchParams();
+
+  const submit = () => {
+    add.mutate(
+      { branch: branch.trim(), commitish: commitish.trim() || undefined },
+      {
+        onSuccess: () => {
+          // 建完选中该分支（ref 源可浏览其内容；不切任何副本的 HEAD）
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              selectCurrent(next, { type: 'ref', id: `refs/heads/${branch.trim()}` });
+              return next;
+            },
+            { replace: true },
+          );
+          onClose();
+        },
+      },
+    );
+  };
+
+  return (
+    <WriteDialogShell title="新建分支" onClose={onClose}>
+      <Field label="分支名" hint="不会切 HEAD，只创建引用；要「建并切过去」用新建 worktree">
+        <Input value={branch} onChange={(e) => setBranch(e.target.value)} placeholder="feat/xxx" autoFocus />
+      </Field>
+      <Field label="基点" hint="commit / 分支 / tag，留空 = HEAD">
+        <Input value={commitish} onChange={(e) => setCommitish(e.target.value)} placeholder="HEAD" />
       </Field>
       {add.isError ? <ErrorLine message={add.error.message} /> : null}
       <DialogActions confirmText="创建" pending={add.isPending} onConfirm={submit} onCancel={onClose} />

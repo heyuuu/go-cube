@@ -46,6 +46,7 @@ gitcache 刷新落点：gitcache 增加包级定向刷新入口（1032 后快照
 
 - `POST /api/workbench/worktree/add`
 - `POST /api/workbench/worktree/remove`
+- `POST /api/workbench/branch/add`（验收前补充：与删除对应，「新建分支 + 切过去」仍由 worktree 新建覆盖）
 - `POST /api/workbench/branch/delete`
 
 查询侧已有 `GET /api/workbench/worktrees`；打开 worktree 复用 opener 既有 API，均不新增。
@@ -54,14 +55,14 @@ gitcache 刷新落点：gitcache 增加包级定向刷新入口（1032 后快照
 
 - 工作副本列表每项加「删除」动作：对话框展示预检状态（dirty / untracked / ahead 徽标）+ force 勾选 + 可选「同时删除其上检出的分支」（前端串联 remove 与 branch/delete 两次调用，服务端不做复合 API）；
 - commit 图 / refs 面板加「在此新建 worktree」入口：选基点（commit / 分支 / HEAD）+ 分支名（留空即 detached），预填目标路径可改；
-- refs 列表加分支删除入口；
+- refs 列表加分支删除入口；分支区标题加新建分支入口（验收前补充）；
 - 删除当前 workbench 正在查看的 worktree 后，前端导航回主项目根目录目标（1032 后的「主项目 + 目标展开」模型）。
 
 ## 不做的事
 
 - **不改 opener 体系**：打开 worktree 就是 open-dir，role / slot / executor 全不动；
 - **不做 worktree 目录模板配置化**：预填可改即可，需要时另案；
-- **不做分支管理全功能**：只做删除这一个动作，新建/改名/merge 等分支操作仍走终端或 IDE；
+- **不做分支管理全功能**：增删两个动作（新建分支为验收前补充，与删除对应；「建分支并切过去」由 worktree 新建覆盖），改名/merge 等仍走终端或 IDE；
 - **不做 CLI 子命令**（见讨论定稿 5，定位修订后 CLI 只保证兜底可行，本需求兜底 = 直接用 git）；
 - **不做批量删除**。
 
