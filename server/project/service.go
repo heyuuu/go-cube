@@ -140,18 +140,19 @@ func (s *Service) SearchByName(query string) []*Project {
 	return fuzzy.MatchBy(query, s.Projects(), (*Project).Name, nil)
 }
 
-// OpenTargets 返回项目的打开目标列表（1032：根目录在前 + worktrees）。
-// 只读 projcache 快照，不现场跑 git（遵守「读路径不得阻塞采集」）；项目未找到返回 nil。
+// OpenTargets 返回项目的打开目标列表（1032 根目录 + worktrees；1030 主/worktree 的 workspaces）。
+// 排序定稿：主项目根 > 主项目 workspaces > 每个 worktree 根 > 该 worktree 的 workspaces。
+// 只读 projcache 快照，不现场跑 git、不读 cube.json（遵守「读路径不得阻塞采集」）；项目未找到返回 nil。
 func (s *Service) OpenTargets(path string) []OpenTarget {
 	proj := s.FindByPath(path)
 	if proj == nil {
 		return nil
 	}
-	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录"}}
+	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录", Kind: KindRoot}}
 	info, _ := s.GitInfo(proj.Path())
 	// 存在性兜底过滤：采集侧已过滤，但目录在两次采集之间被删时快照仍残留，
 	// 打开目标必须是真实可打开的目录（os.Stat 廉价，不违反读路径不跑 git 的纪律）
-	for _, t := range worktreeTargets(info) {
+	for _, t := range targetEntries(proj.Path(), info) {
 		if _, err := os.Stat(t.Path); err == nil {
 			targets = append(targets, t)
 		}

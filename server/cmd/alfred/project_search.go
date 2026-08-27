@@ -25,7 +25,7 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 			latest := a.UsageService().LatestByProject()
 			projects = project.SortByRecentUsage(projects, latest, 10)
 
-			// 平铺直达（1032）：每个项目展开为「根目录 + worktrees」多个条目，
+			// 平铺直达（1032）：每个项目展开为「根目录 + worktrees + workspaces」多个条目，
 			// Arg 直接传目标目录路径，保留一步打开体验（无需先选项目再选目标）
 			items := make([]Item, 0, len(projects))
 			for _, proj := range projects {
