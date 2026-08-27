@@ -338,6 +338,7 @@ export function ProjectsPage() {
     ? (gitParam as GitStatus | 'all')
     : 'all';
   const tagFilter = searchParams.get('tag') ?? 'all';
+  const wtFilter = searchParams.get('wt') === '1';
 
   // 搜索输入本地 state + 300ms debounce 后投影到 URL；URL 侧变化（后退/重置）回灌输入
   const [keywordInput, setKeywordInput] = useState(keyword);
@@ -372,6 +373,7 @@ export function ProjectsPage() {
     if (groupFilter.length > 0 && !groupFilter.includes(p.group)) return false;
     if (!matchGitFilter(p, gitFilter)) return false;
     if (tagFilter !== 'all' && !(p.tags ?? []).includes(tagFilter)) return false;
+    if (wtFilter && (p.gitInfo?.worktrees?.length ?? 0) === 0) return false;
     return true;
   });
 
@@ -414,6 +416,10 @@ export function ProjectsPage() {
 
   function setGitFilterValue(v: GitStatus | 'all') {
     updateParams({ git: v === 'all' ? null : v });
+  }
+
+  function setWtFilter(on: boolean) {
+    updateParams({ wt: on ? '1' : null });
   }
 
   function setTagFilterValue(t: string) {
@@ -590,6 +596,15 @@ export function ProjectsPage() {
               {s.label}
             </Chip>
           ))}
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterLabel label="worktree" mode="单选" />
+          <Chip active={!wtFilter} onClick={() => setWtFilter(false)}>
+            全部
+          </Chip>
+          <Chip active={wtFilter} onClick={() => setWtFilter(true)}>
+            有 ⎇
+          </Chip>
         </div>
         {tags.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
