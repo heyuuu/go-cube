@@ -1,6 +1,6 @@
 # worktree 管理（工作台写侧）
 
-> **状态**：📝 待实施（核心决策已讨论定稿并随 1032 落地联动修订，见「讨论定稿」）
+> **状态**：✅ 已实施（待验收）——5 步全部落地，go vet / go test（17 包）/ pnpm build / 前端 44 测试全通过；验收通过后归档
 >
 > **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（打开 worktree 复用 RoleOpenDir，本提案不改 opener）；[`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md)（worktree 作为 TreeSource 的读侧已就绪）；[`1032-worktree归并为项目打开目标`](../1032-worktree归并为项目打开目标/README.md)（**已实施**：worktree 不再是独立项目，是主项目的打开目标，可见性来自 gitcache 快照的 `worktrees` 枚举；本提案已按此口径修订——验收 1 的「项目列表」改为主项目打开目标，目录位置决策的 maxDepth 论据失效（worktree 可放任意位置），写后定向刷新快照更加必要）。
 
