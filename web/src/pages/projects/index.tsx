@@ -695,6 +695,7 @@ export function ProjectsPage() {
                             {t}
                           </ClickBadge>
                         ))}
+                        <WorktreeCountBadge p={p} />
                       </div>
                       <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
                         {prettyPath(p.path, home)}
