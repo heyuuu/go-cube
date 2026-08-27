@@ -8,6 +8,7 @@ import (
 
 	"cube/project"
 	"cube/project/gitcache"
+	"cube/util/iconkit"
 	"cube/util/slicekit"
 	"cube/web"
 )
@@ -111,14 +112,18 @@ func (h *ProjectHandler) cloneRules(_ struct{}) (web.ListResult[project.CloneRul
 // ScanRuleSaveInput scan-rule/save 接口入参（字段与 project.ScanRule 对齐，path 是唯一键）。
 type ScanRuleSaveInput struct {
 	Body struct {
-		Group    string `json:"group" doc:"扫描出的项目组名"`
-		Path     string `json:"path" doc:"扫描根目录（绝对路径或 ~/ 前缀，规则唯一键）"`
-		MaxDepth int    `json:"maxDepth" doc:"扫描最大深度"`
+		Group    string   `json:"group" doc:"扫描出的项目组名"`
+		Path     string   `json:"path" doc:"扫描根目录（绝对路径或 ~/ 前缀，规则唯一键）"`
+		MaxDepth int      `json:"maxDepth" doc:"扫描最大深度"`
+		Icon     *IconDTO `json:"icon,omitempty" doc:"组图标（可选：lucide 图名或 base64 PNG）"`
 	}
 }
 
 func (h *ProjectHandler) scanRuleSave(input ScanRuleSaveInput) (map[string]any, error) {
 	rule := project.ScanRule{Group: input.Body.Group, Path: input.Body.Path, MaxDepth: input.Body.MaxDepth}
+	if input.Body.Icon != nil {
+		rule.Icon = &iconkit.Icon{Type: input.Body.Icon.Type, Value: input.Body.Icon.Value}
+	}
 	if err := h.projectService.SaveScanRule(rule); err != nil {
 		return nil, err
 	}

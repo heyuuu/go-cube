@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"cube/settings"
+	"cube/util/iconkit"
 	"cube/util/pathkit"
 )
 
@@ -33,7 +34,7 @@ func loadScanRules(settingsFile string) []ScanRule {
 			slog.Warn("scan 规则路径不存在或非目录，跳过", "group", r.Group, "path", r.Path, "abs", absPath, "err", err)
 			continue
 		}
-		rules = append(rules, ScanRule{Group: r.Group, Path: absPath, MaxDepth: r.MaxDepth})
+		rules = append(rules, ScanRule{Group: r.Group, Path: absPath, MaxDepth: r.MaxDepth, Icon: r.Icon})
 	}
 	return rules
 }
@@ -79,6 +80,9 @@ func saveScanRule(settingsFile string, rule ScanRule) error {
 	}
 	if info, err := os.Stat(absPath); err != nil || !info.IsDir() {
 		return fmt.Errorf("scan 规则路径不存在或非目录: %s", rule.Path)
+	}
+	if err := iconkit.ValidateIcon(rule.Icon); err != nil {
+		return fmt.Errorf("scan 规则 %s", err)
 	}
 
 	var specs []ScanRule

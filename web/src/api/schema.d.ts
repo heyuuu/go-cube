@@ -961,6 +961,14 @@ export interface components {
       /** Format: int64 */
       oldStart: number;
     };
+    Icon: {
+      type: string;
+      value: string;
+    };
+    IconDTO: {
+      type: string;
+      value: string;
+    };
     Info: {
       defaultBranch: string;
       root: string;
@@ -987,7 +995,7 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
-      icon: components['schemas']['OpenerIconDTO'];
+      icon: components['schemas']['IconDTO'];
       name: string;
       roles: string[] | null;
       summary: string;
@@ -1012,10 +1020,6 @@ export interface components {
       readonly $schema?: string;
       /** @description .app 目录绝对路径 */
       path: string;
-    };
-    OpenerIconDTO: {
-      type: string;
-      value: string;
     };
     OpenerOpenInputBody: {
       /**
@@ -1049,7 +1053,7 @@ export interface components {
       /** @description 启动命令，$0/$1 占位路径槽位 */
       cmd?: string[] | null;
       /** @description 图标声明 */
-      icon?: components['schemas']['OpenerIconDTO'];
+      icon?: components['schemas']['IconDTO'];
       /** @description opener 名称（唯一标识） */
       name: string;
       /** @description 业务用途枚举，缺省视为 open-dir */
@@ -1091,6 +1095,7 @@ export interface components {
     };
     ScanRule: {
       group: string;
+      icon?: components['schemas']['Icon'];
       /** Format: int64 */
       maxDepth: number;
       path: string;
@@ -1124,6 +1129,8 @@ export interface components {
       readonly $schema?: string;
       /** @description 扫描出的项目组名 */
       group: string;
+      /** @description 组图标（可选：lucide 图名或 base64 PNG） */
+      icon?: components['schemas']['IconDTO'];
       /**
        * Format: int64
        * @description 扫描最大深度

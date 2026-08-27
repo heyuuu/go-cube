@@ -19,14 +19,15 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name    string        `json:"name"`
-	Title   string        `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
-	Summary string        `json:"summary"` // 命令模板展示串
-	Roles   []string      `json:"roles"`
-	Icon    OpenerIconDTO `json:"icon"` // 恒有值（未配置时后端按主 role 填默认 lucide 图）
+	Name    string   `json:"name"`
+	Title   string   `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
+	Summary string   `json:"summary"` // 命令模板展示串
+	Roles   []string `json:"roles"`
+	Icon    IconDTO  `json:"icon"` // 恒有值（未配置时后端按主 role 填默认 lucide 图）
 }
 
-type OpenerIconDTO struct {
+// IconDTO icon 声明的 API 形态（opener / scanRule 等共用，语义见 util/iconkit）。
+type IconDTO struct {
 	Type  string `json:"type"`  // lucide | image
 	Value string `json:"value"` // lucide 图名 或 base64 PNG
 }
@@ -43,7 +44,7 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
 			return string(r)
 		}),
-		Icon: OpenerIconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
+		Icon: IconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
 	}
 }
 
@@ -120,11 +121,11 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 // OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
 type OpenerSaveInput struct {
 	Body struct {
-		Name  string         `json:"name" doc:"opener 名称（唯一标识）"`
-		Title string         `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
-		Cmd   []string       `json:"cmd,omitempty" doc:"启动命令，$0/$1 占位路径槽位"`
-		Roles []string       `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
-		Icon  *OpenerIconDTO `json:"icon,omitempty" doc:"图标声明"`
+		Name  string   `json:"name" doc:"opener 名称（唯一标识）"`
+		Title string   `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
+		Cmd   []string `json:"cmd,omitempty" doc:"启动命令，$0/$1 占位路径槽位"`
+		Roles []string `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
+		Icon  *IconDTO `json:"icon,omitempty" doc:"图标声明"`
 	}
 }
 

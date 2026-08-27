@@ -5,13 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"cube/util/iconkit"
 )
 
 // ScanRule 扫描规则
 type ScanRule struct {
-	Group    string `json:"group"`    // 扫描出的项目组名
-	Path     string `json:"path"`     // 扫描的根目录
-	MaxDepth int    `json:"maxDepth"` // 扫描的最大深度
+	Group    string        `json:"group"`          // 扫描出的项目组名
+	Path     string        `json:"path"`           // 扫描的根目录
+	MaxDepth int           `json:"maxDepth"`       // 扫描的最大深度
+	Icon     *iconkit.Icon `json:"icon,omitempty"` // 组图标（可选，语义见 util/iconkit）
 }
 
 // 项目标签。scanner 命中特征时打标。

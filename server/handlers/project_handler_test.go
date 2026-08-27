@@ -131,8 +131,8 @@ func TestScanRuleWrite(t *testing.T) {
 	env := newTestEnv(t)
 	root := env.ws.Mkdir("g3")
 
-	// save 新增
-	r := postJSON(t, env.url("/api/project/scan-rule/save"), fmt.Sprintf(`{"group":"g3","path":%q,"maxDepth":2}`, root))
+	// save 新增（带 icon）
+	r := postJSON(t, env.url("/api/project/scan-rule/save"), fmt.Sprintf(`{"group":"g3","path":%q,"maxDepth":2,"icon":{"type":"lucide","value":"folder-git-2"}}`, root))
 	if !r.Ok {
 		t.Fatalf("save 应成功, message=%q", r.Message)
 	}
@@ -140,6 +140,11 @@ func TestScanRuleWrite(t *testing.T) {
 	bad := postJSON(t, env.url("/api/project/scan-rule/save"), `{"group":"","path":"/x","maxDepth":2}`)
 	if bad.Ok || !strings.Contains(bad.Message, "group") {
 		t.Fatalf("坏数据应报中文错误, ok=%v message=%q", bad.Ok, bad.Message)
+	}
+	// save 坏 icon：中文错误
+	badIcon := postJSON(t, env.url("/api/project/scan-rule/save"), fmt.Sprintf(`{"group":"g4","path":%q,"maxDepth":2,"icon":{"type":"svg","value":"x"}}`, root))
+	if badIcon.Ok || !strings.Contains(badIcon.Message, "icon type") {
+		t.Fatalf("坏 icon 应报中文错误, message=%q", badIcon.Message)
 	}
 
 	list := getJSON(t, env.url("/api/project/scan-rules"))
@@ -149,6 +154,11 @@ func TestScanRuleWrite(t *testing.T) {
 	decodeData(t, list, &got)
 	if len(got.List) != 3 { // fixture 预置 g1/g2 + 新增 g3
 		t.Fatalf("应返回 3 条规则, got %d: %+v", len(got.List), got.List)
+	}
+	for _, r := range got.List { // icon 落盘并回读（g3 带，g1/g2 未带为 nil）
+		if r.Group == "g3" && (r.Icon == nil || r.Icon.Value != "folder-git-2") {
+			t.Fatalf("g3 icon 未回读: %+v", r.Icon)
+		}
 	}
 
 	// reorder：把 g3 提到最前
