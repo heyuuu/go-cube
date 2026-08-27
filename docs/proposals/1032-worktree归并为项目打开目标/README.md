@@ -1,6 +1,6 @@
 # worktree 归并为项目打开目标
 
-> **状态**：📝 待评审
+> **状态**：✅ 已实施（待验收）——全部 7 步落地，`go vet` / `go test`（17 包）/ `pnpm build` / 前端 35 测试全通过；验收通过后归档
 >
 > **关联**：[`1030-monorepo-workspace`](../1030-monorepo-workspace/README.md)（**顺序依赖：本提案先行**，1030 的「打开流程接入」以本提案确立的「project → 打开目标」模型为地基）；[`1004-gitcache常驻化重构`](../archived/1004-gitcache常驻化重构/README.md)（git.json 快照体系，worktree 列表将作为推导数据进入快照）；[`1011-工作台git树面板`](../archived/1011-工作台git树面板/README.md)（workbench 已有「全部工作副本」端点，数据源随本提案切换）。
 
@@ -35,7 +35,7 @@ git 主仓库与它的 worktree 目前被 scan 当成**多个独立项目**管�
 
 ### 2. worktree 枚举（util/git + gitcache）
 
-- `util/git` 新增类型化封装 `Worktrees(root)`（解析 `git worktree list --porcelain`），返回主仓库下全部工作副本（路径 + 分支名）；
+- `util/git` **复用既有 `WorktreeList(dir)`**（1011 已落地的类型化封装，解析 `git worktree list --porcelain`，返回全部工作副本的路径/分支/detached 标记），无需新增；
 - **git.json 快照新增 worktree 字段**：后台采集时顺带枚举并回写快照；读路径（项目列表、打开流程）只读快照，不现场跑 git（遵守「读路径不得阻塞采集」）；
 - 枚举结果属**推导层**：永不落盘为配置、目录重命名/删除后快照自然淘汰，与「cache 按路径 key 可丢弃」判别式一致。
 
@@ -70,7 +70,7 @@ open 链路（选主项目 → 选目标）是本提案的重心；其他命令�
 | `usage` | `Record.dir` 字段已由 1034 预留（无需存储改动），本提案在打开入口写入时传目标绝对路径 |
 | `gitcache` | 快照结构加 worktree 列表；worktree 目录不再作为独立项目采集，改由主项目采集时附带 |
 | `cmd/doctor.go` | 「指向已删除主仓库的 worktree 残骸」检查项语义变化：悬空 worktree 不再被收录，该项改为检查快照内 worktree 路径失联 |
-| `handlers/workbench_handler.go` | 「全部工作副本」端点数据源从扫描列表切换为主项目枚举 |
+| `handlers/workbench_handler.go` | 「全部工作副本」端点（`/api/workbench/worktrees`）现状即现场跑 `git.WorktreeList`、与 project scan 无关；实施时决策是否统一切换到 gitcache 快照（可选，维持现状也成立） |
 | 前端 projects 页 / workbench | 列表展示从平铺 worktree 行改为主项目 + 目标展开 |
 | alfred workflow | 输出形态适配 |
 
@@ -82,7 +82,7 @@ open 链路（选主项目 → 选目标）是本提案的重心；其他命令�
 
 > 逐步实施、逐步验收；每步可独立收工。
 
-1. `util/git.Worktrees` 封装 + 单测（testfixture 建 worktree）；
+1. testfixture 建 linked worktree 辅助 + `util/git.WorktreeList` 的 worktree 场景单测（复用既有封装，无新代码）；
 2. gitcache 快照加 worktree 字段 + 采集/读取改造 + 单测；
 3. scan 收紧（跳过 `.git` 文件）+ `TagWorktree` 移除 + scan 单测更新；
 4. project 层目标查询 + 打开入口记录 usage `dir`；

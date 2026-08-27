@@ -34,7 +34,7 @@ func NewService() *Service {
 
 // --- git 面板（info / 分支与 tag / commit 日志 / 工作副本快照）---
 
-// Info 读工作台项目信息：入口目录向上探测仓库根、默认分支。
+// Info 读工作台仓库信息：入口目录向上探测仓库根、默认分支。
 func (s *Service) Info(path string) (*Info, error) {
 	root, ok := git.FindGitRoot(path)
 	if !ok {

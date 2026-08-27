@@ -21,11 +21,13 @@ type ScanRule struct {
 //
 // 前提假设：所有项目都是 git 项目（.git 存在是项目判定的必要条件），
 // 因此不再打通用的 "git" tag——它是冗余信息。标签只标记额外特征：
-//   - worktree：.git 是文件而非目录（git worktree，主仓库在别处）
 //   - godot：含 .godot 文件（godot 引擎项目，同时仍是 git 项目）
+//
+// 注：worktree 目录（.git 为文件）不是项目（1032 归并为项目打开目标），
+// 历史的 worktree tag 已随归并移除。
+
 const (
-	TagWorktree = "worktree"
-	TagGodot    = "godot"
+	TagGodot = "godot"
 )
 
 func scan(rules []ScanRule) ([]*Project, error) {
@@ -99,13 +101,13 @@ func checkProjectPath(path string) (isProject bool, tags []string, err error) {
 	hasGit := false
 	for _, entry := range dirEntries {
 		if entry.Name() == ".git" {
-			// .git 存在即认为是 git 项目（前提：所有项目都是 git 项目）：
-			//   - .git 是目录 → 常规仓库
-			//   - .git 是文件 → git worktree（内容形如 "gitdir: <主仓库>/.git/worktrees/<名>"）
-			hasGit = true
 			if !entry.IsDir() {
-				tags = append(tags, TagWorktree)
+				// .git 是文件 → linked worktree：不是项目（1032 归并为所属主项目的打开目标），
+				// 其 git worktree 的可见性来自 git 主项目的 worktree 枚举而非扫描；
+				// worktree 子目录也不可能再含主仓库，直接跳过
+				return false, nil, fs.SkipDir
 			}
+			hasGit = true
 		} else if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".godot") {
 			// godot 标签：在已是 git 项目的前提下，额外标记 godot 引擎项目
 			tags = append(tags, TagGodot)

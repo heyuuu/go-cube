@@ -1,5 +1,6 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
 import { ChevronDown } from 'lucide-react';
+import { useState } from 'react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -16,9 +17,11 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useProjectOpen } from '@/queries/project';
 
-import { quickOpens, tagVariants } from './shared';
+import { projectTargets, quickOpens, tagVariants } from './shared';
 
 // 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。
+// 多目标项目（根目录 + worktrees，1032）：点 opener 后下拉先选目标再打开；
+// 单目标项目点击直达，体验不变。
 export function ProjectActions({
   p,
   openerList,
@@ -28,54 +31,122 @@ export function ProjectActions({
   p: Project;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
-  onOpen: (path: string, opener: string) => void;
+  onOpen: (path: string, opener: string, dir?: string) => void;
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
+  const targets = projectTargets(p);
+  const multiTarget = targets.length > 1;
+  // 两段式下拉的中间态：已选 opener、待选目标（下拉关闭时复位）
+  const [pickedOpener, setPickedOpener] = useState<Opener | null>(null);
+
+  const isPending = (name: string) => open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
+  const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
+
+  const targetMenuItems = (openerName: string) =>
+    targets.map((t) => (
+      <DropdownMenuItem key={t.dir || '/'} onClick={() => openTarget(openerName, t.dir)} disabled={isPending(openerName)}>
+        {renderIcon(openerByName.get(openerName)?.icon, undefined)}
+        {t.label}
+      </DropdownMenuItem>
+    ));
+
+  const quickButton = (name: string) => {
+    const op = openerByName.get(name);
+    if (!op) return null;
+    const button = (
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        title={multiTarget ? `${op.title}（选择目标）` : op.title}
+        aria-label={`${op.title}（${p.name}）`}
+        disabled={isPending(name)}
+      >
+        {renderIcon(op?.icon, null)}
+      </Button>
+    );
+    if (!multiTarget) {
+      return (
+        <Button
+          key={name}
+          variant="ghost"
+          size="icon-sm"
+          title={op.title}
+          aria-label={`${op.title}（${p.name}）`}
+          disabled={isPending(name)}
+          onClick={() => openTarget(name, '')}
+        >
+          {renderIcon(op?.icon, null)}
+        </Button>
+      );
+    }
+    return (
+      <DropdownMenu key={name}>
+        <DropdownMenuTrigger render={button} />
+        <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>
+              {op.title} · 选择目标
+            </DropdownMenuLabel>
+            {targetMenuItems(name)}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {quickOpens
-        .filter((name) => openerNames.has(name))
-        .map((name) => {
-          const op = openerByName.get(name);
-          if (!op) return null;
-          return (
-            <Button
-              key={name}
-              variant="ghost"
-              size="icon-sm"
-              title={op.title}
-              aria-label={`${op.title}（${p.name}）`}
-              disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === name}
-              onClick={() => onOpen(p.path, name)}
-            >
-              {renderIcon(op?.icon, null)}
-            </Button>
-          );
-        })}
-      <DropdownMenu>
+      {quickOpens.filter((name) => openerNames.has(name)).map(quickButton)}
+      <DropdownMenu
+        onOpenChange={(o) => {
+          if (!o) setPickedOpener(null);
+        }}
+      >
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-32">
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
           <DropdownMenuGroup>
-            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-            {openerList.map((op) => (
-              <DropdownMenuItem
-                key={op.name}
-                onClick={() => onOpen(p.path, op.name)}
-                disabled={open.isPending && open.variables?.path === p.path && open.variables?.opener === op.name}
-              >
-                {renderIcon(op?.icon, null)}
-                {op.title}
-              </DropdownMenuItem>
-            ))}
-            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
+            {pickedOpener ? (
+              <>
+                <DropdownMenuLabel>
+                  {pickedOpener.title} · 选择目标
+                </DropdownMenuLabel>
+                {targetMenuItems(pickedOpener.name)}
+              </>
+            ) : (
+              <>
+                <DropdownMenuLabel>打开方式</DropdownMenuLabel>
+                {openerList.map((op) => (
+                  <DropdownMenuItem
+                    key={op.name}
+                    onClick={() => (multiTarget ? setPickedOpener(op) : openTarget(op.name, ''))}
+                    disabled={isPending(op.name)}
+                  >
+                    {renderIcon(op?.icon, null)}
+                    {op.title}
+                  </DropdownMenuItem>
+                ))}
+                {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
+              </>
+            )}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
+  );
+}
+
+// worktree 计数徽标（多目标项目的行内提示，1032）
+export function WorktreeCountBadge({ p }: { p: Project }) {
+  const n = p.gitInfo?.worktrees?.length ?? 0;
+  if (n === 0) return null;
+  return (
+    <Badge variant="outline" title={`${n} 个 worktree（打开时可选目标）`}>
+      ⎇ {n}
+    </Badge>
   );
 }
 

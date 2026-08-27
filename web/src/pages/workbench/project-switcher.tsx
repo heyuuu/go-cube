@@ -16,6 +16,12 @@ import { useProjectList } from '@/queries/project';
 export function ProjectSwitcher({ current, onSwitch }: { current: string; onSwitch: (path: string) => void }) {
   const projects = useProjectList().data?.list ?? [];
 
+  // 只保留最近使用过的 10 个项目：切换是高频直达场景，全量列表留给项目页
+  const recents = projects
+    .filter((p) => p.lastUsedAt)
+    .sort((a, b) => Date.parse(b.lastUsedAt!) - Date.parse(a.lastUsedAt!))
+    .slice(0, 10);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
@@ -30,10 +36,10 @@ export function ProjectSwitcher({ current, onSwitch }: { current: string; onSwit
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="min-w-64">
         <DropdownMenuGroup>
-          <DropdownMenuLabel>切换项目</DropdownMenuLabel>
+          <DropdownMenuLabel>切换项目（最近使用）</DropdownMenuLabel>
         </DropdownMenuGroup>
-        {projects.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">项目列表为空</div>}
-        {projects.map((p) => (
+        {recents.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">暂无最近使用的项目</div>}
+        {recents.map((p) => (
           <DropdownMenuItem key={p.path} onClick={() => p.path !== current && onSwitch(p.path)}>
             <Check className={cn('size-3 shrink-0', p.path !== current && 'invisible')} />
             <span className="truncate">

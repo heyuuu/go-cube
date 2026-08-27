@@ -4,11 +4,13 @@ import (
 	"errors"
 	"log"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	"cube/project/gitcache"
 	"cube/util/easycache"
 	"cube/util/fuzzy"
+	"cube/util/git"
 	"cube/util/pathkit"
 	"cube/util/slicekit"
 )
@@ -117,11 +119,62 @@ func (s *Service) FindByPath(path string) *Project {
 			return proj
 		}
 	}
+	// 兜底：符号链接口径二次比对。项目路径来自扫描（用户配置口径的字面路径），
+	// 而调用方传入的可能是 git 规范化后的路径（macOS /var → /private/var，如 worktree
+	// 归并链路），反之亦然。规范化两侧任一侧即可对齐；只有精确匹配落空才付这笔 syscall。
+	realPath, realErr := filepath.EvalSymlinks(absPath)
+	for _, proj := range s.Projects() {
+		if proj.Path() == realPath {
+			return proj
+		}
+		if realErr == nil {
+			if projReal, err := filepath.EvalSymlinks(proj.Path()); err == nil && projReal == realPath {
+				return proj
+			}
+		}
+	}
 	return nil
 }
 
+// SearchByName 按名称模糊搜索项目列表。
 func (s *Service) SearchByName(query string) []*Project {
 	return fuzzy.MatchBy(query, s.Projects(), (*Project).Name, nil)
+}
+
+// OpenTargets 返回项目的打开目标列表（1032：根目录在前 + worktrees）。
+// 只读 gitcache 快照，不现场跑 git（遵守「读路径不得阻塞采集」）；项目未找到返回 nil。
+func (s *Service) OpenTargets(path string) []OpenTarget {
+	proj := s.FindByPath(path)
+	if proj == nil {
+		return nil
+	}
+	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录"}}
+	info, _ := s.GitInfo(proj.Path())
+	return append(targets, worktreeTargets(info)...)
+}
+
+// ResolveProject 把目标目录归并到所属主项目：项目根本身直接命中，否则走 worktree
+// 归并（ResolveMainProject）。所有「拿一个实际目录反查项目」的出口（打开目标 /
+// usage 聚合 / 后续 workspace 子目录）统一走这里，不要在调用方手拼
+// FindByPath + ResolveMainProject 的两段式。
+// 项目普通子目录不在此列（那是 SearchByPath 的 up 语义，含多结果交互选择）。
+func (s *Service) ResolveProject(dir string) *Project {
+	if p := s.FindByPath(dir); p != nil {
+		return p
+	}
+	return s.ResolveMainProject(dir)
+}
+
+// ResolveMainProject 把任意目录归并到主项目（1032 路径归并链路）：
+// 目录（或其祖先）是 linked worktree 时，顺着 .git 文件定位主仓库并返回对应项目；
+// 非 worktree 或主仓库未收录（不在任何 scan-rule 下）返回 nil。
+// 只做文件系统探测 + 列表查找，不跑 git 子进程。
+func (s *Service) ResolveMainProject(dir string) *Project {
+	main := git.WorktreeMain(dir)
+	if main == "" {
+		return nil
+	}
+	return s.FindByPath(main)
 }
 
 // SearchByPath 通过路径搜索项目列表

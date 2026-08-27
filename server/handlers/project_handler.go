@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -103,15 +104,17 @@ func (h *ProjectHandler) projectInfo(input struct {
 }
 
 // ProjectOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。
-// path 是项目绝对路径（项目唯一标识口径）；后续 1030/1032 落地后可扩展目标目录选择字段。
+// path 是项目绝对路径（项目唯一标识口径）；dir 可选，为目标目录（worktree，1032），
+// 缺省/等于项目根 = 打开根目录。
 type ProjectOpenInput struct {
 	Body struct {
 		Path   string `json:"path" doc:"项目绝对路径"`
+		Dir    string `json:"dir,omitempty" doc:"目标目录绝对路径（worktree；缺省打开项目根）"`
 		Opener string `json:"opener" doc:"opener 名称"`
 	}
 }
 
-// projectOpen 用指定 opener 打开已收录项目，成功后记 usage（best-effort：失败不影响打开结果）。
+// projectOpen 用指定 opener 打开已收录项目的指定目标目录，成功后记 usage（best-effort：失败不影响打开结果）。
 // 区别于 opener/open（打开任意路径，不产生使用信号）。
 func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, error) {
 	proj := h.projectService.FindByPath(input.Body.Path)
@@ -119,17 +122,28 @@ func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, er
 		return nil, errors.New("未找到指定项目: " + input.Body.Path)
 	}
 
+	// 目标目录校验：只允许项目自身的目标（根目录 + 快照内 worktree），不开放任意路径
+	target := proj.Path()
+	if input.Body.Dir != "" && input.Body.Dir != proj.Path() {
+		if !slices.ContainsFunc(h.projectService.OpenTargets(proj.Path()), func(t project.OpenTarget) bool {
+			return t.Path == input.Body.Dir
+		}) {
+			return nil, errors.New("目标目录不属于该项目: " + input.Body.Dir)
+		}
+		target = input.Body.Dir
+	}
+
 	o := h.openerService.FindByName(input.Body.Opener)
 	if o == nil {
 		return nil, errors.New("未找到指定 opener: " + input.Body.Opener)
 	}
 
-	if err := o.Open(opener.RoleOpenDir, proj.Path()); err != nil {
+	if err := o.Open(opener.RoleOpenDir, target); err != nil {
 		return nil, fmt.Errorf("打开失败: %w", err)
 	}
 
-	// 打开主项目根，dir 为空（worktree/workspace 目标选择为 1030/1032 预留）
-	if err := h.usageService.RecordOpen(proj.Path(), o.Name(), ""); err != nil {
+	// project 恒记主项目路径；dir 直接传目标目录（等于根时由 RecordOpen 归一为空）
+	if err := h.usageService.RecordOpen(proj.Path(), o.Name(), target); err != nil {
 		slog.Warn("记录 usage 失败", "err", err)
 	}
 	return map[string]any{"ok": true}, nil

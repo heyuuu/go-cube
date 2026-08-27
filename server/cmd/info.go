@@ -10,6 +10,7 @@ import (
 
 	"cube/app"
 	"cube/util/git"
+	"cube/util/pathkit"
 	"cube/util/tui"
 )
 
@@ -58,6 +59,20 @@ query 支持两种搜索模式：
 			printInfoKV("group", orInfoDash(proj.Group()))
 			printInfoKV("tags", orInfoDash(strings.Join(proj.Tags(), ", ")))
 
+			// 路径 query 命中 worktree 时注明当前所属（1032 归并：项目身份是主仓库，
+			// 但用户在 worktree 目录里执行，需指出实际所在副本）
+			if isPathQuery(query) {
+				if absPath, err := pathkit.AbsPath(query); err == nil {
+					if root, ok := git.FindGitRoot(absPath); ok && root != proj.Path() {
+						branch := git.CurrentBranch(root)
+						if branch != "" {
+							branch = " (" + branch + ")"
+						}
+						printInfoKV("worktree", root+infoDimStyle.Render(branch))
+					}
+				}
+			}
+
 			// git 缓存快照（branch/dirty 等基础字段）；remote 列表走本地实时读
 			info, hasCache := a.ProjectService().GitInfo(proj.Path())
 			cacheUrl := ""
@@ -79,9 +94,6 @@ query 支持两种搜索模式：
 					printInfoKV("default", info.DefaultBranch+" "+formatAheadBehind(info.Ahead, info.Behind))
 				}
 				printInfoKV("dirty", boolToCnColored(info.Dirty))
-				if info.WorktreeMain != "" {
-					printInfoKV("worktree-main", info.WorktreeMain)
-				}
 				printInfoKV("branches", fmt.Sprintf("%d 个", len(info.Branches)))
 				printInfoKV("snapshot", formatInfoSnapshot(info.CollectedAt))
 			}

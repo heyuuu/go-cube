@@ -487,7 +487,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** 获取工作台项目信息 */
+    /** 获取工作台仓库信息 */
     get: operations['workbench.info'];
     put?: never;
     post?: never;
@@ -895,7 +895,7 @@ export interface components {
       defaultBranch: string;
       dirty: boolean;
       repoUrl: string;
-      worktreeMain: string;
+      worktrees: components['schemas']['WorktreeInfo'][] | null;
     };
     ErrorDetail: {
       /** @description Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id' */
@@ -1109,6 +1109,8 @@ export interface components {
        * @example https://example.com/schemas/ProjectOpenInputBody.json
        */
       readonly $schema?: string;
+      /** @description 目标目录绝对路径（worktree；缺省打开项目根） */
+      dir?: string;
       /** @description opener 名称 */
       opener: string;
       /** @description 项目绝对路径 */
@@ -1181,6 +1183,11 @@ export interface components {
     WhoamiResponse: {
       app: string;
       version: string;
+    };
+    WorktreeInfo: {
+      branch: string;
+      detached: boolean;
+      path: string;
     };
     WorktreeStatus: {
       /** Format: int64 */

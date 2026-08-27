@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
-import { ProjectActions } from './actions';
+import { ProjectActions, WorktreeCountBadge } from './actions';
 import { ProjectDrawer } from './drawer';
 import { tagVariants } from './shared';
 
@@ -234,7 +234,7 @@ function TreeRowView({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
-  onOpen: (path: string, opener: string) => void;
+  onOpen: (path: string, opener: string, dir?: string) => void;
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
   onFilterTag: (t: string) => void;
@@ -292,6 +292,7 @@ function TreeRowView({
               {t}
             </ClickBadge>
           ))}
+          <WorktreeCountBadge p={p} />
           <GitCell p={p} onFilter={onFilterGit} />
           <div className="ml-auto flex items-center gap-2">
             {p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}
@@ -446,9 +447,9 @@ export function ProjectsPage() {
     });
   }
 
-  function openProject(path: string, opener: string) {
+  function openProject(path: string, opener: string, dir?: string) {
     setOpenError('');
-    open.mutate({ path, opener }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
+    open.mutate({ path, opener, dir }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 
   const error = list.error ? `加载失败：${list.error.message}` : openError || '';

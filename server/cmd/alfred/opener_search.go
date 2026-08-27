@@ -23,8 +23,13 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 			// 获取匹配的命令列表
 			openers := a.OpenerService().SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
-			// 若指定项目（路径为项目唯一标识口径），且该项目有 opener 使用偏好，则按最近使用排序
+			// 若指定项目，且该项目有 opener 使用偏好，则按最近使用排序。
+			// 传入的可能是目标目录路径（project-search 平铺 worktree 条目的 Arg，1032），
+			// usage 按主项目路径聚合，先归一再查
 			if len(projectPath) > 0 {
+				if proj := a.ProjectService().ResolveProject(projectPath); proj != nil {
+					projectPath = proj.Path()
+				}
 				history := a.UsageService().LatestOpeners(projectPath, 3)
 				openers = sortOpeners(openers, history)
 			}

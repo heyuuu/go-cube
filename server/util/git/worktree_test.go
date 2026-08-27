@@ -1,7 +1,6 @@
 package git
 
 import (
-	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -59,10 +58,7 @@ func TestWorktreeList(t *testing.T) {
 	repo := ws.MakeGitRepo("repo")
 
 	// 加一个 linked worktree（独立分支避免与主目录检出冲突）
-	wtDir := ws.Join("wt-hot")
-	if err := exec.Command("git", "-C", repo, "worktree", "add", "-b", "hotfix", wtDir).Run(); err != nil {
-		t.Fatalf("创建 worktree 失败: %v", err)
-	}
+	wtDir := ws.MakeWorktree(repo, "wt-hot", "hotfix")
 
 	list, err := WorktreeList(repo)
 	if err != nil {
@@ -91,5 +87,30 @@ func TestWorktreeList(t *testing.T) {
 	// 非 git 目录报错
 	if _, err := WorktreeList(ws.Join("plain")); err == nil {
 		t.Error("非 git 目录应报错")
+	}
+}
+
+// 从 worktree 目录内调用应得到与主目录一致的列表（1032 归并链路依赖：
+// 命中 worktree 目录时顺藤定位主仓库、枚举全部目标）。
+func TestWorktreeListFromWorktreeDir(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepo("repo")
+	wtDir := ws.MakeWorktree(repo, "wt-feat", "feat")
+
+	fromMain, err := WorktreeList(repo)
+	if err != nil {
+		t.Fatalf("主目录调用报错: %v", err)
+	}
+	fromWorktree, err := WorktreeList(wtDir)
+	if err != nil {
+		t.Fatalf("worktree 目录调用报错: %v", err)
+	}
+	if len(fromMain) != 2 || len(fromWorktree) != 2 {
+		t.Fatalf("两侧都应有 2 个工作副本: main=%d worktree=%d", len(fromMain), len(fromWorktree))
+	}
+	for i := range fromMain {
+		if fromMain[i] != fromWorktree[i] {
+			t.Errorf("第 %d 个副本两侧不一致: main=%+v worktree=%+v", i, fromMain[i], fromWorktree[i])
+		}
 	}
 }

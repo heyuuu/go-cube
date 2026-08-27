@@ -158,3 +158,21 @@ func TestRecordOpen_Dir(t *testing.T) {
 		}
 	}
 }
+
+func TestRecordOpen_DirEqualsProjectNormalizedToEmpty(t *testing.T) {
+	s := newTestService(t)
+
+	// dir 等于项目根时应归一为空（「根目录记空」是存储契约），worktree 路径原样保留
+	if err := s.RecordOpen("/p/proj", "code", "/p/proj"); err != nil {
+		t.Fatalf("RecordOpen 失败: %v", err)
+	}
+	s.RecordOpen("/p/proj", "code", "/p/proj/.worktrees/wt")
+
+	recs, err := store.LoadJsonl[Record](s.usageFilePath)
+	if err != nil {
+		t.Fatalf("读取记录失败: %v", err)
+	}
+	if len(recs) != 2 || recs[0].Dir != "" || recs[1].Dir != "/p/proj/.worktrees/wt" {
+		t.Fatalf("dir 归一异常: %+v", recs)
+	}
+}

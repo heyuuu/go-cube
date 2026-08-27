@@ -41,7 +41,7 @@ export function ProjectDrawer({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
-  onOpen: (path: string, opener: string) => void;
+  onOpen: (path: string, opener: string, dir?: string) => void;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -93,9 +93,15 @@ export function ProjectDrawer({
                   <KV k="dirty">
                     {g.dirty ? <Badge variant="destructive">dirty</Badge> : <Badge variant="secondary">clean</Badge>}
                   </KV>
-                  {g.worktreeMain && (
-                    <KV k="worktree 主库">
-                      <code>{prettyPath(g.worktreeMain, home)}</code>
+                  {(g.worktrees?.length ?? 0) > 0 && (
+                    <KV k="worktrees">
+                      <span className="flex flex-col gap-0.5">
+                        {g.worktrees!.map((w) => (
+                          <code key={w.path} title={w.path}>
+                            {w.branch || w.path.split('/').pop()} {prettyPath(w.path, home)}
+                          </code>
+                        ))}
+                      </span>
                     </KV>
                   )}
                   <KV k="采集时间">{formatDateTime(g.collectedAt)}</KV>

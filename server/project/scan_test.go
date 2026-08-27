@@ -149,26 +149,21 @@ func TestScan_GodotTag(t *testing.T) {
 	}
 }
 
-// TestScan_WorktreeTag .git 是文件的 worktree 打 worktree tag。
-func TestScan_WorktreeTag(t *testing.T) {
+// TestScan_WorktreeSkipped .git 是文件的 worktree 目录不被收录（1032 归并为项目打开目标），
+// 且其子目录不再遍历。
+func TestScan_WorktreeSkipped(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	root := ws.Mkdir("root")
 	ws.MakeProjectDir(path.Join("root", "wt"), testfixture.WithWorktree())
+	ws.MakeProjectDir(path.Join("root", "normal"))
 
 	s := newServiceAt(t, root, "g", 5)
 	projs := s.Projects()
 	if len(projs) != 1 {
-		t.Fatalf("应扫到 1 个，实际 %d", len(projs))
+		t.Fatalf("worktree 目录应被跳过，实际扫到 %d 个: %+v", len(projs), projs)
 	}
-	tags := projs[0].Tags()
-	found := false
-	for _, tg := range tags {
-		if tg == TagWorktree {
-			found = true
-		}
-	}
-	if !found {
-		t.Fatalf("worktree 应打 worktree tag，实际 tags=%v", tags)
+	if projs[0].Path() != ws.Join("root", "normal") {
+		t.Fatalf("唯一项目应是 normal, got %s", projs[0].Path())
 	}
 }
 

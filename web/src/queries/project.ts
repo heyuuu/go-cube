@@ -22,9 +22,9 @@ export function useOpenerOpen() {
   });
 }
 
-// 打开已收录项目（后端记 usage；后续 1030/1032 目标目录选择在此扩展）——项目页专用
+// 打开已收录项目（后端记 usage；dir 为目标目录——worktree 归并为项目打开目标，1032）
 export function useProjectOpen() {
   return useMutation({
-    mutationFn: (input: { path: string; opener: string }) => apiPost('/api/project/open', input),
+    mutationFn: (input: { path: string; opener: string; dir?: string }) => apiPost('/api/project/open', input),
   });
 }

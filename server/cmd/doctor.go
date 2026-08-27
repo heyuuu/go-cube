@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 
@@ -30,8 +31,13 @@ type doctorCheck struct {
 var allDoctorChecks = []doctorCheck{
 	{
 		name: "git-repo-broken",
-		desc: "被收录为项目、但 git 已无法正常读写的仓库（含指向已删除主仓库的 worktree 残骸、损坏的 .git 等）",
+		desc: "被收录为项目、但 git 已无法正常读写的仓库（损坏的 .git 等）",
 		run:  doctorCheckGitRepoBroken,
+	},
+	{
+		name: "worktree-lost",
+		desc: "快照内 worktree 路径已失联（目录被删/移动/重命名，等下次采集自然淘汰）",
+		run:  doctorCheckWorktreeLost,
 	},
 }
 
@@ -45,10 +51,11 @@ func newDoctorCmd(a *app.App) *cobra.Command {
   doctor 找的是异常损坏（git 环境坏了、数据残缺等非正常状态的问题）。
 
 目前支持的检查项：
-  - git-repo-broken：被收录为项目、但 git 已无法正常读写的仓库。
-    典型场景：worktree 的主仓库被删/移动后留下的悬空目录——
-    目录里有 .git（文件），cube 扫描会识别为项目，但任何 git
-    命令都会失败，gitcache 后台采集到此会崩溃。
+  - git-repo-broken：被收录为项目、但 git 已无法正常读写的仓库
+    （损坏的 .git 等）。
+  - worktree-lost：主项目快照里的 worktree 路径已失联（目录被删/移动/
+    重命名）。1032 归并后 worktree 不是独立项目、悬空目录不再被收录，
+    该检查面向快照数据而非扫描列表；失联条目等下次采集自然淘汰。
 
 不传 items 时，依次执行全部检查项。后续新增的损坏类检查统一收到本命令下。`,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -119,6 +126,29 @@ func doctorCheckGitRepoBroken(service *project.Service) []doctorFinding {
 				problem: "git 无法读取该仓库",
 				detail:  err.Error(),
 			})
+		}
+	}
+	return findings
+}
+
+// doctorCheckWorktreeLost 找出主项目快照里已失联的 worktree 路径（1032）。
+// worktree 归并为项目打开目标后其可见性完全来自快照枚举——目录被删/移动/重命名时
+// 快照条目残留到下次采集，此检查在窗口期内把失联路径指出来。
+func doctorCheckWorktreeLost(service *project.Service) []doctorFinding {
+	var findings []doctorFinding
+	for _, p := range service.Projects() {
+		info, ok := service.GitInfo(p.Path())
+		if !ok {
+			continue
+		}
+		for _, wt := range info.Worktrees {
+			if _, err := os.Stat(wt.Path); err != nil {
+				findings = append(findings, doctorFinding{
+					path:    wt.Path,
+					problem: "快照内 worktree 路径已失联（所属项目 " + p.Path() + "）",
+					detail:  err.Error(),
+				})
+			}
 		}
 	}
 	return findings

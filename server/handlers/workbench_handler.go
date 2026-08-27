@@ -26,7 +26,7 @@ func NewWorkbenchHandler(workbenchService *workbench.Service) *WorkbenchHandler 
 }
 
 func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
-	web.ApiGet(api, "/api/workbench/info", "获取工作台项目信息", h.info)
+	web.ApiGet(api, "/api/workbench/info", "获取工作台仓库信息", h.info)
 	web.ApiGet(api, "/api/workbench/refs", "获取工作台分支与tag列表", h.refs)
 	web.ApiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
 	web.ApiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)

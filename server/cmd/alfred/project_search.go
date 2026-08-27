@@ -25,14 +25,24 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 			latest := a.UsageService().LatestByProject()
 			projects = project.SortByRecentUsage(projects, latest, 10)
 
-			// 返回结果（Arg 传 path——跨命令传参统一以路径为项目标识，对端 FindByPath）
-			return PrintResult(projects, func(proj *project.Project) Item {
-				return Item{
+			// 平铺直达（1032）：每个项目展开为「根目录 + worktrees」多个条目，
+			// Arg 直接传目标目录路径，保留一步打开体验（无需先选项目再选目标）
+			items := make([]Item, 0, len(projects))
+			for _, proj := range projects {
+				items = append(items, Item{
 					Title:    proj.Name(),
 					SubTitle: proj.Path(),
 					Arg:      proj.Path(),
+				})
+				for _, target := range a.ProjectService().OpenTargets(proj.Path())[1:] { // 跳过根目录（上面已输出）
+					items = append(items, Item{
+						Title:    proj.Name() + " (" + target.Label + ")",
+						SubTitle: target.Path,
+						Arg:      target.Path,
+					})
 				}
-			})
+			}
+			return PrintItems(items)
 		},
 	}
 	return cmd

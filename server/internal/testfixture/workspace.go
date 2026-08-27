@@ -158,3 +158,14 @@ func (w *Workspace) MakeGitRepoWith(name string, spec GitRepoSpec) string {
 	BuildGitRepo(w.TB, dir, spec)
 	return dir
 }
+
+// MakeWorktree 在 ws 下为 repoDir 建一个真实的 linked worktree（git worktree add），
+// 检出新分支 branch。返回 worktree 目录绝对路径。
+// 区别于 WithWorktree()：后者只写 .git 文件骗过扫描，不能真跑 git；本方法可被
+// git.WorktreeList / gitcache 采集等真实读路径使用。
+func (w *Workspace) MakeWorktree(repoDir, relPath, branch string) string {
+	w.Helper()
+	wtDir := w.Join(relPath)
+	runGit(w.TB, repoDir, "worktree", "add", "-b", branch, wtDir)
+	return wtDir
+}

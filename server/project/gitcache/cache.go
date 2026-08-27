@@ -14,7 +14,6 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -23,22 +22,32 @@ import (
 )
 
 // 当前缓存文件格式版本；结构变更时递增，用于后续做兼容迁移。
-const cacheVersion = 1
+// v2：worktree 归并为项目打开目标（1032）——移除 WorktreeMain（worktree 不再是独立项目），
+// 新增 Worktrees（主项目附带枚举 linked worktree）。
+const cacheVersion = 2
 
 // 缓存文件名（位于缓存目录 dir 下）。
 const cacheFileName = "git.json"
 
+// WorktreeInfo 主项目快照里的单个 linked worktree（提案 1032：worktree 归并为项目打开目标，
+// 不再是独立项目，枚举结果挂在主项目条目下）。
+type WorktreeInfo struct {
+	Path     string `json:"path"`     // worktree 绝对路径（git 输出经符号链接规范化）
+	Branch   string `json:"branch"`   // 检出分支短名；detached 为空
+	Detached bool   `json:"detached"` // HEAD 游离（展示名回退目录名的信号）
+}
+
 // Entry 单个项目的 git 信息快照。
 type Entry struct {
-	RepoUrl       string    `json:"repoUrl"`       // origin remote URL
-	CurrentBranch string    `json:"currentBranch"` // HEAD 指向分支短名，detached 为空
-	DefaultBranch string    `json:"defaultBranch"` // 默认主分支名（master/main/...）
-	Branches      []string  `json:"branches"`      // 本地+远程分支短名列表
-	Ahead         int       `json:"ahead"`         // 默认分支相对 origin 的领先 commit 数
-	Behind        int       `json:"behind"`        // 落后的 commit 数
-	Dirty         bool      `json:"dirty"`         // 工作区是否有改动
-	WorktreeMain  string    `json:"worktreeMain"`  // git worktree 的主仓库目录（仅 worktree 项目非空）
-	CollectedAt   time.Time `json:"collectedAt"`   // 本次采集时间
+	RepoUrl       string         `json:"repoUrl"`       // origin remote URL
+	CurrentBranch string         `json:"currentBranch"` // HEAD 指向分支短名，detached 为空
+	DefaultBranch string         `json:"defaultBranch"` // 默认主分支名（master/main/...）
+	Branches      []string       `json:"branches"`      // 本地+远程分支短名列表
+	Ahead         int            `json:"ahead"`         // 默认分支相对 origin 的领先 commit 数
+	Behind        int            `json:"behind"`        // 落后的 commit 数
+	Dirty         bool           `json:"dirty"`         // 工作区是否有改动
+	Worktrees     []WorktreeInfo `json:"worktrees"`     // 主项目的 linked worktree 列表（无则空数组；主目录本身不含在内）
+	CollectedAt   time.Time      `json:"collectedAt"`   // 本次采集时间
 }
 
 // cacheFile 缓存文件的磁盘序列化结构。
@@ -265,7 +274,6 @@ func collectEntry(path string) (*Entry, error) {
 	if err != nil {
 		return nil, err
 	}
-	worktreeMain := detectWorktreeMain(path)
 	return &Entry{
 		RepoUrl:       repoUrl,
 		CurrentBranch: currentBranch,
@@ -274,41 +282,25 @@ func collectEntry(path string) (*Entry, error) {
 		Ahead:         ahead,
 		Behind:        behind,
 		Dirty:         st.Dirty,
-		WorktreeMain:  worktreeMain,
+		Worktrees:     collectWorktrees(path),
 		CollectedAt:   time.Now(),
 	}, nil
 }
 
-// detectWorktreeMain 检测 path 是否是 git worktree，若是返回主仓库目录。
-//
-// worktree 的 .git 是文件（非目录），内容形如：
-//
-//	gitdir: /主仓库/.git/worktrees/<worktree名>
-//
-// 从中解析出主仓库目录（去掉 /.git/worktrees/<名> 后缀）。
-// 非 worktree（.git 是目录或不存在）返回空字符串。
-func detectWorktreeMain(path string) string {
-	gitPath := filepath.Join(path, ".git")
-	info, err := os.Stat(gitPath)
-	if err != nil || !info.Mode().IsRegular() {
-		return "" // .git 不存在或是目录 → 非 worktree
-	}
-	data, err := os.ReadFile(gitPath)
+// collectWorktrees 枚举主项目的 linked worktree 列表（1032：worktree 归并为项目打开目标）。
+// WorktreeList 输出主目录在前，从第 2 项起才是 worktree；枚举失败降级为空列表
+// （与非仓库目录 collectEntry 返回零值 entry 的降级基调一致，不让 worktree 问题拖垮整个条目）。
+func collectWorktrees(path string) []WorktreeInfo {
+	list, err := git.WorktreeList(path)
 	if err != nil {
-		return ""
+		slog.Debug("枚举 worktree 失败，降级为空列表", "path", path, "err", err)
+		return []WorktreeInfo{}
 	}
-	line := strings.TrimSpace(string(data))
-	const prefix = "gitdir:"
-	if !strings.HasPrefix(line, prefix) {
-		return ""
+	worktrees := make([]WorktreeInfo, 0, len(list))
+	for _, wt := range list[1:] { // 第 1 项是主目录自身
+		worktrees = append(worktrees, WorktreeInfo{Path: wt.Path, Branch: wt.Branch, Detached: wt.Detached})
 	}
-	gitdir := strings.TrimSpace(strings.TrimPrefix(line, prefix))
-	// gitdir 形如 /主仓库/.git/worktrees/<名>；找到 /.git/worktrees/ 截断
-	const marker = "/.git/worktrees/"
-	if idx := strings.Index(gitdir, marker); idx >= 0 {
-		return gitdir[:idx]
-	}
-	return ""
+	return worktrees
 }
 
 // backupCorrupt 把损坏文件备份到 git.json.corrupt-{timestamp}，便于事后排查。

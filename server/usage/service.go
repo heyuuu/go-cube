@@ -33,9 +33,12 @@ func NewService(usageFilePath string) *Service {
 // project：主项目绝对路径（归并键）——worktree / monorepo 子目录打开时也恒记主项目路径，
 // 排序与 opener 偏好信号不因打开目标不同而分裂。
 // opener：opener 名（settings openers 节的 key）。
-// dir：实际打开的目标目录绝对路径。打开主项目根时传空（字段省略）；打开 worktree
-// 或 workspace 子目录时传其绝对路径（1030/1032 落地后生效）。
+// dir：实际打开的目标目录绝对路径，直接传打开结果即可——等于项目根时在此归一为空
+// （「根目录记空」是存储契约，compact 组合键含 dir，不要在调用方各自判断）。
 func (s *Service) RecordOpen(project string, opener string, dir string) error {
+	if dir == project {
+		dir = ""
+	}
 	rec := Record{Time: time.Now(), Project: project, Opener: opener, Dir: dir}
 	if err := store.AppendJsonl(s.usageFilePath, rec); err != nil {
 		return fmt.Errorf("写入 usage 记录失败: %w", err)

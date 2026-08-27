@@ -2,6 +2,8 @@ package git
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 )
 
@@ -23,6 +25,42 @@ func WorktreeList(dir string) ([]Worktree, error) {
 		return nil, fmt.Errorf("git worktree list 执行失败: %w", err)
 	}
 	return parseWorktreePorcelain(out), nil
+}
+
+// WorktreeMain 探测 dir（或其祖先）是否为 linked worktree，是则返回主仓库目录，否则返回空串。
+// worktree 的 .git 是文件，内容形如 "gitdir: /主仓库/.git/worktrees/<名>"，从中截出主仓库目录。
+// 提案 1032：worktree 不再是独立项目，此函数是「命中 worktree 目录 → 归并主项目」的探测原语。
+func WorktreeMain(dir string) string {
+	root, ok := FindGitRoot(dir)
+	if !ok {
+		return ""
+	}
+	gitPath := filepath.Join(root, ".git")
+	info, err := os.Stat(gitPath)
+	if err != nil || !info.Mode().IsRegular() {
+		return "" // .git 不存在或是目录 → 非 worktree
+	}
+	data, err := os.ReadFile(gitPath)
+	if err != nil {
+		return ""
+	}
+	line := strings.TrimSpace(string(data))
+	const prefix = "gitdir:"
+	if !strings.HasPrefix(line, prefix) {
+		return ""
+	}
+	gitdir := strings.TrimSpace(strings.TrimPrefix(line, prefix))
+	// gitdir 形如 /主仓库/.git/worktrees/<名>；找到 /.git/worktrees/ 截断。
+	// git 写入的是符号链接规范化后的路径（macOS 上 /var → /private/var），
+	// 与调用方持有的扫描路径可能不一致，返回前同样求值保持口径统一
+	const marker = "/.git/worktrees/"
+	if idx := strings.Index(gitdir, marker); idx >= 0 {
+		if real, err := filepath.EvalSymlinks(gitdir[:idx]); err == nil {
+			return real
+		}
+		return gitdir[:idx]
+	}
+	return ""
 }
 
 // parseWorktreePorcelain 解析 `git worktree list --porcelain` 输出：

@@ -133,6 +133,51 @@ func TestCollectEntry_NonRepo(t *testing.T) {
 	}
 }
 
+// TestCollectEntry_Worktrees 主项目采集时附带枚举 linked worktree（1032 归并）。
+func TestCollectEntry_Worktrees(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
+	ws.MakeWorktree(repo, "wt-hot", "hotfix")
+	ws.MakeWorktree(repo, "wt-feat", "feat")
+
+	e, err := collectEntry(repo)
+	if err != nil {
+		t.Fatalf("collectEntry 不应返回 error: %v", err)
+	}
+	if len(e.Worktrees) != 2 {
+		t.Fatalf("应附带 2 个 worktree, got %d (%+v)", len(e.Worktrees), e.Worktrees)
+	}
+	// 分支名 + 路径落在快照里（主目录自身不含在内）；git 输出路径经符号链接规范化，比较前同样求值
+	canonicalWt, err := filepath.EvalSymlinks(ws.Join("wt-hot"))
+	if err != nil {
+		t.Fatalf("解析真实路径失败: %v", err)
+	}
+	byBranch := map[string]WorktreeInfo{}
+	for _, wt := range e.Worktrees {
+		byBranch[wt.Branch] = wt
+	}
+	if wt, ok := byBranch["hotfix"]; !ok || wt.Path != canonicalWt {
+		t.Fatalf("hotfix worktree 字段不符: %+v ok=%v", wt, ok)
+	}
+	if _, ok := byBranch["feat"]; !ok {
+		t.Fatalf("缺少 feat worktree: %+v", e.Worktrees)
+	}
+}
+
+// TestCollectEntry_WorktreesDegraded 非仓库目录（WorktreeList 失败）降级为空列表而非报错。
+func TestCollectEntry_WorktreesDegraded(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.Mkdir("empty")
+
+	e, err := collectEntry(dir)
+	if err != nil {
+		t.Fatalf("非仓库 collectEntry 不应返回 error: %v", err)
+	}
+	if e.Worktrees == nil || len(e.Worktrees) != 0 {
+		t.Fatalf("非仓库 Worktrees 应为空列表, got %+v", e.Worktrees)
+	}
+}
+
 // TestRefresh_RealRepo Refresh 真实仓库后能读到采集结果。
 func TestRefresh_RealRepo(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)

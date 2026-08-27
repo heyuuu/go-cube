@@ -78,6 +78,9 @@ func searchProjects(service *project.Service, query string, up bool) ([]*project
 // 非交互环境不支持多项选择，会报错提示使用精确名称或路径。
 // --local 模式（cubex 入口）下 query 缺省视作 "."，以 cwd 为起点定位项目；
 // 显式给了 query 则不干预，--local 对其无效果。
+//
+// 路径 query 命中 worktree 目录时归并到主项目（1032：worktree 不再是独立项目，
+// pull / push / info 等在 worktree 内执行等同于操作主仓库根目录）。
 func pickProject(service *project.Service, query string) (*project.Project, error) {
 	if localMode && query == "" {
 		query = "."
@@ -88,6 +91,14 @@ func pickProject(service *project.Service, query string) (*project.Project, erro
 	}
 
 	if len(projects) == 0 {
+		// 路径 query 落在 worktree 内：SearchByPath 找不到（worktree 通常在项目目录之外），归并主项目
+		if isPathQuery(query) {
+			if absPath, err := pathkit.AbsPath(query); err == nil {
+				if proj := service.ResolveProject(absPath); proj != nil {
+					return proj, nil
+				}
+			}
+		}
 		return nil, fmt.Errorf("未找到匹配的 project: query=`%s`", query)
 	} else if len(projects) == 1 {
 		return projects[0], nil

@@ -10,7 +10,7 @@ import (
 
 // --- git 面板（info / 分支与 tag / commit 日志 / 工作副本快照）---
 
-// Info 工作台项目基本信息：入口目录规范化的仓库根 + 默认分支。
+// Info 工作台仓库基本信息：入口目录规范化的仓库根 + 默认分支。
 // 工作副本列表归 /worktrees 快照（含状态，刷新节奏不同）。
 type Info struct {
 	Root          string `json:"root"`          // 仓库根目录（path 向上探测 .git 的结果，主目录与 worktree 进来得到同一结果）
