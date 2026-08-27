@@ -274,7 +274,8 @@ export function ProjectsPage() {
 
   const projects = list.data?.list ?? [];
   const home = guessHome(projects.map((p) => p.path));
-  const groups = [...new Set(projects.map((p) => p.group))].sort();
+  // group 不排序：Set 去重保留首次出现序 = 项目列表序 = scanRules 规则序（settings 可拖拽调整）
+  const groups = [...new Set(projects.map((p) => p.group))];
   const tags = [...new Set(projects.flatMap((p) => p.tags ?? []))].sort();
 
   const filtered = projects.filter((p) => {
