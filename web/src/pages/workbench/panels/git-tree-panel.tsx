@@ -272,8 +272,11 @@ function BranchRow({
   onAddWorktree: () => void;
   onDeleteBranch: () => void;
 }) {
+  // 选中态放整行容器（与 WorktreeRow 同构）：SelectableRow 传 bare 后自身不上底色
+  const src: TreeSource = { type: 'ref', id: refName };
+  const selected = sameSource(params.current, src) || sameSource(params.base, src);
   return (
-    <div className="group flex items-center hover:bg-accent">
+    <div className={cn('group flex items-center hover:bg-accent', selected && 'bg-primary/15')}>
       <SelectableRow
         label={refShortName(refName)}
         source={{ type: 'ref', id: refName }}
