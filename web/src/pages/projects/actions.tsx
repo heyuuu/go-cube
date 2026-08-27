@@ -1,6 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
 import { ChevronDown } from 'lucide-react';
-import { useState } from 'react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +10,9 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { renderIcon } from '@/lib/icon';
@@ -20,7 +22,8 @@ import { useProjectOpen } from '@/queries/project';
 import { projectTargets, quickOpens, tagVariants } from './shared';
 
 // 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。
-// 多目标项目（根目录 + worktrees，1032）：点 opener 后下拉先选目标再打开；
+// 多目标项目（根目录 + worktrees，1032）：opener 挂子菜单选目标（Base UI 的
+// SubmenuRoot；同弹层内点 item 切内容的做法不可行——item 点击即关菜单）；
 // 单目标项目点击直达，体验不变。
 export function ProjectActions({
   p,
@@ -37,8 +40,6 @@ export function ProjectActions({
   const openerNames = new Set(openerList.map((op) => op.name));
   const targets = projectTargets(p);
   const multiTarget = targets.length > 1;
-  // 两段式下拉的中间态：已选 opener、待选目标（下拉关闭时复位）
-  const [pickedOpener, setPickedOpener] = useState<Opener | null>(null);
 
   const isPending = (name: string) => open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
@@ -98,40 +99,31 @@ export function ProjectActions({
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       {quickOpens.filter((name) => openerNames.has(name)).map(quickButton)}
-      <DropdownMenu
-        onOpenChange={(o) => {
-          if (!o) setPickedOpener(null);
-        }}
-      >
+      <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-32">
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
           <DropdownMenuGroup>
-            {pickedOpener ? (
-              <>
-                <DropdownMenuLabel>
-                  {pickedOpener.title} · 选择目标
-                </DropdownMenuLabel>
-                {targetMenuItems(pickedOpener.name)}
-              </>
-            ) : (
-              <>
-                <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-                {openerList.map((op) => (
-                  <DropdownMenuItem
-                    key={op.name}
-                    onClick={() => (multiTarget ? setPickedOpener(op) : openTarget(op.name, ''))}
-                    disabled={isPending(op.name)}
-                  >
+            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
+            {openerList.map((op) =>
+              multiTarget ? (
+                <DropdownMenuSub key={op.name}>
+                  <DropdownMenuSubTrigger disabled={isPending(op.name)}>
                     {renderIcon(op?.icon, null)}
                     {op.title}
-                  </DropdownMenuItem>
-                ))}
-                {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
-              </>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>{targetMenuItems(op.name)}</DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : (
+                <DropdownMenuItem key={op.name} onClick={() => openTarget(op.name, '')} disabled={isPending(op.name)}>
+                  {renderIcon(op?.icon, null)}
+                  {op.title}
+                </DropdownMenuItem>
+              ),
             )}
+            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
