@@ -371,12 +371,11 @@ func TestBranchDelete(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
 
-	// 在第一个 commit 上建分支，其后再有 commit → 该分支相对 HEAD 未合并
-	out, err := runOut(repo, "rev-list", "--max-parents=0", "HEAD")
-	if err != nil {
-		t.Fatalf("取首个 commit 失败: %v", err)
-	}
-	runGit(t, repo, "branch", "old", strings.TrimSpace(out))
+	// 建分支并在其上追加 commit → 相对 HEAD 未合并（祖先方向的分支算已合并）
+	runGit(t, repo, "branch", "old")
+	runGit(t, repo, "checkout", "old")
+	runGit(t, repo, "commit", "--allow-empty", "-m", "on old")
+	runGit(t, repo, "checkout", "-")
 
 	if err := BranchDelete(repo, "old", false); err == nil {
 		t.Fatalf("未合并分支非 force 删除应被拒绝")

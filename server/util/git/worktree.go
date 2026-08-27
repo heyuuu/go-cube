@@ -85,15 +85,18 @@ func WorktreeAdd(dir string, targetPath string, branch string, commitish string)
 	args := []string{"worktree", "add"}
 	switch {
 	case branch == "":
-		args = append(args, "--detach")
+		args = append(args, "--detach", targetPath)
+		if commitish != "" {
+			args = append(args, commitish)
+		}
 	case branchExists(dir, branch):
-		// 检出已有分支，无附加 flag
+		// 检出已有分支：分支名即位置参数基点，忽略 commitish
+		args = append(args, targetPath, branch)
 	default:
-		args = append(args, "-b", branch)
-	}
-	args = append(args, targetPath)
-	if commitish != "" {
-		args = append(args, commitish)
+		args = append(args, "-b", branch, targetPath)
+		if commitish != "" {
+			args = append(args, commitish)
+		}
 	}
 	if _, err := runOut(dir, args...); err != nil {
 		return nil, fmt.Errorf("git worktree add 执行失败: %w", err)
