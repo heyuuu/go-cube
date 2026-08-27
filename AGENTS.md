@@ -18,7 +18,7 @@
 ```
 基础设施  config / db / logger / version / runtime               所有层共享
 能力      opener / util(git / fuzzy / easycache / pathkit / slicekit / tui)  通用动作, 不含业务实体
-领域      project (含 gitcache / scan / clone) / history          业务 domain, 含实体和规则
+领域      project (含 projcache / scan / clone / workspace) / usage / workbench   业务 domain, 含实体和规则
 出口      cmd / handlers / web                                     把领域包成 CLI/Web（handlers=业务 HTTP handler 层，web=服务端框架）
 装配      app / main                                              接线
 ```
@@ -31,7 +31,8 @@
 
 - **项目前提：所有项目都是 git 项目**。`.git` 存在是扫描判定项目的必要条件（详见 `project/scan.go`）。因此 `tags` 不打冗余的 `git` 标签，只标额外特征（`worktree` / `godot`）。改扫描/tag 逻辑时遵守此假设。
 - **持久配置不按项目路径记录内容**：project 一切由 scan-rule 推导。**禁止的是在 settings.json / config 等「持久配置」里按项目路径记录具体 project 的内容**——项目目录会重命名/移动，按路径 keyed 的持久配置会失联留脏数据；**短生命周期、自动刷新、可丢弃的 cache（如 git.json）不在此列**。需要「project 自身的配置」（如 monorepo workspace 声明，方向定为项目根 `.cube/cube.json`）时，放项目内跟仓库走，不放全局配置。
-- **gitcache 异步采集**：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读 git 状态快照（几乎零开销）；**单写者模型**——常驻 server 是 git.json 的唯一写方（后台异步采集回写），CLI 只读不写，落盘靠原子写（tmp + rename），无跨进程锁。**读路径不得阻塞采集——只能读快照**。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
+- **projcache 异步采集**（原 projcache，1030 起含 workspace 更名）：`project list --status` 等读命令从 `~/.config/cube/cache/git.json` 读项目状态快照（git 信息 + worktree 枚举 + workspace 成员，几乎零开销）；**单写者模型**——常驻 server 是 git.json 的唯一写方（后台异步采集回写），CLI 只读不写，落盘靠原子写（tmp + rename），无跨进程锁。**读路径不得阻塞采集——只能读快照**（workspace 也一样：解析/探测只发生在采集侧，读路径不读 `.cube/cube.json`）。详见 [`docs/spec/现状.md`](./docs/spec/现状.md)「三、关键机制」。
+- **monorepo workspace（1030）**：项目根 `.cube/cube.json` 声明打开子目录（`workspaces` 显式声明优先，空数组不回落探测；字段缺失按 `workspaceScanRule`/默认 `pnpm,npm` 探测 pnpm/npm 标准声明文件为正选）。解析与探测在 `project/workspace` 包（纯函数），组合进 projcache 采集。此为「project 自身的配置放项目内跟仓库走」的落地形态，不放全局配置。
 - **opener：接口 + 唯一 exec 实现 + settings.json**：`Opener` 是接口（`opener/opener.go`），唯一实现 `execOpener`（`opener/exec.go`，cmd 模板 `$0/$1` 占位）——「打开工作台页」不设独立形态，配 exec cmd `["cube","ui","workbench","$0"]` 组合 cube 自身 CLI；能力由 `roles []Role` 声明（见 `opener/role.go`），`slotCount` 由 role 推导；`Open(role, slotArgs...)` 的 role 校验收敛在实现内；经 `Executor` 执行（`opener/executor.go`，测试注入 fake）。**opener 数据存 settings.json 的 openers 节**（`settings` 包节级 API，Service 直读不缓存、写侧领域校验；详见 现状.md 3.3）——改 opener 时同步看 `opener/opener.go`、`opener/exec.go`、`opener/role.go`、`opener/executor.go`、`settings/settings.go`。
 - **全局 flag 预解析**：`-c`（配置目录）/ `-d`（debug）用 Go 原生 `flag` 包在 cobra 初始化**之前**预解析（`cmd/root.go` 的 `extractGlobalFlags`），保证 logger 和 config 先就绪。cobra 上的 `--config`/`--debug` 仅用于 help 提示。新增需在 logger/config 之前生效的全局 flag，走 `extractGlobalFlags` 而非 cobra。
 - **Web 出口分两层**：`web` 包是服务端框架（Server 装配 / envelope / 静态资源 / system 端点，`web.NewServer(handlers ...Handler)` 自动追加内置 system 与 static handler）；业务 handler 在 `handlers` 包（`<domain>_handler.go` 同包分文件，不按 domain 分子包），实现 `Handler.Register(api huma.API, mux *http.ServeMux)`——注册统一走 `web.ApiGet` / `web.ApiPost`，WebSocket 等原生路由直接挂 mux（不经 huma）。统一 `ApiOutput{ok,message,data}` envelope（泛型 `ApiOutput[T]`，见 `web/api.go`）；路径强制 `/api/` 前缀，由 `apiRegister` 解析 group tag + operationId。响应 JSON 经 `nilSliceJSONFormat`（`web/jsonfmt.go`）把 nil 切片序列化为 `[]`——新增 handler 自动复用，不要在 handler 里手写 `make([]T, 0)` 兜底。
@@ -79,12 +80,12 @@ repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
 ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
 ```
 
-**为什么 testfixture 不 import `project` 包**：底层包（`git`/`gitcache`）的测试要用 testfixture，而 `project → gitcache → git` 是依赖链。若 testfixture 反向依赖 project 会形成循环。所以「构造 project.Service」这种依赖 `project` 包的逻辑写在调用方测试里（见 `project/scan_test.go` 的 `newServiceAt`），不沉淀进 testfixture。
+**为什么 testfixture 不 import `project` 包**：底层包（`git`/`projcache`）的测试要用 testfixture，而 `project → projcache → git` 是依赖链。若 testfixture 反向依赖 project 会形成循环。所以「构造 project.Service」这种依赖 `project` 包的逻辑写在调用方测试里（见 `project/scan_test.go` 的 `newServiceAt`），不沉淀进 testfixture。
 
 ### 测试策略（什么测、什么不测）
 
 - **纯函数**（解析、计算、字符串处理）：普通表驱动测试。`fuzzy`/`pathkit`/`git/url`/`git 读输出解析`/`slicekit`/`easycache`/`opener 解析`。
-- **依赖外部进程/库的 IO**（git 二进制读/写仓库）：**用 testfixture 建真实临时仓库测**，不 mock。`git` 的 `Refs/Remotes/IsDirty/LoadRepoStatus`、`git.FindGitRoot`、`gitcache.Load/Save/Refresh/collectEntry`。
+- **依赖外部进程/库的 IO**（git 二进制读/写仓库）：**用 testfixture 建真实临时仓库测**，不 mock。`git` 的 `Refs/Remotes/IsDirty/LoadRepoStatus`、`git.FindGitRoot`、`projcache.Load/Save/Refresh/collectEntry`。
 - **依赖 sqlite**：用 `:memory:` 内存库 + 直接 AutoMigrate。`history` 全部测试。
 - **依赖真实目录扫描**：用 testfixture 建工程目录树，构造 `config.ProjectConfig` 喂给 `project.NewService`（绕开 config/app 单例）。`project/scan_test.go`。
 - **opener 执行类**：通过 `Executor` 接口注入 fake，不真的启动编辑器。见 `opener/opener_test.go`。
@@ -112,7 +113,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - `NewXxx()` → 返回 `*Xxx`（指针，单返回值）。例：`NewService` / `NewOpenerHandler` / `NewItem`。
    - `MakeXxx()` → 返回 `Xxx`（值类型，单返回值）。
    - `InitXxx()` → 用于构造时需要返回 `error` 等额外值的情况（即 `(*Xxx, error)` 或 `(Xxx, error)`）。
-   - 解析/加载类函数不在本约定范围内，保留 `ParseXxx` / `LoadXxx` 等既有命名（如 `ParseRepoUrl`、`gitcache.Load`）。
+   - 解析/加载类函数不在本约定范围内，保留 `ParseXxx` / `LoadXxx` 等既有命名（如 `ParseRepoUrl`、`projcache.Load`）。
 8. **getter / setter 尽量写成一行**，避免函数体展开过多行影响阅读密度。例：
    ```go
    func (o *Opener) Name() string { return o.name }
@@ -130,7 +131,7 @@ ws.MakeProjectDir("scanroot/g1/proj", testfixture.WithGodot())
    - 虽名为 `GetXxx`/`SetXxx` 但方法体不是属性的直接读/写——例如 `return s.cache.Get()`、`return strings.Join(o.cmd, " ")`、`Projects()`（委托、计算、聚合等）。
 
    getter/setter 的书写约定：
-   - **建议不加注释**（建议性，非强制）——struct 属性的行尾注释通常已足够说明，方法上再写只会重复。参考 `project.Project`：属性 `path string // 项目路径，唯一标识`，getter `Path()` 不写注释。**但如果注释包含超出属性说明本身的内容**（如跨文件调用指引、设计意图、注意事项等），则应当保留。参考 `gitcache` 系列的 getter：除说明返回值外，还注明其调度用途（如「供 TTL 调度逻辑使用」）。
+   - **建议不加注释**（建议性，非强制）——struct 属性的行尾注释通常已足够说明，方法上再写只会重复。参考 `project.Project`：属性 `path string // 项目路径，唯一标识`，getter `Path()` 不写注释。**但如果注释包含超出属性说明本身的内容**（如跨文件调用指引、设计意图、注意事项等），则应当保留。参考 `projcache` 系列的 getter：除说明返回值外，还注明其调度用途（如「供 TTL 调度逻辑使用」）。
    - **多个 getter（或多个 setter）连写在一起，不加空行**；顺序与对应属性在 struct 内的声明顺序一致。参考 `project.Project` 的 `Group/Name/Path/Tags/GitInfo`。
    - getter 组与其它方法之间保留一个空行分隔。
 9. 写表用 `tui.PrintTable`，交互选择用 `tui.SelectItem`，保持 CLI 输出风格一致。
