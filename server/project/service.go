@@ -282,10 +282,14 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 			}
 		}()
 
-		// 启动即刷一次，避免冷启动空窗；但磁盘缓存仍新鲜（距上次落盘 < interval）时跳过——
+		// 启动即刷一次，避免冷启动空窗；但磁盘缓存仍新鲜（距上次落盘 < interval）时跳过 git 采集——
 		// 开发期 air 等热重载场景每次重启都全量重采上百个仓库，纯属浪费。
+		// 跳过的只是数十秒级的采集；扫描本身毫秒级照跑并记录 scanUpdatedAt，
+		// 否则该时间戳挂零值，前端「项目列表」新鲜度会一直显示 -
 		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
-			slog.Debug("git 缓存新鲜，跳过启动刷新", "上次落盘距今", since.Round(time.Second).String())
+			slog.Debug("git 缓存新鲜，跳过启动采集（仅重扫项目列表）", "上次落盘距今", since.Round(time.Second).String())
+			s.scanCache.Reload()
+			s.scanUpdatedAt = time.Now()
 		} else {
 			s.refresh()
 		}
