@@ -5,6 +5,7 @@ import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { prettyPath } from '@/lib/path';
 import { formatDateTime } from '@/lib/time';
 import { useProjectOpen } from '@/queries/project';
@@ -93,17 +94,6 @@ export function ProjectDrawer({
                   <KV k="dirty">
                     {g.dirty ? <Badge variant="destructive">dirty</Badge> : <Badge variant="secondary">clean</Badge>}
                   </KV>
-                  {(g.worktrees?.length ?? 0) > 0 && (
-                    <KV k="worktrees">
-                      <span className="flex flex-col gap-0.5">
-                        {g.worktrees!.map((w) => (
-                          <code key={w.path} title={w.path}>
-                            {w.branch || w.path.split('/').pop()} {prettyPath(w.path, home)}
-                          </code>
-                        ))}
-                      </span>
-                    </KV>
-                  )}
                   <KV k="采集时间">{formatDateTime(g.collectedAt)}</KV>
                 </dl>
               ) : (
@@ -119,6 +109,29 @@ export function ProjectDrawer({
                 </Button>
               </div>
             </DrawerSection>
+
+            {(g?.worktrees?.length ?? 0) > 0 && (
+              <DrawerSection title={`worktrees（${g!.worktrees!.length}）`}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>分支</TableHead>
+                      <TableHead>路径</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {g!.worktrees!.map((w) => (
+                      <TableRow key={w.path}>
+                        <TableCell className="px-2 py-1.5 font-medium">{w.branch || w.path.split('/').pop()}</TableCell>
+                        <TableCell className="px-2 py-1.5 font-mono text-xs" title={w.path}>
+                          {prettyPath(w.path, home)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </DrawerSection>
+            )}
           </div>
         </SheetContent>
       )}
