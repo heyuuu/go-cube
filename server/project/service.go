@@ -20,11 +20,9 @@ type Service struct {
 	// settings
 	settingsFile string // settings.json 路径，scan/clone 规则每次现读（直读不缓存，改完即生效）
 	// scan
-	scanCache *easycache.Item[[]*Project] // 项目扫描的缓存
+	scanCache *easycache.Item[[]*Project] // 项目扫描的缓存（新鲜度时间戳由缓存自身维护，见 UpdatedAt）
 	// git info cache
 	gitCache *gitcache.Cache // git 信息缓存（项目 branch/dirty/repoUrl 等）
-	// 刷新时间戳（供前端展示数据新鲜度；零值 = 未刷新过）
-	scanUpdatedAt time.Time // 项目列表最近一次重扫完成时间
 	// 定时刷新（仅常驻 server 启用，CLI 不启用）
 	stopCh chan struct{} // nil = 未启用；非 nil = 定时器在跑
 }
@@ -68,7 +66,7 @@ func (s *Service) SaveScanRule(rule ScanRule) error {
 	if err := saveScanRule(s.settingsFile, rule); err != nil {
 		return err
 	}
-	s.rescan()
+	s.scanCache.Reload()
 	return nil
 }
 
@@ -76,7 +74,7 @@ func (s *Service) DeleteScanRule(path string) error {
 	if err := deleteScanRule(s.settingsFile, path); err != nil {
 		return err
 	}
-	s.rescan()
+	s.scanCache.Reload()
 	return nil
 }
 
@@ -85,7 +83,7 @@ func (s *Service) ReorderScanRules(paths []string) error {
 	if err := reorderScanRules(s.settingsFile, paths); err != nil {
 		return err
 	}
-	s.rescan()
+	s.scanCache.Reload()
 	return nil
 }
 
@@ -238,8 +236,9 @@ func (s *Service) GitInfo(path string) (*gitcache.Entry, bool) {
 	return s.gitCache.Get(path)
 }
 
-// ScanUpdatedAt 返回项目列表最近一次重扫完成时间；未刷新过返回零值。
-func (s *Service) ScanUpdatedAt() time.Time { return s.scanUpdatedAt }
+// ScanUpdatedAt 返回项目列表最近一次扫描完成时间；从未扫描过返回零值。
+// 委托缓存的计算时间戳——数据与新鲜度由 scanCache 单点维护（对称：GitUpdatedAt 委托 gitCache）。
+func (s *Service) ScanUpdatedAt() time.Time { return s.scanCache.UpdatedAt() }
 
 // GitUpdatedAt 返回 git 缓存最近一次落盘时间；无缓存返回零值。
 // 区别于单项目的 CollectedAt：这是整个 cache 文件的刷新时间。
@@ -260,7 +259,7 @@ const defaultRefreshInterval = 5 * time.Minute
 //
 // interval <= 0 时用 defaultRefreshInterval。重复调用安全：已在跑则直接返回。
 // 启动后立即刷新一次（避免冷启动空窗；磁盘缓存距上次落盘 < interval 时跳过），之后按 interval 定时刷新。
-// 刷新动作：重扫项目列表（毫秒级）→ 记录 scanUpdatedAt → 用最新列表采集 git 信息（数十秒级）→ 记录 gitUpdatedAt。
+// 刷新动作：重扫项目列表（毫秒级，时间戳由 scanCache 自记）→ 用最新列表采集 git 信息（数十秒级，时间戳由 gitCache 自记）。
 // 两个时间戳分开记录：扫描极快、git 采集慢，前端需据此分别判断「项目列表新鲜度」和「git 状态新鲜度」。
 //
 // CLI 不调用此方法（CLI 短命，只读启动时 Load 的快照）。
@@ -285,7 +284,7 @@ func (s *Service) StartRefreshTicker(interval time.Duration) {
 		// 启动即刷一次，避免冷启动空窗。扫描（毫秒级）无条件执行；git 采集（数十秒级）
 		// 在磁盘缓存仍新鲜（距上次落盘 < interval）时跳过——开发期 air 等热重载场景
 		// 每次重启都全量重采上百个仓库，纯属浪费。
-		s.rescan()
+		s.scanCache.Reload()
 		if since := time.Since(s.gitCache.UpdatedAt()); since < interval {
 			slog.Debug("git 缓存新鲜，跳过启动采集（仅重扫项目列表）", "上次落盘距今", since.Round(time.Second).String())
 		} else {
@@ -321,14 +320,6 @@ func (s *Service) StopRefreshTicker() {
 	s.stopCh = nil
 }
 
-// rescan 重扫项目列表（纳入新增/剔除已删）并记录 scanUpdatedAt。
-// 毫秒级、独立于 git 采集——「项目列表新鲜度」与「git 状态新鲜度」是两条时间线。
-func (s *Service) rescan() []*Project {
-	projects := s.scanCache.Reload()
-	s.scanUpdatedAt = time.Now()
-	return projects
-}
-
 // refresh 完整刷新 project 视图（定时器周期任务）：重扫 + git 采集。
 // 采集异常不抛出（降级优先）：失败只 slog 记录，不影响 server 进程。
 func (s *Service) refresh() {
@@ -340,7 +331,7 @@ func (s *Service) refresh() {
 	slog.Debug("project 视图刷新完成", "projects", total, "collected", collected)
 }
 
-// collectGit 按当前项目列表整表采集 git 信息，不触发重扫——启动时机（已 rescan）
+// collectGit 按当前项目列表整表采集 git 信息，不触发重扫——启动时机（已重扫）
 // 与定时器共用。异常降级只记日志。
 func (s *Service) collectGit() {
 	if s.gitCache == nil {
@@ -359,7 +350,7 @@ func (s *Service) collectGit() {
 // 与 server 定时刷新同一逻辑。CLI 平时只读缓存不写（单写者模型：server 是唯一写方），
 // 本方法仅供 dev 调试命令手动触发，用于开发期实测全量采集的时间成本。
 func (s *Service) Refresh() (total int, collected int, err error) {
-	projects := s.rescan()
+	projects := s.scanCache.Reload()
 
 	paths := slicekit.Map(projects, (*Project).Path)
 	if s.gitCache == nil {

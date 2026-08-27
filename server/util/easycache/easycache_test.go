@@ -3,6 +3,7 @@ package easycache
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestItem_GetLoadsOnce(t *testing.T) {
@@ -114,5 +115,35 @@ func TestItem_ConcurrentGetLoadsOnce(t *testing.T) {
 
 	if calls != 1 {
 		t.Fatalf("并发 Get 下 loader 应仅调用 1 次，实际 %d", calls)
+	}
+}
+
+func TestItem_UpdatedAt(t *testing.T) {
+	item := NewItem(func() int { return 1 })
+
+	// 未加载：零值
+	if !item.UpdatedAt().IsZero() {
+		t.Fatal("未加载时 UpdatedAt 应为零值")
+	}
+	// Get 懒加载与 Reload 都记录计算时间
+	item.Get()
+	first := item.UpdatedAt()
+	if first.IsZero() {
+		t.Fatal("Get 加载后 UpdatedAt 应有值")
+	}
+	time.Sleep(2 * time.Millisecond)
+	item.Reload()
+	if !item.UpdatedAt().After(first) {
+		t.Fatal("Reload 后 UpdatedAt 应更新")
+	}
+	// 命中缓存不重算，时间不变
+	item.Get()
+	if !item.UpdatedAt().Equal(item.UpdatedAt()) {
+		t.Fatal("缓存命中不应改变 UpdatedAt")
+	}
+	// Clear 复位为零值
+	item.Clear()
+	if !item.UpdatedAt().IsZero() {
+		t.Fatal("Clear 后 UpdatedAt 应复位零值")
 	}
 }

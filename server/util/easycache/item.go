@@ -2,13 +2,24 @@ package easycache
 
 import (
 	"sync"
+	"time"
 )
 
 type Item[T any] struct {
-	lock    sync.RWMutex
-	hasData bool
-	data    T
-	loader  func() T
+	lock       sync.RWMutex
+	hasData    bool
+	data       T
+	computedAt time.Time // 最近一次 loader 计算完成的时间（零值 = 从未计算）；时间戳跟数据走，由缓存自身维护
+	loader     func() T
+}
+
+// UpdatedAt 返回最近一次 loader 计算完成时间；从未计算过（含 Clear 后）返回零值。
+// 使用方不得另设平行时间戳字段记录同一信息——靠约定同步是历史上多类不一致的根源。
+// 未来 TTL 能力（计算后超时自动失效）也以此时间为基准，暂不实现。
+func (c *Item[T]) UpdatedAt() time.Time {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	return c.computedAt
 }
 
 func NewItem[T any](loader func() T) *Item[T] {
@@ -44,6 +55,7 @@ func (c *Item[T]) Get() T {
 	if !c.hasData {
 		c.data = c.loader()
 		c.hasData = true
+		c.computedAt = time.Now()
 	}
 	return c.data
 }
@@ -56,6 +68,7 @@ func (c *Item[T]) Clear() {
 	var zero T
 	c.data = zero
 	c.hasData = false
+	c.computedAt = time.Time{}
 }
 
 // Reload 强制加载，无论是否有缓存都重新获取（写锁）
@@ -65,5 +78,6 @@ func (c *Item[T]) Reload() T {
 
 	c.data = c.loader()
 	c.hasData = true
+	c.computedAt = time.Now()
 	return c.data
 }
