@@ -62,13 +62,13 @@ func TestProjectInfo(t *testing.T) {
 			Group string `json:"group"`
 		} `json:"project"`
 	}
-	decodeData(t, getJSON(t, env.url("/api/project/info?name=g1:proj1")), &got)
+	decodeData(t, getJSON(t, env.url("/api/project/info?path="+env.proj1Path())), &got)
 	if got.Project == nil || got.Project.Name != "g1:proj1" || got.Project.Group != "g1" {
 		t.Errorf("info 应返回 g1:proj1, got %+v", got.Project)
 	}
 
-	// 不存在的 name：ok 仍为 true，data.project 为 null（与列表语义一致）
-	env2 := getJSON(t, env.url("/api/project/info?name=not-exist"))
+	// 不存在的 path：ok 仍为 true，data.project 为 null（与列表语义一致）
+	env2 := getJSON(t, env.url("/api/project/info?path=/not/exist"))
 	var got2 struct {
 		Project *struct {
 			Name string `json:"name"`
@@ -86,7 +86,7 @@ func TestProjectInfo(t *testing.T) {
 	}
 	resp.Body.Close()
 	if resp.StatusCode == http.StatusOK {
-		t.Errorf("缺必填 name 应非 200, got %d", resp.StatusCode)
+		t.Errorf("缺必填 path 应非 200, got %d", resp.StatusCode)
 	}
 }
 

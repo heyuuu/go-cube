@@ -104,15 +104,6 @@ func (s *Service) Projects() []*Project {
 	return s.scanCache.Get()
 }
 
-func (s *Service) FindByName(name string) *Project {
-	for _, proj := range s.Projects() {
-		if proj.Name() == name {
-			return proj
-		}
-	}
-	return nil
-}
-
 func (s *Service) FindByPath(path string) *Project {
 	// 仅接受绝对路径/~ 前缀（调用方是 web，server 进程的 cwd 对请求路径无意义）；
 	// 相对路径视为未找到而非报错，与「查无此项目」语义一致

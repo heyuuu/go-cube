@@ -1655,7 +1655,7 @@ export interface operations {
   'project.info': {
     parameters: {
       query: {
-        name: string;
+        path: string;
       };
       header?: never;
       path?: never;

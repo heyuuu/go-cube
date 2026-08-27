@@ -92,9 +92,9 @@ type ProjectInfoResult struct {
 }
 
 func (h *ProjectHandler) projectInfo(input struct {
-	Name string `query:"name" required:"true"`
+	Path string `query:"path" required:"true"`
 }) (ProjectInfoResult, error) {
-	proj := h.projectService.FindByName(input.Name)
+	proj := h.projectService.FindByPath(input.Path)
 	return ProjectInfoResult{
 		Project:       h.toProjectDTO(proj),
 		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),

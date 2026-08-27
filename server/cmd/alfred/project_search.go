@@ -25,12 +25,12 @@ func newProjectSearchCmd(a *app.App) *cobra.Command {
 			latest := a.UsageService().LatestByProject()
 			projects = project.SortByRecentUsage(projects, latest, 10)
 
-			// 返回结果
+			// 返回结果（Arg 传 path——跨命令传参统一以路径为项目标识，对端 FindByPath）
 			return PrintResult(projects, func(proj *project.Project) Item {
 				return Item{
 					Title:    proj.Name(),
 					SubTitle: proj.Path(),
-					Arg:      proj.Name(),
+					Arg:      proj.Path(),
 				}
 			})
 		},

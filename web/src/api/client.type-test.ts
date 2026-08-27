@@ -21,8 +21,8 @@ export async function typeContractProbe() {
   void apiGet('/api/not-exist');
 
   // GET 的 query 扁平直传：类型来自 op 的 parameters.query 声明
-  await apiGet('/api/project/info', { name: 'x123' });
-  // @ts-expect-error name 必填，漏传 query 报错
+  await apiGet('/api/project/info', { path: '/x123' });
+  // @ts-expect-error path 必填，漏传 query 报错
   await apiGet('/api/project/info');
   // @ts-expect-error query 字段名错误
   await apiGet('/api/project/info', { nope: 1 });

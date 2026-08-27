@@ -16,16 +16,16 @@ func newProjectOpenCmd(a *app.App) *cobra.Command {
 	var openerName string
 
 	cmd := &cobra.Command{
-		Use:   "project-open <project-name>",
+		Use:   "project-open <project-path>",
 		Short: "打开项目, 只支持准确项目绝对路径",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			projectName := args[0]
+			projectPath := args[0]
 
-			// 匹配项目
-			proj := a.ProjectService().FindByName(projectName)
+			// 匹配项目（路径为项目唯一标识口径）
+			proj := a.ProjectService().FindByPath(projectPath)
 			if proj == nil {
-				return errors.New("未找到指定项目: " + projectName)
+				return errors.New("未找到指定项目: " + projectPath)
 			}
 
 			// 按 opener 名精确查找（区别于主命令的模糊 pickOpener）

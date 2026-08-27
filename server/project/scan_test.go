@@ -172,7 +172,7 @@ func TestScan_WorktreeTag(t *testing.T) {
 	}
 }
 
-// TestFindByPathAndName FindByPath / FindByName 查找。
+// TestFindByPath FindByPath 查找（name 不再作查询键，FindByName 已移除）。
 func TestFindByPathAndName(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)
 	root := ws.Mkdir("root")
@@ -192,9 +192,6 @@ func TestFindByPathAndName(t *testing.T) {
 	}
 
 	// name 格式 = group:subpath，这里 = g1:proj
-	if p := s.FindByName("g1:proj"); p == nil {
-		t.Fatalf("FindByName 未找到 g1:proj")
-	}
 }
 
 // TestScanRules_Getter ScanRules() 从 settings.json 读出规则（含路径校验）。

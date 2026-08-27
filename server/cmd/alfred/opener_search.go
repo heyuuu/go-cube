@@ -13,7 +13,7 @@ import (
 
 // cmd `alfred opener-search`
 func newOpenerSearchCmd(a *app.App) *cobra.Command {
-	var projectName string
+	var projectPath string
 	cmd := &cobra.Command{
 		Use:   "opener-search [query]",
 		Short: "搜索可用命令列表",
@@ -23,9 +23,9 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 			// 获取匹配的命令列表
 			openers := a.OpenerService().SearchFor(opener.RoleOpenDir, strings.Join(query, " "))
 
-			// 若指定项目，且该项目有 opener 使用偏好，则按最近使用排序
-			if len(projectName) > 0 {
-				if proj := a.ProjectService().FindByName(projectName); proj != nil {
+			// 若指定项目（路径为项目唯一标识口径），且该项目有 opener 使用偏好，则按最近使用排序
+			if len(projectPath) > 0 {
+				if proj := a.ProjectService().FindByPath(projectPath); proj != nil {
 					history := a.UsageService().LatestOpeners(proj.Path(), 3)
 					openers = sortOpeners(openers, history)
 				}
@@ -42,7 +42,7 @@ func newOpenerSearchCmd(a *app.App) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&projectName, "project", "", "项目名")
+	cmd.Flags().StringVar(&projectPath, "project", "", "项目绝对路径")
 	return cmd
 }
 
