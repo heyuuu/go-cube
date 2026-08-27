@@ -7,6 +7,8 @@ import type { components, paths } from './schema';
 export type Config = components['schemas']['Config'];
 export type Opener = components['schemas']['OpenerDTO'];
 export type Project = components['schemas']['ProjectDTO'];
+export type ScanRule = components['schemas']['ScanRule'];
+export type CloneRule = components['schemas']['CloneRule'];
 export type ProjectInfoResult = components['schemas']['ProjectInfoResult'];
 export type ProjectListResult = components['schemas']['ProjectListResult'];
 

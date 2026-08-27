@@ -5,14 +5,15 @@ import { cn } from '@/lib/utils';
 
 import { ConfigSection } from './config-section';
 import { OpenerSection } from './opener-section';
+import { ScanSection } from './scan-section';
 
 // settings 分区清单（提案 1025）：Config（config.json 只读展示的过渡分区）为默认分区，
-// Opener 可编辑；各域配置管理能力到位后逐步把 Config 内容收编为可编辑分区（如「项目·扫描」）。
+// Opener / 项目·扫描 可编辑；各域配置管理能力到位后逐步把 Config 内容收编为可编辑分区。
 // key 同时是 ?section= 的取值与内容区分发键。
 const SECTIONS = [
   { key: 'config', label: 'Config' },
   { key: 'opener', label: 'Opener' },
-  { key: 'scan', label: '项目·扫描', placeholder: '扫描规则编辑随 project 域提案到货（当前在 Config 分区只读查看）' },
+  { key: 'scan', label: '项目·扫描' },
 ] as const;
 
 const DEFAULT_SECTION = SECTIONS[0].key;
@@ -49,9 +50,7 @@ export function SettingsPage() {
         <div className="min-w-0 flex-1">
           {current.key === 'config' && <ConfigSection />}
           {current.key === 'opener' && <OpenerSection />}
-          {'placeholder' in current && (
-            <div className="rounded-lg border p-8 text-center text-xs text-muted-foreground">{current.placeholder}</div>
-          )}
+          {current.key === 'scan' && <ScanSection />}
         </div>
       </div>
     </div>

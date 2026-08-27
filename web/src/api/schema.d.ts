@@ -174,6 +174,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/project/clone-rule/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按 host+prefix 删除 clone 规则 */
+    post: operations['project.cloneRuleDelete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/clone-rule/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按键重排 clone 规则顺序 */
+    post: operations['project.cloneRuleReorder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/clone-rule/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新增或按 host+prefix 替换 clone 规则 */
+    post: operations['project.cloneRuleSave'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/project/clone-rules': {
     parameters: {
       query?: never;
@@ -219,6 +270,57 @@ export interface paths {
     get: operations['project.list'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/scan-rule/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按 path 删除扫描规则 */
+    post: operations['project.scanRuleDelete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/scan-rule/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按 path 重排扫描规则顺序 */
+    post: operations['project.scanRuleReorder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/project/scan-rule/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新增或按 path 替换扫描规则 */
+    post: operations['project.scanRuleSave'];
     delete?: never;
     options?: never;
     head?: never;
@@ -677,10 +779,45 @@ export interface components {
       repoHost: string;
       repoPrefix: string;
     };
-    CloneRuleConfig: {
-      localPath: string;
+    CloneRuleDeleteInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/CloneRuleDeleteInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 规则键：源域名 */
+      repoHost: string;
+      /** @description 规则键：uri 前缀 */
+      repoPrefix: string;
+    };
+    CloneRuleKey: {
       repoHost: string;
       repoPrefix: string;
+    };
+    CloneRuleReorderInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/CloneRuleReorderInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 按目标顺序排列的 host+prefix 名单 */
+      rules: components['schemas']['CloneRuleKey'][] | null;
+    };
+    CloneRuleSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/CloneRuleSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 对应本地目录（绝对路径或 ~/ 前缀） */
+      localPath: string;
+      /** @description 源域名，无协议，如 github.com */
+      repoHost: string;
+      /** @description uri 前缀，须以 / 开头或为空，如 /heyuuu */
+      repoPrefix?: string;
     };
     CommitEntry: {
       author: string;
@@ -706,7 +843,6 @@ export interface components {
       create: components['schemas']['CreateConfig'];
       dataDir: string;
       log: components['schemas']['LogConfig'];
-      project: components['schemas']['ProjectConfig'];
       server: components['schemas']['ServerConfig'];
     };
     CreateConfig: {
@@ -921,10 +1057,6 @@ export interface components {
       /** @description 展示文案（如「打开所在目录」），缺省由 name 生成 */
       title?: string;
     };
-    ProjectConfig: {
-      clone: components['schemas']['CloneRuleConfig'][] | null;
-      scan: components['schemas']['ScanRuleConfig'][] | null;
-    };
     ProjectDTO: {
       gitInfo: components['schemas']['Entry'];
       group: string;
@@ -963,10 +1095,41 @@ export interface components {
       maxDepth: number;
       path: string;
     };
-    ScanRuleConfig: {
+    ScanRuleDeleteInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ScanRuleDeleteInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 规则唯一键 */
+      path: string;
+    };
+    ScanRuleReorderInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ScanRuleReorderInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 按目标顺序排列的规则路径名单 */
+      paths: string[] | null;
+    };
+    ScanRuleSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ScanRuleSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 扫描出的项目组名 */
       group: string;
-      /** Format: int64 */
+      /**
+       * Format: int64
+       * @description 扫描最大深度
+       */
       maxDepth: number;
+      /** @description 扫描根目录（绝对路径或 ~/ 前缀，规则唯一键） */
       path: string;
     };
     ServerConfig: {
@@ -1323,6 +1486,105 @@ export interface operations {
       };
     };
   };
+  'project.cloneRuleDelete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CloneRuleDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.cloneRuleReorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CloneRuleReorderInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.cloneRuleSave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CloneRuleSaveInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'project.cloneRules': {
     parameters: {
       query?: never;
@@ -1399,6 +1661,105 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputProjectListResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.scanRuleDelete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScanRuleDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.scanRuleReorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScanRuleReorderInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'project.scanRuleSave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ScanRuleSaveInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */
