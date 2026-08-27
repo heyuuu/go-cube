@@ -174,6 +174,32 @@ func DefaultBranch(path string) (string, error) {
 	return "", nil
 }
 
+// BranchAdd 在 path 仓库创建本地分支（`git branch`，不检出、不切 HEAD——「建分支
+// 并切过去」的场景由 WorktreeAdd 覆盖）。commitish 为基点（commit/分支/tag，空 = HEAD）。
+// 常见拒绝（重名 / 非法名 / 基点不存在）翻译为中文上抛；stderr 在 runOutRaw 的
+// C locale 注入下稳定为英文。
+func BranchAdd(path string, branch string, commitish string) error {
+	args := []string{"branch", branch}
+	if commitish != "" {
+		args = append(args, commitish)
+	}
+	_, stderr, err := runOutRaw(path, args...)
+	if err != nil {
+		// 匹配一律小写化：git 各版本对 "Not a valid object name" 的大小写不一致
+		lower := strings.ToLower(stderr)
+		switch {
+		case strings.Contains(lower, "already exists"):
+			return fmt.Errorf("分支 %s 已存在", branch)
+		case strings.Contains(lower, "not a valid branch name"):
+			return errors.New(branch + " 不是合法的分支名")
+		case strings.Contains(lower, "not a valid object name"):
+			return errors.New("基点不存在: " + commitish)
+		}
+		return fmt.Errorf("git branch 执行失败: %w", err)
+	}
+	return nil
+}
+
 // BranchDelete 删除 path 仓库的本地分支。force 决定语义：
 //   - false：git 原生 -d（分支已合并到上游或 HEAD 才允许）；
 //   - true：-D 强删（丢弃未合并提交）。

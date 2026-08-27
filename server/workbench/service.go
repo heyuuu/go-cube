@@ -226,6 +226,21 @@ func (s *Service) WorktreeRemove(path string, targetPath string, force bool) err
 
 // BranchDelete 删除本地分支。被任一工作副本（含主目录）检出的分支是硬约束，
 // 无论 force 均拒绝并说明检出位置；其余走 force 开关语义（见 git.BranchDelete）。
+// BranchAdd 新建本地分支（不检出、不切 HEAD——「建分支并切过去」由 WorktreeAdd 覆盖）。
+// branch 支持规范全名或短名；commitish 为基点（空 = HEAD）。成功后刷新主项目快照。
+func (s *Service) BranchAdd(path string, branch string, commitish string) error {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	branch = strings.TrimPrefix(branch, "refs/heads/")
+	if err := git.BranchAdd(root, branch, commitish); err != nil {
+		return err
+	}
+	s.refreshCache(mainRootOf(root))
+	return nil
+}
+
 func (s *Service) BranchDelete(path string, branch string, force bool) error {
 	root, ok := git.FindGitRoot(path)
 	if !ok {

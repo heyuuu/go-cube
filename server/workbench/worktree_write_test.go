@@ -155,3 +155,32 @@ func currentBranchOf(t *testing.T, repo string) string {
 	}
 	return b
 }
+
+func TestBranchAdd(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepo("repo")
+	wtDir := ws.MakeWorktree(repo, "wt-src", "src")
+	s, refreshed := newWriteService()
+
+	if err := s.BranchAdd(repo, "feat", ""); err != nil {
+		t.Fatalf("BranchAdd 报错: %v", err)
+	}
+	// 全名入参剥前缀；从 worktree 内发起刷新归并主仓库
+	if err := s.BranchAdd(wtDir, "refs/heads/full", "src"); err != nil {
+		t.Fatalf("全名 + 指定基点报错: %v", err)
+	}
+	// 主目录路径与 worktree 归并路径的规范化形态不同（/var vs /private/var），比较前求值
+	if len(*refreshed) != 2 {
+		t.Fatalf("两次都应触发刷新: %v", *refreshed)
+	}
+	for _, got := range *refreshed {
+		canonical, _ := filepath.EvalSymlinks(got)
+		want, _ := filepath.EvalSymlinks(repo)
+		if canonical != want {
+			t.Errorf("刷新目标应归并主仓库: got %s want %s", got, repo)
+		}
+	}
+	if err := s.BranchAdd(repo, "feat", ""); err == nil || !strings.Contains(err.Error(), "已存在") {
+		t.Errorf("重名应中文报错, got: %v", err)
+	}
+}

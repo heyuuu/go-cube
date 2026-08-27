@@ -727,3 +727,33 @@ func TestWorkbenchBranchDelete(t *testing.T) {
 		t.Fatalf("未检出分支删除应成功: %s", r.Message)
 	}
 }
+
+func TestWorkbenchBranchAdd(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+
+	r := postJSON(t, env.url("/api/workbench/branch/add"), fmt.Sprintf(`{"path":%q,"branch":"feat/api"}`, repo))
+	if !r.Ok {
+		t.Fatalf("新建分支应成功: %s", r.Message)
+	}
+	// refs 列表立即可见
+	var got struct {
+		Locals []string `json:"locals"`
+	}
+	decodeData(t, getJSON(t, env.url("/api/workbench/refs?path="+repo)), &got)
+	found := false
+	for _, b := range got.Locals {
+		if b == "refs/heads/feat/api" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("refs 应含新分支: %v", got.Locals)
+	}
+
+	// 重名 → ok=false + 中文错误
+	r = postJSON(t, env.url("/api/workbench/branch/add"), fmt.Sprintf(`{"path":%q,"branch":"feat/api"}`, repo))
+	if r.Ok || !strings.Contains(r.Message, "已存在") {
+		t.Errorf("重名应报中文错误, got: %s", r.Message)
+	}
+}

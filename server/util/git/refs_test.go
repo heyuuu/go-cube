@@ -392,3 +392,37 @@ func TestBranchDelete(t *testing.T) {
 		t.Fatalf("已合并分支删除应成功: %v", err)
 	}
 }
+
+// BranchAdd：建分支（HEAD/tag 基点）、重名/非法名/基点不存在的中文拒绝。
+func TestBranchAdd(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+
+	if err := BranchAdd(repo, "feat", ""); err != nil {
+		t.Fatalf("以 HEAD 为基点建分支应成功: %v", err)
+	}
+	if err := BranchAdd(repo, "from-tag", "v1.0"); err != nil {
+		t.Fatalf("以 tag 为基点建分支应成功: %v", err)
+	}
+	refs, err := Refs(repo)
+	if err != nil {
+		t.Fatalf("Refs 报错: %v", err)
+	}
+	names := map[string]bool{}
+	for _, r := range refs.Locals {
+		names[r.Branch] = true
+	}
+	if !names["feat"] || !names["from-tag"] {
+		t.Fatalf("新分支应出现在 refs 中: %v", names)
+	}
+
+	if err := BranchAdd(repo, "feat", ""); err == nil || !strings.Contains(err.Error(), "已存在") {
+		t.Errorf("重名应报中文错误, got: %v", err)
+	}
+	if err := BranchAdd(repo, "a b", ""); err == nil || !strings.Contains(err.Error(), "不是合法的分支名") {
+		t.Errorf("非法名应报中文错误, got: %v", err)
+	}
+	if err := BranchAdd(repo, "ok", "no-such-thing"); err == nil || !strings.Contains(err.Error(), "基点不存在") {
+		t.Errorf("基点不存在应报中文错误, got: %v", err)
+	}
+}
