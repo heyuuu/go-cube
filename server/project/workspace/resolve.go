@@ -17,7 +17,7 @@ import (
 //
 // 本函数供采集侧调用（读文件系统），读路径不应调用——读 projcache 快照。
 func Resolve(root string) []Workspace {
-	if cf, ok := loadCubeFile(root); ok {
+	if cf, ok := LoadCubeFile(root); ok {
 		if cf.WorkspacesSet {
 			return validateDeclared(root, cf.Workspaces)
 		}
@@ -26,9 +26,9 @@ func Resolve(root string) []Workspace {
 	return Detect(root, "")
 }
 
-// loadCubeFile 读取并解析 root/.cube/cube.json；文件不存在或坏 JSON 都按「无声明」处理
+// LoadCubeFile 读取并解析 root/.cube/cube.json；文件不存在或坏 JSON 都按「无声明」处理
 // （坏 JSON 属可恢复降级：记日志后走探测，不让一个坏文件拖垮整个项目的采集）。
-func loadCubeFile(root string) (*CubeFile, bool) {
+func LoadCubeFile(root string) (*CubeFile, bool) {
 	data, err := os.ReadFile(filepath.Join(root, ".cube", "cube.json"))
 	if err != nil {
 		return nil, false

@@ -19,9 +19,9 @@ type Declared struct {
 
 // CubeFile .cube/cube.json 的反序列化结构。
 type CubeFile struct {
-	Workspaces        []Declared // 显式声明；WorkspacesSet 区分「字段不存在」与「空声明」
-	WorkspacesSet     bool       // workspaces 字段是否存在（空数组也是显式声明：没有任何 workspace，不回落探测）
-	WorkspaceScanRule string     // 探测规则组合（逗号分隔按序），仅在 workspaces 字段不存在时生效
+	Workspaces        []Declared `json:"workspaces,omitempty"`        // 显式声明；WorkspacesSet 区分「字段不存在」与「空声明」
+	WorkspacesSet     bool       `json:"-"`                           // workspaces 字段是否存在（空数组也是显式声明：没有任何 workspace，不回落探测）
+	WorkspaceScanRule string     `json:"workspaceScanRule,omitempty"` // 探测规则组合（逗号分隔按序），仅在 workspaces 字段不存在时生效
 }
 
 // UnmarshalJSON 用中间结构的指针字段区分 workspaces 字段存在与否。
