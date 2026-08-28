@@ -148,7 +148,7 @@ func (s *Service) OpenTargets(path string) []OpenTarget {
 	if proj == nil {
 		return nil
 	}
-	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录", Kind: KindRoot}}
+	targets := []OpenTarget{{Path: proj.Path(), Label: "根目录"}}
 	info, _ := s.GitInfo(proj.Path())
 	// 存在性兜底过滤：采集侧已过滤，但目录在两次采集之间被删时快照仍残留，
 	// 打开目标必须是真实可打开的目录（os.Stat 廉价，不违反读路径不跑 git 的纪律）
@@ -158,6 +158,29 @@ func (s *Service) OpenTargets(path string) []OpenTarget {
 		}
 	}
 	return targets
+}
+
+// OwnsDir 判断 dir 是否位于项目领地内：主根或其子目录、任一 linked worktree（快照内）
+// 或其子目录。供 Web 打开接口做目标归属校验——前端目录树可从任意子目录发起打开，
+// 不限于 OpenTarget 精确集合；worktree 归属只读快照，不现场跑 git。
+func (s *Service) OwnsDir(path, dir string) bool {
+	proj := s.FindByPath(path)
+	if proj == nil {
+		return false
+	}
+	if underDir(proj.Path(), dir) {
+		return true
+	}
+	info, _ := s.GitInfo(proj.Path())
+	if info == nil {
+		return false
+	}
+	for _, wt := range info.Worktrees {
+		if underDir(wt.Path, dir) {
+			return true
+		}
+	}
+	return false
 }
 
 // ResolveProject 把目标目录归并到所属主项目：项目根本身直接命中，否则走 worktree

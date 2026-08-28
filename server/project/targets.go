@@ -3,32 +3,43 @@ package project
 // 打开目标（提案 1032 + 1030）：project = git 仓库身份，
 // 打开目标 = { 根目录, 主项目 workspaces…, 各 worktree 根及其 workspaces… }。
 // worktree / workspace 的可见性都来自主项目 projcache 快照的枚举（读路径不跑 git、不读声明文件）。
+//
+// OpenTargets 是 CLI 专用出口（cube open 的交互选择、alfred 的平铺展开、
+// Web project/open 的目录归属校验）；Web 前端不消费它（无对应 HTTP 端点），
+// 前端下拉从 project/list DTO 的快照字段自行拼装同一套排序——改排序/展示规则时两边同步。
 
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cube/project/projcache"
 	"cube/project/workspace"
 )
 
-// TargetKind 打开目标的身份类型（1030）：描述「目录以什么身份成为打开目标」，
-// 不编码归属关系——归属由排序分组的天然结构表达（workspace 跟随其所属根）。
-type TargetKind string
+// TargetFlags 打开目标的位标记：一个目标可同时命中多类身份——
+// worktree 下的 workspace 目录 = FlagWorktree|FlagWorkspace（「长在 worktree 里的
+// workspace 子目录」，两类语义都成立）；根目录 = 0。
+type TargetFlags uint8
 
 const (
-	KindRoot      TargetKind = "root"      // 主项目根目录
-	KindWorktree  TargetKind = "worktree"  // linked worktree 根目录
-	KindWorkspace TargetKind = "workspace" // workspace 成员子目录（不管长在主根还是 worktree 根下）
+	FlagWorktree  TargetFlags = 1 << iota // linked worktree（根或其下目录）
+	FlagWorkspace                         // workspace 成员子目录
 )
 
 // OpenTarget 项目的一个打开目标。
 type OpenTarget struct {
-	Path   string     // 目标目录绝对路径
-	Label  string     // 展示名：根目录固定「根目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取声明/推导名
-	Branch string     // worktree 检出分支短名（其余为空）
-	Kind   TargetKind // 目标身份（root / worktree / workspace）
+	Path   string      // 目标目录绝对路径
+	Label  string      // 展示名：根目录固定「根目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取声明/推导名
+	Branch string      // worktree 检出分支短名（其余为空）
+	Flags  TargetFlags // 身位标记（root=0 / FlagWorktree / FlagWorkspace / 组合）
 }
+
+// IsWorktree 目标位于 linked worktree 内（worktree 根或其下）。
+func (t OpenTarget) IsWorktree() bool { return t.Flags&FlagWorktree != 0 }
+
+// IsWorkspace 目标是 workspace 成员子目录。
+func (t OpenTarget) IsWorkspace() bool { return t.Flags&FlagWorkspace != 0 }
 
 // targetEntries 由项目根路径 + 快照条目构造全部非根目标（纯函数，便于单测）。
 // 排序（1030 定稿）：主项目 workspaces → 每个 worktree 根 → 该 worktree 的 workspaces。
@@ -40,7 +51,7 @@ func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 		return nil
 	}
 	targets := make([]OpenTarget, 0, len(info.Workspaces)+2*len(info.Worktrees))
-	targets = append(targets, workspaceTargetsAt(root, info.Workspaces)...)
+	targets = append(targets, workspaceTargetsAt(root, info.Workspaces, 0)...)
 	branchCount := make(map[string]int, len(info.Worktrees))
 	for _, wt := range info.Worktrees {
 		if wt.Branch != "" {
@@ -52,14 +63,15 @@ func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 		if label == "" || branchCount[label] > 1 {
 			label = filepath.Base(wt.Path)
 		}
-		targets = append(targets, OpenTarget{Path: wt.Path, Label: label, Branch: wt.Branch, Kind: KindWorktree})
-		targets = append(targets, workspaceTargetsAt(wt.Path, wt.Workspaces)...)
+		targets = append(targets, OpenTarget{Path: wt.Path, Label: label, Branch: wt.Branch, Flags: FlagWorktree})
+		targets = append(targets, workspaceTargetsAt(wt.Path, wt.Workspaces, FlagWorktree)...)
 	}
 	return targets
 }
 
-// workspaceTargetsAt 把相对所属根的 workspace 成员展开为绝对路径目标。
-func workspaceTargetsAt(root string, ws []workspace.Workspace) []OpenTarget {
+// workspaceTargetsAt 把相对所属根的 workspace 成员展开为绝对路径目标；
+// baseFlags 是所属根的标记（主根 = 0，worktree 根 = FlagWorktree），叠加 FlagWorkspace。
+func workspaceTargetsAt(root string, ws []workspace.Workspace, baseFlags TargetFlags) []OpenTarget {
 	if len(ws) == 0 {
 		return nil
 	}
@@ -69,7 +81,16 @@ func workspaceTargetsAt(root string, ws []workspace.Workspace) []OpenTarget {
 		if _, err := os.Stat(abs); err != nil {
 			continue
 		}
-		targets = append(targets, OpenTarget{Path: abs, Label: w.Name, Kind: KindWorkspace})
+		targets = append(targets, OpenTarget{Path: abs, Label: w.Name, Flags: baseFlags | FlagWorkspace})
 	}
 	return targets
+}
+
+// underDir 判断 dir 是否位于 root 之下（含 root 自身，拒绝 ../ 逃逸）。
+func underDir(root, dir string) bool {
+	rel, err := filepath.Rel(root, dir)
+	if err != nil {
+		return false
+	}
+	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }

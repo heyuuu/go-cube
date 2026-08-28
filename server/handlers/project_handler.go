@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"slices"
 	"strings"
 	"time"
 
@@ -128,17 +127,15 @@ func (h *ProjectHandler) projectOpen(input ProjectOpenInput) (map[string]any, er
 		return nil, errors.New("未找到指定项目: " + input.Body.Path)
 	}
 
-	// 目标目录校验：只允许项目自身的目标（根目录 + 快照内 worktree），不开放任意路径
+	// 目标目录校验：存在性是常规校验；归属只要求「在项目领地内」——主根或其子目录、
+	// 任一 worktree 或其子目录（前端目录树可从任意子目录发起打开，不限于 OpenTarget 集合）
 	target := proj.Path()
 	if input.Body.Dir != "" && input.Body.Dir != proj.Path() {
-		if !slices.ContainsFunc(h.projectService.OpenTargets(proj.Path()), func(t project.OpenTarget) bool {
-			return t.Path == input.Body.Dir
-		}) {
-			// OpenTargets 已按存在性过滤：命中这里的目标目录多半是快照过期残留
-			if _, err := os.Stat(input.Body.Dir); err != nil {
-				return nil, errors.New("目标目录已不存在（快照过期，等下次采集刷新后重试）: " + input.Body.Dir)
-			}
-			return nil, errors.New("目标目录不属于该项目: " + input.Body.Dir)
+		if _, err := os.Stat(input.Body.Dir); err != nil {
+			return nil, errors.New("目标目录不存在: " + input.Body.Dir)
+		}
+		if !h.projectService.OwnsDir(proj.Path(), input.Body.Dir) {
+			return nil, errors.New("目标目录不属于该项目（须位于项目根或其 worktree 内）: " + input.Body.Dir)
 		}
 		target = input.Body.Dir
 	}
