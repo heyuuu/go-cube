@@ -162,8 +162,9 @@ func commonPrefixDir(a, b string) string {
 	}
 }
 
-// HasPrefix 判断 path 是否为 parent 或 parent 下的目录
-func HasPrefix(path string, parent string) bool {
+// IsUnder 判断 path 是否为 parent 本身或 parent 下的目录/文件（路径语义：两边 Clean，
+// 按分隔符边界比较，/a/b 不算在 /a/bb 之下）
+func IsUnder(path string, parent string) bool {
 	path = filepath.Clean(path)
 	parent = filepath.Clean(parent)
 	return path == parent || strings.HasPrefix(path, parent+string(filepath.Separator))

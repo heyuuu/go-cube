@@ -168,7 +168,7 @@ func (s *Service) OwnsDir(path, dir string) bool {
 	if proj == nil {
 		return false
 	}
-	if pathkit.HasPrefix(dir, proj.Path()) {
+	if pathkit.IsUnder(dir, proj.Path()) {
 		return true
 	}
 	info, _ := s.GitInfo(proj.Path())
@@ -176,7 +176,7 @@ func (s *Service) OwnsDir(path, dir string) bool {
 		return false
 	}
 	for _, wt := range info.Worktrees {
-		if pathkit.HasPrefix(dir, wt.Path) {
+		if pathkit.IsUnder(dir, wt.Path) {
 			return true
 		}
 	}
@@ -222,12 +222,12 @@ func (s *Service) SearchByPath(path string, up bool) []*Project {
 	var result []*Project
 	for _, proj := range s.Projects() {
 		// 判断 proj 是否在 realpath 目录及子目录中
-		if pathkit.HasPrefix(proj.Path(), absPath) {
+		if pathkit.IsUnder(proj.Path(), absPath) {
 			result = append(result, proj)
 			continue
 		}
 		// 若向上查找， 判断 proj.Path() 是否在 realpath 父目录
-		if up && pathkit.HasPrefix(absPath, proj.Path()) {
+		if up && pathkit.IsUnder(absPath, proj.Path()) {
 			result = append(result, proj)
 			continue
 		}
