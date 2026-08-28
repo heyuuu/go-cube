@@ -1,7 +1,10 @@
 package web
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -21,10 +24,15 @@ import (
 // shutdown 不走 huma 注册（运维端点，不进 OpenAPI 文档），直接挂 ServeMux。
 // SystemHandler 不持有 Server 引用——shutdown 通过给本进程发 SIGTERM 触发，
 // 复用 Start 里已注册的信号监听路径。
-type SystemHandler struct{}
+type SystemHandler struct {
+	// instance 进程级随机实例标识，随 whoami 暴露。
+	// 服务被重启（如 launchctl 保活拉起新进程）后端口可能立刻被新实例占回，
+	// 调用方（serve.Stop）靠它区分「重启前后的不同实例」，只看端口会误判。
+	instance string
+}
 
 func newSystemHandler() *SystemHandler {
-	return &SystemHandler{}
+	return &SystemHandler{instance: newInstanceID()}
 }
 
 func (h *SystemHandler) Register(api huma.API, mux *http.ServeMux) {
@@ -37,12 +45,23 @@ func (h *SystemHandler) Register(api huma.API, mux *http.ServeMux) {
 
 // WhoamiResponse whoami 返回体。
 type WhoamiResponse struct {
-	App     string `json:"app"`     // 固定 "cube"，供探活方验证身份
-	Version string `json:"version"` // cube 版本号
+	App      string `json:"app"`      // 固定 "cube"，供探活方验证身份
+	Version  string `json:"version"`  // cube 版本号
+	Instance string `json:"instance"` // 进程启动时随机生成的实例标识，重启后变化
 }
 
 func (h *SystemHandler) whoami(_ struct{}) (WhoamiResponse, error) {
-	return WhoamiResponse{App: version.AppName, Version: version.Version()}, nil
+	return WhoamiResponse{App: version.AppName, Version: version.Version(), Instance: h.instance}, nil
+}
+
+// newInstanceID 生成实例标识（8 字节随机 hex）。
+// crypto/rand 失败极罕见，退化为纳秒时间戳——只需保证进程间不同，不要求密码学强度。
+func newInstanceID() string {
+	b := make([]byte, 8)
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Sprintf("t%x", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(b)
 }
 
 // handleShutdown 校验 X-Shutdown-Token 后给本进程发 SIGTERM 触发 graceful shutdown。

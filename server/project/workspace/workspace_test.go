@@ -162,14 +162,80 @@ func TestDetectOrder(t *testing.T) {
 	}
 
 	// pnpm 命名来源优先：两处都展开 apps/web，名字应同为 web——用来源区分不可行，
-	// 这里验证的是「pnpm,npm 与 npm,pnpm 结果一致（都命中同一目录集）」以及未知规则跳过
-	for _, rule := range []string{"pnpm,npm", "npm,pnpm", "ghost,pnpm"} {
+	// 这里验证的是「pnpm|npm 与 npm+pnpm 结果一致（都命中同一目录集）」以及未知规则跳过
+	for _, rule := range []string{"pnpm|npm", "npm|pnpm", "ghost|pnpm", "ghost+pnpm"} {
 		if got := Detect(root, rule); len(got) != 1 {
 			t.Fatalf("Detect(%s) = %v, want 1 个成员", rule, got)
 		}
 	}
 	if got := Detect(root, "ghost"); got != nil {
 		t.Fatalf("全部未知规则应无结果，got %v", got)
+	}
+}
+
+// 组内 + 合并去重：两份声明展开结果有交集时只留一份，并集全保留。
+func TestDetectGroupMerge(t *testing.T) {
+	root := makeMonorepo(t, "apps/web", "packages/ui")
+	writePnpmWorkspace(t, root, "apps/*")
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"workspaces":["apps/*","packages/*"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	got := Detect(root, "pnpm+npm")
+	if len(got) != 2 || got[0].Path != "apps/web" || got[1].Path != "packages/ui" {
+		t.Fatalf("pnpm+npm 应合并去重，got %v", got)
+	}
+}
+
+// 规则组按序回落：第一组无命中时落到下一组；逗号不再是分隔符（整段视为一个规则名 → 未知跳过）。
+func TestDetectGroupFallback(t *testing.T) {
+	root := makeMonorepo(t, "apps/web")
+	if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(`{"workspaces":["apps/*"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if got := Detect(root, "pnpm|npm"); len(got) != 1 || got[0].Path != "apps/web" {
+		t.Fatalf("第一组未命中应回落 npm 组，got %v", got)
+	}
+	if got := Detect(root, "pnpm,npm"); got != nil {
+		t.Fatalf("逗号不再是分隔符，整段为未知规则应无结果，got %v", got)
+	}
+}
+
+// 显式声明 path 支持 glob：展开命中目录（覆盖 pnpm-workspace.yaml 的表达力）。
+// 单命中时声明 name 生效；多命中时各取路径末段；无命中等价坏条目跳过。
+func TestResolveGlobDeclared(t *testing.T) {
+	root := makeMonorepo(t, "apps/web", "apps/api", "packages/ui", "docs")
+
+	writeCubeFile(t, root, `{"workspaces":[{"path":"apps/*"},{"name":"UI 库","path":"packages/*"}]}`)
+	got := Resolve(root)
+	if len(got) != 3 {
+		t.Fatalf("glob 声明应展开 apps/* + packages/*，got %v", got)
+	}
+	byPath := map[string]string{}
+	for _, w := range got {
+		byPath[w.Path] = w.Name
+	}
+	// 多命中（apps/*）取路径末段；单命中（packages/*）用声明的 name
+	if byPath["apps/web"] != "web" || byPath["apps/api"] != "api" || byPath["packages/ui"] != "UI 库" {
+		t.Fatalf("命名规则不符，got %v", byPath)
+	}
+
+	// 无命中的通配条目跳过，不阻断其余条目
+	writeCubeFile(t, root, `{"workspaces":[{"path":"nothing/*"},{"path":"docs"}]}`)
+	if got := Resolve(root); len(got) != 1 || got[0].Path != "docs" {
+		t.Fatalf("无命中 glob 条目应跳过，got %v", got)
+	}
+}
+
+// glob 排除项与探测同口径：node_modules / 隐藏目录不进显式声明展开结果。
+func TestResolveGlobExcludes(t *testing.T) {
+	root := makeMonorepo(t, "apps/web", "apps/node_modules/pkg", "apps/.hidden")
+	writeCubeFile(t, root, `{"workspaces":[{"path":"apps/*"}]}`)
+
+	got := Resolve(root)
+	if len(got) != 1 || got[0].Path != "apps/web" {
+		t.Fatalf("glob 声明应排除 node_modules 与隐藏目录，got %v", got)
 	}
 }
 

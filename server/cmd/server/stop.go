@@ -16,14 +16,17 @@ func newStopCmd(a *app.App) *cobra.Command {
 		Short: "停止后台 server",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			stopped, err := serve.Stop(a.Server().Port())
+			stopped, replaced, err := serve.Stop(a.Server().Port())
 			if err != nil {
 				return err
 			}
-			if stopped {
-				fmt.Println("server 已停止")
-			} else {
+			switch {
+			case !stopped:
 				fmt.Println("server 未在运行")
+			case replaced:
+				fmt.Println("旧实例已停止（端口已被新实例接管，可能由系统保活拉起）")
+			default:
+				fmt.Println("server 已停止")
 			}
 			return nil
 		},

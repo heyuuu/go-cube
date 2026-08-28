@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -351,6 +352,11 @@ func (h *ProjectHandler) workspaceSave(input WorkspaceSaveInput) (map[string]any
 		return nil, errors.New("workspaces 不能为空（清除声明请删除项目内 .cube/cube.json）")
 	}
 	root := proj.Path()
+	for _, m := range input.Body.Workspaces {
+		if strings.ContainsAny(m.Path, "*?[") {
+			return nil, errors.New("path 不支持通配符（glob 是手写 cube.json 的表达，保存接口固化具体成员）: " + m.Path)
+		}
+	}
 	declared := slicekit.Map(input.Body.Workspaces, func(m WorkspaceMemberDTO) cubefile.Declared {
 		return cubefile.Declared(m)
 	})

@@ -31,14 +31,16 @@ func runStatus(a *app.App) error {
 func printStatus(a *app.App, st serve.StatusInfo) {
 	state := "未运行"
 	version := "-"
+	instance := "-"
 	url := "-"
 	if st.Running {
 		state = "运行中"
 		version = st.Version
+		instance = st.Instance
 		url = a.Server().ServerURL()
 	}
 	tui.PrintTable(
-		[]string{"状态", "端口", "版本", "访问地址"},
-		[][]string{{state, fmt.Sprintf("%d", a.Server().Port()), version, url}},
+		[]string{"状态", "端口", "版本", "实例", "访问地址"},
+		[][]string{{state, fmt.Sprintf("%d", a.Server().Port()), version, instance, url}},
 	)
 }

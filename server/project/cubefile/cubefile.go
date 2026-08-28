@@ -19,14 +19,14 @@ const cubeFileName = ".cube/cube.json"
 // Declared workspaces 节里的单条显式声明（schema 类型；运行期值对象见 workspace.Workspace）。
 type Declared struct {
 	Name string `json:"name"` // 显示名
-	Path string `json:"path"` // 相对所属根的路径
+	Path string `json:"path"` // 相对所属根的路径；支持 glob 通配（apps/*、packages/**，语义同 pnpm-workspace.yaml 的 packages）
 }
 
 // File cube.json 的内存表示。
 type File struct {
 	Workspaces        []Declared `json:"workspaces,omitempty"`        // 显式声明；WorkspacesSet 区分「字段不存在」与「空声明」
 	WorkspacesSet     bool       `json:"-"`                           // workspaces 字段是否存在（空数组也是显式声明：没有任何 workspace，不回落探测）
-	WorkspaceScanRule string     `json:"workspaceScanRule,omitempty"` // 探测规则组合（逗号分隔按序），仅在 workspaces 字段不存在时生效
+	WorkspaceScanRule string     `json:"workspaceScanRule,omitempty"` // 探测规则组合（| 分规则组按序，组内 + 合并去重），仅在 workspaces 字段不存在时生效
 }
 
 // UnmarshalJSON 用中间结构的指针字段区分 workspaces 字段存在与否。

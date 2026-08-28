@@ -28,7 +28,7 @@ type Workspace struct {
 // DefaultScanRule 默认探测规则：pnpm 最强（pnpm-workspace.yaml 是显式 monorepo 声明），
 // npm（package.json workspaces，覆盖 yarn）次之。其余探测器实现了也不默认开——
 // 误报率高，想要的人显式写 workspaceScanRule。
-const DefaultScanRule = "pnpm,npm"
+const DefaultScanRule = "pnpm|npm"
 
 // detector 探测器：给定根目录，返回相对根的成员目录列表（空 = 未命中）。
 type detector func(root string) []string
@@ -39,23 +39,46 @@ var detectors = map[string]detector{
 	"npm":  detectNpm,
 }
 
-// Detect 按 scanRule（逗号分隔，按序）探测根下的 workspace 成员，第一个命中生效。
-// rule 为空时用 DefaultScanRule；未知规则名跳过。
+// Detect 按 scanRule 探测根下的 workspace 成员。
+// 规则格式："pnpm+npm | go-work"——整体以 | 分割为多个规则组，按序尝试，
+// 第一个「合并后至少有一个成员」的规则组生效并返回；组内以 + 分割多个规则，
+// 各自探测后合并去重（同一目录被多个来源声明只留一份）。不用逗号做分隔符——
+// 逗号表达不了「并列合并」与「按序回落」的区别。rule 为空时用 DefaultScanRule；
+// 未知规则名跳过（等价于该规则无命中）。
 func Detect(root string, rule string) []Workspace {
 	if strings.TrimSpace(rule) == "" {
 		rule = DefaultScanRule
 	}
-	for _, name := range strings.Split(rule, ",") {
+	for _, group := range strings.Split(rule, "|") {
+		members := detectGroup(root, group)
+		if len(members) > 0 {
+			return makeWorkspaces(members)
+		}
+	}
+	return nil
+}
+
+// detectGroup 跑单个规则组（+ 分割），合并去重各规则的命中结果，按路径排序保持稳定。
+func detectGroup(root string, group string) []string {
+	var merged []string
+	seen := map[string]bool{}
+	for _, name := range strings.Split(group, "+") {
 		name = strings.TrimSpace(name)
 		d, ok := detectors[name]
 		if !ok {
 			continue
 		}
-		if members := d(root); len(members) > 0 {
-			return makeWorkspaces(members)
+		for _, m := range d(root) {
+			if !seen[m] {
+				seen[m] = true
+				merged = append(merged, m)
+			}
 		}
 	}
-	return nil
+	if len(merged) > 0 {
+		sort.Strings(merged)
+	}
+	return merged
 }
 
 // makeWorkspaces 把相对目录列表构造成 Workspace（显示名取路径末段），保持输入顺序。

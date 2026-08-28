@@ -81,8 +81,9 @@ func TestWhoami(t *testing.T) {
 	ts := newTestServer(t)
 	env := getJSON(t, ts.URL+"/api/system/whoami")
 	var got struct {
-		App     string `json:"app"`
-		Version string `json:"version"`
+		App      string `json:"app"`
+		Version  string `json:"version"`
+		Instance string `json:"instance"`
 	}
 	decodeData(t, env, &got)
 	if got.App != "cube" {
@@ -90,6 +91,19 @@ func TestWhoami(t *testing.T) {
 	}
 	if got.Version == "" {
 		t.Error("version 不应为空")
+	}
+	if got.Instance == "" {
+		t.Error("instance 不应为空")
+	}
+
+	// 实例标识应进程级随机：两个 Server 实例（模拟重启前后）不得同值
+	env2 := getJSON(t, newTestServer(t).URL+"/api/system/whoami")
+	var got2 struct {
+		Instance string `json:"instance"`
+	}
+	decodeData(t, env2, &got2)
+	if got.Instance == got2.Instance {
+		t.Errorf("不同 Server 实例的 instance 不应相同: %q", got.Instance)
 	}
 }
 

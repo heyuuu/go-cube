@@ -28,7 +28,7 @@ func newWorkspaceInitCmd(a *app.App) *cobra.Command {
 		Use:   "init [query]",
 		Short: "探测 monorepo 声明并挑选成员，写入 .cube/cube.json",
 		Long: `探测项目根下的标准 monorepo 声明文件（pnpm-workspace.yaml / package.json workspaces，
-规则同打开目标探测：优先 cube.json 的 workspaceScanRule，无则默认 pnpm,npm），
+规则同打开目标探测：优先 cube.json 的 workspaceScanRule，无则默认 pnpm|npm），
 交互挑选成员后固化为显式 workspaces 声明。声明进 git 跟仓库走。
 
 query 支持项目名模糊搜索，规则同 open 命令。`,
