@@ -11,7 +11,6 @@ package project
 import (
 	"os"
 	"path/filepath"
-	"strings"
 
 	"cube/project/projcache"
 	"cube/project/workspace"
@@ -84,13 +83,4 @@ func workspaceTargetsAt(root string, ws []workspace.Workspace, baseFlags TargetF
 		targets = append(targets, OpenTarget{Path: abs, Label: w.Name, Flags: baseFlags | FlagWorkspace})
 	}
 	return targets
-}
-
-// underDir 判断 dir 是否位于 root 之下（含 root 自身，拒绝 ../ 逃逸）。
-func underDir(root, dir string) bool {
-	rel, err := filepath.Rel(root, dir)
-	if err != nil {
-		return false
-	}
-	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
 }

@@ -168,7 +168,7 @@ func (s *Service) OwnsDir(path, dir string) bool {
 	if proj == nil {
 		return false
 	}
-	if underDir(proj.Path(), dir) {
+	if pathkit.HasPrefix(dir, proj.Path()) {
 		return true
 	}
 	info, _ := s.GitInfo(proj.Path())
@@ -176,7 +176,7 @@ func (s *Service) OwnsDir(path, dir string) bool {
 		return false
 	}
 	for _, wt := range info.Worktrees {
-		if underDir(wt.Path, dir) {
+		if pathkit.HasPrefix(dir, wt.Path) {
 			return true
 		}
 	}
