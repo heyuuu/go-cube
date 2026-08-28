@@ -1,5 +1,4 @@
-// Package workspace 提供 `cube workspace` 命令族：monorepo workspace 声明管理（提案 1030）。
-package workspace
+package cmd
 
 import (
 	"errors"
@@ -8,23 +7,22 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/cmd/internal/pick"
 	"cube/project/workspace"
 	"cube/util/tui"
 )
 
-// NewCmd `cube workspace` 组命令。：探测标准 monorepo 声明 → 挑选成员 →
+// cmd `cube workspace init`（提案 1030）：探测标准 monorepo 声明 → 挑选成员 →
 // 固化为 .cube/cube.json 的显式 workspaces（init 的语义就是固化，不提供只写 scanRule 的选项）。
-func NewCmd(a *app.App) *cobra.Command {
+func newWorkspaceCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "workspace",
 		Short: "monorepo workspace 声明管理",
 	}
-	cmd.AddCommand(newInitCmd(a))
+	cmd.AddCommand(newWorkspaceInitCmd(a))
 	return cmd
 }
 
-func newInitCmd(a *app.App) *cobra.Command {
+func newWorkspaceInitCmd(a *app.App) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "init [query]",
 		Short: "探测 monorepo 声明并挑选成员，写入 .cube/cube.json",
@@ -35,7 +33,7 @@ func newInitCmd(a *app.App) *cobra.Command {
 query 支持项目名模糊搜索，规则同 open 命令。`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			proj, err := pick.PickProject(a.ProjectService(), pick.GetArg(args, 0))
+			proj, err := pickProject(a.ProjectService(), getArg(args, 0))
 			if err != nil {
 				return err
 			}
