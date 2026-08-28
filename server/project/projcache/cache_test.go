@@ -1,6 +1,7 @@
 package projcache
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -81,6 +82,28 @@ func TestLoad_CorruptFile(t *testing.T) {
 	matches, _ := filepath.Glob(filepath.Join(dir, cacheFileName+".corrupt-*"))
 	if len(matches) == 0 {
 		t.Fatalf("损坏文件应被备份为 .corrupt-*")
+	}
+}
+
+// TestLoad_VersionMismatch 版本不符的 git.json 当文件不存在丢弃（不备份、不 lenient 混入）。
+// 老数据按新结构反序列化会得到缺字段全零值的部分数据，比空缓存更糟。
+func TestLoad_VersionMismatch(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	dir := ws.Mkdir("cache")
+	old := `{"version":` + fmt.Sprintf("%d", cacheVersion-1) + `,"entries":{"/p/a":{"repoUrl":"x","currentBranch":"main"}}}`
+	ws.WriteFile(filepath.Join("cache", cacheFileName), []byte(old))
+
+	c, err := Load(dir)
+	if err != nil {
+		t.Fatalf("版本不符 Load 不应报错: %v", err)
+	}
+	if _, ok := c.Get("/p/a"); ok {
+		t.Fatal("旧版本数据应被整体丢弃")
+	}
+	// 区别于损坏文件：版本不符不备份（文件是合法的，只是过时）
+	matches, _ := filepath.Glob(filepath.Join(dir, cacheFileName+".corrupt-*"))
+	if len(matches) != 0 {
+		t.Fatal("版本不符不应走损坏备份路径")
 	}
 }
 

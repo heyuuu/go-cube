@@ -104,10 +104,16 @@ func Load(dir string) (*Cache, error) {
 	}
 
 	// 解析失败：备份损坏文件，返回空缓存（降级优先）
+	// 版本不符：结构已变，老数据按新结构 lenient unmarshal 会得到缺字段全零值的
+	// 部分数据（比没有数据更糟），直接当文件不存在丢弃，靠下轮采集重建
 	var file cacheFile
 	if err := json.Unmarshal(data, &file); err != nil {
 		slog.Warn("git 缓存文件损坏，备份后从空重建", "path", path, "err", err)
 		backupCorrupt(path, data)
+		return c, nil
+	}
+	if file.Version != cacheVersion {
+		slog.Warn("git 缓存版本不符，丢弃旧文件从空重建", "path", path, "version", file.Version)
 		return c, nil
 	}
 	c.mu.Lock()

@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 )
 
+const cubeFileName = ".cube/cube.json"
+
 // Declared workspaces 节里的单条显式声明（schema 类型；运行期值对象见 workspace.Workspace）。
 type Declared struct {
 	Name string `json:"name"` // 显示名
@@ -63,7 +65,7 @@ func Load(root string) (*File, bool) {
 // cube.json 是多节容器，本包只认识其中几节，不能把不认识的节写丢。
 // workspaces 为空清单时字段仍写出（空数组是有效声明，不能被 omitempty 吞掉）。
 func Save(root string, f *File) error {
-	raw, err := os.ReadFile(filepath.Join(root, ".cube", "cube.json"))
+	raw, err := os.ReadFile(filepath.Join(root, cubeFileName))
 	var merged map[string]json.RawMessage
 	if err == nil && json.Unmarshal(raw, &merged) == nil {
 		for _, k := range knownKeys {
