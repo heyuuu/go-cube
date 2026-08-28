@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
+	"cube/project/cubefile"
 	"cube/project/workspace"
 	"cube/util/tui"
 )
@@ -40,7 +41,7 @@ query 支持项目名模糊搜索，规则同 open 命令。`,
 			root := proj.Path()
 
 			// 已有显式声明时确认覆盖（探测产的是候选全集，覆盖会丢失人工裁剪）
-			if cf, ok := workspace.LoadCubeFile(root); ok && cf.WorkspacesSet {
+			if cf, ok := cubefile.Load(root); ok && cf.WorkspacesSet {
 				overwrite, err := tui.Confirm("已存在显式 workspaces 声明，重新探测并覆盖？")
 				if err != nil {
 					return err

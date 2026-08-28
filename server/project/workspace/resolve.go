@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"cube/project/cubefile"
 )
 
 // Resolve 解析项目根（或 worktree 根）的 workspace 列表，返回相对该根的成员目录。
@@ -17,33 +19,18 @@ import (
 //
 // 本函数供采集侧调用（读文件系统），读路径不应调用——读 projcache 快照。
 func Resolve(root string) []Workspace {
-	if cf, ok := LoadCubeFile(root); ok {
-		if cf.WorkspacesSet {
-			return ValidateDeclared(root, cf.Workspaces)
+	if f, ok := cubefile.Load(root); ok {
+		if f.WorkspacesSet {
+			return ValidateDeclared(root, f.Workspaces)
 		}
-		return Detect(root, cf.WorkspaceScanRule)
+		return Detect(root, f.WorkspaceScanRule)
 	}
 	return Detect(root, "")
 }
 
-// LoadCubeFile 读取并解析 root/.cube/cube.json；文件不存在或坏 JSON 都按「无声明」处理
-// （坏 JSON 属可恢复降级：记日志后走探测，不让一个坏文件拖垮整个项目的采集）。
-func LoadCubeFile(root string) (*CubeFile, bool) {
-	data, err := os.ReadFile(filepath.Join(root, ".cube", "cube.json"))
-	if err != nil {
-		return nil, false
-	}
-	var cf CubeFile
-	if err := cf.UnmarshalJSON(data); err != nil {
-		slog.Warn("cube.json 解析失败，按无声明处理", "root", root, "err", err)
-		return nil, false
-	}
-	return &cf, true
-}
-
 // ValidateDeclared 校验显式声明并构造成员列表：路径须相对、不逃逸出根、目录存在；
 // 坏条目跳过（记日志），name 缺省取路径末段。
-func ValidateDeclared(root string, declared []Declared) []Workspace {
+func ValidateDeclared(root string, declared []cubefile.Declared) []Workspace {
 	result := make([]Workspace, 0, len(declared))
 	for _, d := range declared {
 		w, ok := validateOne(root, d)
@@ -55,7 +42,7 @@ func ValidateDeclared(root string, declared []Declared) []Workspace {
 	return result
 }
 
-func validateOne(root string, d Declared) (Workspace, bool) {
+func validateOne(root string, d cubefile.Declared) (Workspace, bool) {
 	if d.Path == "" {
 		slog.Warn("cube.json workspace 条目缺 path，跳过", "root", root, "name", d.Name)
 		return Workspace{}, false

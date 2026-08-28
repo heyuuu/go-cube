@@ -13,6 +13,7 @@ import (
 
 	"cube/opener"
 	"cube/project"
+	"cube/project/cubefile"
 	"cube/project/projcache"
 	"cube/project/workspace"
 	"cube/usage"
@@ -317,9 +318,9 @@ func (h *ProjectHandler) workspaceGet(input struct {
 			return WorkspaceMemberDTO(w)
 		})
 	}
-	if cf, ok := workspace.LoadCubeFile(root); ok {
+	if cf, ok := cubefile.Load(root); ok {
 		result.DeclaredSet = cf.WorkspacesSet
-		result.Declared = slicekit.Map(cf.Workspaces, func(d workspace.Declared) WorkspaceMemberDTO {
+		result.Declared = slicekit.Map(cf.Workspaces, func(d cubefile.Declared) WorkspaceMemberDTO {
 			return WorkspaceMemberDTO(d)
 		})
 		result.ScanRule = cf.WorkspaceScanRule
@@ -350,8 +351,8 @@ func (h *ProjectHandler) workspaceSave(input WorkspaceSaveInput) (map[string]any
 		return nil, errors.New("workspaces 不能为空（清除声明请删除项目内 .cube/cube.json）")
 	}
 	root := proj.Path()
-	declared := slicekit.Map(input.Body.Workspaces, func(m WorkspaceMemberDTO) workspace.Declared {
-		return workspace.Declared(m)
+	declared := slicekit.Map(input.Body.Workspaces, func(m WorkspaceMemberDTO) cubefile.Declared {
+		return cubefile.Declared(m)
 	})
 	validated := workspace.ValidateDeclared(root, declared)
 	if len(validated) != len(declared) {
