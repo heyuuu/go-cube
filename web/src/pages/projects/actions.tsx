@@ -19,12 +19,13 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useProjectOpen } from '@/queries/project';
 
-import { projectTargets, quickOpens, tagVariants } from './shared';
+import { filterTargets, projectTargets, quickOpens, tagVariants, type ProjectTarget, type QuickOpen } from './shared';
 
 // 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。
-// 多目标项目（根目录 + worktrees，1032）：opener 挂子菜单选目标（Base UI 的
+// 多目标项目（1032 worktrees / 1030 workspaces）：opener 挂子菜单选目标（Base UI 的
 // SubmenuRoot；同弹层内点 item 切内容的做法不可行——item 点击即关菜单）；
-// 单目标项目点击直达，体验不变。
+// 单目标点击直达，体验不变。快捷位按 opener 的目标策略筛（stree 只挂仓库根、
+// cube-workbench 只挂主根，见 shared.tsx）；全量「打开方式」下拉不筛（通用 opener 目标语义未知）。
 export function ProjectActions({
   p,
   openerList,
@@ -38,14 +39,14 @@ export function ProjectActions({
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
-  const targets = projectTargets(p);
-  const multiTarget = targets.length > 1;
+  const allTargets = projectTargets(p);
+  const multiTarget = allTargets.length > 1;
 
   const isPending = (name: string) =>
     open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
 
-  const targetMenuItems = (openerName: string) =>
+  const targetMenuItems = (targets: ProjectTarget[], openerName: string) =>
     targets.map((t) => (
       <DropdownMenuItem
         key={t.dir || '/'}
@@ -57,42 +58,46 @@ export function ProjectActions({
       </DropdownMenuItem>
     ));
 
-  const quickButton = (name: string) => {
-    const op = openerByName.get(name);
+  const quickButton = (q: QuickOpen) => {
+    const op = openerByName.get(q.name);
     if (!op) return null;
-    const button = (
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title={multiTarget ? `${op.title}（选择目标）` : op.title}
-        aria-label={`${op.title}（${p.name}）`}
-        disabled={isPending(name)}
-      >
-        {renderIcon(op?.icon, null)}
-      </Button>
-    );
-    if (!multiTarget) {
+    // 该快捷位实际可选的目标（策略筛过）；筛剩单目标时点击直达
+    const targets = filterTargets(allTargets, q.targets);
+    if (targets.length === 1) {
       return (
         <Button
-          key={name}
+          key={q.name}
           variant="ghost"
           size="icon-sm"
           title={op.title}
           aria-label={`${op.title}（${p.name}）`}
-          disabled={isPending(name)}
-          onClick={() => openTarget(name, '')}
+          disabled={isPending(q.name)}
+          onClick={() => openTarget(q.name, targets[0].dir)}
         >
           {renderIcon(op?.icon, null)}
         </Button>
       );
     }
     return (
-      <DropdownMenu key={name}>
-        <DropdownMenuTrigger render={button} />
-        <DropdownMenuContent align="end" className="min-w-48">
+      <DropdownMenu key={q.name}>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title={`${op.title}（选择目标）`}
+              aria-label={`${op.title}（${p.name}）`}
+              disabled={isPending(q.name)}
+            >
+              {renderIcon(op?.icon, null)}
+            </Button>
+          }
+        />
+        {/* w-auto 覆盖基类的 w-(--anchor-width)：目标名比触发图标宽得多，按内容撑开 */}
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
           <DropdownMenuGroup>
             <DropdownMenuLabel>{op.title} · 选择目标</DropdownMenuLabel>
-            {targetMenuItems(name)}
+            {targetMenuItems(targets, q.name)}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -101,12 +106,12 @@ export function ProjectActions({
 
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {quickOpens.filter((name) => openerNames.has(name)).map(quickButton)}
+      {quickOpens.filter((q) => openerNames.has(q.name)).map(quickButton)}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-32">
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
           <DropdownMenuGroup>
             <DropdownMenuLabel>打开方式</DropdownMenuLabel>
@@ -117,7 +122,9 @@ export function ProjectActions({
                     {renderIcon(op?.icon, null)}
                     {op.title}
                   </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent>{targetMenuItems(op.name)}</DropdownMenuSubContent>
+                  <DropdownMenuSubContent className="w-auto min-w-56">
+                    {targetMenuItems(allTargets, op.name)}
+                  </DropdownMenuSubContent>
                 </DropdownMenuSub>
               ) : (
                 <DropdownMenuItem key={op.name} onClick={() => openTarget(op.name, '')} disabled={isPending(op.name)}>

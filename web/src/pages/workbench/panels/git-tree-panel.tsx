@@ -414,7 +414,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${name}`} />}>
           <ChevronDown className="size-3.5" />
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-32">
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
           <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(path)}>
             <Copy className="mr-1 size-3" />
             复制绝对路径
