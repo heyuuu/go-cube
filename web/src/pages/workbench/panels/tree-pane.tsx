@@ -45,11 +45,13 @@ export type TreePanePrefs = ReturnType<typeof useTreePanePrefs>;
 export function FileTreePane({
   prefs,
   above,
+  below,
   toolbarExtra,
   ...fileTreeProps
 }: {
   prefs: TreePanePrefs;
   above?: ReactNode; // 树上方附加行（diff 面板的路径搜索框）
+  below?: ReactNode; // 树下方附加区（内容面板的提交详情，自带拖拽分隔条）
   toolbarExtra?: ReactNode; // 树工具条附加区（diff 面板的对比模式·数量）
 } & Omit<Parameters<typeof FileTree>[0], 'viewMode' | 'onViewMode' | 'scope' | 'onScope'>) {
   const { view, setView, scope, setScope, width, setWidth } = prefs;
@@ -60,6 +62,7 @@ export function FileTreePane({
         <div className="min-h-0 flex-1">
           <FileTree {...fileTreeProps} viewMode={view} onViewMode={setView} scope={scope} onScope={setScope} />
         </div>
+        {below}
       </div>
       <PanelSplitter onDelta={(dx) => setWidth((w) => Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, w + dx)))} />
     </>
@@ -78,6 +81,7 @@ export function SourcePanelShell({
   stats,
   statsPending,
   above,
+  below,
   toolbarExtra,
   children,
 }: {
@@ -90,6 +94,7 @@ export function SourcePanelShell({
   stats: Map<string, FileStat> | null;
   statsPending: boolean;
   above?: ReactNode;
+  below?: ReactNode;
   toolbarExtra?: ReactNode;
   children: ReactNode;
 }) {
@@ -98,6 +103,7 @@ export function SourcePanelShell({
       <FileTreePane
         prefs={prefs}
         above={above}
+        below={below}
         toolbarExtra={toolbarExtra}
         path={path}
         source={treeSource}

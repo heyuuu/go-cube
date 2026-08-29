@@ -14,6 +14,7 @@ import {
 
 import { sourceLabel, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
+import { CommitDetailPane } from './commit-detail';
 import { FileContentArea, useFileEditing, type ContentMode } from './file-content';
 import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
@@ -157,6 +158,12 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
             className="h-6 text-xs"
           />
         </div>
+      }
+      // 源为 ref/commit 时目录树下追加提交详情区（完整 message 正文）；worktree 源无单一提交
+      below={
+        viewSource.type === 'ref' || viewSource.type === 'commit' ? (
+          <CommitDetailPane path={path} source={viewSource} />
+        ) : null
       }
       toolbarExtra={
         !listPending && changeList.length >= 0 && (viewBase || treePrefs.scope === 'diff') ? (

@@ -1,6 +1,7 @@
 package git
 
 import (
+	"os/exec"
 	"testing"
 
 	"cube/internal/testfixture"
@@ -54,5 +55,35 @@ func TestCommitsPage(t *testing.T) {
 	}
 	if len(all[0].Refs) == 0 || all[0].Refs[0].Name != "main" || all[0].Refs[0].Kind != "local" {
 		t.Errorf("首条应带 main(local) 装饰: %v", all[0].Refs)
+	}
+}
+
+func TestCommitDetailAt(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
+	// 多行 message：标题 + 正文（AI 时代典型形态，详情区就是为它而设）
+	cmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "标题行", "-m", "正文一\n正文二")
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("建提交失败: %v: %s", err, out)
+	}
+
+	detail, err := CommitDetailAt(repo, "main")
+	if err != nil {
+		t.Fatalf("CommitDetailAt 报错: %v", err)
+	}
+	if detail.Subject != "标题行" {
+		t.Errorf("subject 不符: %q", detail.Subject)
+	}
+	if detail.Body != "正文一\n正文二" {
+		t.Errorf("body 不符: %q", detail.Body)
+	}
+	if len(detail.Sha) != 40 || detail.ShortSha == "" || detail.Author == "" || detail.Timestamp == 0 {
+		t.Errorf("基础字段不完整: %+v", detail)
+	}
+	if len(detail.Parents) != 1 {
+		t.Errorf("parents 应为 1: %v", detail.Parents)
+	}
+	if len(detail.Refs) == 0 || detail.Refs[0].Name != "main" {
+		t.Errorf("refs 应带 main: %v", detail.Refs)
 	}
 }

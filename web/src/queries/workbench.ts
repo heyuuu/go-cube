@@ -58,6 +58,19 @@ export function useWorkbenchCommits(path: string) {
 
 export type WorktreeStatus = components['schemas']['WorktreeStatus'];
 
+export type CommitDetail = components['schemas']['CommitDetail'];
+
+// 提交详情（含完整 message 正文，内容面板的提交详情区）：AI 时代 commit 信息长且多行，
+// commit 图行内展示不全，详情区补全量展示。worktree 源无单一提交，不拉
+export function useWorkbenchCommit(path: string, src: TreeSource) {
+  return useQuery({
+    queryKey: ['workbench', 'commit', path, toUri(src)],
+    queryFn: () => apiGet('/api/workbench/commit', { path, ...sourceQuery(src) }),
+    enabled: path !== '' && !!src && src.type !== 'worktree',
+    staleTime: 30_000,
+  });
+}
+
 // 工作副本状态快照（全部副本一次拿全）：行徽标与 commit 图虚拟节点的共同数据源。
 // 实时性要求高，staleTime 短 + 轮询 + 窗口聚焦重取
 export function useWorkbenchWorktrees(path: string) {

@@ -135,6 +135,25 @@ func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResul
 	}, nil
 }
 
+// CommitInfo 读 ref/commit 源指向提交的完整信息（含 message 正文，内容面板提交详情区）。
+// worktree 源是工作区状态而非单一提交，拒绝。
+func (s *Service) CommitInfo(path string, src TreeSource) (*git.CommitDetail, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	switch src.Type {
+	case SourceTypeCommit, SourceTypeRef:
+		detail, err := git.CommitDetailAt(root, src.Id)
+		if err != nil {
+			return nil, fmt.Errorf("读取提交信息失败: %s: %w", src.Id, err)
+		}
+		return detail, nil
+	default:
+		return nil, fmt.Errorf("worktree 源没有提交信息: %s", src.String())
+	}
+}
+
 // WorktreeStatuses 返回全部工作副本的状态快照。工作副本徽标与 commit 图
 // 虚拟节点（前端构造）共用这一份数据——status 只在这里拉，不再分散到各接口。
 func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {

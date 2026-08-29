@@ -17,6 +17,43 @@ type CommitEntry struct {
 	Subject   string      `json:"subject"`   // 提交标题首行
 }
 
+// CommitDetail 单条提交的完整信息（内容阅读面板的提交详情区）：CommitEntry 之外
+// 多了 Body（message 正文，%b），解决 AI 时代长多行 commit 信息在 commit 图里展示不全。
+type CommitDetail struct {
+	Sha       string      `json:"sha"`
+	ShortSha  string      `json:"shortSha"`
+	Parents   []string    `json:"parents"`
+	Author    string      `json:"author"`
+	Timestamp int64       `json:"timestamp"`
+	Refs      []CommitRef `json:"refs"`
+	Subject   string      `json:"subject"`
+	Body      string      `json:"body"` // message 正文（不含首行 subject，已去首尾空白）
+}
+
+// CommitDetailAt 读 rev（sha/ref 名）指向提交的完整信息。rev 不存在由 git 报错。
+func CommitDetailAt(dir string, rev string) (*CommitDetail, error) {
+	out, err := runOut(dir, "show", "-s", "--no-show-signature",
+		"--pretty=format:%H%x1f%h%x1f%P%x1f%an%x1f%at%x1f%D%x1f%s%x1f%b", rev)
+	if err != nil {
+		return nil, fmt.Errorf("git show 执行失败: %w", err)
+	}
+	f := strings.SplitN(out, "\x1f", 8)
+	if len(f) < 8 {
+		return nil, fmt.Errorf("commit 信息输出格式异常: %q", out)
+	}
+	ts, _ := strconv.ParseInt(f[4], 10, 64)
+	return &CommitDetail{
+		Sha:       f[0],
+		ShortSha:  f[1],
+		Parents:   splitNonEmpty(f[2], " "),
+		Author:    f[3],
+		Timestamp: ts,
+		Refs:      parseDecorations(f[5]),
+		Subject:   f[6],
+		Body:      strings.TrimSpace(f[7]),
+	}, nil
+}
+
 // CommitsPage 拉取全部分支（--all）的 commit 一页，skip/limit 分页。
 // 分页稳定性依赖 git 对同一 ref 集合输出顺序确定（topo-order），翻页期间仓库有新提交
 // 时可能出现边界重复，由前端按 sha 去重。

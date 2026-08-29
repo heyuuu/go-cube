@@ -10,6 +10,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 
+	"cube/util/git"
 	"cube/web"
 	"cube/workbench"
 )
@@ -32,6 +33,7 @@ func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/workbench/remotes", "获取工作台 remote 列表", h.remotes)
 	web.ApiGet(api, "/api/workbench/commits", "拉取工作台 commit 图（分页）", h.commits)
 	web.ApiGet(api, "/api/workbench/worktrees", "全部工作副本的状态快照", h.worktrees)
+	web.ApiGet(api, "/api/workbench/commit", "获取 TreeSource（ref/commit）指向提交的完整信息", h.commitInfo)
 	web.ApiGet(api, "/api/workbench/tree", "列出 TreeSource 下的目录树", h.tree)
 	web.ApiGet(api, "/api/workbench/file", "读取 TreeSource 下的文件内容", h.file)
 	web.ApiPost(api, "/api/workbench/file/save", "保存工作副本文件（唯一写路径）", h.saveFile)
@@ -72,6 +74,17 @@ func (h *WorkbenchHandler) commits(input struct {
 	Limit  int    `query:"limit"`  // 页大小，默认 50，上限 200
 }) (*workbench.CommitsPageResult, error) {
 	return h.workbenchService.Commits(input.Path, input.Cursor, input.Limit)
+}
+
+func (h *WorkbenchHandler) commitInfo(input struct {
+	Path   string `query:"path" required:"true"`
+	Source string `query:"source" required:"true"`
+}) (*git.CommitDetail, error) {
+	src, err := workbench.ParseTreeSource(input.Source)
+	if err != nil {
+		return nil, err
+	}
+	return h.workbenchService.CommitInfo(input.Path, src)
 }
 
 func (h *WorkbenchHandler) worktrees(input struct {

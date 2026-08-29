@@ -463,6 +463,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/commit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取 TreeSource（ref/commit）指向提交的完整信息 */
+    get: operations['workbench.commit'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/commits': {
     parameters: {
       query?: never;
@@ -688,6 +705,17 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    ApiOutputCommitDetailBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputCommitDetailBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['CommitDetail'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputCommitsPageResultBody: {
       /**
        * Format: uri
@@ -1009,6 +1037,17 @@ export interface components {
       repoHost: string;
       /** @description uri 前缀，须以 / 开头或为空，如 /heyuuu */
       repoPrefix?: string;
+    };
+    CommitDetail: {
+      author: string;
+      body: string;
+      parents: string[] | null;
+      refs: components['schemas']['CommitRef'][] | null;
+      sha: string;
+      shortSha: string;
+      subject: string;
+      /** Format: int64 */
+      timestamp: number;
     };
     CommitEntry: {
       author: string;
@@ -2307,6 +2346,38 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputDiffTreesResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.commit': {
+    parameters: {
+      query: {
+        path: string;
+        source: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputCommitDetailBody'];
         };
       };
       /** @description Error */

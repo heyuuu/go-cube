@@ -28,8 +28,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { renderIcon } from '@/lib/icon';
 import { Switch } from '@/components/ui/switch';
+import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
@@ -54,6 +54,7 @@ import {
 } from '../params';
 import { useWorktreeVisibility } from '../worktree-visibility';
 
+import { formatCommitTime, REF_BADGE_STYLE } from './commit-bits';
 import {
   BranchAddDialog,
   BranchDeleteDialog,
@@ -614,9 +615,7 @@ function CommitGraphSection({
     const nodesOf = new Map(nodes.map((n, i) => [n.sha, i]));
     // 轻量模式「最近 N 个」区域的下边界行（第 N 个提交所在行；列表比 N 长才画）
     const dividerRow =
-      lite && decorated.length > LITE_KEEP_RECENT
-        ? (nodesOf.get(decorated[LITE_KEEP_RECENT - 1].sha) ?? -1)
-        : -1;
+      lite && decorated.length > LITE_KEEP_RECENT ? (nodesOf.get(decorated[LITE_KEEP_RECENT - 1].sha) ?? -1) : -1;
     const virtualLaneEnd = new Map<number, number>();
     for (const n of nodes) {
       if (!('worktree' in n && n.worktree)) continue;
@@ -686,41 +685,41 @@ function CommitGraphSection({
 
   return (
     <>
-    <div className="flex shrink-0 items-center justify-end gap-1.5 border-b border-border px-2 py-1 text-muted-foreground">
-      <span className="text-[10px]" title="轻量模式：只保留分支/tag/merge/分叉点，隐藏其余提交">
-        轻量拓扑
-      </span>
-      <Switch checked={mode === 'lite'} onCheckedChange={toggleMode} aria-label="轻量拓扑" />
-    </div>
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-      <div className="relative">
-        {/* 轻量模式「最近 N 个」下边界：overlay 画虚线，不占行高（不破坏行内 SVG 对齐） */}
-        {dividerRow >= 0 ? (
-          <div
-            className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-muted-foreground/50"
-            style={{ top: (dividerRow + 1) * ROW_H }}
-          />
-        ) : null}
-        {rows.map((c, i) => (
-          <CommitRow
-            key={c.sha}
-            c={c}
-            laneWidth={laneWidth}
-            wires={wireMap.get(i - 1) ?? []}
-            virtualLaneEnd={virtualLaneEnd}
-            params={params}
-            active={c.sha === focusSha}
-            onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
-          />
-        ))}
-        <div ref={sentinelRef} className="h-8" />
-        {commits.isFetchingNextPage ? (
-          <div className="pb-2 text-center text-xs text-muted-foreground">加载中…</div>
-        ) : !commits.hasNextPage && rows.length > 0 ? (
-          <div className="pb-2 text-center text-xs text-muted-foreground">— 没有更多了 —</div>
-        ) : null}
+      <div className="flex shrink-0 items-center justify-end gap-1.5 border-b border-border px-2 py-1 text-muted-foreground">
+        <span className="text-[10px]" title="轻量模式：只保留分支/tag/merge/分叉点，隐藏其余提交">
+          轻量拓扑
+        </span>
+        <Switch checked={mode === 'lite'} onCheckedChange={toggleMode} aria-label="轻量拓扑" />
       </div>
-    </div>
+      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+        <div className="relative">
+          {/* 轻量模式「最近 N 个」下边界：overlay 画虚线，不占行高（不破坏行内 SVG 对齐） */}
+          {dividerRow >= 0 ? (
+            <div
+              className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-muted-foreground/50"
+              style={{ top: (dividerRow + 1) * ROW_H }}
+            />
+          ) : null}
+          {rows.map((c, i) => (
+            <CommitRow
+              key={c.sha}
+              c={c}
+              laneWidth={laneWidth}
+              wires={wireMap.get(i - 1) ?? []}
+              virtualLaneEnd={virtualLaneEnd}
+              params={params}
+              active={c.sha === focusSha}
+              onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
+            />
+          ))}
+          <div ref={sentinelRef} className="h-8" />
+          {commits.isFetchingNextPage ? (
+            <div className="pb-2 text-center text-xs text-muted-foreground">加载中…</div>
+          ) : !commits.hasNextPage && rows.length > 0 ? (
+            <div className="pb-2 text-center text-xs text-muted-foreground">— 没有更多了 —</div>
+          ) : null}
+        </div>
+      </div>
     </>
   );
 }
@@ -808,17 +807,17 @@ function CommitRow({
               .sort((a, b) => (a.kind === 'worktree' ? -1 : b.kind === 'worktree' ? 1 : 0))
               .slice(0, 3)
               .map((r) => (
-              <Badge
-                key={r.kind + r.name}
-                variant="outline"
-                className={cn(
-                  'max-w-24 shrink-0 truncate border px-1 py-0 text-[10px]',
-                  REF_BADGE_STYLE[r.kind as keyof typeof REF_BADGE_STYLE] ?? REF_BADGE_STYLE.local,
-                )}
-              >
-                {r.name}
-              </Badge>
-            ))}
+                <Badge
+                  key={r.kind + r.name}
+                  variant="outline"
+                  className={cn(
+                    'max-w-24 shrink-0 truncate border px-1 py-0 text-[10px]',
+                    REF_BADGE_STYLE[r.kind as keyof typeof REF_BADGE_STYLE] ?? REF_BADGE_STYLE.local,
+                  )}
+                >
+                  {r.name}
+                </Badge>
+              ))}
           </>
         }
       />
@@ -837,16 +836,6 @@ function CommitRow({
     </div>
   );
 }
-
-// ref 徽标按类型分组配色（与泳道色无关）：本地分支蓝、远程灰、tag 琥珀、HEAD 紫；
-// worktree 实心填充（其余仅描边）——副本徽标与引用徽标视觉分层
-const REF_BADGE_STYLE = {
-  local: 'border-blue-500/40 text-blue-600 dark:text-blue-400',
-  remote: 'border-muted-foreground/30 text-muted-foreground',
-  tag: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
-  head: 'border-violet-500/40 text-violet-600 dark:text-violet-400',
-  worktree: 'border-cyan-500/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
-} as const;
 
 // 泳道几何：列宽/行高/左边距；调色板与后端 color 索引对应（循环取色）
 const LANE_W = 12;
@@ -967,27 +956,4 @@ function Section({
       <div className="flex flex-col gap-0.5">{children}</div>
     </section>
   );
-}
-
-// 提交时间显示：今天 → 纯时间（HH:mm）；今天以前 → 纯日期（当年 MM-DD，跨年 YYYY-MM-DD）；
-// 悬停 → 完整「日期 时间」
-function formatCommitTime(ts: number): { text: string; full: string } {
-  const d = new Date(ts * 1000);
-  const now = new Date();
-  const sameDay =
-    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-  const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
-  const ymd = sameYear(d, now)
-    ? `${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
-    : `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  const full = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${hm}`;
-  return { text: sameDay ? hm : ymd, full };
-}
-
-function sameYear(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear();
-}
-
-function pad2(n: number): string {
-  return n < 10 ? `0${n}` : String(n);
 }
