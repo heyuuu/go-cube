@@ -29,22 +29,25 @@ build: build-ui
 	@$(OUTPUT) version
 
 install: build-ui
-	# 编译安装
-	@echo "==> go install ($(VERSION) @ $(COMMIT))"
+	@echo ">>> 编译安装 go install ... ($(VERSION) @ $(COMMIT) $(BUILD_TIME))"
 	cd server && go install -ldflags "$(LDFLAGS)"
-	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
 
-	# 安装完成，确认生效：PATH 上的 cube 必须是刚构建的版本（输出含本次
-	# BUILD_TIME），否则视为安装未生效（GOBIN 不在 PATH / 旧版本在前等），中止
+	@echo ">>> 验证是否正确安装..."
+	@# 安装完成，确认生效：PATH 上的 cube 必须是刚构建的版本（输出含本次BUILD_TIME），否则视为安装未生效（GOBIN 不在 PATH / 旧版本在前等），中止
 	@cube version | grep -qF "$(BUILD_TIME)" || { echo "!! 安装校验失败：PATH 上的 cube 不是刚构建的版本（检查 GOBIN 是否在 PATH 且优先于旧安装）" >&2; exit 1; }
 
-	# 关闭旧版本 server（服务未运行时 stop 会非零退出，- 忽略）
+	@echo ">>> 已安装版本"
+	@cube version
+
+	@echo ">>> 停止旧服务"
+	@# 关闭旧版本 server（服务未运行时 stop 会非零退出，- 忽略）
 	-@cube server stop 2>/dev/null
 
-	# 安装 zsh completion + shell 扩展（p / pz，见 scripts/zsh-append.sh）
-	# completion 生成是覆盖写，重复 install 不会累积
-	cube completion zsh > $(ZSH_COMPLETION_FILE)
-	cat scripts/zsh-append.sh >> $(ZSH_COMPLETION_FILE)
+	@echo ">>> 写入 zsh 提示"
+	@# 安装 zsh completion + shell 扩展（p / pz，见 scripts/zsh-append.sh）
+	@# completion 生成是覆盖写，重复 install 不会累积
+	@cube completion zsh > $(ZSH_COMPLETION_FILE)
+	@cat scripts/zsh-append.sh >> $(ZSH_COMPLETION_FILE)
 
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
