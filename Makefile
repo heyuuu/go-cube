@@ -47,6 +47,9 @@ install: build-ui
 	# install zsh completion（末尾追加 compdef，让 cubex 复用 _cube 的补全）
 	cube completion zsh > $(ZSH_COMPLETION_FILE)
 	echo "compdef _cube cubex" >> $(ZSH_COMPLETION_FILE)
+	# 追加 shell 跳转包装：cube path 在 stdout 输出路径，cd 必须由 shell 执行
+	# （子进程无法改父 shell 的 cwd）。completion 生成是覆盖写，重复 install 不会累积
+	cat scripts/zsh-jump.sh >> $(ZSH_COMPLETION_FILE)
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
 	@set -e; \
