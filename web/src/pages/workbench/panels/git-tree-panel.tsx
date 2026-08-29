@@ -7,7 +7,6 @@ import {
   Eye,
   EyeOff,
   GitBranch,
-  GitFork,
   Monitor,
   Plus,
   RotateCcw,
@@ -30,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { renderIcon } from '@/lib/icon';
+import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
@@ -677,16 +677,11 @@ function CommitGraphSection({
 
   return (
     <>
-    <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={toggleMode}
-        title={mode === 'full' ? '切换为轻量拓扑（只留分支/tag/merge/分叉点）' : '切换为完整提交列表'}
-        className={cn('text-muted-foreground', mode === 'lite' && 'text-foreground')}
-      >
-        <GitFork className="size-3" />
-      </Button>
+    <div className="flex shrink-0 items-center justify-end gap-1.5 border-b border-border px-2 py-1 text-muted-foreground">
+      <span className="text-[10px]" title="轻量模式：只保留分支/tag/merge/分叉点，隐藏其余提交">
+        轻量拓扑
+      </span>
+      <Switch checked={mode === 'lite'} onCheckedChange={toggleMode} aria-label="轻量拓扑" />
     </div>
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
       {rows.map((c, i) => (

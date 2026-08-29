@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { computeGraph, type GraphWire } from './graph-layout';
+import { computeGraph, simplifyLite, type GraphWire } from './graph-layout';
 
 interface Entry {
   sha: string;
@@ -225,5 +225,91 @@ describe('虚拟节点（dirty worktree 合成提交）', () => {
       { row: 1, from: 1, to: 1, color: 2 }, // merge → m1（首父接管原泳道）
       { row: 1, from: 1, to: 2, color: 3 }, // merge → f2（额外父拐弯曲线）
     ]);
+  });
+});
+
+// --- simplifyLite（轻量模式） ---
+
+interface LiteEntry {
+  sha: string;
+  parents: string[];
+  refs?: string[];
+}
+
+describe('simplifyLite', () => {
+  it('线性链只留带 ref 的端点，且边重接到保留祖先', () => {
+    const list: LiteEntry[] = [
+      { sha: 'tip', parents: ['b'], refs: ['main'] },
+      { sha: 'b', parents: ['a'] },
+      { sha: 'a', parents: ['root'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list);
+    expect(out.map((c) => c.sha)).toEqual(['tip', 'root']);
+    expect(out[0].parents).toEqual(['root']);
+  });
+
+  it('merge 提交与分叉点保留，中间线性节点隐藏', () => {
+    // main: root←m1←m2←merge；feature: root←f1←f2（merge 双父）
+    const list: LiteEntry[] = [
+      { sha: 'merge', parents: ['m2', 'f2'], refs: ['main'] },
+      { sha: 'm2', parents: ['m1'] },
+      { sha: 'm1', parents: ['root'] },
+      { sha: 'f2', parents: ['f1'] },
+      { sha: 'f1', parents: ['root'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list);
+    // root 是分叉点（children=2）；f2 链上无 ref，f1/f2 都隐藏
+    expect(out.map((c) => c.sha)).toEqual(['merge', 'root']);
+    expect(out[0].parents).toEqual(['root']);
+  });
+
+  it('分支 tip 带 ref 时保留，边沿各自链重接', () => {
+    const list: LiteEntry[] = [
+      { sha: 'tip', parents: ['a'], refs: ['main'] },
+      { sha: 'a', parents: ['fork'] },
+      { sha: 'b2', parents: ['b1'], refs: ['dev'] },
+      { sha: 'b1', parents: ['fork'] },
+      { sha: 'fork', parents: ['root'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list);
+    expect(out.map((c) => c.sha)).toEqual(['tip', 'b2', 'fork', 'root']);
+    expect(out[0].parents).toEqual(['fork']);
+    expect(out[1].parents).toEqual(['fork']);
+    expect(out[2].parents).toEqual(['root']);
+  });
+
+  it('tag 徽标也算 ref，tagged 提交保留', () => {
+    const list: LiteEntry[] = [
+      { sha: 'head', parents: ['t'], refs: ['main'] },
+      { sha: 't', parents: ['root'], refs: ['v1.0'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list);
+    expect(out.map((c) => c.sha)).toEqual(['head', 't', 'root']);
+  });
+
+  it('两条隐藏链汇到同一保留祖先时去重（已知退化：merge 塌成单父）', () => {
+    const list: LiteEntry[] = [
+      { sha: 'merge', parents: ['m', 'f'] },
+      { sha: 'm', parents: ['root'] },
+      { sha: 'f', parents: ['root'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list);
+    expect(out.map((c) => c.sha)).toEqual(['merge', 'root']);
+    expect(out[0].parents).toEqual(['root']);
+  });
+
+  it('父提交超出已加载范围（链断裂）时丢弃该边', () => {
+    const list: LiteEntry[] = [
+      { sha: 'tip', parents: ['a'], refs: ['main'] },
+      { sha: 'a', parents: ['unloaded'] },
+    ];
+    const out = simplifyLite(list);
+    expect(out.map((c) => c.sha)).toEqual(['tip']);
+    expect(out[0].parents).toEqual([]);
   });
 });

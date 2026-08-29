@@ -16,6 +16,55 @@
 // 条目映射到 lanesAfter[i+1] 中的新位置；条目正是 i+1 行的 commit 时映射到
 // 该节点的泳道（线进入节点）。分段表达使渲染端无需建模跨行整线。
 
+// 轻量模式简化（纯前端）：只保留「拓扑骨架」——带 ref 的提交（分支/tag/HEAD）、
+// merge 提交、分叉点（children > 1）——其余线性节点隐藏；隐藏段的边重接到
+// 最近的保留祖先，保证分支切出/汇合的形状不断线。
+// 已知退化：若 merge 的两条父链在被隐藏后汇到同一保留祖先（如两侧链上都没有
+// 任何 ref），去重后 merge 会塌成单父直线——分支 tip 通常带 ref，实践中罕见。
+export function simplifyLite<T extends { sha: string; parents?: string[] | null; refs?: readonly unknown[] | null }>(
+  commits: readonly T[],
+): T[] {
+  const bySha = new Map(commits.map((c) => [c.sha, c]));
+  const childrenCount = new Map<string, number>();
+  for (const c of commits) {
+    for (const p of c.parents ?? []) childrenCount.set(p, (childrenCount.get(p) ?? 0) + 1);
+  }
+  const kept = new Set(
+    commits
+      .filter(
+        (c) =>
+          (c.parents ?? []).length === 0 || // 根提交 = 链的终点，保留
+          (c.refs?.length ?? 0) > 0 ||
+          (c.parents ?? []).length > 1 ||
+          (childrenCount.get(c.sha) ?? 0) > 1,
+      )
+      .map((c) => c.sha),
+  );
+
+  // 被隐藏的都是线性节点（merge/分叉点必保留），沿首父链上溯即最近保留祖先
+  const memo = new Map<string, string | null>();
+  const nearestKept = (sha: string): string | null => {
+    const hit = memo.get(sha);
+    if (hit !== undefined) return hit;
+    memo.set(sha, null); // 防环兜底
+    let res: string | null = null;
+    if (kept.has(sha)) res = sha;
+    else {
+      const p = bySha.get(sha)?.parents?.[0];
+      res = p ? nearestKept(p) : null;
+    }
+    memo.set(sha, res);
+    return res;
+  };
+
+  return commits
+    .filter((c) => kept.has(c.sha))
+    .map((c) => ({
+      ...c,
+      parents: [...new Set((c.parents ?? []).map(nearestKept).filter((x): x is string => x != null))],
+    }));
+}
+
 export interface GraphWire {
   row: number; // 段的起始行（连到 row+1）
   from: number; // 起始泳道
