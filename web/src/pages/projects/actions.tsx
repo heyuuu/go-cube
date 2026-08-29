@@ -1,5 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Folder, GitBranch, Layers } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,15 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useProjectOpen } from '@/queries/project';
 
-import { filterTargets, projectTargets, quickOpens, tagVariants, type ProjectTarget, type QuickOpen } from './shared';
+import {
+  filterTargets,
+  projectTargets,
+  quickOpens,
+  tagVariants,
+  type ProjectTarget,
+  type QuickOpen,
+  type TargetKind,
+} from './shared';
 
 // 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。
 // 多目标项目（1032 worktrees / 1030 workspaces）：opener 挂子菜单选目标（Base UI 的
@@ -46,6 +54,15 @@ export function ProjectActions({
     open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
 
+  // 目标条目的身份图标（按 kind 配色，与文字 label 双通道区分）：
+  // 根目录=目录（前景色）、worktree=紫罗兰（与 ⎇ 计数徽标同族）、workspace=绿。
+  // 不再复用 opener 图标——同一菜单内每项都一样，无区分度
+  const targetIcon = (kind: TargetKind) => {
+    if (kind === 'workspace') return <Layers className="size-3.5 text-emerald-600 dark:text-emerald-400" />;
+    if (kind === 'worktree') return <GitBranch className="size-3.5 text-violet-600 dark:text-violet-400" />;
+    return <Folder className="size-3.5 text-muted-foreground" />;
+  };
+
   const targetMenuItems = (targets: ProjectTarget[], openerName: string) =>
     targets.map((t) => (
       <DropdownMenuItem
@@ -53,7 +70,7 @@ export function ProjectActions({
         onClick={() => openTarget(openerName, t.dir)}
         disabled={isPending(openerName)}
       >
-        {renderIcon(openerByName.get(openerName)?.icon, undefined)}
+        {targetIcon(t.kind)}
         {t.label}
       </DropdownMenuItem>
     ));
