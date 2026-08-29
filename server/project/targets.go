@@ -29,7 +29,7 @@ const (
 // OpenTarget 项目的一个打开目标。
 type OpenTarget struct {
 	Path   string      // 目标目录绝对路径
-	Label  string      // 展示名：根目录固定「根目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取声明/推导名
+	Label  string      // 展示名：主目录固定「主目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取声明/推导名
 	Branch string      // worktree 检出分支短名（其余为空）
 	Flags  TargetFlags // 身位标记（root=0 / FlagWorktree / FlagWorkspace / 组合）
 }

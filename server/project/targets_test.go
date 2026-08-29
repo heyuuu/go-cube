@@ -105,7 +105,7 @@ func TestOpenTargets(t *testing.T) {
 
 	// 未采集快照时只有根目录目标
 	targets := s.OpenTargets(repo)
-	if len(targets) != 1 || targets[0].Path != repo || targets[0].Label != "根目录" || targets[0].Flags != 0 {
+	if len(targets) != 1 || targets[0].Path != repo || targets[0].Label != "主目录" || targets[0].Flags != 0 {
 		t.Fatalf("无快照应只有根目录目标: %+v", targets)
 	}
 

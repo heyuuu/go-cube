@@ -29,7 +29,7 @@ export function projectTargets(p: Project): ProjectTarget[] {
   const joinDir = (root: string, rel: string) => root.replace(/\/$/, '') + '/' + rel;
 
   type Entry = ProjectTarget & { rel: string };
-  const entries: Entry[] = [{ dir: '', label: '根目录', kind: 'root', rel: '' }];
+  const entries: Entry[] = [{ dir: '', label: '主目录', kind: 'root', rel: '' }];
   for (const w of g?.workspaces ?? []) {
     entries.push({ dir: joinDir(p.path, w.path), label: w.name, kind: 'workspace', rel: w.path });
   }
