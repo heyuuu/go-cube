@@ -25,7 +25,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 		Long: `cube —— 面向个人开发者的本地多项目管理工具（CLI 优先 + 本地 Web）。
 
 命令按领域分组：
-  - 项目：projects(列表) info(详情) open(打开) init/clone(初始化) check(检查)
+  - 项目：list(列表) info(详情) open(打开) init/clone(初始化) check(检查)
   - opener：openers(列表) open-path(打开路径) diff(对比)
   - git：push(批量推送) pull(批量拉取)
   - Web：server(本地服务) ui(打开 Web UI) openapi(导出 API spec)
@@ -43,7 +43,7 @@ func newRootCmd(a *app.App) *cobra.Command {
 	cmd.AddCommand(newOpenapiCmd(a))
 
 	// project 相关
-	cmd.AddCommand(newProjectsCmd(a))  // 项目列表
+	cmd.AddCommand(newListCmd(a))      // 项目列表
 	cmd.AddCommand(newInfoCmd(a))      // 项目信息
 	cmd.AddCommand(newOpenCmd(a))      // 打开项目
 	cmd.AddCommand(newInitCmd(a))      // 初始化空项目
