@@ -15,6 +15,9 @@ type Option[T any] struct {
 	Value T
 }
 
+// maxSelectHeight 是 Select 列表的显示高度上限（行）：超过后列表内部滚动。
+const maxSelectHeight = 15
+
 // Select 展示单选列表，返回被选中的值。
 //
 // 选项数小于等于 0 时返回 ErrEmptyOptions。
@@ -35,11 +38,12 @@ func Select[T any](title string, options []Option[T]) (T, error) {
 		huhOptions[i] = huh.NewOption(o.Label, i)
 	}
 
-	// 启动 Select，返回选择 index
+	// 启动 Select，返回选择 index；显式限制列表高度（选项数 + 标题行，封顶
+	// maxSelectHeight），否则选项很多时整个终端被列表占满，标题被顶出首屏
 	var index int
 	err := huh.NewForm(
 		huh.NewGroup(
-			huh.NewSelect[int]().Title(title).Options(huhOptions...).Value(&index),
+			huh.NewSelect[int]().Title(title).Height(min(len(huhOptions)+1, maxSelectHeight)).Options(huhOptions...).Value(&index),
 		),
 	).Run()
 	if err != nil {
