@@ -38,6 +38,8 @@ install: build-ui
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
 	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
+	# 关闭旧版本 server（服务未运行时 stop 会非零退出，- 忽略）
+	-@cube server stop 2>/dev/null
 	# cubex 是本目录模式 wrapper：cubex <args> == cube <args> --local（query 缺省以 cwd 定位项目）
 	@printf '#!/bin/sh\nexec $(GOBIN_DIR)/cube "$$@" --local\n' > $(GOBIN_DIR)/cubex
 	@chmod +x $(GOBIN_DIR)/cubex
