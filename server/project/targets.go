@@ -29,7 +29,7 @@ const (
 // OpenTarget 项目的一个打开目标。
 type OpenTarget struct {
 	Path   string      // 目标目录绝对路径
-	Label  string      // 展示名：主目录固定「主目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取声明/推导名
+	Label  string      // 展示名：主目录固定「主目录」；worktree 取分支名，冲突/detached 回退目录名；workspace 取「[worktree 标签 · ]名字」（撞名追加相对路径，见 targetEntries）
 	Branch string      // worktree 检出分支短名（其余为空）
 	Flags  TargetFlags // 身位标记（root=0 / FlagWorktree / FlagWorkspace / 组合）
 }
@@ -45,12 +45,18 @@ func (t OpenTarget) IsWorkspace() bool { return t.Flags&FlagWorkspace != 0 }
 // worktree 展示名规则（提案 1032）：取分支名；分支为空（detached）或同分支被多个
 // worktree 检出时回退目录名。workspaces 已在采集侧做过存在性校验，这里再兜一层
 // os.Stat（同 worktree 的过滤口径：目录在两次采集之间被删时快照仍残留，目标必须真实可打开）。
+// label 去歧义（与前端 projectTargets 同规则，两边同步改）：worktree 下的 workspace
+// 恒带归属前缀「worktree 标签 · 名字」；前缀后仍撞名（跨 worktree 同名、或与
+// worktree 根/主 workspace 撞名）的 workspace 追加相对路径后缀；worktree 根靠
+// 分支名/目录名本身已可区分，不追加。
 func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 	if info == nil {
 		return nil
 	}
 	targets := make([]OpenTarget, 0, len(info.Workspaces)+2*len(info.Worktrees))
-	targets = append(targets, workspaceTargetsAt(root, info.Workspaces, 0)...)
+	rels := make([]string, 0, cap(targets)) // workspace 相对所属根的路径，撞名消歧时作后缀；非 workspace 位填 ""
+	targets = append(targets, workspaceTargetsAt(root, info.Workspaces, 0, "", &rels)...)
+	rels = append(rels, "")
 	branchCount := make(map[string]int, len(info.Worktrees))
 	for _, wt := range info.Worktrees {
 		if wt.Branch != "" {
@@ -63,14 +69,26 @@ func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 			label = filepath.Base(wt.Path)
 		}
 		targets = append(targets, OpenTarget{Path: wt.Path, Label: label, Branch: wt.Branch, Flags: FlagWorktree})
-		targets = append(targets, workspaceTargetsAt(wt.Path, wt.Workspaces, FlagWorktree)...)
+		targets = append(targets, workspaceTargetsAt(wt.Path, wt.Workspaces, FlagWorktree, label+" · ", &rels)...)
+	}
+
+	labelCount := make(map[string]int, len(targets))
+	for _, t := range targets {
+		labelCount[t.Label]++
+	}
+	for i := range targets {
+		if targets[i].IsWorkspace() && labelCount[targets[i].Label] > 1 {
+			targets[i].Label += " (" + rels[i] + ")"
+		}
 	}
 	return targets
 }
 
 // workspaceTargetsAt 把相对所属根的 workspace 成员展开为绝对路径目标；
 // baseFlags 是所属根的标记（主根 = 0，worktree 根 = FlagWorktree），叠加 FlagWorkspace。
-func workspaceTargetsAt(root string, ws []workspace.Workspace, baseFlags TargetFlags) []OpenTarget {
+// prefix 是归属前缀（worktree 下恒为「worktree 标签 · 」，主根为空）；rels 收集
+// 各成员的相对路径供调用方撞名消歧。
+func workspaceTargetsAt(root string, ws []workspace.Workspace, baseFlags TargetFlags, prefix string, rels *[]string) []OpenTarget {
 	if len(ws) == 0 {
 		return nil
 	}
@@ -80,7 +98,8 @@ func workspaceTargetsAt(root string, ws []workspace.Workspace, baseFlags TargetF
 		if _, err := os.Stat(abs); err != nil {
 			continue
 		}
-		targets = append(targets, OpenTarget{Path: abs, Label: w.Name, Flags: baseFlags | FlagWorkspace})
+		targets = append(targets, OpenTarget{Path: abs, Label: prefix + w.Name, Flags: baseFlags | FlagWorkspace})
+		*rels = append(*rels, w.Path)
 	}
 	return targets
 }

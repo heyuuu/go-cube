@@ -90,8 +90,38 @@ func TestTargetEntriesWorktreeWorkspaces(t *testing.T) {
 	if got[0].Flags != FlagWorktree || got[0].Label != "feat" {
 		t.Errorf("worktree 根目标不符: %+v", got[0])
 	}
-	if got[1].Flags != FlagWorktree|FlagWorkspace || got[1].Path != filepath.Join(wtRoot, "app") || got[1].Label != "app" {
+	if got[1].Flags != FlagWorktree|FlagWorkspace || got[1].Path != filepath.Join(wtRoot, "app") || got[1].Label != "feat · app" {
 		t.Errorf("worktree 下 workspace 目标不符: %+v", got[1])
+	}
+}
+
+// TestTargetEntriesLabelDedup label 去歧义（与前端 projectTargets 同规则）：
+// worktree 下的 workspace 恒带「worktree 标签 · 」前缀；前缀后仍撞名的
+// workspace（同根同名 workspace 不同路径 / 与 worktree 标签撞名）追加相对
+// 路径后缀；worktree 根不追加。
+func TestTargetEntriesLabelDedup(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	for _, sub := range []string{"server", "web/server", "wt-feat/app"} {
+		ws.Mkdir(sub)
+	}
+
+	got := targetEntries(ws.Dir, &projcache.Entry{
+		Workspaces: []workspace.Workspace{
+			{Name: "server", Path: "server"},
+			{Name: "server", Path: "web/server"},
+		},
+		Worktrees: []projcache.WorktreeInfo{
+			{Path: ws.Join("wt-feat"), Branch: "feat", Workspaces: []workspace.Workspace{{Name: "app", Path: "app"}}},
+		},
+	})
+	want := []string{"server (server)", "server (web/server)", "feat", "feat · app"}
+	if len(got) != len(want) {
+		t.Fatalf("应返回 %d 个目标, got %d (%+v)", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i].Label != w {
+			t.Errorf("第 %d 个 label 不符: want %s, got %s", i, w, got[i].Label)
+		}
 	}
 }
 
