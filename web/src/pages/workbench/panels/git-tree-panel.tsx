@@ -140,6 +140,9 @@ function loadWsExpanded(): Set<string> {
 
 // commit 图展示模式持久化（与 wsExpanded 同款模式）：
 // full = 全量提交；lite = 轻量拓扑（只留 ref/merge/分叉点，见 simplifyLite）
+// LITE_KEEP_RECENT：轻量模式下顶部无条件保留的最近提交数（N 边界画虚线分割；
+// 调试期常量，方便改小改大看效果）
+const LITE_KEEP_RECENT = 5;
 const GRAPH_MODE_KEY = 'cube.workbench.gitTree.mode';
 function loadGraphMode(): 'full' | 'lite' {
   return localStorage.getItem(GRAPH_MODE_KEY) === 'lite' ? 'lite' : 'full';
@@ -564,7 +567,7 @@ function CommitGraphSection({
   const worktrees = useWorkbenchWorktrees(path);
   // 页拼接去重（skip 分页在仓库有新提交时可能边界重复）→ 注入 worktree 虚拟节点/装饰
   // → 本地算泳道布局。布局永远从「当前持有数据」推导，不存在跨快照拼接错位。
-  const { rows, wireMap, virtualLaneEnd } = useMemo(() => {
+  const { rows, wireMap, virtualLaneEnd, dividerRow } = useMemo(() => {
     const seen = new Set<string>();
     const list: CommitEntry[] = [];
     for (const page of commits.data?.pages ?? []) {
@@ -601,13 +604,19 @@ function CommitGraphSection({
       }
     }
 
-    const { nodes, wires } = computeGraph([...virtual, ...(mode === 'lite' ? simplifyLite(decorated) : decorated)]);
+    const lite = mode === 'lite' ? simplifyLite(decorated, LITE_KEEP_RECENT) : null;
+    const { nodes, wires } = computeGraph([...virtual, ...(lite ?? decorated)]);
     const map = new Map<number, GraphWire[]>();
     for (const w of wires) map.set(w.row, [...(map.get(w.row) ?? []), w]);
     // 虚拟节点（未提交改动）独用灰色：与已提交节点一眼区分。
     // 置灰范围只到「虚拟节点 → 其 HEAD」为止：HEAD 之下同泳道的线属于真实历史，
     // 记 lane → HEAD 行号，灰线段判 row < headRow（HEAD 未加载则整段可见线全灰）
     const nodesOf = new Map(nodes.map((n, i) => [n.sha, i]));
+    // 轻量模式「最近 N 个」区域的下边界行（第 N 个提交所在行；列表比 N 长才画）
+    const dividerRow =
+      lite && decorated.length > LITE_KEEP_RECENT
+        ? (nodesOf.get(decorated[LITE_KEEP_RECENT - 1].sha) ?? -1)
+        : -1;
     const virtualLaneEnd = new Map<number, number>();
     for (const n of nodes) {
       if (!('worktree' in n && n.worktree)) continue;
@@ -615,7 +624,7 @@ function CommitGraphSection({
       const headRow = head != null ? (nodesOf.get(head) ?? nodes.length) : 0;
       virtualLaneEnd.set(n.lane, headRow);
     }
-    return { rows: nodes, wireMap: map, virtualLaneEnd };
+    return { rows: nodes, wireMap: map, virtualLaneEnd, dividerRow };
   }, [commits.data, worktrees.data, hiddenWorktrees, mode]);
 
   // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
@@ -684,24 +693,33 @@ function CommitGraphSection({
       <Switch checked={mode === 'lite'} onCheckedChange={toggleMode} aria-label="轻量拓扑" />
     </div>
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-      {rows.map((c, i) => (
-        <CommitRow
-          key={c.sha}
-          c={c}
-          laneWidth={laneWidth}
-          wires={wireMap.get(i - 1) ?? []}
-          virtualLaneEnd={virtualLaneEnd}
-          params={params}
-          active={c.sha === focusSha}
-          onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
-        />
-      ))}
-      <div ref={sentinelRef} className="h-8" />
-      {commits.isFetchingNextPage ? (
-        <div className="pb-2 text-center text-xs text-muted-foreground">加载中…</div>
-      ) : !commits.hasNextPage && rows.length > 0 ? (
-        <div className="pb-2 text-center text-xs text-muted-foreground">— 没有更多了 —</div>
-      ) : null}
+      <div className="relative">
+        {/* 轻量模式「最近 N 个」下边界：overlay 画虚线，不占行高（不破坏行内 SVG 对齐） */}
+        {dividerRow >= 0 ? (
+          <div
+            className="pointer-events-none absolute inset-x-0 z-10 border-t border-dashed border-muted-foreground/50"
+            style={{ top: (dividerRow + 1) * ROW_H }}
+          />
+        ) : null}
+        {rows.map((c, i) => (
+          <CommitRow
+            key={c.sha}
+            c={c}
+            laneWidth={laneWidth}
+            wires={wireMap.get(i - 1) ?? []}
+            virtualLaneEnd={virtualLaneEnd}
+            params={params}
+            active={c.sha === focusSha}
+            onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
+          />
+        ))}
+        <div ref={sentinelRef} className="h-8" />
+        {commits.isFetchingNextPage ? (
+          <div className="pb-2 text-center text-xs text-muted-foreground">加载中…</div>
+        ) : !commits.hasNextPage && rows.length > 0 ? (
+          <div className="pb-2 text-center text-xs text-muted-foreground">— 没有更多了 —</div>
+        ) : null}
+      </div>
     </div>
     </>
   );

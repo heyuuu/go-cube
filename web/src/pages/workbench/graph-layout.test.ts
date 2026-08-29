@@ -303,6 +303,22 @@ describe('simplifyLite', () => {
     expect(out[0].parents).toEqual(['root']);
   });
 
+  it('keepRecent：顶部最近 N 个无条件保留', () => {
+    const list: LiteEntry[] = [
+      { sha: 'r5', parents: ['r4'] },
+      { sha: 'r4', parents: ['r3'] },
+      { sha: 'r3', parents: ['r2'] },
+      { sha: 'r2', parents: ['r1'] },
+      { sha: 'r1', parents: ['tip'], refs: ['main'] },
+      { sha: 'tip', parents: ['root'] },
+      { sha: 'root', parents: [] },
+    ];
+    const out = simplifyLite(list, 5);
+    expect(out.map((c) => c.sha)).toEqual(['r5', 'r4', 'r3', 'r2', 'r1', 'root']);
+    expect(out[0].parents).toEqual(['r4']);
+    expect(out[4].parents).toEqual(['root']); // r1 的边越过隐藏的 tip 重接到 root
+  });
+
   it('父提交超出已加载范围（链断裂）时丢弃该边', () => {
     const list: LiteEntry[] = [
       { sha: 'tip', parents: ['a'], refs: ['main'] },

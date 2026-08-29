@@ -17,12 +17,13 @@
 // 该节点的泳道（线进入节点）。分段表达使渲染端无需建模跨行整线。
 
 // 轻量模式简化（纯前端）：只保留「拓扑骨架」——带 ref 的提交（分支/tag/HEAD）、
-// merge 提交、分叉点（children > 1）——其余线性节点隐藏；隐藏段的边重接到
-// 最近的保留祖先，保证分支切出/汇合的形状不断线。
+// merge 提交、分叉点（children > 1）、根提交，以及最近 keepRecent 个提交——
+// 其余线性节点隐藏；隐藏段的边重接到最近的保留祖先，保证分支切出/汇合的形状不断线。
 // 已知退化：若 merge 的两条父链在被隐藏后汇到同一保留祖先（如两侧链上都没有
 // 任何 ref），去重后 merge 会塌成单父直线——分支 tip 通常带 ref，实践中罕见。
 export function simplifyLite<T extends { sha: string; parents?: string[] | null; refs?: readonly unknown[] | null }>(
   commits: readonly T[],
+  keepRecent = 0,
 ): T[] {
   const bySha = new Map(commits.map((c) => [c.sha, c]));
   const childrenCount = new Map<string, number>();
@@ -32,7 +33,8 @@ export function simplifyLite<T extends { sha: string; parents?: string[] | null;
   const kept = new Set(
     commits
       .filter(
-        (c) =>
+        (c, i) =>
+          i < keepRecent || // 顶部最近 N 个无条件保留（渲染端在 N 边界画虚线分割）
           (c.parents ?? []).length === 0 || // 根提交 = 链的终点，保留
           (c.refs?.length ?? 0) > 0 ||
           (c.parents ?? []).length > 1 ||
