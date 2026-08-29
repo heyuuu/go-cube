@@ -11,7 +11,7 @@ p() {
 # cube path 的 TUI 画在 /dev/tty，stdout 只有干净的一行路径，可安全被 $( ) 捕获；
 # 取消/非 TTY 多目标时 cube 以非零码退出，此处直接返回不 cd
 pz() {
-	local path
-	path=$(cube path "$@") || return
-	[[ -n $path ]] && cd -- "$path"
+	local dir
+	dir=$(cube path "$@") || return
+	[[ -n $dir ]] && cd -- "$dir"
 }
