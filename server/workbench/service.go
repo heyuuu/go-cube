@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 
+	"cube/project/workspace"
 	"cube/util/git"
 	"cube/util/slicekit"
 
@@ -160,6 +161,7 @@ func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
 			item.Dirty, item.Ahead, item.Behind = st.Dirty, st.Ahead, st.Behind
 			item.Staged, item.Unstaged, item.Untracked = st.Staged, st.Unstaged, st.Untracked
 		}
+		item.Workspaces = workspace.Resolve(wt.Path)
 		result = append(result, item)
 	}
 	return result, nil

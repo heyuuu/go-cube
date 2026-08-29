@@ -1340,6 +1340,7 @@ export interface components {
     };
     WhoamiResponse: {
       app: string;
+      instance: string;
       version: string;
     };
     Workspace: {
@@ -1424,6 +1425,7 @@ export interface components {
       unstaged: number;
       /** Format: int64 */
       untracked: number;
+      workspaces: components['schemas']['Workspace'][] | null;
     };
   };
   responses: never;

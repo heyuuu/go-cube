@@ -1,6 +1,7 @@
 import {
   Check,
   ChevronDown,
+  ChevronRight,
   Cloud,
   Copy,
   ExternalLink,
@@ -117,6 +118,16 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
       {branchAddOpen ? <BranchAddDialog path={path} onClose={() => setBranchAddOpen(false)} /> : null}
     </div>
   );
+}
+
+// workspace 子行展开态持久化（与 worktree-visibility 同款模式）
+const WS_EXPANDED_KEY = 'cube.workbench.wsExpanded';
+function loadWsExpanded(): Set<string> {
+  try {
+    return new Set<string>(JSON.parse(localStorage.getItem(WS_EXPANDED_KEY) ?? '[]'));
+  } catch {
+    return new Set<string>();
+  }
 }
 
 // --- 工作副本状态区 ---
@@ -329,51 +340,93 @@ function WorktreeRow({
   // hover/选中态放整行容器（前后的开关/opener 按钮同属一行，只亮中间段会很碎）
   const selected = sameSource(params.current, src) || sameSource(params.base, src);
 
+  // workspace 子行展开态：与副本显隐开关同款 localStorage 持久化
+  const wsList = wt.workspaces ?? [];
+  const [wsExpanded, setWsExpanded] = useState(() => loadWsExpanded().has(wt.path));
+  const toggleWs = () => {
+    const next = new Set(loadWsExpanded());
+    if (next.has(wt.path)) next.delete(wt.path);
+    else next.add(wt.path);
+    localStorage.setItem(WS_EXPANDED_KEY, JSON.stringify([...next]));
+    setWsExpanded(next.has(wt.path));
+  };
+
   return (
-    <div
-      className={cn(
-        'group flex items-center transition-colors hover:bg-accent',
-        selected && 'bg-primary/15',
-        hidden && 'opacity-50',
-      )}
-    >
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        title={hidden ? '在 commit 图中展示该副本' : '在 commit 图中隐藏该副本'}
-        aria-label={hidden ? `展示 ${name}` : `隐藏 ${name}`}
-        onClick={onToggle}
+    <div className="w-full">
+      <div
+        className={cn(
+          'group flex items-center transition-colors hover:bg-accent',
+          selected && 'bg-primary/15',
+          hidden && 'opacity-50',
+        )}
       >
-        {hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
-      </Button>
-      <SelectableRow
-        label={name}
-        source={src}
-        params={params}
-        title={wt.path}
-        afterSelect={afterSelect}
-        bare
-        badges={
-          <>
-            {wt.branch ? <Badge variant="secondary">{wt.branch}</Badge> : null}
-            {wt.bare ? <Badge variant="outline">bare</Badge> : null}
-            {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
-            {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
-            {wt.dirty ? (
-              <Badge variant="destructive" className="px-1">
-                脏 {wt.staged + wt.unstaged + wt.untracked}
-              </Badge>
-            ) : null}
-            {wt.detached ? <Badge variant="outline">detached</Badge> : null}
-          </>
-        }
-      />
-      <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100">
-        <Button variant="ghost" size="icon-sm" title="删除该 worktree" aria-label={`删除 ${name}`} onClick={onRemove}>
-          <Trash2 className="size-3.5" />
+        {wsList.length > 0 && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0"
+            title={wsExpanded ? '收起 workspace' : `展开 ${wsList.length} 个 workspace`}
+            aria-label={wsExpanded ? `收起 ${name} 的 workspace` : `展开 ${name} 的 workspace`}
+            aria-expanded={wsExpanded}
+            onClick={toggleWs}
+          >
+            <ChevronRight className={cn('size-3.5 transition-transform', wsExpanded && 'rotate-90')} />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          title={hidden ? '在 commit 图中展示该副本' : '在 commit 图中隐藏该副本'}
+          aria-label={hidden ? `展示 ${name}` : `隐藏 ${name}`}
+          onClick={onToggle}
+        >
+          {hidden ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
         </Button>
+        <SelectableRow
+          label={name}
+          source={src}
+          params={params}
+          title={wt.path}
+          afterSelect={afterSelect}
+          bare
+          badges={
+            <>
+              {wt.branch ? <Badge variant="secondary">{wt.branch}</Badge> : null}
+              {wt.bare ? <Badge variant="outline">bare</Badge> : null}
+              {wt.ahead > 0 ? <Badge variant="secondary">↑{wt.ahead}</Badge> : null}
+              {wt.behind > 0 ? <Badge variant="secondary">↓{wt.behind}</Badge> : null}
+              {wt.dirty ? (
+                <Badge variant="destructive" className="px-1">
+                  脏 {wt.staged + wt.unstaged + wt.untracked}
+                </Badge>
+              ) : null}
+              {wt.detached ? <Badge variant="outline">detached</Badge> : null}
+            </>
+          }
+        />
+        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity hover:opacity-100 group-hover:opacity-100">
+          <Button variant="ghost" size="icon-sm" title="删除该 worktree" aria-label={`删除 ${name}`} onClick={onRemove}>
+            <Trash2 className="size-3.5" />
+          </Button>
+        </div>
+        <WorktreeOpenActions path={wt.path} name={name} />
       </div>
-      <WorktreeOpenActions path={wt.path} name={name} />
+      {wsExpanded &&
+        wsList.map((w) => {
+          // 子行不可选中（不是 TreeSource，纯打开入口）：目录名 + 相对路径 + 各自的打开动作
+          const wsDir = wt.path.replace(/\/$/, '') + '/' + w.path;
+          return (
+            <div key={wsDir} className="flex items-center pl-8 text-xs text-muted-foreground hover:bg-accent">
+              <span className="shrink-0">{w.name}</span>
+              <span className="ml-2 min-w-0 truncate font-mono text-[10px] opacity-70" title={wsDir}>
+                {w.path}
+              </span>
+              <div className="ml-auto flex shrink-0 items-center">
+                <WorktreeOpenActions path={wsDir} name={w.name} />
+              </div>
+            </div>
+          );
+        })}
     </div>
   );
 }

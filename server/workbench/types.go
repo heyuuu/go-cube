@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"cube/project/workspace"
 	"cube/util/git"
 )
 
@@ -57,6 +58,11 @@ type WorktreeStatus struct {
 	Staged    int    `json:"staged"`    // 暂存区变更文件数
 	Unstaged  int    `json:"unstaged"`  // 工作区变更文件数（不含 untracked）
 	Untracked int    `json:"untracked"` // 未跟踪文件数
+
+	// 该副本根的 workspace 成员（1030；Path 相对副本根）。工作台 git 信息本就走实时
+	// 读取（不走 projcache 快照），workspace 解析同样实时——直接 import project/workspace
+	// 纯函数包（叶子包，无反向依赖，不同于经 app 注入的 cacheRefresh 回调）
+	Workspaces []workspace.Workspace `json:"workspaces"`
 }
 
 // --- 文件树 / 文件读写 / diff（代码阅读面板与 diff 面板）---
