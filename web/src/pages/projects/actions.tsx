@@ -1,5 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { ChevronDown, Copy, Folder, GitBranch, Layers } from 'lucide-react';
+import { Copy, Ellipsis, Folder, GitBranch, Layers } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -118,7 +118,7 @@ export function ProjectActions({
       {quickOpens.filter((q) => openerNames.has(q.name)).map(quickButton)}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
-          <ChevronDown className="size-3.5" />
+          <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
@@ -235,7 +235,7 @@ export function TargetRowActions({
         })}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${target.label}`} />}>
-          <ChevronDown className="size-3.5" />
+          <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(target.dir || p.path)}>

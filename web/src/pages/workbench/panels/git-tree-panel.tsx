@@ -1,6 +1,5 @@
 import {
   Check,
-  ChevronDown,
   ChevronRight,
   Cloud,
   Copy,
@@ -11,6 +10,7 @@ import {
   Monitor,
   Plus,
   Trash2,
+  Ellipsis,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
@@ -465,7 +465,7 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
       })}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${name}`} />}>
-          <ChevronDown className="size-3.5" />
+          <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(path)}>
