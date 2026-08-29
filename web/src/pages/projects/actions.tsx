@@ -39,11 +39,13 @@ export function ProjectActions({
   openerList,
   open,
   onOpen,
+  quickDirect = false,
 }: {
   p: Project;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string, dir?: string) => void;
+  quickDirect?: boolean; // 快捷位直达根目录、不挂目标菜单（目标选择交给展开的目标子行）
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
@@ -54,15 +56,6 @@ export function ProjectActions({
     open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const openTarget = (opener: string, dir: string) => onOpen(p.path, opener, dir || undefined);
 
-  // 目标条目的身份图标（按 kind 配色，与文字 label 双通道区分）：
-  // 根目录=目录（前景色）、worktree=紫罗兰（与 ⎇ 计数徽标同族）、workspace=绿。
-  // 不再复用 opener 图标——同一菜单内每项都一样，无区分度
-  const targetIcon = (kind: TargetKind) => {
-    if (kind === 'workspace') return <Layers className="size-3.5 text-emerald-600 dark:text-emerald-400" />;
-    if (kind === 'worktree') return <GitBranch className="size-3.5 text-violet-600 dark:text-violet-400" />;
-    return <Folder className="size-3.5 text-muted-foreground" />;
-  };
-
   const targetMenuItems = (targets: ProjectTarget[], openerName: string) =>
     targets.map((t) => (
       <DropdownMenuItem
@@ -70,7 +63,7 @@ export function ProjectActions({
         onClick={() => openTarget(openerName, t.dir)}
         disabled={isPending(openerName)}
       >
-        {targetIcon(t.kind)}
+        <TargetKindIcon kind={t.kind} />
         {t.label}
       </DropdownMenuItem>
     ));
@@ -78,8 +71,8 @@ export function ProjectActions({
   const quickButton = (q: QuickOpen) => {
     const op = openerByName.get(q.name);
     if (!op) return null;
-    // 该快捷位实际可选的目标（策略筛过）；筛剩单目标时点击直达
-    const targets = filterTargets(allTargets, q.targets);
+    // 该快捷位实际可选的目标（策略筛过）；筛剩单目标（或快捷位被简化为直达）时点击直达
+    const targets = quickDirect ? allTargets.slice(0, 1) : filterTargets(allTargets, q.targets);
     if (targets.length === 1) {
       return (
         <Button
@@ -158,6 +151,15 @@ export function ProjectActions({
   );
 }
 
+// 目标条目的身份图标（按 kind 配色，与文字 label 双通道区分）：
+// 根目录=目录（前景色）、worktree=紫罗兰（与 ⎇ 计数徽标同族）、workspace=绿。
+// 不复用 opener 图标——同一菜单内每项都一样，无区分度
+export function TargetKindIcon({ kind }: { kind: TargetKind }) {
+  if (kind === 'workspace') return <Layers className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />;
+  if (kind === 'worktree') return <GitBranch className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" />;
+  return <Folder className="size-3.5 shrink-0 text-muted-foreground" />;
+}
+
 // worktree 计数徽标（多目标项目的行内提示，1032）。
 // 紫罗兰专属配色：与 tag 徽标（default/outline）和 git 状态徽标视觉区分
 export function WorktreeCountBadge({ p }: { p: Project }) {
@@ -185,5 +187,47 @@ export function TagBadges({ tags, className }: { tags?: string[] | null; classNa
         </Badge>
       ))}
     </span>
+  );
+}
+
+// 展开的目标子行的动作位：按快捷位策略给该目标内联直达图标
+// （stree 行只出现在仓库根目标上、cube-workbench 只在主根上，策略见 shared.tsx）。
+export function TargetRowActions({
+  p,
+  target,
+  openerList,
+  open,
+  onOpen,
+}: {
+  p: Project;
+  target: ProjectTarget;
+  openerList: Opener[];
+  open: ReturnType<typeof useProjectOpen>;
+  onOpen: (path: string, opener: string, dir?: string) => void;
+}) {
+  const openerByName = new Map(openerList.map((op) => [op.name, op]));
+  const isPending = (name: string) =>
+    open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
+  return (
+    <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
+      {quickOpens
+        .filter((q) => openerByName.has(q.name) && filterTargets([target], q.targets).length > 0)
+        .map((q) => {
+          const op = openerByName.get(q.name)!;
+          return (
+            <Button
+              key={q.name}
+              variant="ghost"
+              size="icon-sm"
+              title={`${op.title} · ${target.label}`}
+              aria-label={`${op.title}（${p.name} ${target.label}）`}
+              disabled={isPending(q.name)}
+              onClick={() => onOpen(p.path, q.name, target.dir || undefined)}
+            >
+              {renderIcon(op.icon, null)}
+            </Button>
+          );
+        })}
+    </div>
   );
 }

@@ -36,9 +36,9 @@ import { cn } from '@/lib/utils';
 import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
-import { ProjectActions, WorktreeCountBadge } from './actions';
+import { ProjectActions, TargetKindIcon, TargetRowActions, WorktreeCountBadge } from './actions';
 import { ProjectDrawer } from './drawer';
-import { tagVariants } from './shared';
+import { projectTargets, tagVariants } from './shared';
 
 type GitStatus = 'clean' | 'dirty' | 'ahead' | 'behind' | 'none';
 
@@ -369,6 +369,23 @@ export function ProjectsPage() {
 
   const mode: 'table' | 'tree' = searchParams.get('view') === 'tree' ? 'tree' : 'table';
   const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set());
+
+  // 多目标项目展开的目标子行（localStorage 持久化，key 收敛项目路径）
+  const [targetExpanded, setTargetExpanded] = useState<ReadonlySet<string>>(() => {
+    try {
+      return new Set<string>(JSON.parse(localStorage.getItem('cube.projects.expanded') ?? '[]'));
+    } catch {
+      return new Set<string>();
+    }
+  });
+  const toggleTargetExpanded = (path: string) =>
+    setTargetExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      localStorage.setItem('cube.projects.expanded', JSON.stringify([...next]));
+      return next;
+    });
 
   const projects = list.data?.list ?? [];
   const home = guessHome(projects.map((p) => p.path));
@@ -713,67 +730,126 @@ export function ProjectsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sorted.map((p) => (
-                  <TableRow
-                    key={p.path}
-                    className={cn('cursor-pointer', selected.has(p.path) && 'bg-muted/50')}
-                    onClick={() => setDrawer(p)}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.has(p.path)}
-                        onCheckedChange={() => toggleSelect(p.path)}
-                        aria-label={`选择 ${p.name}`}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <button
-                          type="button"
-                          className="text-left text-xs font-medium hover:underline"
-                          onClick={() => setDrawer(p)}
-                        >
-                          {p.name}
-                        </button>
-                        {(p.tags ?? []).map((t) => (
-                          <ClickBadge
-                            key={t}
-                            variant={tagVariants[t] ?? 'outline'}
-                            title={`筛选 tag：${t}`}
-                            onClick={() => toggleTagSolo(t)}
+                {sorted.flatMap((p) => {
+                  const targets = projectTargets(p);
+                  const multi = targets.length > 1;
+                  const expanded = targetExpanded.has(p.path);
+                  return [
+                    <TableRow
+                      key={p.path}
+                      className={cn('cursor-pointer', selected.has(p.path) && 'bg-muted/50')}
+                      onClick={() => setDrawer(p)}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selected.has(p.path)}
+                          onCheckedChange={() => toggleSelect(p.path)}
+                          aria-label={`选择 ${p.name}`}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          {multi && (
+                            <button
+                              type="button"
+                              className="text-muted-foreground hover:text-foreground"
+                              title={expanded ? '收起目标' : `展开 ${targets.length - 1} 个目标`}
+                              aria-label={expanded ? `收起 ${p.name} 目标` : `展开 ${p.name} 目标`}
+                              aria-expanded={expanded}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleTargetExpanded(p.path);
+                              }}
+                            >
+                              <ChevronRight className={cn('size-3.5 transition-transform', expanded && 'rotate-90')} />
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="text-left text-xs font-medium hover:underline"
+                            onClick={() => setDrawer(p)}
                           >
-                            {t}
-                          </ClickBadge>
-                        ))}
-                        <WorktreeCountBadge p={p} />
-                      </div>
-                      <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
-                        {prettyPath(p.path, home)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <ClickBadge
-                        variant="secondary"
-                        title={`筛选 group：${p.group}`}
-                        onClick={() => toggleGroupSolo(p.group)}
-                      >
-                        <span className="flex items-center gap-1">
-                          {renderIcon(groupIcons.get(p.group), null)}
-                          {p.group}
-                        </span>
-                      </ClickBadge>
-                    </TableCell>
-                    <TableCell>
-                      <GitCell p={p} onFilter={toggleGitSolo} />
-                    </TableCell>
-                    <TableCell>{p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}</TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex justify-end">
-                        <ProjectActions p={p} openerList={openerList} open={open} onOpen={openProject} />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                            {p.name}
+                          </button>
+                          {(p.tags ?? []).map((t) => (
+                            <ClickBadge
+                              key={t}
+                              variant={tagVariants[t] ?? 'outline'}
+                              title={`筛选 tag：${t}`}
+                              onClick={() => toggleTagSolo(t)}
+                            >
+                              {t}
+                            </ClickBadge>
+                          ))}
+                          <WorktreeCountBadge p={p} />
+                        </div>
+                        <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
+                          {prettyPath(p.path, home)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <ClickBadge
+                          variant="secondary"
+                          title={`筛选 group：${p.group}`}
+                          onClick={() => toggleGroupSolo(p.group)}
+                        >
+                          <span className="flex items-center gap-1">
+                            {renderIcon(groupIcons.get(p.group), null)}
+                            {p.group}
+                          </span>
+                        </ClickBadge>
+                      </TableCell>
+                      <TableCell>
+                        <GitCell p={p} onFilter={toggleGitSolo} />
+                      </TableCell>
+                      <TableCell>{p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}</TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <div className="flex justify-end">
+                          {/* 多目标项目快捷位直达根目录（目标选择交给展开的子行）；全量下拉仍可选目标 */}
+                          <ProjectActions
+                            p={p}
+                            openerList={openerList}
+                            open={open}
+                            onOpen={openProject}
+                            quickDirect={multi}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>,
+                    ...(expanded
+                      ? targets.slice(1).map((t) => (
+                          <TableRow key={p.path + '\x00' + (t.dir || 'root')} className="text-muted-foreground">
+                            <TableCell />
+                            <TableCell>
+                              <div className="flex items-center gap-1.5 pl-6 text-xs">
+                                <TargetKindIcon kind={t.kind} />
+                                <span className="shrink-0" title={t.dir || p.path}>
+                                  {t.label}
+                                </span>
+                                <span className="truncate font-mono text-[10px] opacity-70" title={t.dir || p.path}>
+                                  {prettyPath(t.dir || p.path, home)}
+                                </span>
+                              </div>
+                            </TableCell>
+                            <TableCell />
+                            <TableCell />
+                            <TableCell />
+                            <TableCell onClick={(e) => e.stopPropagation()}>
+                              <div className="flex justify-end">
+                                <TargetRowActions
+                                  p={p}
+                                  target={t}
+                                  openerList={openerList}
+                                  open={open}
+                                  onOpen={openProject}
+                                />
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      : []),
+                  ];
+                })}
               </TableBody>
             </Table>
 
