@@ -38,18 +38,17 @@ install: build-ui
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
 	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
+
 	# 关闭旧版本 server（服务未运行时 stop 会非零退出，- 忽略）
 	-@cube server stop 2>/dev/null
-	# cubex 是本目录模式 wrapper：cubex <args> == cube <args> --local（query 缺省以 cwd 定位项目）
-	@printf '#!/bin/sh\nexec $(GOBIN_DIR)/cube "$$@" --local\n' > $(GOBIN_DIR)/cubex
-	@chmod +x $(GOBIN_DIR)/cubex
+
+	# 旧版本遗留的 cubex wrapper（已废弃，shell 侧改用 scripts/zsh-append.sh 的 p）
+	-@rm -f $(GOBIN_DIR)/cubex
 	cube version
-	# install zsh completion（末尾追加 compdef，让 cubex 复用 _cube 的补全）
+	# install zsh completion + shell 扩展（p / pz，见 scripts/zsh-append.sh）
+	# completion 生成是覆盖写，重复 install 不会累积
 	cube completion zsh > $(ZSH_COMPLETION_FILE)
-	echo "compdef _cube cubex" >> $(ZSH_COMPLETION_FILE)
-	# 追加 shell 跳转包装：cube path 在 stdout 输出路径，cd 必须由 shell 执行
-	# （子进程无法改父 shell 的 cwd）。completion 生成是覆盖写，重复 install 不会累积
-	cat scripts/zsh-jump.sh >> $(ZSH_COMPLETION_FILE)
+	cat scripts/zsh-append.sh >> $(ZSH_COMPLETION_FILE)
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
 	@set -e; \

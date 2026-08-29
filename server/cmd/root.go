@@ -109,7 +109,7 @@ func Execute() {
 	// cmd 上绑定全局 flag，仅用于生成 help 提示(此时 --config/--debug/--local 早解析完了)
 	cmd.PersistentFlags().String("config", defaultConfigPath(), fmt.Sprintf("config file (default is %s)", defaultConfigPath()))
 	cmd.PersistentFlags().BoolP("debug", "D", false, "enable debug mode")
-	cmd.PersistentFlags().Bool("local", false, "query 缺省时以当前目录定位项目（cubex 入口即此模式）")
+	cmd.PersistentFlags().Bool("local", false, "query 缺省时以当前目录定位项目（shell 函数 p 即此模式）")
 
 	// 执行命令
 	err = cmd.Execute()

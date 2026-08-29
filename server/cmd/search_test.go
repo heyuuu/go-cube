@@ -57,7 +57,7 @@ func TestSearchProjects_PathQueryCwd(t *testing.T) {
 	}
 }
 
-// TestPickProject_LocalMode 验证 --local（cubex 入口）模式：
+// TestPickProject_LocalMode 验证 --local（p 入口）模式：
 //   - query 缺省以 cwd 为起点定位项目（子目录内向上标定项目根）；
 //   - 非 local 模式下 query 空匹配多个项目，非 TTY 无法交互选择而报错（守住原有行为）；
 //   - 显式 query 不受 --local 干预，仍按名称搜索。
