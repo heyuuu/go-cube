@@ -40,6 +40,7 @@ func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/workbench/changes", "列出源相对上一版本的变更文件", h.changes)
 	web.ApiPost(api, "/api/workbench/worktree/add", "新增 worktree", h.worktreeAdd)
 	web.ApiPost(api, "/api/workbench/worktree/remove", "删除 worktree（非 force 预检拒绝返回 denied+reasons）", h.worktreeRemove)
+	web.ApiPost(api, "/api/workbench/worktree/reset", "重置 worktree 到指定分支/commit（可选 hard）", h.worktreeReset)
 	web.ApiPost(api, "/api/workbench/branch/add", "新建本地分支（不检出）", h.branchAdd)
 	web.ApiPost(api, "/api/workbench/branch/delete", "删除本地分支", h.branchDelete)
 
@@ -195,6 +196,20 @@ func (h *WorkbenchHandler) worktreeRemove(input struct {
 		return nil, err
 	}
 	return &worktreeRemoveResult{}, nil
+}
+
+// worktreeReset 把 path 所在副本重置到 target（分支名/commit/tag）；hard = --hard。
+func (h *WorkbenchHandler) worktreeReset(input struct {
+	Body struct {
+		Path   string `json:"path"`
+		Target string `json:"target"`
+		Hard   bool   `json:"hard,omitempty"`
+	}
+}) (map[string]any, error) {
+	if err := h.workbenchService.WorktreeReset(input.Body.Path, input.Body.Target, input.Body.Hard); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
 }
 
 func (h *WorkbenchHandler) branchAdd(input struct {

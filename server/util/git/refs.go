@@ -225,6 +225,38 @@ func BranchDelete(path string, branch string, force bool) error {
 	return nil
 }
 
+// Reset 把 path 仓库的 HEAD 重置到 target（分支名/commit/tag）。hard 决定语义：
+//   - false：默认 mixed——移动 HEAD 并重置暂存区，工作区改动保留；
+//   - true：--hard——暂存区与工作区改动一并丢弃，不可恢复。
+//     注意：reset --hard 不碰未跟踪文件，需要一并清掉新增文件时随后调用 Clean。
+//
+// 不做「脏工作区」预检：hard 丢弃改动是调用方（前端弹窗）显式确认过的选择。
+// target 不存在等拒绝翻译成中文上抛（stderr 在 runOutRaw 的 C locale 注入下稳定为英文）。
+func Reset(path string, target string, hard bool) error {
+	args := []string{"reset", target}
+	if hard {
+		args = append(args, "--hard")
+	}
+	_, stderr, err := runOutRaw(path, args...)
+	if err != nil {
+		lower := strings.ToLower(stderr)
+		if strings.Contains(lower, "unknown revision") || strings.Contains(lower, "ambiguous argument") {
+			return errors.New("重置目标不存在: " + target)
+		}
+		return fmt.Errorf("git reset 执行失败: %w", err)
+	}
+	return nil
+}
+
+// Clean 删除 path 仓库的未跟踪文件与目录（git clean -fd，不碰 .gitignore 忽略的文件）。
+// 典型组合：Reset --hard 之后调用它清掉残留的新增文件——reset 不碰未跟踪文件。
+func Clean(path string) error {
+	if _, _, err := runOutRaw(path, "clean", "-fd"); err != nil {
+		return fmt.Errorf("git clean 执行失败: %w", err)
+	}
+	return nil
+}
+
 // HeadSha 返回 path 仓库 HEAD 指向 commit 的完整 sha（detached HEAD 同样适用）。
 // 空仓库（尚无任何 commit）时 rev-parse 报错，原样返回错误。
 // 只需 sha 时不要改用 LoadRepoStatus 的 Sha 字段——status 要扫描工作区，

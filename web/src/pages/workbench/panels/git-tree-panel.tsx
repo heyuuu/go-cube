@@ -7,8 +7,10 @@ import {
   Eye,
   EyeOff,
   GitBranch,
+  GitFork,
   Monitor,
   Plus,
+  RotateCcw,
   Trash2,
   Ellipsis,
 } from 'lucide-react';
@@ -41,7 +43,7 @@ import {
   type WorktreeStatus,
 } from '@/queries/workbench';
 
-import { computeGraph, type GraphWire, type LaneInfo } from '../graph-layout';
+import { computeGraph, simplifyLite, type GraphWire, type LaneInfo } from '../graph-layout';
 import {
   refShortName,
   sameSource,
@@ -52,7 +54,13 @@ import {
 } from '../params';
 import { useWorktreeVisibility } from '../worktree-visibility';
 
-import { BranchAddDialog, BranchDeleteDialog, WorktreeAddDialog, WorktreeRemoveDialog } from './worktree-write';
+import {
+  BranchAddDialog,
+  BranchDeleteDialog,
+  WorktreeAddDialog,
+  WorktreeRemoveDialog,
+  WorktreeResetDialog,
+} from './worktree-write';
 
 // git 树面板（提案 1011）：工作台默认入口，取代 SourceTree 的核心视图。
 // 上段 = 工作副本状态区（worktree 分组，各自分支/ahead-behind/脏状态）；
@@ -128,6 +136,13 @@ function loadWsExpanded(): Set<string> {
   } catch {
     return new Set<string>();
   }
+}
+
+// commit 图展示模式持久化（与 wsExpanded 同款模式）：
+// full = 全量提交；lite = 轻量拓扑（只留 ref/merge/分叉点，见 simplifyLite）
+const GRAPH_MODE_KEY = 'cube.workbench.gitTree.mode';
+function loadGraphMode(): 'full' | 'lite' {
+  return localStorage.getItem(GRAPH_MODE_KEY) === 'lite' ? 'lite' : 'full';
 }
 
 // --- 工作副本状态区 ---
@@ -342,6 +357,7 @@ function WorktreeRow({
 
   // workspace 子行展开态：与副本显隐开关同款 localStorage 持久化
   const wsList = wt.workspaces ?? [];
+  const [resetOpen, setResetOpen] = useState(false);
   const [wsExpanded, setWsExpanded] = useState(() => loadWsExpanded().has(wt.path));
   const toggleWs = () => {
     const next = new Set(loadWsExpanded());
@@ -409,8 +425,11 @@ function WorktreeRow({
             <Trash2 className="size-3.5" />
           </Button>
         </div>
-        <WorktreeOpenActions path={wt.path} name={name} />
+        <WorktreeOpenActions path={wt.path} name={name} onReset={() => setResetOpen(true)} />
       </div>
+      {resetOpen ? (
+        <WorktreeResetDialog wtPath={wt.path} branch={wt.branch || undefined} onClose={() => setResetOpen(false)} />
+      ) : null}
       {wsExpanded &&
         wsList.map((w) => {
           // 子行不可选中（不是 TreeSource，纯打开入口）：目录名 + 相对路径 + 各自的打开动作
@@ -436,7 +455,8 @@ function WorktreeRow({
 // 须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
 const QUICK_OPENS = ['finder', 'stree'];
 
-function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
+// onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）
+function WorktreeOpenActions({ path, name, onReset }: { path: string; name: string; onReset?: () => void }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
   const openerList = openers.data?.list ?? [];
@@ -472,6 +492,15 @@ function WorktreeOpenActions({ path, name }: { path: string; name: string }) {
             <Copy className="mr-1 size-3" />
             复制绝对路径
           </DropdownMenuItem>
+          {onReset ? (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onReset}>
+                <RotateCcw className="mr-1 size-3" />
+                重置到指定位置
+              </DropdownMenuItem>
+            </>
+          ) : null}
           <DropdownMenuSeparator />
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
           <DropdownMenuGroup>
@@ -512,6 +541,12 @@ function CommitGraphSection({
 }) {
   const commits = useWorkbenchCommits(path);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const [mode, setMode] = useState<'full' | 'lite'>(loadGraphMode);
+  const toggleMode = () => {
+    const next = mode === 'full' ? 'lite' : 'full';
+    setMode(next);
+    localStorage.setItem(GRAPH_MODE_KEY, next);
+  };
 
   // 无限滚动：哨兵进入视口即拉下一页
   useEffect(() => {
@@ -566,7 +601,7 @@ function CommitGraphSection({
       }
     }
 
-    const { nodes, wires } = computeGraph([...virtual, ...decorated]);
+    const { nodes, wires } = computeGraph([...virtual, ...(mode === 'lite' ? simplifyLite(decorated) : decorated)]);
     const map = new Map<number, GraphWire[]>();
     for (const w of wires) map.set(w.row, [...(map.get(w.row) ?? []), w]);
     // 虚拟节点（未提交改动）独用灰色：与已提交节点一眼区分。
@@ -581,7 +616,7 @@ function CommitGraphSection({
       virtualLaneEnd.set(n.lane, headRow);
     }
     return { rows: nodes, wireMap: map, virtualLaneEnd };
-  }, [commits.data, worktrees.data, hiddenWorktrees]);
+  }, [commits.data, worktrees.data, hiddenWorktrees, mode]);
 
   // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
   // / clean 的 HEAD 行；commit → 自身。选中态高亮不能只比对 source（ref/worktree 与
@@ -641,6 +676,18 @@ function CommitGraphSection({
   const laneWidth = LANE_X0 * 2 + (maxLane + 1) * LANE_W;
 
   return (
+    <>
+    <div className="flex shrink-0 items-center justify-end border-b border-border px-2 py-1">
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={toggleMode}
+        title={mode === 'full' ? '切换为轻量拓扑（只留分支/tag/merge/分叉点）' : '切换为完整提交列表'}
+        className={cn('text-muted-foreground', mode === 'lite' && 'text-foreground')}
+      >
+        <GitFork className="size-3" />
+      </Button>
+    </div>
     <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
       {rows.map((c, i) => (
         <CommitRow
@@ -661,6 +708,7 @@ function CommitGraphSection({
         <div className="pb-2 text-center text-xs text-muted-foreground">— 没有更多了 —</div>
       ) : null}
     </div>
+    </>
   );
 }
 
@@ -739,10 +787,14 @@ function CommitRow({
           ) : undefined
         }
         // 标签挪到 message 前；样式按 ref 类型分组（本地/远程/tag/head），
-        // 不跟泳道色——泳道色属于「分支线」，标签属于「引用」两个维度
+        // 不跟泳道色——泳道色属于「分支线」，标签属于「引用」两个维度。
+        // worktree 徽标排最前（副本是「位置」语义，优先于分支引用）
         prefixBadges={
           <>
-            {(c.refs ?? []).slice(0, 3).map((r) => (
+            {[...(c.refs ?? [])]
+              .sort((a, b) => (a.kind === 'worktree' ? -1 : b.kind === 'worktree' ? 1 : 0))
+              .slice(0, 3)
+              .map((r) => (
               <Badge
                 key={r.kind + r.name}
                 variant="outline"
@@ -773,13 +825,14 @@ function CommitRow({
   );
 }
 
-// ref 徽标按类型分组配色（与泳道色无关）：本地分支蓝、远程灰、tag 琥珀、HEAD 紫
+// ref 徽标按类型分组配色（与泳道色无关）：本地分支蓝、远程灰、tag 琥珀、HEAD 紫；
+// worktree 实心填充（其余仅描边）——副本徽标与引用徽标视觉分层
 const REF_BADGE_STYLE = {
   local: 'border-blue-500/40 text-blue-600 dark:text-blue-400',
   remote: 'border-muted-foreground/30 text-muted-foreground',
   tag: 'border-amber-500/40 text-amber-600 dark:text-amber-400',
   head: 'border-violet-500/40 text-violet-600 dark:text-violet-400',
-  worktree: 'border-cyan-500/40 text-cyan-600 dark:text-cyan-400',
+  worktree: 'border-cyan-500/50 bg-cyan-500/15 text-cyan-700 dark:text-cyan-300',
 } as const;
 
 // 泳道几何：列宽/行高/左边距；调色板与后端 color 索引对应（循环取色）

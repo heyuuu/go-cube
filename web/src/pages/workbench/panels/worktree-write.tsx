@@ -5,13 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { selectCurrent, writePathParam, type TreeSource } from '@/pages/workbench/params';
+import { refShortName, selectCurrent, writePathParam, type TreeSource } from '@/pages/workbench/params';
 import { useWorkbenchRefs } from '@/queries/workbench';
 import {
   useBranchAdd,
   useBranchDelete,
   useWorktreeAdd,
   useWorktreeRemove,
+  useWorktreeReset,
   type WorktreeStatus,
 } from '@/queries/workbench';
 
@@ -134,6 +135,82 @@ export function BranchAddDialog({ path, onClose }: { path: string; onClose: () =
           confirmDisabled={branch.trim() === ''}
           confirmText="创建"
           pending={add.isPending}
+          onConfirm={submit}
+          onCancel={onClose}
+        />
+      </form>
+    </WriteDialogShell>
+  );
+}
+
+// --- 重置 worktree ---
+
+export function WorktreeResetDialog({
+  wtPath,
+  branch,
+  onClose,
+}: {
+  wtPath: string; // 被重置的副本目录（refs 与 reset 都以它为基准）
+  branch?: string; // 副本当前检出分支（展示）
+  onClose: () => void;
+}) {
+  const [target, setTarget] = useState('');
+  const [hard, setHard] = useState(false);
+  const refs = useWorkbenchRefs(wtPath);
+  const reset = useWorktreeReset(wtPath);
+
+  const submit = () => {
+    if (reset.isPending || target.trim() === '') return;
+    reset.mutate({ target: target.trim(), hard }, { onSuccess: () => onClose() });
+  };
+
+  return (
+    <WriteDialogShell title="重置 worktree" onClose={onClose}>
+      <div className="font-mono text-[11px] break-all text-muted-foreground">{wtPath}</div>
+      {branch ? <Badge>{branch}</Badge> : null}
+      <form
+        className="flex flex-col gap-2.5"
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
+      >
+        <Field label="重置到" hint="分支名 / commit / tag">
+          <Input
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            placeholder="main、abc1234、v1.0"
+            autoFocus
+          />
+        </Field>
+        <div className="flex flex-wrap gap-1">
+          {(refs.data?.locals ?? []).map((b) => {
+            const short = refShortName(b);
+            return (
+              <button
+                key={b}
+                type="button"
+                className={cn(
+                  'rounded border px-1.5 py-0.5 text-[10px] font-mono',
+                  short === target.trim()
+                    ? 'border-primary text-primary'
+                    : 'border-muted-foreground/30 text-muted-foreground hover:bg-accent',
+                )}
+                onClick={() => setTarget(short)}
+              >
+                {short}
+              </button>
+            );
+          })}
+        </div>
+        <CheckLine checked={hard} onCheckedChange={setHard} label="--hard（丢弃暂存区与工作区全部改动，不可恢复）" />
+        {reset.isError ? <ErrorLine message={reset.error.message} /> : null}
+        <DialogActions
+          confirmType="submit"
+          confirmDisabled={target.trim() === ''}
+          confirmText="重置"
+          danger={hard}
+          pending={reset.isPending}
           onConfirm={submit}
           onCancel={onClose}
         />

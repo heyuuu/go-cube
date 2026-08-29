@@ -7,6 +7,7 @@ package workbench
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -223,6 +224,30 @@ func (s *Service) WorktreeRemove(path string, targetPath string, force bool) err
 		return err
 	}
 	s.refreshCache(mainRoot)
+	return nil
+}
+
+// WorktreeReset 把 path 所在副本的 HEAD 重置到 target（分支名/commit/tag）。
+// hard 为 true 时 --hard 丢弃暂存区与工作区改动，并 Clean 清掉未跟踪的新增文件
+// （reset --hard 不碰未跟踪文件）——是调用方弹窗显式确认的选择，此处不做脏工作区预检。
+// 成功后定向刷新主项目快照。
+func (s *Service) WorktreeReset(path string, target string, hard bool) error {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	if target == "" {
+		return errors.New("重置目标不能为空")
+	}
+	if err := git.Reset(path, target, hard); err != nil {
+		return err
+	}
+	if hard {
+		if err := git.Clean(path); err != nil {
+			return err
+		}
+	}
+	s.refreshCache(mainRootOf(root))
 	return nil
 }
 

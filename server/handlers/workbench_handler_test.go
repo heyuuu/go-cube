@@ -706,6 +706,56 @@ func TestWorkbenchWorktreeRemove(t *testing.T) {
 	}
 }
 
+func TestWorkbenchWorktreeReset(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	wtDir := env.ws.MakeWorktree(repo, "wt-reset", "reset-test")
+
+	base := gitHead(t, wtDir)
+	env.ws.WriteFile("wt-reset/a.txt", []byte("more"))
+	_ = exec.Command("git", "-C", wtDir, "add", "-A").Run()
+	_ = git.Commit(wtDir, "second")
+	if gitHead(t, wtDir) == base {
+		t.Fatal("前置条件不成立：second commit 未生效")
+	}
+
+	// hard 重置回 base：HEAD 回退 + 工作区文件消失
+	r := postJSON(t, env.url("/api/workbench/worktree/reset"),
+		fmt.Sprintf(`{"path":%q,"target":%q,"hard":true}`, wtDir, base))
+	if !r.Ok {
+		t.Fatalf("hard reset 应成功: %s", r.Message)
+	}
+	if got := gitHead(t, wtDir); got != base {
+		t.Errorf("HEAD 应回退到 %s，实为 %s", base, got)
+	}
+	if _, err := os.Stat(filepath.Join(wtDir, "a.txt")); !os.IsNotExist(err) {
+		t.Error("--hard 应丢弃 a.txt")
+	}
+
+	// 软重置（mixed）：HEAD 回退但工作区改动保留（分支名会随 commit 前移，故用 sha）
+	env.ws.WriteFile("wt-reset/b.txt", []byte("keep"))
+	_ = exec.Command("git", "-C", wtDir, "add", "-A").Run()
+	_ = git.Commit(wtDir, "third")
+	r = postJSON(t, env.url("/api/workbench/worktree/reset"),
+		fmt.Sprintf(`{"path":%q,"target":%q}`, wtDir, base))
+	if !r.Ok {
+		t.Fatalf("mixed reset 应成功: %s", r.Message)
+	}
+	if got := gitHead(t, wtDir); got != base {
+		t.Errorf("mixed reset 后 HEAD 应为 %s，实为 %s", base, got)
+	}
+	if _, err := os.Stat(filepath.Join(wtDir, "b.txt")); err != nil {
+		t.Error("mixed reset 不应丢弃工作区文件 b.txt")
+	}
+
+	// 目标不存在 → ok=false + 中文错误
+	r = postJSON(t, env.url("/api/workbench/worktree/reset"),
+		fmt.Sprintf(`{"path":%q,"target":"no-such-ref"}`, wtDir))
+	if r.Ok {
+		t.Error("不存在的重置目标应被拒绝")
+	}
+}
+
 func TestWorkbenchBranchDelete(t *testing.T) {
 	env := newTestEnv(t)
 	repo := env.ws.Join("g1/proj1")

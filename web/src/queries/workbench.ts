@@ -192,6 +192,16 @@ export function useWorktreeRemove(path: string) {
   });
 }
 
+// 重置 worktree 到指定分支/commit：hard=true 即 --hard（丢弃暂存区与工作区改动，UI 负责二次确认）
+export function useWorktreeReset(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: (input: { target: string; hard?: boolean }) =>
+      apiPost('/api/workbench/worktree/reset', { path, ...input }),
+    onSuccess: invalidate,
+  });
+}
+
 // 新建本地分支（不检出——「建分支并切过去」走 worktree 新建）
 export function useBranchAdd(path: string) {
   const invalidate = useInvalidateWorkbench(path);

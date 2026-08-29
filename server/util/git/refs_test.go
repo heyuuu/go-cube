@@ -2,6 +2,7 @@
 package git
 
 import (
+	"os"
 	"os/exec"
 	"reflect"
 	"strings"
@@ -363,6 +364,34 @@ func TestParentSha(t *testing.T) {
 	// EmptyCommitCount=2 时 parent 已是根提交：再取父应报错
 	if _, err := ParentSha(dir, parent); err == nil {
 		t.Error("根提交再取父应报错")
+	}
+}
+
+// Clean：删除未跟踪文件与目录；.gitignore 忽略的文件保留。
+func TestClean(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 1})
+
+	untracked := ws.Join("repo", "new.txt")
+	untrackedDir := ws.Join("repo", "newdir", "inner.txt")
+	ignored := ws.Join("repo", "ignored.log")
+	ws.WriteFile("repo/new.txt", []byte("x"))
+	ws.WriteFile("repo/newdir/inner.txt", []byte("x"))
+	ws.WriteFile("repo/.gitignore", []byte("ignored.log\n"))
+	ws.WriteFile("repo/ignored.log", []byte("x"))
+	runGit(t, repo, "add", ".gitignore")
+	runGit(t, repo, "commit", "-m", "gitignore")
+
+	if err := Clean(repo); err != nil {
+		t.Fatalf("Clean 应成功: %v", err)
+	}
+	for _, p := range []string{untracked, untrackedDir} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("未跟踪路径应被删除: %s", p)
+		}
+	}
+	if _, err := os.Stat(ignored); err != nil {
+		t.Errorf("被 .gitignore 忽略的文件应保留: %v", err)
 	}
 }
 

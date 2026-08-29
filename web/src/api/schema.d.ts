@@ -650,6 +650,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/worktree/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 重置 worktree 到指定分支/commit（可选 hard） */
+    post: operations['workbench.worktreeReset'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/worktrees': {
     parameters: {
       query?: never;
@@ -1407,6 +1424,17 @@ export interface components {
     WorktreeRemoveResult: {
       denied: boolean;
       reasons: string[] | null;
+    };
+    WorktreeResetRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/WorktreeResetRequest.json
+       */
+      readonly $schema?: string;
+      hard?: boolean;
+      path: string;
+      target: string;
     };
     WorktreeStatus: {
       /** Format: int64 */
@@ -2637,6 +2665,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputWorktreeRemoveResultBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.worktreeReset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorktreeResetRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */
