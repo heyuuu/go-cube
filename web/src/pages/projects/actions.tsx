@@ -1,5 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { ChevronDown, Folder, GitBranch, Layers } from 'lucide-react';
+import { ChevronDown, Copy, Folder, GitBranch, Layers } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +10,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -39,13 +40,11 @@ export function ProjectActions({
   openerList,
   open,
   onOpen,
-  quickDirect = false,
 }: {
   p: Project;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string, dir?: string) => void;
-  quickDirect?: boolean; // 快捷位直达根目录、不挂目标菜单（目标选择交给展开的目标子行）
 }) {
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const openerNames = new Set(openerList.map((op) => op.name));
@@ -71,8 +70,8 @@ export function ProjectActions({
   const quickButton = (q: QuickOpen) => {
     const op = openerByName.get(q.name);
     if (!op) return null;
-    // 该快捷位实际可选的目标（策略筛过）；筛剩单目标（或快捷位被简化为直达）时点击直达
-    const targets = quickDirect ? allTargets.slice(0, 1) : filterTargets(allTargets, q.targets);
+    // 该快捷位实际可选的目标（策略筛过）；筛剩单目标时点击直达
+    const targets = filterTargets(allTargets, q.targets);
     if (targets.length === 1) {
       return (
         <Button
@@ -123,6 +122,11 @@ export function ProjectActions({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
+          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(p.path)}>
+            <Copy className="mr-1 size-3" />
+            复制绝对路径
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuGroup>
             <DropdownMenuLabel>打开方式</DropdownMenuLabel>
             {openerList.map((op) =>
@@ -208,6 +212,7 @@ export function TargetRowActions({
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
   const isPending = (name: string) =>
     open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
+  const dir = target.dir || undefined; // 子行目标都打开自身目录（主根子行 = 项目根）
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
       {quickOpens
@@ -222,12 +227,38 @@ export function TargetRowActions({
               title={`${op.title} · ${target.label}`}
               aria-label={`${op.title}（${p.name} ${target.label}）`}
               disabled={isPending(q.name)}
-              onClick={() => onOpen(p.path, q.name, target.dir || undefined)}
+              onClick={() => onOpen(p.path, q.name, dir)}
             >
               {renderIcon(op.icon, null)}
             </Button>
           );
         })}
+      <DropdownMenu>
+        <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${target.label}`} />}>
+          <ChevronDown className="size-3.5" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-auto min-w-56">
+          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(target.dir || p.path)}>
+            <Copy className="mr-1 size-3" />
+            复制绝对路径
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
+            {openerList.map((op) => (
+              <DropdownMenuItem
+                key={op.name}
+                disabled={isPending(op.name)}
+                onClick={() => onOpen(p.path, op.name, dir)}
+              >
+                {renderIcon(op?.icon, null)}
+                {op.title}
+              </DropdownMenuItem>
+            ))}
+            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

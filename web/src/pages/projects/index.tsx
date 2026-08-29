@@ -748,12 +748,37 @@ export function ProjectsPage() {
                         />
                       </TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <button
+                                type="button"
+                                className="text-left text-xs font-medium hover:underline"
+                                onClick={() => setDrawer(p)}
+                              >
+                                {p.name}
+                              </button>
+                              {(p.tags ?? []).map((t) => (
+                                <ClickBadge
+                                  key={t}
+                                  variant={tagVariants[t] ?? 'outline'}
+                                  title={`筛选 tag：${t}`}
+                                  onClick={() => toggleTagSolo(t)}
+                                >
+                                  {t}
+                                </ClickBadge>
+                              ))}
+                              <WorktreeCountBadge p={p} />
+                            </div>
+                            <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
+                              {prettyPath(p.path, home)}
+                            </div>
+                          </div>
                           {multi && (
                             <button
                               type="button"
-                              className="text-muted-foreground hover:text-foreground"
-                              title={expanded ? '收起目标' : `展开 ${targets.length - 1} 个目标`}
+                              className="ml-1 shrink-0 text-muted-foreground hover:text-foreground"
+                              title={expanded ? '收起目标' : `展开 ${targets.length} 个目标`}
                               aria-label={expanded ? `收起 ${p.name} 目标` : `展开 ${p.name} 目标`}
                               aria-expanded={expanded}
                               onClick={(e) => {
@@ -761,30 +786,9 @@ export function ProjectsPage() {
                                 toggleTargetExpanded(p.path);
                               }}
                             >
-                              <ChevronRight className={cn('size-3.5 transition-transform', expanded && 'rotate-90')} />
+                              <ChevronRight className={cn('size-4 transition-transform', expanded && 'rotate-90')} />
                             </button>
                           )}
-                          <button
-                            type="button"
-                            className="text-left text-xs font-medium hover:underline"
-                            onClick={() => setDrawer(p)}
-                          >
-                            {p.name}
-                          </button>
-                          {(p.tags ?? []).map((t) => (
-                            <ClickBadge
-                              key={t}
-                              variant={tagVariants[t] ?? 'outline'}
-                              title={`筛选 tag：${t}`}
-                              onClick={() => toggleTagSolo(t)}
-                            >
-                              {t}
-                            </ClickBadge>
-                          ))}
-                          <WorktreeCountBadge p={p} />
-                        </div>
-                        <div className="mt-0.5 font-mono text-xs text-muted-foreground" title={p.path}>
-                          {prettyPath(p.path, home)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -805,19 +809,12 @@ export function ProjectsPage() {
                       <TableCell>{p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}</TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex justify-end">
-                          {/* 多目标项目快捷位直达根目录（目标选择交给展开的子行）；全量下拉仍可选目标 */}
-                          <ProjectActions
-                            p={p}
-                            openerList={openerList}
-                            open={open}
-                            onOpen={openProject}
-                            quickDirect={multi}
-                          />
+                          <ProjectActions p={p} openerList={openerList} open={open} onOpen={openProject} />
                         </div>
                       </TableCell>
                     </TableRow>,
                     ...(expanded
-                      ? targets.slice(1).map((t) => (
+                      ? targets.map((t) => (
                           <TableRow key={p.path + '\x00' + (t.dir || 'root')} className="text-muted-foreground">
                             <TableCell />
                             <TableCell>

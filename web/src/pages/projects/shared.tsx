@@ -57,9 +57,9 @@ export function projectTargets(p: Project): ProjectTarget[] {
 export type QuickOpen = { name: string; targets: 'all' | 'repo-roots' | 'root-only' };
 
 export const quickOpens: QuickOpen[] = [
-  { name: 'finder', targets: 'all' },
-  { name: 'stree', targets: 'repo-roots' },
   { name: 'cube-workbench', targets: 'root-only' },
+  { name: 'stree', targets: 'repo-roots' },
+  { name: 'finder', targets: 'all' },
 ];
 
 // 按策略筛目标；根目录恒在（策略不排除主根）。
