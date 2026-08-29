@@ -6,6 +6,8 @@ import {
   ChevronRight,
   Folder,
   FolderGit2,
+  GitBranch,
+  Layers,
   RefreshCw,
   RotateCcw,
 } from 'lucide-react';
@@ -66,6 +68,13 @@ const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
   { value: 'none', label: '未采集' },
 ];
 
+// workspace 总数：主根 + 各 worktree 下的 workspace 成员合计（列表快照字段，读路径零探测）
+function countWorkspaces(p: Project): number {
+  const g = p.gitInfo;
+  if (!g) return 0;
+  return (g.workspaces?.length ?? 0) + (g.worktrees ?? []).reduce((n, w) => n + (w.workspaces?.length ?? 0), 0);
+}
+
 function timeOf(iso: string | null | undefined): number {
   if (!iso) return 0;
   const t = new Date(iso).getTime();
@@ -92,12 +101,12 @@ function matchGitFilter(p: Project, filter: GitStatus | 'all'): boolean {
   }
 }
 
-// 筛选行标签：名称 + 单选/多选标注（与旧页面一致）
+// 筛选行标签：单选/多选标注 + 名称。整块固定宽度（以最长的 workspace 为准），让各行 chips 起点对齐
 function FilterLabel({ label, mode }: { label: string; mode: '单选' | '多选' }) {
   return (
-    <span className="w-20 shrink-0 text-muted-foreground">
+    <span className="flex w-24 shrink-0 items-baseline gap-1 text-muted-foreground">
+      <span className="text-[0.625rem] opacity-70">{mode}</span>
       {label}
-      <span className="ml-1 text-[0.625rem] opacity-70">{mode}</span>
     </span>
   );
 }
@@ -354,6 +363,7 @@ export function ProjectsPage() {
     : 'all';
   const tagFilter = searchParams.get('tag') ?? 'all';
   const wtFilter = searchParams.get('wt') === '1';
+  const wsFilter = searchParams.get('ws') === '1';
 
   // 搜索输入本地 state + 300ms debounce 后投影到 URL；URL 侧变化（后退/重置）回灌输入
   const [keywordInput, setKeywordInput] = useState(keyword);
@@ -406,6 +416,7 @@ export function ProjectsPage() {
     if (!matchGitFilter(p, gitFilter)) return false;
     if (tagFilter !== 'all' && !(p.tags ?? []).includes(tagFilter)) return false;
     if (wtFilter && (p.gitInfo?.worktrees?.length ?? 0) === 0) return false;
+    if (wsFilter && countWorkspaces(p) === 0) return false;
     return true;
   });
 
@@ -456,13 +467,17 @@ export function ProjectsPage() {
     updateParams({ wt: on ? '1' : null });
   }
 
+  function setWsFilter(on: boolean) {
+    updateParams({ ws: on ? '1' : null });
+  }
+
   function setTagFilterValue(t: string) {
     updateParams({ tag: t === 'all' ? null : t });
   }
 
   function resetFilters() {
     setKeywordInput('');
-    updateParams({ q: null, group: null, git: null, tag: null, sort: null });
+    updateParams({ q: null, group: null, git: null, tag: null, wt: null, ws: null, sort: null });
   }
 
   function toggleSelect(path: string) {
@@ -638,7 +653,16 @@ export function ProjectsPage() {
             全部
           </Chip>
           <Chip active={wtFilter} onClick={() => setWtFilter(true)}>
-            有 ⎇
+            有 <GitBranch className="ml-0.5 inline size-3" />
+          </Chip>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <FilterLabel label="workspace" mode="单选" />
+          <Chip active={!wsFilter} onClick={() => setWsFilter(false)}>
+            全部
+          </Chip>
+          <Chip active={wsFilter} onClick={() => setWsFilter(true)}>
+            有 <Layers className="ml-0.5 inline size-3" />
           </Chip>
         </div>
         {tags.length > 0 && (

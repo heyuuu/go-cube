@@ -156,7 +156,7 @@ export function ProjectActions({
 }
 
 // 目标条目的身份图标（按 kind 配色，与文字 label 双通道区分）：
-// 根目录=目录（前景色）、worktree=紫罗兰（与 ⎇ 计数徽标同族）、workspace=绿。
+// 根目录=目录（前景色）、worktree=紫罗兰（与 worktree 计数徽标同族）、workspace=绿。
 // 不复用 opener 图标——同一菜单内每项都一样，无区分度
 export function TargetKindIcon({ kind }: { kind: TargetKind }) {
   if (kind === 'workspace') return <Layers className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />;
@@ -175,7 +175,7 @@ export function WorktreeCountBadge({ p }: { p: Project }) {
       title={`${n} 个 worktree（打开时可选目标）`}
       className="border-violet-500/40 bg-violet-500/10 text-violet-600 dark:bg-violet-500/15 dark:text-violet-400"
     >
-      ⎇ {n}
+      <GitBranch className="size-3" data-icon="inline-start" /> {n}
     </Badge>
   );
 }
