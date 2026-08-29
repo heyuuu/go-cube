@@ -17,12 +17,6 @@ LDFLAGS := \
 
 ZSH_COMPLETION_FILE := ~/.config/cube/zsh.sh
 
-# go install 的落地目录：GOBIN 未设时退回 GOPATH/bin
-GOBIN_DIR := $(shell go env GOBIN)
-ifeq ($(GOBIN_DIR),)
-GOBIN_DIR := $(shell go env GOPATH)/bin
-endif
-
 build-ui:
 	rm -rf ./server/web/ui
 	pnpm -C ./web build
@@ -35,20 +29,23 @@ build: build-ui
 	@$(OUTPUT) version
 
 install: build-ui
+	# 编译安装
 	@echo "==> go install ($(VERSION) @ $(COMMIT))"
 	cd server && go install -ldflags "$(LDFLAGS)"
 	@echo "==> installed cube ($(VERSION) @ $(COMMIT), $(BUILD_TIME))"
 
+	# 安装完成，确认生效：PATH 上的 cube 必须是刚构建的版本（输出含本次
+	# BUILD_TIME），否则视为安装未生效（GOBIN 不在 PATH / 旧版本在前等），中止
+	@cube version | grep -qF "$(BUILD_TIME)" || { echo "!! 安装校验失败：PATH 上的 cube 不是刚构建的版本（检查 GOBIN 是否在 PATH 且优先于旧安装）" >&2; exit 1; }
+
 	# 关闭旧版本 server（服务未运行时 stop 会非零退出，- 忽略）
 	-@cube server stop 2>/dev/null
 
-	# 旧版本遗留的 cubex wrapper（已废弃，shell 侧改用 scripts/zsh-append.sh 的 p）
-	-@rm -f $(GOBIN_DIR)/cubex
-	cube version
-	# install zsh completion + shell 扩展（p / pz，见 scripts/zsh-append.sh）
+	# 安装 zsh completion + shell 扩展（p / pz，见 scripts/zsh-append.sh）
 	# completion 生成是覆盖写，重复 install 不会累积
 	cube completion zsh > $(ZSH_COMPLETION_FILE)
 	cat scripts/zsh-append.sh >> $(ZSH_COMPLETION_FILE)
+
 
 tag: ## 在当前位置打一个新版本 tag（上个版本末位 +1，如 v3.0.6 -> v3.0.7）
 	@set -e; \
