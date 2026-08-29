@@ -35,6 +35,7 @@
 - [`1027-工作台暂存区分组展示/`](proposals/parked/1027-工作台暂存区分组展示/) — 工作台变更清单按暂存区/未暂存分组展示 + stage/unstage（SourceTree 式）
 - [`1028-desktop壳与wails评估/`](proposals/parked/1028-desktop壳与wails评估/) — 不做 desktop 壳；wails 与「本地 server + 通用 HTTP API」结构性不匹配（私有 RPC vs 开放 API），个人工具线转投 Swift/SwiftUI
 - [`1035-opener排序策略/`](proposals/parked/1035-opener排序策略/) — opener 按最近使用排序对「固定组合开多个 opener」场景反向轮转；候选方案已收集（滑动窗口频次 / frecency / n-gram 条件预测 / 显式分层等），待选型讨论
+- [`1037-desktop薄壳重新评估/`](proposals/parked/1037-desktop薄壳重新评估/) — 壳需求重新成立（快捷键与浏览器冲突为硬需求，pty 保持已由超时独立解决）；前提收敛为自用/macOS 独占/薄壳（连已有 server，不动 1036 生命周期）；wails v2 功能不匹配（全局快捷键/多窗口系 v3 独有）、对 wails 整体持保留意见，候选路线对比已定倾向：**Swift 原生通用参数化壳**（`--url --hotkey`，零 cube 逻辑、独立仓库，与个人 Swift 工具线合流；Swift > Tauri ≈ Wails v3 > Electron）；解挂主条件为 Swift 工具线推进到成熟
 
 #### [proposals/archived/](proposals/archived/) — 已完成提案归档
 
