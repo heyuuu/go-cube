@@ -16,6 +16,9 @@ import (
 	"cube/project/workspace"
 )
 
+// rootLabel 主根目标的展示名（OpenTargets 列表首位的根目录条目）。
+const rootLabel = "主目录"
+
 // TargetFlags 打开目标的位标记：一个目标可同时命中多类身份——
 // worktree 下的 workspace 目录 = FlagWorktree|FlagWorkspace（「长在 worktree 里的
 // workspace 子目录」，两类语义都成立）；根目录 = 0。
@@ -54,9 +57,8 @@ func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 		return nil
 	}
 	targets := make([]OpenTarget, 0, len(info.Workspaces)+2*len(info.Worktrees))
-	rels := make([]string, 0, cap(targets)) // workspace 相对所属根的路径，撞名消歧时作后缀；非 workspace 位填 ""
+	rels := make([]string, 0, cap(targets)) // workspace 相对所属根的路径，撞名消歧时作后缀；非 workspace 位（各 worktree 根）填 ""
 	targets = append(targets, workspaceTargetsAt(root, info.Workspaces, 0, "", &rels)...)
-	rels = append(rels, "")
 	branchCount := make(map[string]int, len(info.Worktrees))
 	for _, wt := range info.Worktrees {
 		if wt.Branch != "" {
@@ -69,10 +71,12 @@ func targetEntries(root string, info *projcache.Entry) []OpenTarget {
 			label = filepath.Base(wt.Path)
 		}
 		targets = append(targets, OpenTarget{Path: wt.Path, Label: label, Branch: wt.Branch, Flags: FlagWorktree})
+		rels = append(rels, "")
 		targets = append(targets, workspaceTargetsAt(wt.Path, wt.Workspaces, FlagWorktree, label+" · ", &rels)...)
 	}
 
-	labelCount := make(map[string]int, len(targets))
+	labelCount := make(map[string]int, len(targets)+1)
+	labelCount[rootLabel] = 1 // 主根目标「主目录」由调用方拼在列表头，这里计入撞名计数（与前端 projectTargets 同口径）
 	for _, t := range targets {
 		labelCount[t.Label]++
 	}

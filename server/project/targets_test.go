@@ -125,6 +125,35 @@ func TestTargetEntriesLabelDedup(t *testing.T) {
 	}
 }
 
+// TestTargetEntriesLabelDedupMultiWorktrees 多 worktree 下 rels 对齐回归：
+// 每个 worktree 根在 targets 中占一位、rels 中对应补 ""，撞名后缀必须取到
+// 目标自身的相对路径（历史 bug："" 补在循环外，第二个 worktree 起后缀错位，
+// 去重失效）。撞名构造：第二个 worktree 内两个同名 workspace。
+func TestTargetEntriesLabelDedupMultiWorktrees(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	for _, sub := range []string{"f1-x/s1", "f2-x/a", "f2-x/b"} {
+		ws.Mkdir(sub)
+	}
+
+	got := targetEntries(ws.Dir, &projcache.Entry{
+		Worktrees: []projcache.WorktreeInfo{
+			{Path: ws.Join("f1-x"), Branch: "f1", Workspaces: []workspace.Workspace{{Name: "s1", Path: "s1"}}},
+			{Path: ws.Join("f2-x"), Branch: "f2", Workspaces: []workspace.Workspace{
+				{Name: "s", Path: "a"}, {Name: "s", Path: "b"},
+			}},
+		},
+	})
+	want := []string{"f1", "f1 · s1", "f2", "f2 · s (a)", "f2 · s (b)"}
+	if len(got) != len(want) {
+		t.Fatalf("应返回 %d 个目标, got %d (%+v)", len(want), len(got), got)
+	}
+	for i, w := range want {
+		if got[i].Label != w {
+			t.Errorf("第 %d 个 label 不符: want %s, got %s", i, w, got[i].Label)
+		}
+	}
+}
+
 // TestOpenTargets 根目录在前 + 快照内目标跟随；未采集/无附加目标项目只有根目录。
 func TestOpenTargets(t *testing.T) {
 	ws := testfixture.NewWorkspace(t)

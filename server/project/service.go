@@ -148,7 +148,7 @@ func (s *Service) OpenTargets(path string) []OpenTarget {
 	if proj == nil {
 		return nil
 	}
-	targets := []OpenTarget{{Path: proj.Path(), Label: "主目录"}}
+	targets := []OpenTarget{{Path: proj.Path(), Label: rootLabel}}
 	info, _ := s.GitInfo(proj.Path())
 	// 存在性兜底过滤：采集侧已过滤，但目录在两次采集之间被删时快照仍残留，
 	// 打开目标必须是真实可打开的目录（os.Stat 廉价，不违反读路径不跑 git 的纪律）
