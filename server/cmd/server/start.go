@@ -7,40 +7,23 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/serve"
 	"cube/version"
 )
 
-// newStartCmd `cube server start` —— 启动 server。
+// newStartCmd `cube server start` —— 前台启动 server（Ctrl+C 退出）。
 //
-// 默认前台（开发/调试用，Ctrl+C 退）；--detach 后台 fork 脱终端。
+// 不提供后台 detach 形态：常驻由系统级保活承担（prod launchd / dev air），
+// 自 fork 曾有 argv 不透传与启动失败无声的结构性问题，已移除（1036）。
 func newStartCmd(a *app.App) *cobra.Command {
-	var detach bool
 	cmd := &cobra.Command{
 		Use:   "start",
 		Short: "前台启动 server（Ctrl+C 退出）",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if detach {
-				return startDetached(a)
-			}
 			return startServer(a)
 		},
 	}
-	cmd.Flags().BoolVarP(&detach, "detach", "d", false, "后台启动（fork 脱终端，不占 stdout）")
 	return cmd
-}
-
-// startDetached 后台 fork 一个 server 子进程（参 serve.Fork）。
-func startDetached(a *app.App) error {
-	pid, err := serve.Fork()
-	if err != nil {
-		return err
-	}
-	fmt.Printf("cube version: %s\n", version.VersionInfo())
-	fmt.Printf("server 后台启动中（pid=%d）\n", pid)
-	fmt.Printf("  访问地址：%s\n", a.Server().ServerURL())
-	return nil
 }
 
 func startServer(a *app.App) error {

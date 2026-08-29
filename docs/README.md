@@ -16,6 +16,7 @@
 
 **ID 分配规则（硬约束）**：提案 ID 全局唯一、不得重复，三个目录（顶层 / `parked/` / `archived/`）共用一套编号空间。**新建提案前必须先执行 `make last-proposal` 获取当前最大 ID，新提案 ID = 最大 ID + 1**，不得凭记忆或猜测取号。
 
+- [`1036-server进程管理定调/`](proposals/archived/1036-server进程管理定调/) — 移除 `start -d` 自 fork 后台（argv 不透传 + 启动失败无声的结构性 bug，常驻由 launchd/air 承担后无消费者）+ whoami instance 实例标识（stop 按 instance 判旧实例下线，launchctl 保活占回端口不误判）+ daemon 设计定调（零参数发现配置 / 可管理性三条件 / supervisor-ready 六条 / 桌面 app helper 的 socket 重连与 pipe 生命线）；`server reload` 搁置（解挂条件在提案内）
 - [`1030-monorepo-workspace/`](proposals/archived/1030-monorepo-workspace/) — monorepo 子目录打开支持：`.cube/cube.json`（workspaces 显式声明 / workspaceScanRule 探测正选，文件格式层独立 `project/cubefile`），workspace 进 projcache 采集与 `OpenTargets`（gitcache 更名 projcache）；CLI `workspace init`、Web 下拉/展开行/编辑弹窗、工作台副本行 workspace 子行
 - [`1015-工作台面板组装/`](proposals/archived/1015-工作台面板组装/) — 工作台自定义布局（面板组装，最后做）
 - [`1014-工作台PTY面板/`](proposals/archived/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）
