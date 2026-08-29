@@ -9,6 +9,7 @@ import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { splitInlineDiff, type InlineSegment } from '@/lib/inline-diff';
 import { cn } from '@/lib/utils';
 import { saveWorkbenchFile } from '@/queries/workbench';
 import type { FileDiffResult, FileResult } from '@/queries/workbench';
@@ -24,6 +25,9 @@ import type { TreeSource } from '../params';
 // 不用 effect 重置（React Compiler 禁止 effect 内同步 setState）。
 
 export type ContentMode = 'file' | 'diff';
+
+// diff 视图行号开关持久化键（默认开：长行自动换行后靠行号区分行边界）
+const DIFF_LINENO_KEY = 'cube.workbench.diff.linenumbers';
 
 type EditState = { key: string; draft: string };
 
@@ -145,6 +149,11 @@ export function FileContentArea({
 }) {
   const fileContent = contentQuery.data?.content ?? '';
   const { editing: isEditing, draft, dirty } = editing;
+  const [showLineNumbers, setShowLineNumbers] = useState(() => localStorage.getItem(DIFF_LINENO_KEY) !== '0');
+  const toggleLineNumbers = (on: boolean) => {
+    setShowLineNumbers(on);
+    localStorage.setItem(DIFF_LINENO_KEY, on ? '1' : '0');
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -186,6 +195,33 @@ export function FileContentArea({
               </button>
             ))}
           </div>
+          {mode === 'diff' ? (
+            <div
+              className="flex overflow-hidden rounded-md border border-border text-[10px]"
+              title="diff 视图行号显示（长行自动换行后靠行号区分行边界）"
+            >
+              {(
+                [
+                  [true, '开'],
+                  [false, '关'],
+                ] as const
+              ).map(([v, label]) => (
+                <button
+                  key={label}
+                  type="button"
+                  className={cn(
+                    'px-1.5 py-0.5 transition-colors',
+                    showLineNumbers === v
+                      ? 'bg-primary/15 font-medium text-primary'
+                      : 'text-muted-foreground hover:bg-accent',
+                  )}
+                  onClick={() => toggleLineNumbers(v)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {mode === 'file' && canEdit ? (
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground" title="预览 / 编辑切换">
               <span className={cn(!isEditing && 'font-medium text-foreground')}>预览</span>
@@ -251,7 +287,7 @@ export function FileContentArea({
         ) : fileDiffQuery.data?.binary ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
         ) : (
-          <SideBySideHunks hunks={fileDiffQuery.data?.hunks ?? []} />
+          <SideBySideHunks hunks={fileDiffQuery.data?.hunks ?? []} showLineNumbers={showLineNumbers} />
         )}
       </div>
       {editing.dialogs}
@@ -260,7 +296,13 @@ export function FileContentArea({
 }
 
 // side-by-side 双栏渲染：del 进左栏、add 进右栏、ctx 两侧同步；连续 del/add 块按行配对
-function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) {
+function SideBySideHunks({
+  hunks,
+  showLineNumbers,
+}: {
+  hunks: components['schemas']['Hunk'][];
+  showLineNumbers: boolean;
+}) {
   if (hunks.length === 0) {
     return <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">两侧内容一致</div>;
   }
@@ -271,34 +313,45 @@ function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) 
           <div className="bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
             @@ -{h.oldStart},{h.oldCount} +{h.newStart},{h.newCount} @@
           </div>
-          <HunkRows hunk={h} />
+          <HunkRows hunk={h} showLineNumbers={showLineNumbers} />
         </div>
       ))}
     </div>
   );
 }
 
-function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
-  // 连续 del 块与 add 块逐行配对（左删右增同行对照）为 mod 行，剩余各自单侧展示
-  type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'mod' | 'ctx' };
+function HunkRows({ hunk, showLineNumbers }: { hunk: components['schemas']['Hunk']; showLineNumbers: boolean }) {
+  // 连续 del 块与 add 块逐行配对（左删右增同行对照）为 mod 行，剩余各自单侧展示；
+  // 同时按 hunk 起始行推算每行的 old/new 行号（del 只占 old、add 只占 new）
+  type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'mod' | 'ctx'; oldNo?: number; newNo?: number };
   const rows: Row[] = [];
+  let oldNo = hunk.oldStart;
+  let newNo = hunk.newStart;
   let pendingDels: string[] = [];
   const flush = () => {
-    for (const d of pendingDels) rows.push({ left: d, kind: 'del' });
+    for (const d of pendingDels) {
+      rows.push({ left: d, kind: 'del', oldNo });
+      oldNo++;
+    }
     pendingDels = [];
   };
   for (const line of hunk.lines ?? []) {
     if (line.kind === 'ctx') {
       flush();
-      rows.push({ left: line.text, right: line.text, kind: 'ctx' });
+      rows.push({ left: line.text, right: line.text, kind: 'ctx', oldNo, newNo });
+      oldNo++;
+      newNo++;
     } else if (line.kind === 'del') {
       pendingDels.push(line.text);
     } else {
       const paired = pendingDels.shift();
       if (paired !== undefined) {
-        rows.push({ left: paired, right: line.text, kind: 'mod' });
+        rows.push({ left: paired, right: line.text, kind: 'mod', oldNo, newNo });
+        oldNo++;
+        newNo++;
       } else {
-        rows.push({ right: line.text, kind: 'add' });
+        rows.push({ right: line.text, kind: 'add', newNo });
+        newNo++;
       }
     }
   }
@@ -308,30 +361,57 @@ function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
     <table className="w-full table-fixed border-collapse">
       <tbody>
         {rows.map((r, i) => {
+          // mod 行整行淡底、行内仅差异字符换字体色（Beyond Compare 风格）；
+          // 纯增删行整行高亮语义不变
           const leftChanged = r.kind === 'del' || r.kind === 'mod';
           const rightChanged = r.kind === 'add' || r.kind === 'mod';
+          const inline = r.kind === 'mod' ? splitInlineDiff(r.left ?? '', r.right ?? '') : null;
+          const gutterCls = 'w-10 select-none text-right align-top text-[10px] leading-5 text-muted-foreground/60';
           return (
-            <tr key={i} className="align-top">
+            <tr key={i}>
+              {showLineNumbers ? <td className={gutterCls}>{r.oldNo ?? ''}</td> : null}
               <td
                 className={cn(
-                  'w-1/2 whitespace-pre-wrap break-all border-r border-border px-2',
-                  leftChanged && 'bg-red-500/10 text-red-600 dark:text-red-400',
+                  'whitespace-pre-wrap break-all border-r border-border px-2 align-top',
+                  leftChanged && (r.kind === 'mod' ? 'bg-red-500/10' : 'bg-red-500/10 text-red-600 dark:text-red-400'),
                 )}
               >
-                {r.left ?? ''}
+                {inline ? <InlineSegments segs={inline.left} tone="del" /> : (r.left ?? '')}
               </td>
+              {showLineNumbers ? <td className={gutterCls}>{r.newNo ?? ''}</td> : null}
               <td
                 className={cn(
-                  'w-1/2 whitespace-pre-wrap break-all px-2',
-                  rightChanged && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                  'whitespace-pre-wrap break-all px-2 align-top',
+                  rightChanged &&
+                    (r.kind === 'mod'
+                      ? 'bg-emerald-500/10'
+                      : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'),
                 )}
               >
-                {r.right ?? ''}
+                {inline ? <InlineSegments segs={inline.right} tone="add" /> : (r.right ?? '')}
               </td>
             </tr>
           );
         })}
       </tbody>
     </table>
+  );
+}
+
+// mod 行行内片段渲染：changed 片段仅换字体色（底色由整行 <td> 提供），公共片段保持原字体色
+function InlineSegments({ segs, tone }: { segs: InlineSegment[]; tone: 'del' | 'add' }) {
+  const changedCls = tone === 'del' ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400';
+  return (
+    <>
+      {segs.map((s, i) =>
+        s.changed ? (
+          <span key={i} className={changedCls}>
+            {s.text}
+          </span>
+        ) : (
+          s.text
+        ),
+      )}
+    </>
   );
 }
