@@ -19,6 +19,31 @@ opener 目前只有 role（能力/槽签名），没有「适用范围」概念�
 - **语言粒度到 workspace**：monorepo 天然多语言，语言是 workspace（含 worktree）级属性而非项目级；主根与各 workspace / worktree 各自判定。
 - **match 方案本体待议**（见下），挂起到需要时再讨论。
 
+## intent 拆分（2026-08-29 讨论新增，倾向先行于 match）
+
+讨论中发现 role 身兼两职——**业务意图**（open vs diff vs terminal vs git 客户端）与**槽签名**（dir/file × 1/2 槽，`$0/$1` 校验依据）——导致 per-role 默认粒度不够：用户需要「terminal 的默认」「git 客户端的默认」等更细场景默认，而它们的槽签名都是 `[dir]`。且现状 `ParseRoles` 要求 opener 全 role slotCount 一致，使 vscode 无法同时声明 open-dir（1 槽）与 diff-dir（2 槽）——槽个数本是调用时的属性。
+
+**拆分模型**：
+
+- **槽签名**（机械维度，调用时携带）：`[dir]` / `[file]` / `[dir,dir]` / `[file,file]`。
+- **intent**（场景维度，defaults 的键空间，按 cube 实际入口枚举）：
+
+| intent | 场景（谁在发起） | 槽形态 | 现状 | 默认举例 |
+|--------|-----------------|--------|------|---------|
+| `dir` | 通用打开目录：项目列表打开、workbench/目录树目录节点、open-path 目录、open | `[dir]` | role open-dir | vscode |
+| `file` | 通用打开文件：目录树文件节点、open-path 文件 | `[file]` | role open-file | vscode |
+| `diff` | 对比两个路径：cube diff、diff 面板外部对比 | 调用时定 | role diff-dir/diff-file（被 slotCount 一致性绑死） | bcompare |
+| `terminal` | 在终端打开目录 | `[dir]` | 无 | ghostty |
+| `git` | 在 git 客户端打开仓库（恒仓库根） | `[dir]` | 前端硬编码 stree 快捷位 | stree |
+| `workbench` | 在 cube 工作台打开 | `[dir]` | 前端硬编码 cube-workbench 快捷位 | cube-workbench |
+| `doc` | 文档查看打开 | `[dir]`/`[file]` | 前端 cube-md | cube-md |
+
+- opener 声明「支持哪些 intent」+ 占位符最大个数，slotCount 一致性约束消失；`<default>` 解析按 intent（`ResolveOpener(name, intent)`）。
+- **前端 quickOpens 三个硬编码快捷位（finder/stree/cube-workbench）= `dir`/`git`/`workbench` 三个 intent 的具名化**——落地后快捷位改为「取该 intent 的默认 opener」，配置 defaults 即换快捷位，消掉硬编码。
+- 特化 intent（terminal/git/...）未配默认时**不回落** `dir` 默认（避免「终端按钮打开了 VS Code」），入口隐藏或提示配置。
+- role 枚举整体退役（倾向双轨更乱），`ParseRoles`/roleSlots 随之拆除。
+- 与 match 的关系：两层正交，解析顺序 match 路由 > intent 默认 > 交互；match 谓词同样按 intent 路由，共用 opener 声明。
+
 ## 候选方案（待选型）
 
 ### 方案 A：声明式 match + 复用列表序当优先级（当前倾向）
@@ -57,5 +82,5 @@ settings.json 增有序规则节（first-match-wins），规则 = `{match, role,
 
 ## 解挂条件
 
-- 1038 已落地（默认机制就绪）。
+- intent 拆分先行落地（见上章，2026-08-29 讨论后倾向把 intent 拆分从本提案单独立案先行——它是 per-role 默认粒度不足的当下痛点，比 match 自动路由小得多）。
 - match 方案 A/B 选型讨论完成；若选 A，需确认前端硬编码策略（stree / cube-workbench）迁移方案一并设计。

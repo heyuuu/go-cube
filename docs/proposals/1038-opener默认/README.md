@@ -2,7 +2,7 @@
 
 ## 状态
 
-活动，准备开发。
+活动，**设计定稿，未实现**（曾完成一次实现后整体回退——改动面偏大，设计继续演进中，另起会话重新开发）。设计定稿如下。
 
 ## 背景
 
@@ -10,51 +10,64 @@ opener 列表目前是纯能力清单，没有任何「默认」概念：CLI `op
 
 ## 需求
 
-每个 role 一个默认 opener，未显式指定时自动使用：
+每个 role 一个默认 opener，未显式指定时可自动使用。
 
-- CLI：`open` / `open-path` / `diff` 不传 `-o` 时先查默认，默认缺失或指向已删 opener 时回退现有交互流程。
-- Web：`opener/open` / `project/open` 的 opener 参数可选化（或前端先查默认），默认失效时回退全量下拉。
+## 设计定稿
 
-## 设计
+### 数据：settings.json `openers` 节（不兼容变更）
 
-### 数据：settings.json 新增 `openerDefaults` 节
+默认与列表**同节存储**——读写都需联动校验（默认 opener 必须在列表中存在），放一节内做单写者一致性最自然：
 
 ```json
 {
-  "openerDefaults": {
-    "open-dir": "finder",
-    "open-file": "typora",
-    "diff-dir": "beyond-compare",
-    "diff-file": "kaleidoscope"
+  "openers": {
+    "list": [
+      { "name": "finder", "cmd": ["open", "$0"], "roles": ["open-dir"] }
+    ],
+    "defaults": { "open-dir": "finder", "diff-file": "kaleidoscope" }
   }
 }
 ```
 
-- 键 = role 枚举值（4 个固定枚举），值 = opener name。
-- 存 settings.json 而非 config.json：与 openers 节同源——运行中可变更的用户可管理数据，跟随节级 API 体系（`LoadSection` / `SaveSection`）。
-- 全局配置，不按项目路径 keyed，不触碰「持久配置不记项目路径内容」红线。
+- **旧形态（openers = Spec 数组）硬切不兼容**：读侧解析失败按既有节级降级为空，存量 openers 用户手工迁移（无代码兼容读）；写侧恒写新形态。
+- defaults 键 = role 枚举（4 个），值 = opener name；读侧失效条目降级跳过，写侧校验 name 必须现存。
+
+### 特殊标识 `<default>`
+
+各 open 调用点（HTTP 与 CLI 的 opener 选择参数）**不接收空字符串回退**——空/缺省维持报错（避免误传）；请求默认时显式传特殊标识 **`<default>`**，服务端解析为「该 role 的默认 opener」（失效时报中文错误）。此标识机制为后续更多特殊标识预留。
+
+### opener name 校验规则
+
+保存 opener 时校验 name：`^[a-z](?:[a-z0-9_-]*[a-z0-9])?$`（首字符小写字母，中间 `[a-z0-9_-]`，末字符字母/数字，不允许 `-`/`_` 结尾）——排除 `<` 等字符，与特殊标识（`<...>` 形态）结构性区分。写侧拦截，读侧沿用坏条目跳过。
 
 ### 领域逻辑（`opener` 包）
 
-- `Service` 增默认读写方法：`DefaultOpener(role) (Opener, bool)`（直读不缓存，坏数据/失效名降级为无默认）+ `SaveDefaultOpener(role, name)` / `DeleteDefaultOpener(role)`（写侧校验：role 合法枚举、name 必须指向现存 opener，坏数据中文错误不落文件）。
-- CLI 侧新增一个共用的「解析 opener」helper：`-o` 显式指定 > 默认 > 交互选择，三段回退收敛在单点，`open` / `open-path` / `diff` 三命令共用。
+- `Service` 增方法：`DefaultOpener(role) (Opener, error)` / `SaveDefaultOpener(role, name)` / `DeleteDefaultOpener(role)` / `ResolveOpener(name, role)`（`<default>` 标识解析收敛单点）。
+- 节形状改为 struct（list + defaults），加载/保存联动：`DeleteOpener` 连带清指向被删名的默认。
+- name 校验收敛进 `InitExecOpener` 构造校验（写侧入口）。
 
 ### Web API
 
-- `GET /api/opener/defaults` — 读默认映射（含失效标记，供前端展示）。
-- `POST /api/opener/default/save` — body: role + opener（校验同上）。
+- `GET /api/opener/overview` — **统一输出** `{openers: [...], defaults: {...}}`，代替旧 `GET /api/opener/list`（旧接口暂留，前端替换后移除）。
+- `POST /api/opener/default/save` — body: role + opener。
 - `POST /api/opener/default/delete` — body: role。
+- `opener/open` / `project/open` 的 opener 参数：空/缺省报错（维持现状），`<default>` 走默认解析。
+
+### CLI
+
+`open` / `open-path` / `diff` 不传 `-o` 时**恒交互**（保持现状，不静默用默认）；`-o <default>` 显式请求默认（收敛在 `pickOpener` 的标识解析）。是否改为「无 -o 时默认直开」留待完成后单独讨论（单纯入口问题，后续好改）。
 
 ### 前端
 
-- 设置页 Opener 分区增加「默认」展示与编辑（每个 role 一行，下拉选 opener，可选「无默认」）。
-- `opener/open`、`project/open` 调用处：无 opener 参数时先查默认（读 defaults 接口或 list DTO 附带），命中直接打开，未命中/失效走现有全量下拉。
+- `queries/opener.ts`：overview 查询 + default/save/delete mutation。
+- 设置页 Opener 分区：每个 role 一行「默认」下拉（候选 = 该 role 的 opener + 无默认，悬挂引用标失效）。
+- 打开调用处：全量「打开方式」下拉中默认项标「默认」徽标；传给后端的 opener 恒显式（名字或 `<default>`），不依赖空串语义。
 
-## 范围外（留给 1039）
+## 与 intent 演进的关系（重要）
 
-- 按上下文（文件后缀 / 项目语言 / 仓库根 vs 普通目录）的条件路由——见 parked 提案 `1039-opener适用范围match`。本提案的 role 级默认是它的兜底层。
+per-role 默认在讨论中被发现粒度不够（见 1039 新增的「intent 拆分」章节）：用户还需要「terminal 的默认」「git 客户端的默认」等更细场景的默认，而这些都是 `[dir]` 槽——role 键空间装不下。**重新开发前需先决策**：直接按 1039 的 intent × 槽签名模型做（defaults 键 = intent，role 退役），还是先落本提案的 role 版再演进。倾向前者，避免两次不兼容变更。
 
 ## 验证
 
-- 纯函数 + settings 读写：表驱动测试（默认解析、失效回退、写侧校验）。
-- CLI 回退链：手动验证三命令的 `-o` > 默认 > 交互。
+- 纯函数 + settings 读写：表驱动测试（节形态解析、默认失效降级、name 正则、`<default>` 解析、写侧联动校验）。
+- CLI 回退链与 API：手动验证。
