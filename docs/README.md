@@ -16,6 +16,7 @@
 
 **ID 分配规则（硬约束）**：提案 ID 全局唯一、不得重复，三个目录（顶层 / `parked/` / `archived/`）共用一套编号空间。**新建提案前必须先执行 `make last-proposal` 获取当前最大 ID，新提案 ID = 最大 ID + 1**，不得凭记忆或猜测取号。
 
+- [`1030-monorepo-workspace/`](proposals/archived/1030-monorepo-workspace/) — monorepo 子目录打开支持：`.cube/cube.json`（workspaces 显式声明 / workspaceScanRule 探测正选，文件格式层独立 `project/cubefile`），workspace 进 projcache 采集与 `OpenTargets`（gitcache 更名 projcache）；CLI `workspace init`、Web 下拉/展开行/编辑弹窗、工作台副本行 workspace 子行
 - [`1015-工作台面板组装/`](proposals/archived/1015-工作台面板组装/) — 工作台自定义布局（面板组装，最后做）
 - [`1014-工作台PTY面板/`](proposals/archived/1014-工作台PTY面板/) — 工作台 PTY 终端（WebSocket + xterm.js）
 - [`1013-工作台diff面板/`](proposals/archived/1013-工作台diff面板/) — 工作台双源 diff（目录 + 文件对比）
@@ -24,7 +25,6 @@
 - [`1010-workbench基座/`](proposals/archived/1010-workbench基座/) — 工作台基座（路由 + TreeSource + 核心 API + 面板骨架）
 - [`1008-workspace工作台/`](proposals/archived/1008-workspace工作台/) — workspace 工作台总纲（决策记录 + 子提案索引）
 
-- [`1030-monorepo-workspace/`](proposals/1030-monorepo-workspace/) — monorepo 子目录打开支持：项目根 `.cube/cube.json` 声明 workspace 成员（`workspaces` 显式声明优先，无声明时按 `workspaceScanRule`/默认规则探测 pnpm/npm 标准声明文件为正选），workspace 作为第三来源进 `OpenTargets`（采集侧组合进快照，gitcache 顺势更名 projcache）；CLI/Web 选择复用 1032 泛化链路，另增 `cube workspace init` 固化声明（**已实施，待验收归档**）
 
 #### [proposals/parked/](proposals/parked/) — 挂起提案
 

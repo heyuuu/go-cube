@@ -1,6 +1,6 @@
 # monorepo workspace 打开支持
 
-> **状态**：✅ 已实施，待验收归档
+> **状态**：✅ 已验收归档（2026-08-29）
 >
 > **关联**：[`1016-opener改造`](../archived/1016-opener改造/README.md)（opener 接口化 + role 体系，本提案不改 opener，仅消费其 open-dir 语义）；[`1008-workspace工作台`](../archived/1008-workspace工作台/README.md)（名字撞车但概念无关：那是 Web 工作台面板，本提案是 monorepo 子目录打开入口）；[`1032-worktree归并为项目打开目标`](../archived/1032-worktree归并为项目打开目标/README.md)（已落地：`Service.OpenTargets` 打开目标模型，workspace 作为第三来源纯增量插入）；[`1034-最近使用排序与usage统一`](../archived/1034-最近使用排序与usage统一/README.md)（已落地：`usage.Record.dir` 恒记实际打开目录绝对路径，本提案直接复用）。
 
