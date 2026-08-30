@@ -13,12 +13,11 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 	var openerName string
 	cmd := &cobra.Command{
 		Use:   "open-path <path> [-o|--opener=打开工具名]",
-		Short: "用 opener 打开路径（按 dir/file 自动匹配 role）",
+		Short: "用 opener 打开路径（按 dir/file 自动选 intent）",
 		Long: `用 opener 打开任意路径，不限于已收录的项目。
 
-按路径类型自动选择 role（目录 → open-dir，文件 → open-file），
-再从声明了该 role 的 opener 中挑选：-o 精确指定名称；
-未指定时模糊匹配，命中多个则进入交互选择。`,
+按路径类型自动选择 intent（目录 → dir，文件 → file）。
+不传 -o 时使用该 intent 的默认 opener；-o 不带值时交互选择；-o <name> 按名模糊匹配。`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// 检查路径
@@ -27,16 +26,13 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 				return err
 			}
 
-			// 判断 role 类型
-			var role opener.Role
+			// 判断 intent（目录 → dir，文件 → file），不带 -o 时用默认 opener
+			intent := opener.IntentFile
+			role := opener.RoleOpenFile
 			if isDir {
-				role = opener.RoleOpenDir
-			} else {
-				role = opener.RoleOpenFile
+				intent, role = opener.IntentDir, opener.RoleOpenDir
 			}
-
-			// 选 opener
-			pick, err := pickOpener(a.OpenerService(), role, openerName)
+			pick, err := pickOpener(a.OpenerService(), intent, openerName)
 			if err != nil {
 				return err
 			}
@@ -48,6 +44,7 @@ func newOpenPathCmd(a *app.App) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 支持模糊搜索")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名；不带值时交互选择，缺省用默认 opener")
+	cmd.Flags().Lookup("opener").NoOptDefVal = interactivePick
 	return cmd
 }

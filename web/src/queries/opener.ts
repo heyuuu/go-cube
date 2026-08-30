@@ -1,7 +1,41 @@
-// opener 增删改（openers 数据落 settings.json，经 Web API 写，保存即生效）。
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+// 打开意图（openerIntents 节，1038）：intent → 默认 opener + 候选清单。
+// 候选缺省 = 声明了对应 role 的全部 opener（读侧合成，openers 数组可覆盖）。
+export interface OpenerIntent {
+  intent: string;
+  defaultOpener?: string;
+  openers: string[];
+}
 
-import { apiPost } from '@/api/client';
+export function useOpenerIntents() {
+  return useQuery({
+    queryKey: ['opener', 'intents'],
+    queryFn: async () => {
+      const data = await apiGet('/api/opener/intents');
+      return (data as { list: OpenerIntent[] }).list;
+    },
+  });
+}
+
+export function useIntentDefaultSave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { intent: string; opener: string }) => apiPost('/api/opener/intent-default/save', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['opener', 'intents'] }),
+  });
+}
+
+export function useIntentDefaultDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { intent: string }) => apiPost('/api/opener/intent-default/delete', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['opener', 'intents'] }),
+  });
+}
+
+// opener 增删改（openers 数据落 settings.json，经 Web API 写，保存即生效）。
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { apiGet, apiPost } from '@/api/client';
 
 export function useOpenerSave() {
   const qc = useQueryClient();

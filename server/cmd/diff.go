@@ -39,15 +39,16 @@ func newDiffCmd(a *app.App) *cobra.Command {
 			if isDir1 != isDir2 {
 				return fmt.Errorf("两个路径类型不一致：%s 的 isDir=%v，%s 的 isDir=%v", args[0], isDir1, args[1], isDir2)
 			}
+			var intent opener.Intent
 			var role opener.Role
 			if isDir1 {
-				role = opener.RoleDiffDir
+				intent, role = opener.IntentDiffDir, opener.RoleDiffDir
 			} else {
-				role = opener.RoleDiffFile
+				intent, role = opener.IntentDiffFile, opener.RoleDiffFile
 			}
 
-			// 选 opener
-			pick, err := pickOpener(a.OpenerService(), role, openerName)
+			// 选 opener（不带 -o 时用该 intent 的默认）
+			pick, err := pickOpener(a.OpenerService(), intent, openerName)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
 					return nil
@@ -62,6 +63,7 @@ func newDiffCmd(a *app.App) *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 支持模糊搜索")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名；不带值时交互选择，缺省用默认 opener")
+	cmd.Flags().Lookup("opener").NoOptDefVal = interactivePick
 	return cmd
 }

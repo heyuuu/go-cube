@@ -137,13 +137,24 @@ func checkOpenPath(path string) (absPath string, isDir bool, err error) {
 	return absPath, info.IsDir(), nil
 }
 
-// pickOpener 根据 role 和关键词匹配 opener：精确匹配直接返回，多项匹配则交互选择。
+// pickOpener 按打开意图挑选 opener（1038）：
+//   - name 为空（未传 -o）→ 直接用该 intent 的默认 opener，未配置时报错引导；
+//   - name 为交互哨兵 "?"（-o 不带值）→ 在该 intent 对应 role 的候选中模糊匹配，
+//     命中多个且在 TTY 环境时交互选择；
+//   - name 为具体值 → 按名模糊匹配（现有语义不变）。
 //
 // 非交互环境不支持多项选择，会报错提示使用精确 opener 名。
-func pickOpener(service *opener.Service, role opener.Role, name string) (opener.Opener, error) {
+func pickOpener(service *opener.Service, intent opener.Intent, name string) (opener.Opener, error) {
+	if name == "" {
+		return service.DefaultOpener(intent)
+	}
+	if name == interactivePick {
+		name = ""
+	}
+	role := intent.Role()
 	openers := service.SearchFor(role, name)
 	if len(openers) == 0 {
-		return nil, fmt.Errorf("未找到匹配的 opener: role=%s, name=`%s`", role, name)
+		return nil, fmt.Errorf("未找到匹配的 opener: intent=%s, name=`%s`", intent, name)
 	} else if len(openers) == 1 {
 		return openers[0], nil
 	}
@@ -161,3 +172,6 @@ func pickOpener(service *opener.Service, role opener.Role, name string) (opener.
 	}
 	return pick, nil
 }
+
+// interactivePick `-o` 不带值时的哨兵（flag NoOptDefVal）：触发交互选择。
+const interactivePick = "?"

@@ -65,17 +65,38 @@ func NewOpenerHandler(service *opener.Service) *OpenerHandler {
 
 func (h *OpenerHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
+	web.ApiGet(api, "/api/opener/intents", "获取打开意图清单（intent → 默认 opener + 候选）", h.openerIntents)
 	web.ApiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
 	web.ApiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
 	web.ApiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
 	web.ApiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
 	web.ApiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
+	web.ApiPost(api, "/api/opener/intent-default/save", "设置某 intent 的默认 opener", h.intentDefaultSave)
+	web.ApiPost(api, "/api/opener/intent-default/delete", "清除某 intent 的默认 opener", h.intentDefaultDelete)
 	web.ApiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
 }
 
 func (h *OpenerHandler) openerList(_ struct{}) (web.ListResult[*OpenerDTO], error) {
 	openers := h.service.AllOpeners()
 	list := slicekit.Map(openers, toOpenerDTO)
+	return listResult(list), nil
+}
+
+// OpenerIntentDTO intents 接口输出条目。
+type OpenerIntentDTO struct {
+	Intent        string   `json:"intent"`
+	DefaultOpener string   `json:"defaultOpener,omitempty"`
+	Openers       []string `json:"openers"` // 候选清单（缺省 = 声明了对应 role 的全部 opener，读侧合成）
+}
+
+func (h *OpenerHandler) openerIntents(_ struct{}) (web.ListResult[*OpenerIntentDTO], error) {
+	list := slicekit.Map(h.service.Intents(), func(i opener.IntentInfo) *OpenerIntentDTO {
+		return &OpenerIntentDTO{
+			Intent:        string(i.Intent),
+			DefaultOpener: i.DefaultOpener,
+			Openers:       i.Openers,
+		}
+	})
 	return listResult(list), nil
 }
 
@@ -192,4 +213,41 @@ func (h *OpenerHandler) openerExtractIcon(input OpenerExtractIconInput) (map[str
 		return nil, err
 	}
 	return map[string]any{"value": base64.StdEncoding.EncodeToString(pngData)}, nil
+}
+
+// IntentDefaultSaveInput intent-default/save 接口入参。
+type IntentDefaultSaveInput struct {
+	Body struct {
+		Intent string `json:"intent" doc:"打开意图（如 dir / file / diff-file / git）"`
+		Opener string `json:"opener" doc:"opener 名称（须声明该 intent 对应的 role）"`
+	}
+}
+
+func (h *OpenerHandler) intentDefaultSave(input IntentDefaultSaveInput) (map[string]any, error) {
+	intent, err := opener.ParseIntent(input.Body.Intent)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.service.SaveIntentDefault(intent, input.Body.Opener); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// IntentDefaultDeleteInput intent-default/delete 接口入参。
+type IntentDefaultDeleteInput struct {
+	Body struct {
+		Intent string `json:"intent" doc:"打开意图"`
+	}
+}
+
+func (h *OpenerHandler) intentDefaultDelete(input IntentDefaultDeleteInput) (map[string]any, error) {
+	intent, err := opener.ParseIntent(input.Body.Intent)
+	if err != nil {
+		return nil, err
+	}
+	if err := h.service.DeleteIntentDefault(intent); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
 }

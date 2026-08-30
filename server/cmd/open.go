@@ -17,12 +17,13 @@ import (
 func newOpenCmd(a *app.App) *cobra.Command {
 	var openerName string
 	cmd := &cobra.Command{
-		Use:   "open [query] [-o|--opener=打开工具名]",
-		Short: "打开项目。非交互模式只支持准确项目名，非交互模式下支持模糊搜索",
-		Long: `用指定 opener 打开一个已收录的项目目录。
+		Use:   "open [query] [-o|--opener[=打开工具名]]",
+		Short: "打开项目。默认 opener 直开，-o 指定/交互选择",
+		Long: `用 opener 打开一个已收录的项目目录（intent: dir）。
 
 query 支持项目名和项目列表模糊搜索，具体规则同 info 命令。
---opener 为 opener 名称，支持模糊搜索。`,
+不传 -o 时直接使用 dir 意图的默认 opener（openerIntents 节配置）；
+-o 不带值时交互选择；-o <name> 按名模糊匹配。`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			query := getArg(args, 0)
@@ -33,9 +34,8 @@ query 支持项目名和项目列表模糊搜索，具体规则同 info 命令�
 				return err
 			}
 
-			// 选 opener
-			role := opener.RoleOpenDir
-			o, err := pickOpener(a.OpenerService(), role, openerName)
+			// 选 opener（intent: dir，不带 -o 时用默认）
+			o, err := pickOpener(a.OpenerService(), opener.IntentDir, openerName)
 			if err != nil {
 				return err
 			}
@@ -47,7 +47,7 @@ query 支持项目名和项目列表模糊搜索，具体规则同 info 命令�
 			}
 
 			// 打开项目
-			err = o.Open(role, target)
+			err = o.Open(opener.RoleOpenDir, target)
 			if err != nil {
 				return fmt.Errorf("打开失败: %w", err)
 			}
@@ -61,7 +61,8 @@ query 支持项目名和项目列表模糊搜索，具体规则同 info 命令�
 			return nil
 		},
 	}
-	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名, 支持模糊搜索")
+	cmd.Flags().StringVarP(&openerName, "opener", "o", "", "打开工具(opener)名；不带值时交互选择，缺省用默认 opener")
+	cmd.Flags().Lookup("opener").NoOptDefVal = interactivePick
 	return cmd
 }
 

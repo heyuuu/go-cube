@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useOpenerDelete, useOpenerReorder, useOpenerSave } from '@/queries/opener';
+import { useIntentDefaultDelete, useIntentDefaultSave, useOpenerDelete, useOpenerReorder, useOpenerSave, useOpenerIntents } from '@/queries/opener';
 import { useOpenerList } from '@/queries/project';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
@@ -161,6 +161,53 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+// 打开意图分区：每个 intent 一行「默认 opener」下拉（候选 = 该 intent 的 openers）。
+// 选「无默认」即删除；保存即生效。候选/默认的失效清理由后端读侧完成，此处只见有效值。
+function IntentSection() {
+  const intents = useOpenerIntents();
+  const save = useIntentDefaultSave();
+  const del = useIntentDefaultDelete();
+
+  const onChange = (intent: string, opener: string) => {
+    if (opener === '') del.mutate({ intent });
+    else save.mutate({ intent, opener });
+  };
+
+  return (
+    <div className="mt-6">
+      <div className="mb-2 flex items-baseline gap-2">
+        <h2 className="text-sm font-medium">打开意图（intents）</h2>
+        <span className="text-xs text-muted-foreground">每个场景一个默认 opener；CLI 不传 -o 时直接使用默认</span>
+      </div>
+      {intents.error && <ErrorBanner message={`加载失败：${intents.error.message}`} />}
+      {(save.error || del.error) && (
+        <ErrorBanner message={`保存失败：${((save.error || del.error) as Error).message}`} />
+      )}
+      <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+        {(intents.data ?? []).map((it) => (
+          <label key={it.intent} className="flex items-center gap-3 text-sm">
+            <span className="w-24 shrink-0 font-mono text-xs">{it.intent}</span>
+            <select
+              className="h-8 rounded-md border bg-background px-2 text-sm"
+              value={it.defaultOpener ?? ''}
+              disabled={save.isPending || del.isPending}
+              onChange={(e) => onChange(it.intent, e.target.value)}
+            >
+              <option value="">无默认</option>
+              {it.openers.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-muted-foreground">{it.openers.length} 个候选</span>
+          </label>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -314,6 +361,7 @@ export function OpenerSection() {
           onClose={() => setEditing(null)}
         />
       )}
+      <IntentSection />
     </section>
   );
 }

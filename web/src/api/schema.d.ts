@@ -106,6 +106,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/opener/intent-default/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 清除某 intent 的默认 opener */
+    post: operations['opener.intentDefaultDelete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/intent-default/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 设置某 intent 的默认 opener */
+    post: operations['opener.intentDefaultSave'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/opener/intents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取打开意图清单（intent → 默认 opener + 候选） */
+    get: operations['opener.intents'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/list': {
     parameters: {
       query?: never;
@@ -832,6 +883,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputListResultOpenerIntentDTOBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultOpenerIntentDTOBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultOpenerIntentDTO'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputListResultScanRuleBody: {
       /**
        * Format: uri
@@ -1221,11 +1283,36 @@ export interface components {
       defaultBranch: string;
       root: string;
     };
+    IntentDefaultDeleteInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/IntentDefaultDeleteInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 打开意图 */
+      intent: string;
+    };
+    IntentDefaultSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/IntentDefaultSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 打开意图（如 dir / file / diff-file / git） */
+      intent: string;
+      /** @description opener 名称（须声明该 intent 对应的 role） */
+      opener: string;
+    };
     ListResultCloneRule: {
       list: components['schemas']['CloneRule'][] | null;
     };
     ListResultOpenerDTO: {
       list: components['schemas']['OpenerDTO'][] | null;
+    };
+    ListResultOpenerIntentDTO: {
+      list: components['schemas']['OpenerIntentDTO'][] | null;
     };
     ListResultScanRule: {
       list: components['schemas']['ScanRule'][] | null;
@@ -1270,6 +1357,11 @@ export interface components {
       readonly $schema?: string;
       /** @description .app 目录绝对路径 */
       path: string;
+    };
+    OpenerIntentDTO: {
+      defaultOpener?: string;
+      intent: string;
+      openers: string[] | null;
     };
     OpenerOpenInputBody: {
       /**
@@ -1705,6 +1797,101 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputOpenerDTOBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.intentDefaultDelete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IntentDefaultDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.intentDefaultSave': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IntentDefaultSaveInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.intents': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultOpenerIntentDTOBody'];
         };
       };
       /** @description Error */
