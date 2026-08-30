@@ -19,7 +19,11 @@ opener 目前只有 role（能力/槽签名），没有「适用范围」概念�
 - **语言粒度到 workspace**：monorepo 天然多语言，语言是 workspace（含 worktree）级属性而非项目级；主根与各 workspace / worktree 各自判定。
 - **match 方案本体待议**（见下），挂起到需要时再讨论。
 
-## intent 拆分（2026-08-29 讨论新增，倾向先行于 match）
+## intent 拆分（✅ 已由 1038 落地，2026-08-31）
+
+本章的 intent 拆分已随 `1038-opener默认`（已归档）实现：intent 8 值枚举多对一映射 role、`openerIntents` 节（默认 + 候选）、CLI `-o` 三态、前端快捷位意图化。原设计差异备查：槽签名未随 intent 拆分（role 保持 4 值承担槽约束 + 能力声明）；「特化 intent 未配默认不回落」按本章结论落地。本章余下的讨论记录保留如下。
+
+> 以下为原始讨论：
 
 讨论中发现 role 身兼两职——**业务意图**（open vs diff vs terminal vs git 客户端）与**槽签名**（dir/file × 1/2 槽，`$0/$1` 校验依据）——导致 per-role 默认粒度不够：用户需要「terminal 的默认」「git 客户端的默认」等更细场景默认，而它们的槽签名都是 `[dir]`。且现状 `ParseRoles` 要求 opener 全 role slotCount 一致，使 vscode 无法同时声明 open-dir（1 槽）与 diff-dir（2 槽）——槽个数本是调用时的属性。
 
@@ -91,5 +95,5 @@ settings.json 增有序规则节（first-match-wins），规则 = `{match, role,
 
 ## 解挂条件
 
-- intent 拆分先行落地（见上章，2026-08-29 讨论后倾向把 intent 拆分从本提案单独立案先行——它是 per-role 默认粒度不足的当下痛点，比 match 自动路由小得多）。
-- match 方案 A/B 选型讨论完成；若选 A，需确认前端硬编码策略（stree / cube-workbench）迁移方案一并设计。
+- ~~intent 拆分先行落地~~（✅ 已随 1038 归档完成；前端硬编码策略（stree / cube-workbench 快捷位）也已随之意图化，不再需要本提案迁移）。
+- match 方案 A/B 选型讨论完成。注意：讨论方向已转为「调用点按目标属性选更细 intent」（如未来 workspace 语言落地后的 `dev-go`），match 谓词可能整体不再需要——解挂讨论时应先重估这个前提。
