@@ -1,6 +1,6 @@
 // settings 页 Opener 分区：列表 + 抽屉（Sheet）编辑表单，删除前确认。
 // 数据源是 /api/opener/list（settings.json），保存即生效。
-import { GripVertical } from 'lucide-react';
+import { ChevronDown, GripVertical } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Opener } from '@/api/client';
@@ -186,24 +186,33 @@ function IntentSection() {
       {(save.error || del.error) && (
         <ErrorBanner message={`保存失败：${((save.error || del.error) as Error).message}`} />
       )}
-      <div className="flex flex-col gap-1.5 rounded-lg border p-3">
+      <div className="flex flex-col divide-y rounded-lg border">
         {(intents.data ?? []).map((it) => (
-          <label key={it.intent} className="flex items-center gap-3 text-sm">
-            <span className="w-24 shrink-0 font-mono text-xs">{it.intent}</span>
-            <select
-              className="h-8 rounded-md border bg-background px-2 text-sm"
-              value={it.defaultOpener ?? ''}
-              disabled={save.isPending || del.isPending}
-              onChange={(e) => onChange(it.intent, e.target.value)}
-            >
-              <option value="">无默认</option>
-              {it.openers.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            <span className="text-xs text-muted-foreground">{it.openers.length} 个候选</span>
+          <label
+            key={it.intent}
+            className="grid grid-cols-[6rem_14rem_1fr] items-center gap-3 px-3 py-1.5 text-sm"
+          >
+            <span className="font-mono text-xs/relaxed">{it.intent}</span>
+            <div className="relative">
+              <select
+                className="h-7 w-full appearance-none rounded-md border border-input bg-input/20 px-2 pr-7 text-xs/relaxed transition-colors outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 dark:bg-input/30"
+                value={it.defaultOpener ?? ''}
+                disabled={save.isPending || del.isPending}
+                onChange={(e) => onChange(it.intent, e.target.value)}
+              >
+                <option value="">无默认</option>
+                {it.openers.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1/2 size-3 -translate-y-1/2 text-muted-foreground" />
+            </div>
+            <span className="text-xs/relaxed text-muted-foreground">
+              {it.defaultOpener ? '' : '未配置默认'}
+              {it.openers.length} 个候选
+            </span>
           </label>
         ))}
       </div>
