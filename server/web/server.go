@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -79,9 +80,18 @@ func (s *Server) OpenAPIJSON() ([]byte, error) {
 	return s.api.OpenAPI().MarshalJSON()
 }
 
+// serverHost server 绑定的主机名——全仓 http 地址拼接的唯一事实源（web.BaseURL），
+// 以后换域名/绑定时只改这里。
+const serverHost = "127.0.0.1"
+
+// BaseURL 按 port 拼 server 的基地址（无尾斜杠），全仓 http 地址拼接收敛于此。
+func BaseURL(port int) string {
+	return "http://" + serverHost + ":" + strconv.Itoa(port)
+}
+
 // ServerURL 访问地址
 func (s *Server) ServerURL() string {
-	return fmt.Sprintf("http://localhost:%d/", s.port)
+	return BaseURL(s.port) + "/"
 }
 
 // Start 启动 server，收到 SIGINT/SIGTERM 时优雅关闭。

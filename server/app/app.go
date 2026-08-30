@@ -9,7 +9,6 @@ import (
 	"cube/usage"
 	"cube/web"
 	"cube/workbench"
-	"strconv"
 )
 
 type App struct {
@@ -33,7 +32,7 @@ func New(cfg *config.Config) (*App, error) {
 
 	// 组装 services
 	projectService := project.NewService(paths.SettingsFile(), paths.CacheDir())
-	openerService := opener.NewService(paths.SettingsFile(), nil, "http://127.0.0.1:"+strconv.Itoa(cfg.Server.Port))
+	openerService := opener.NewService(paths.SettingsFile(), nil, web.BaseURL(cfg.Server.Port))
 	usageService := usage.NewService(paths.UsageFile())
 	workbenchService := workbench.NewService(projectService.RefreshGitInfo)
 	createService := create.NewService(cfg.Create)

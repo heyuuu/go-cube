@@ -31,7 +31,7 @@ type StatusInfo struct {
 // 只区分「在跑/没在跑」：连不上、非 200、响应非法、身份不符一律降级为零值（未运行），
 // 不返回 error——调用方只关心二元状态。
 func Status(port int) StatusInfo {
-	url := fmt.Sprintf("http://127.0.0.1:%d/api/system/whoami", port)
+	url := web.BaseURL(port) + "/api/system/whoami"
 	resp, err := http.Get(url)
 	if err != nil {
 		return StatusInfo{} // 连不上 = 没在跑
@@ -79,7 +79,7 @@ func Stop(port int) (stopped bool, replaced bool, err error) {
 	old := st.Instance
 
 	// 构造带 HMAC 鉴权的 shutdown 请求
-	url := fmt.Sprintf("http://127.0.0.1:%d/api/system/shutdown", port)
+	url := web.BaseURL(port) + "/api/system/shutdown"
 	req, err := http.NewRequest(http.MethodPost, url, nil)
 	if err != nil {
 		return false, false, fmt.Errorf("构造 shutdown 请求失败: %w", err)
