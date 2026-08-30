@@ -33,7 +33,6 @@ import { Switch } from '@/components/ui/switch';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
-import { tryOpenUrlAction } from '@/lib/opener-action';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -484,12 +483,7 @@ function WorktreeOpenActions({ path, name, onReset }: { path: string; name: stri
   const openerList = openers.data?.list ?? [];
   const openerNames = new Set(openerList.map((op) => op.name));
   const openerByName = new Map(openerList.map((op) => [op.name, op]));
-  // url 型动作在当前浏览器新 tab 直开（同源 + 不跳出当前浏览器），非 url 走后端
-  const onOpen = (opener: string) => {
-    const op = openerByName.get(opener);
-    if (op && tryOpenUrlAction(op.actions?.['open-dir'], [path])) return;
-    open.mutate({ path, opener });
-  };
+  const onOpen = (opener: string) => open.run(opener, path, true);
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
