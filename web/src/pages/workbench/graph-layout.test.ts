@@ -207,6 +207,32 @@ describe('虚拟节点（dirty worktree 合成提交）', () => {
     expect(nodes[1].sha).toBe('worktree:dev');
   });
 
+  it('泳道号复用不串灰线：clean worktree tip 复用虚拟节点让出的泳道，其出线不属于虚拟线', () => {
+    // 真实场景（develop 仓库现场）：两个 dirty 副本的虚拟节点在顶部，
+    // 第二个虚拟节点因让位（defer）把泳道 1 留洞，紧随其后的真实提交
+    // （另一 clean worktree 的 tip，parent = 主线 tip）复用泳道 1。
+    // 旧实现按泳道号判灰线，该真实提交的出线被误置灰——线身份（origin）须与泳道号解耦
+    const list = [
+      { sha: 'worktree:main', parents: ['dev'] }, // 虚拟 1：主线 dirty
+      { sha: 'worktree:tpl', parents: ['tpl'] }, // 虚拟 2：让位，泳道 1 留洞
+      { sha: 'wt01', parents: ['dev'] }, // clean worktree tip：复用泳道 1
+      { sha: 'dev', parents: ['tpl'] },
+      { sha: 'tpl', parents: [] },
+    ];
+    const { nodes, wires } = computeGraph(list);
+    verifyGraphInvariants(list, nodes, wires);
+    const rowOf = new Map(nodes.map((n, i) => [n.sha, i]));
+    // wt01 节点出线：origin 是 wt01 自己的行（真实提交），不是任何虚拟节点行
+    const out = wires.find((w) => w.row === rowOf.get('wt01')! && w.from === nodes[rowOf.get('wt01')!].lane)!;
+    expect(out.origin).toBe(rowOf.get('wt01'));
+    // 虚拟节点自己的出线 origin 即其所在行
+    for (const v of ['worktree:main', 'worktree:tpl']) {
+      const r = rowOf.get(v)!;
+      const w = wires.find((x) => x.row === r && x.from === nodes[r].lane)!;
+      expect(w.origin).toBe(r);
+    }
+  });
+
   it('虚拟节点的父不在已持有数据中时，等待泳道延续到页底自然截止', () => {
     // 只加载了第一页（merge..m1），虚拟节点挂载的 m2 不在其中：
     // m2 泳道以穿越线延续到最后一行后截止——与分页底部的普通支线同语义
@@ -220,10 +246,10 @@ describe('虚拟节点（dirty worktree 合成提交）', () => {
     // 线段集合确定性：虚拟节点出线（0 道）、m2 穿越线（0 道，页底截止）、
     // merge 的两条节点出线均从节点泳道出发（第二条拐向 f2 的等待泳道）
     expect(wires).toEqual([
-      { row: 0, from: 0, to: 0, color: 1 }, // worktree:main → 等待中的 m2 泳道
-      { row: 1, from: 0, to: 0, color: 1 }, // m2 泳道穿越（父未加载，延续到页底）
-      { row: 1, from: 1, to: 1, color: 2 }, // merge → m1（首父接管原泳道）
-      { row: 1, from: 1, to: 2, color: 3 }, // merge → f2（额外父拐弯曲线）
+      { row: 0, from: 0, to: 0, color: 1, origin: 0 }, // worktree:main → 等待中的 m2 泳道
+      { row: 1, from: 0, to: 0, color: 1, origin: 0 }, // m2 泳道穿越（父未加载，延续到页底）
+      { row: 1, from: 1, to: 1, color: 2, origin: 1 }, // merge → m1（首父接管原泳道）
+      { row: 1, from: 1, to: 2, color: 3, origin: 1 }, // merge → f2（额外父拐弯曲线）
     ]);
   });
 });

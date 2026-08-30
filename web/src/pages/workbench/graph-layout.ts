@@ -72,6 +72,9 @@ export interface GraphWire {
   from: number; // 起始泳道
   to: number; // 结束泳道
   color: number; // 调色板索引（渲染端映射具体颜色）
+  origin: number; // 线的起始行（创建该等待泳道的节点行）：线的稳定身份，
+  // 渲染端据此判定「虚拟节点的线」——泳道号会被复用（让位留洞、newLane 回填），
+  // 不能作为灰线判定的键
 }
 
 export interface LaneInfo {
@@ -82,6 +85,7 @@ export interface LaneInfo {
 interface graphLane {
   sha: string; // 空 sha = 空洞（已腾出待复用的泳道位）
   color: number;
+  origin: number; // 创建该等待线的节点行（首父接管时沿线下传，见 GraphWire.origin）
 }
 
 // commits 须为拓扑序（新→旧）；扩展字段（refs/subject 等）原样带到返回节点。
@@ -129,14 +133,18 @@ export function computeGraph<T extends { sha: string; parents?: string[] | null 
   });
 
   const deferred = new Map<number, number>(); // 行号 → 让位目标泳道（出线拐弯的落点）
+  const nodeOrigins = new Array<number>(commits.length); // 行号 → 该节点出线的线身份（进入该节点的线的起始行）
   let colorSeq = 0;
   commits.forEach((c, i) => {
     let lane = laneIndexOf(c.sha);
     if (lane < 0) {
       colorSeq++;
-      lane = newLane({ sha: c.sha, color: colorSeq });
+      lane = newLane({ sha: c.sha, color: colorSeq, origin: i });
     }
     const color = lanes[lane].color;
+    // 节点出线延续进入本节点的线（未在等待泳道中出现 = 新线的起点，origin 即本行）
+    const lineOrigin = lanes[lane].origin;
+    nodeOrigins[i] = lineOrigin;
     nodes[i] = { ...c, lane, color };
 
     const ps = parentsOf(c);
@@ -150,20 +158,20 @@ export function computeGraph<T extends { sha: string; parents?: string[] | null 
       }
       if (deferTo >= 0 || laneIndexOf(ps[0]) >= 0) {
         // 首父已被其它子提交占位（或让位）→ 合并过去，原泳道留洞（不左移）
-        lanes[lane] = { sha: '', color: 0 };
+        lanes[lane] = { sha: '', color: 0, origin: 0 };
         if (deferTo >= 0) deferred.set(i, deferTo);
       } else {
-        lanes[lane] = { sha: ps[0], color };
+        lanes[lane] = { sha: ps[0], color, origin: lineOrigin };
       }
       // 其余父各占新位（若未占位）
       for (const p of ps.slice(1)) {
         if (laneIndexOf(p) < 0) {
           colorSeq++;
-          newLane({ sha: p, color: colorSeq });
+          newLane({ sha: p, color: colorSeq, origin: i });
         }
       }
     } else {
-      lanes[lane] = { sha: '', color: 0 };
+      lanes[lane] = { sha: '', color: 0, origin: 0 };
     }
     trimTrailingHoles();
 
@@ -191,7 +199,7 @@ export function computeGraph<T extends { sha: string; parents?: string[] | null 
     };
     const deferTo = deferred.get(i);
     if (deferTo !== undefined) {
-      wires.push({ row: i, from: nodes[i].lane, to: deferTo, color: nodes[i].color });
+      wires.push({ row: i, from: nodes[i].lane, to: deferTo, color: nodes[i].color, origin: nodeOrigins[i] });
     }
 
     snapshots[i].forEach((entry, pos) => {
@@ -206,11 +214,11 @@ export function computeGraph<T extends { sha: string; parents?: string[] | null 
       // 只有真正的主线竖线用主线色
       if (isParent) {
         const outColor = incoming ? nodes[i].color : entry.color;
-        wires.push({ row: i, from: nodes[i].lane, to, color: outColor });
+        wires.push({ row: i, from: nodes[i].lane, to, color: outColor, origin: nodeOrigins[i] });
       }
       // 穿越线（上方支线延续），首父接管原泳道时与节点出线重合，跳过
       if (incoming && !(isParent && pos === nodes[i].lane)) {
-        wires.push({ row: i, from: pos, to, color: entry.color });
+        wires.push({ row: i, from: pos, to, color: entry.color, origin: entry.origin });
       }
     });
   }

@@ -568,7 +568,7 @@ function CommitGraphSection({
   const worktrees = useWorkbenchWorktrees(path);
   // 页拼接去重（skip 分页在仓库有新提交时可能边界重复）→ 注入 worktree 虚拟节点/装饰
   // → 本地算泳道布局。布局永远从「当前持有数据」推导，不存在跨快照拼接错位。
-  const { rows, wireMap, virtualLaneEnd, dividerRow } = useMemo(() => {
+  const { rows, wireMap, virtualOriginEnd, dividerRow } = useMemo(() => {
     const seen = new Set<string>();
     const list: CommitEntry[] = [];
     for (const page of commits.data?.pages ?? []) {
@@ -610,20 +610,23 @@ function CommitGraphSection({
     const map = new Map<number, GraphWire[]>();
     for (const w of wires) map.set(w.row, [...(map.get(w.row) ?? []), w]);
     // 虚拟节点（未提交改动）独用灰色：与已提交节点一眼区分。
-    // 置灰范围只到「虚拟节点 → 其 HEAD」为止：HEAD 之下同泳道的线属于真实历史，
-    // 记 lane → HEAD 行号，灰线段判 row < headRow（HEAD 未加载则整段可见线全灰）
+    // 置灰范围只到「虚拟节点 → 其 HEAD」为止：HEAD 之下的线属于真实历史。
+    // 灰线段的键是线段的 origin（线的起始行，见 GraphWire）而非泳道号——
+    // 泳道号会被复用（让位留洞、newLane 回填），按泳道号判会把恰好复用到
+    // 虚拟泳道号的真实支线（如另一 worktree 的 tip 出线）整段误置灰。
+    // 记 origin 行号 → HEAD 行号，灰线段判 row < headRow（HEAD 未加载则整段可见线全灰）
     const nodesOf = new Map(nodes.map((n, i) => [n.sha, i]));
     // 轻量模式「最近 N 个」区域的下边界行（第 N 个提交所在行；列表比 N 长才画）
     const dividerRow =
       lite && decorated.length > LITE_KEEP_RECENT ? (nodesOf.get(decorated[LITE_KEEP_RECENT - 1].sha) ?? -1) : -1;
-    const virtualLaneEnd = new Map<number, number>();
-    for (const n of nodes) {
-      if (!('worktree' in n && n.worktree)) continue;
+    const virtualOriginEnd = new Map<number, number>();
+    nodes.forEach((n, i) => {
+      if (!('worktree' in n && n.worktree)) return;
       const head = n.parents?.[0];
       const headRow = head != null ? (nodesOf.get(head) ?? nodes.length) : 0;
-      virtualLaneEnd.set(n.lane, headRow);
-    }
-    return { rows: nodes, wireMap: map, virtualLaneEnd, dividerRow };
+      virtualOriginEnd.set(i, headRow);
+    });
+    return { rows: nodes, wireMap: map, virtualOriginEnd, dividerRow };
   }, [commits.data, worktrees.data, hiddenWorktrees, mode]);
 
   // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
@@ -706,7 +709,7 @@ function CommitGraphSection({
               c={c}
               laneWidth={laneWidth}
               wires={wireMap.get(i - 1) ?? []}
-              virtualLaneEnd={virtualLaneEnd}
+              virtualOriginEnd={virtualOriginEnd}
               params={params}
               active={c.sha === focusSha}
               onAddWorktree={() => onAddWorktree({ commitish: c.sha })}
@@ -728,7 +731,7 @@ function CommitRow({
   c,
   laneWidth,
   wires,
-  virtualLaneEnd,
+  virtualOriginEnd,
   params,
   active,
   onAddWorktree,
@@ -736,7 +739,7 @@ function CommitRow({
   c: RowCommit;
   laneWidth: number;
   wires: GraphWire[];
-  virtualLaneEnd: Map<number, number>;
+  virtualOriginEnd: Map<number, number>;
   params: WorkbenchParams;
   active?: boolean; // 选中的是 ref/worktree 时，其 tip/HEAD 所在行
   onAddWorktree: () => void;
@@ -760,8 +763,8 @@ function CommitRow({
         {wires.map((w, wi) => {
           const x1 = LANE_X0 + w.from * LANE_W;
           const x2 = LANE_X0 + w.to * LANE_W;
-          // 虚拟节点的连线段（起点在其泳道、且尚未到其 HEAD 行）置灰
-          const end = virtualLaneEnd.get(w.from);
+          // 虚拟节点的连线段（线身份为虚拟节点行、且尚未到其 HEAD 行）置灰
+          const end = virtualOriginEnd.get(w.origin);
           const color = end !== undefined && w.row < end ? VIRTUAL_COLOR : LANE_PALETTE[w.color % LANE_PALETTE.length];
           // 同泳道 = 竖线；切入/切出行 = 单条斜线（无曲线、无折线），其余位置恒竖线
           return <line key={wi} x1={x1} y1={-ROW_H / 2} x2={x2} y2={ROW_H / 2} stroke={color} strokeWidth={1.5} />;
