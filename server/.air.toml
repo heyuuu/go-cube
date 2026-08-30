@@ -5,6 +5,9 @@ tmp_dir = "tmp"
 [build]
   # 编译
   pre_cmd = [
+    # 纯后端开发兜底：web/ui 缺失时 go:embed ui/* 匹配不到文件是编译期错误，下面的 vet 会直接挂；
+    # 放一个占位 index.html 让 embed 可编译、SPA fallback 返回提示页（make build-ui 的 rm -rf 会清掉它，真产物不受影响）
+    "test -f web/ui/index.html || (mkdir -p web/ui && echo '纯后端模式：web/ui 未构建，未嵌入前端 UI，API 正常可用。需要前端请执行 make build-ui 后重启。' > web/ui/index.html)",
     # GOMODCACHE 指空目录：禁止 goimports 全量扫描 module cache 建候选包索引（否则 18GB cache 要扫 9s）；
     # 已写明的 import 整理/排序不受影响，只损失「自动补未写 import」的能力（交给编辑器）
     "GOMODCACHE=/tmp/empty-modcache goimports -w .",

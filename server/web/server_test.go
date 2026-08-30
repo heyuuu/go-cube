@@ -140,6 +140,10 @@ func TestOpenAPIJSON(t *testing.T) {
 }
 
 func TestStaticSPAFallback(t *testing.T) {
+	// ui/index.html 是 air pre_cmd 生成的纯文本占位（前端未构建）时，无法断言 HTML 回退
+	if index, err := fs.ReadFile(uiFS, "ui/index.html"); err != nil || !contains(string(index), "<!doctype html") {
+		t.Skip("ui/index.html 是纯文本占位（前端未构建），跳过 SPA fallback 断言")
+	}
 	ts := newTestServer(t)
 	for _, path := range []string{"/", "/projects", "/projects?view=tree", "/config"} {
 		resp, err := http.Get(ts.URL + path)
