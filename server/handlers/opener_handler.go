@@ -19,12 +19,11 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name    string   `json:"name"`
-	Title   string   `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
-	Summary string   `json:"summary"` // 命令模板展示串
-	Cmd     string   `json:"cmd"`     // 命令模板原文（sh 风格字符串，编辑表单回显用）
-	Roles   []string `json:"roles"`
-	Icon    IconDTO  `json:"icon"` // 恒有值（未配置时后端按主 role 填默认 lucide 图）
+	Name     string            `json:"name"`
+	Title    string            `json:"title"`    // 展示文案（如「打开所在目录」），缺省由 name 生成
+	Summary  string            `json:"summary"`  // 命令模板展示串（"role:cmd" 拼接）
+	Commands map[string]string `json:"commands"` // role → 命令模板原文（sh 风格字符串，编辑表单回显用）；键集合即声明的 roles
+	Icon     IconDTO           `json:"icon"`     // 恒有值（未配置时后端按主 role 填默认 lucide 图）
 }
 
 // IconDTO icon 声明的 API 形态（opener / scanRule 等共用，语义见 util/iconkit）。
@@ -38,15 +37,17 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 		return nil
 	}
 
+	commands := entity.Commands()
+	dtoCommands := make(map[string]string, len(commands))
+	for r, line := range commands {
+		dtoCommands[string(r)] = line
+	}
 	return &OpenerDTO{
-		Name:    entity.Name(),
-		Title:   entity.Title(),
-		Summary: entity.Summary(),
-		Cmd:     entity.Cmd(),
-		Roles: slicekit.Map(entity.Roles(), func(r opener.Role) string {
-			return string(r)
-		}),
-		Icon: IconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
+		Name:     entity.Name(),
+		Title:    entity.Title(),
+		Summary:  entity.Summary(),
+		Commands: dtoCommands,
+		Icon:     IconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
 	}
 }
 
@@ -123,20 +124,22 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 // OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
 type OpenerSaveInput struct {
 	Body struct {
-		Name  string   `json:"name" doc:"opener 名称（唯一标识）"`
-		Title string   `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
-		Cmd   string   `json:"cmd,omitempty" doc:"启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位"`
-		Roles []string `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
-		Icon  *IconDTO `json:"icon,omitempty" doc:"图标声明"`
+		Name     string            `json:"name" doc:"opener 名称（唯一标识）"`
+		Title    string            `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
+		Commands map[string]string `json:"commands" doc:"role → 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位"`
+		Icon     *IconDTO          `json:"icon,omitempty" doc:"图标声明"`
 	}
 }
 
 func (h *OpenerHandler) openerSave(input OpenerSaveInput) (map[string]any, error) {
+	commands := make(map[opener.Role]string, len(input.Body.Commands))
+	for r, line := range input.Body.Commands {
+		commands[opener.Role(r)] = line
+	}
 	spec := opener.Spec{
-		Name:  input.Body.Name,
-		Title: input.Body.Title,
-		Cmd:   input.Body.Cmd,
-		Roles: input.Body.Roles,
+		Name:     input.Body.Name,
+		Title:    input.Body.Title,
+		Commands: commands,
 	}
 	if input.Body.Icon != nil {
 		spec.Icon = &opener.Icon{Type: input.Body.Icon.Type, Value: input.Body.Icon.Value}

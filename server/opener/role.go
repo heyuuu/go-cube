@@ -5,71 +5,52 @@ import (
 	"strings"
 )
 
-// Role 描述 opener 的业务用途（固定枚举）。筛选时按用途而非参数类型，
-// 避免「参数类型相同但用途不同」导致的筛选错位。
+// Role 描述 opener 的参数约束（固定枚举，封闭稳定）：role 决定调用时需要几个
+// 路径参数（槽个数），是 per-role cmd（见 Spec.Commands）占位符 $0/$1 校验的依据。
+// 「场景/意图」（如终端打开、git 客户端打开）不属于 role——那是 defaults 的键空间，
+// 由 role 之外的映射承载。
 //
-// 取值见 RoleXxx 常量。每个 role 内含一组参数槽类型签名（见 roleSlots），
-// 用于推导参数槽个数（slotCount），供 cmd 占位符 $0/$1 越界校验。
+// 取值见 RoleXxx 常量与 roleSlotCount。
 type Role string
 
 const (
-	// RoleOpenDir 打开目录（如项目根、worktree）。槽签名：[dir]，slotCount=1。
+	// RoleOpenDir 打开目录（如项目根、worktree）。槽签名：[dir]，1 槽。
 	RoleOpenDir Role = "open-dir"
-	// RoleOpenFile 打开单个文件。槽签名：[file]，slotCount=1。
+	// RoleOpenFile 打开单个文件。槽签名：[file]，1 槽。
 	RoleOpenFile Role = "open-file"
-	// RoleDiffDir 对比两个目录。槽签名：[dir,dir]，slotCount=2。
+	// RoleDiffDir 对比两个目录。槽签名：[dir,dir]，2 槽。
 	RoleDiffDir Role = "diff-dir"
-	// RoleDiffFile 对比两个文件。槽签名：[file,file]，slotCount=2。
+	// RoleDiffFile 对比两个文件。槽签名：[file,file]，2 槽。
 	RoleDiffFile Role = "diff-file"
 )
 
-// 参数类型常量（内部用，role 签名的元素）。
-const (
-	typeDir  = "dir"
-	typeFile = "file"
-)
+// roleOrder role 的固定展示序（Roles/Summary 等遍历用）。
+var roleOrder = []Role{RoleOpenDir, RoleOpenFile, RoleDiffDir, RoleDiffFile}
 
-// roleSlots 是 role → 每槽参数类型签名 的映射。
-// 类型仅区分 dir/file（内部细节，不暴露给配置与筛选层）。
-var roleSlots = map[Role][]string{
-	RoleOpenDir:  {typeDir},
-	RoleOpenFile: {typeFile},
-	RoleDiffDir:  {typeDir, typeDir},
-	RoleDiffFile: {typeFile, typeFile},
+// RoleOrder 返回 role 固定序副本（展示/校验提示用）。
+func RoleOrder() []Role { return append([]Role(nil), roleOrder...) }
+
+// roleSlotCounts role → 槽个数。
+var roleSlotCounts = map[Role]int{
+	RoleOpenDir:  1,
+	RoleOpenFile: 1,
+	RoleDiffDir:  2,
+	RoleDiffFile: 2,
 }
 
-// roleSlotCount 返回 role 对应的参数槽个数。
-func roleSlotCount(r Role) int { return len(roleSlots[r]) }
+// roleSlotCount 返回 role 的槽个数；未知 role 第二返回值为 false。
+func roleSlotCount(r Role) (int, bool) {
+	n, ok := roleSlotCounts[r]
+	return n, ok
+}
 
-// ParseRoles 解析 role 字符串数组。
-//   - 每个 role 必须是合法枚举值，否则返回中文错误；
-//   - 同一 opener 声明的所有 role 必须 slotCount 一致（cmd 的 $0/$1 占位符个数唯一），
-//     否则报错；
-//   - 返回解析后的 role 列表与统一 slotCount。
-func ParseRoles(raw []string) (roles []Role, slotCount int, err error) {
-	if len(raw) == 0 {
-		// 缺省视为 open-dir（最常见的「打开目录」场景）
-		return []Role{RoleOpenDir}, roleSlotCount(RoleOpenDir), nil
+// ParseRole 解析单个 role 字符串，未知值返回中文错误。
+func ParseRole(s string) (Role, error) {
+	r := Role(strings.TrimSpace(s))
+	if _, ok := roleSlotCount(r); !ok {
+		return "", fmt.Errorf("未知的 opener role %q（合法值：%s）", s, RolesString(roleOrder))
 	}
-
-	roles = make([]Role, 0, len(raw))
-	for _, s := range raw {
-		s = strings.TrimSpace(s)
-		r := Role(s)
-		if _, ok := roleSlots[r]; !ok {
-			return nil, 0, fmt.Errorf("未知的 opener role %q（合法值：open-dir/open-file/diff-dir/diff-file）", s)
-		}
-		roles = append(roles, r)
-	}
-
-	// 校验所有 role 的 slotCount 一致
-	slotCount = roleSlotCount(roles[0])
-	for _, r := range roles[1:] {
-		if roleSlotCount(r) != slotCount {
-			return nil, 0, fmt.Errorf("opener 声明的 role slotCount 不一致（占位符个数需唯一）：涉及 %s", RolesString(roles))
-		}
-	}
-	return roles, slotCount, nil
+	return r, nil
 }
 
 // RolesString 把 role 声明格式化为 "open-dir,diff-file"（展示用）。

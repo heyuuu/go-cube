@@ -17,9 +17,10 @@ type Opener interface {
 	// exec 显示命令模板，web 显示 target。
 	Summary() string
 
-	// Cmd 启动命令模板原文（sh 风格字符串），供 Web 编辑表单无损回显——
+	// Commands 各 role 的命令模板原文（sh 风格字符串），供 Web 编辑表单无损回显——
 	// 含空格的 token 以引号包裹，token 原文可从字符串无损恢复。
-	Cmd() string
+	// 每个 role 一条：同一 opener 的不同 role 可配不同命令（如 dir 与 diff）。
+	Commands() map[Role]string
 
 	// Open 以指定用途打开路径。role 校验收敛在实现内——不支持该 role 时返回
 	// 中文错误，调用方无需再自行核对 HasRole。

@@ -20,6 +20,13 @@ import { useOpenerList } from '@/queries/project';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 
+const PLACEHOLDER_BY_ROLE: Record<(typeof ALL_ROLES)[number], string> = {
+  'open-dir': 'code $0',
+  'open-file': 'code $0',
+  'diff-dir': 'bcompare $0 $1',
+  'diff-file': 'code --diff $0 $1',
+};
+
 // 冻结列：name 贴左、操作贴右，水平滚动时始终可见。实心 bg 遮住下层滑过的单元格，
 // 分隔线用 inset 阴影而非 border（border-collapse 下 border 不随 sticky 单元格移动）；
 // 行 hover 靠 group 保持整行联动（sticky 单元格自身的 bg 会盖掉 tr 的 hover bg）
@@ -31,20 +38,19 @@ const STICKY_RIGHT =
 // 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
 const DEFAULT_LUCIDE = 'app-window-mac';
 
-// 表单草稿：cmd 以 shell 风格编辑——空格分隔，含空格的 token 用引号包裹（如 "/Applications/Visual Studio Code.app/..."）
+// 表单草稿：commands 按 role 各一条 cmd（sh 风格编辑——空格分隔，
+// 含空格的 token 用引号包裹，如 "/Applications/Visual Studio Code.app/..."）
 interface Draft {
   name: string;
   title: string;
-  cmd: string;
-  roles: string[];
+  commands: Record<string, string>;
   icon: IconDecl;
 }
 
 const EMPTY_DRAFT: Draft = {
   name: '',
   title: '',
-  cmd: '',
-  roles: ['open-dir'],
+  commands: { 'open-dir': '' },
   icon: { type: 'lucide', value: DEFAULT_LUCIDE },
 };
 
@@ -52,9 +58,7 @@ function fromOpener(op: Opener): Draft {
   return {
     name: op.name,
     title: op.title === `用 ${op.name} 打开` ? '' : op.title,
-    // cmd 是模板原文（sh 风格字符串），直接回显
-    cmd: op.cmd ?? '',
-    roles: op.roles ?? [],
+    commands: { ...(op.commands ?? {}) },
     icon:
       op.icon?.type === 'image'
         ? { type: 'image', value: op.icon.value ?? '' }
@@ -68,13 +72,24 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const save = useOpenerSave();
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setForm((f) => ({ ...f, [key]: value }));
 
+  const setCommand = (role: string, cmd: string) =>
+    setForm((f) => ({ ...f, commands: { ...f.commands, [role]: cmd } }));
+  const toggleRole = (role: string, on: boolean) =>
+    setForm((f) => {
+      const commands = { ...f.commands };
+      if (on) commands[role] = commands[role] ?? '';
+      else delete commands[role];
+      return { ...f, commands };
+    });
+
   const submit = () => {
+    // 过滤空 cmd 的 role（后端对空 cmd 报错；勾了没填=未声明）
+    const commands = Object.fromEntries(Object.entries(form.commands).filter(([, cmd]) => cmd.trim() !== ''));
     save.mutate(
       {
         name: form.name.trim(),
         title: form.title.trim() || undefined,
-        cmd: form.cmd,
-        roles: form.roles,
+        commands,
         icon: { type: form.icon.type, value: form.icon.value },
       },
       { onSuccess: onClose },
@@ -101,31 +116,29 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
             <Input value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="打开所在目录" />
           </label>
 
-          <label className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             <span className="text-xs text-muted-foreground">
-              cmd（空格分隔，含空格的路径用引号包裹；$0/$1 占位路径槽位；打开工作台可用 `cube ui workbench $0`）
+              commands（每个用途一条 cmd：空格分隔，含空格的路径用引号包裹；$0/$1 占位路径槽位）
             </span>
-            <Input
-              value={form.cmd}
-              onChange={(e) => set('cmd', e.target.value)}
-              placeholder="code $0"
-              className="font-mono"
-            />
-          </label>
-
-          <div className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">roles（用途；slotCount 需一致）</span>
-            <div className="flex flex-wrap gap-x-4 gap-y-1">
-              {ALL_ROLES.map((r) => (
-                <label key={r} className="flex items-center gap-1.5 text-xs">
+            {ALL_ROLES.map((r) => (
+              <div key={r} className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs">
                   <Checkbox
-                    checked={form.roles.includes(r)}
-                    onCheckedChange={(v) => set('roles', v ? [...form.roles, r] : form.roles.filter((x) => x !== r))}
+                    checked={r in form.commands}
+                    onCheckedChange={(v) => toggleRole(r, v === true)}
                   />
                   {r}
                 </label>
-              ))}
-            </div>
+                {r in form.commands && (
+                  <Input
+                    value={form.commands[r]}
+                    onChange={(e) => setCommand(r, e.target.value)}
+                    placeholder={PLACEHOLDER_BY_ROLE[r]}
+                    className="font-mono"
+                  />
+                )}
+              </div>
+            ))}
           </div>
 
           <div className="flex flex-col gap-1">
@@ -141,7 +154,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
             <Button size="sm" variant="outline" onClick={onClose}>
               取消
             </Button>
-            <Button size="sm" disabled={save.isPending || !form.name.trim()} onClick={submit}>
+            <Button size="sm" disabled={save.isPending || !form.name.trim() || Object.keys(form.commands).length === 0} onClick={submit}>
               保存
             </Button>
           </div>
@@ -268,7 +281,7 @@ export function OpenerSection() {
                 <TableCell>{renderIcon(op?.icon, <span className="text-xs text-muted-foreground">-</span>)}</TableCell>
                 <TableCell className="text-xs">{op.title}</TableCell>
                 <TableCell className="font-mono text-xs">{op.summary || '-'}</TableCell>
-                <TableCell className="font-mono text-xs">{(op.roles ?? []).join(', ') || '-'}</TableCell>
+                <TableCell className="font-mono text-xs">{Object.keys(op.commands ?? {}).join(', ') || '-'}</TableCell>
                 <TableCell className={`${STICKY_RIGHT} text-right`}>
                   <Button size="sm" variant="ghost" onClick={() => setEditing(fromOpener(op))}>
                     编辑

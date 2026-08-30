@@ -31,8 +31,8 @@ func TestServiceDirectRead(t *testing.T) {
 
 	t.Run("读取全部与按名查找", func(t *testing.T) {
 		s, _ := newServiceAt(t, []Spec{
-			{Name: "code", Cmd: "code"},
-			{Name: "bcompare", Cmd: "bcompare $0 $1", Roles: []string{"diff-dir"}},
+			{Name: "code", Commands: map[Role]string{"open-dir": `code`}},
+			{Name: "bcompare", Commands: map[Role]string{"diff-dir": `bcompare $0 $1`}},
 		})
 		if got := s.AllOpeners(); len(got) != 2 {
 			t.Fatalf("期望 2 个, got %d", len(got))
@@ -47,9 +47,9 @@ func TestServiceDirectRead(t *testing.T) {
 
 	t.Run("坏条目跳过不阻断", func(t *testing.T) {
 		s, _ := newServiceAt(t, []Spec{
-			{Name: "bad", Cmd: ""},      // 缺 cmd，条目级坏
-			{Name: "code", Cmd: "code"}, // 正常
-			{Name: "bad2", Cmd: "c $9"}, // 占位符越界，条目级坏
+			{Name: "bad", Commands: map[Role]string{"open-dir": ``}},      // 缺 cmd，条目级坏
+			{Name: "code", Commands: map[Role]string{"open-dir": `code`}}, // 正常
+			{Name: "bad2", Commands: map[Role]string{"open-dir": `c $9`}}, // 占位符越界，条目级坏
 		})
 		got := s.AllOpeners()
 		if len(got) != 1 || got[0].Name() != "code" {
@@ -59,8 +59,8 @@ func TestServiceDirectRead(t *testing.T) {
 
 	t.Run("RoleOpeners 过滤", func(t *testing.T) {
 		s, _ := newServiceAt(t, []Spec{
-			{Name: "code", Cmd: "code"},
-			{Name: "bcompare", Cmd: "bcompare $0 $1", Roles: []string{"diff-dir"}},
+			{Name: "code", Commands: map[Role]string{"open-dir": `code`}},
+			{Name: "bcompare", Commands: map[Role]string{"diff-dir": `bcompare $0 $1`}},
 		})
 		if got := s.RoleOpeners(RoleDiffDir); len(got) != 1 || got[0].Name() != "bcompare" {
 			t.Fatalf("diff-dir 应只有 bcompare, got %v", got)
@@ -69,8 +69,8 @@ func TestServiceDirectRead(t *testing.T) {
 
 	t.Run("SearchAll 模糊匹配", func(t *testing.T) {
 		s, _ := newServiceAt(t, []Spec{
-			{Name: "code", Cmd: "code"},
-			{Name: "vscode", Cmd: "vscode"},
+			{Name: "code", Commands: map[Role]string{"open-dir": `code`}},
+			{Name: "vscode", Commands: map[Role]string{"open-dir": `vscode`}},
 		})
 		if got := s.SearchAll("cod"); len(got) != 2 {
 			t.Fatalf("cod 应匹配 code+vscode, got %v", got)
@@ -78,9 +78,9 @@ func TestServiceDirectRead(t *testing.T) {
 	})
 
 	t.Run("保存后无需重建 Service 即生效（直读不缓存）", func(t *testing.T) {
-		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: "code"}})
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Commands: map[Role]string{"open-dir": `code`}}})
 		if err := settings.SaveSection(s.settingsFile, settingsSection,
-			[]Spec{{Name: "newone", Cmd: "newone"}}); err != nil {
+			[]Spec{{Name: "newone", Commands: map[Role]string{"open-dir": `newone`}}}); err != nil {
 			t.Fatalf("写入失败: %v", err)
 		}
 		if o := s.FindByName("newone"); o == nil {
@@ -92,7 +92,7 @@ func TestServiceDirectRead(t *testing.T) {
 	})
 
 	t.Run("其他节不受影响", func(t *testing.T) {
-		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: "code"}})
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Commands: map[Role]string{"open-dir": `code`}}})
 		if err := settings.SaveSection(s.settingsFile, "other", map[string]int{"a": 1}); err != nil {
 			t.Fatalf("写入失败: %v", err)
 		}
@@ -105,8 +105,8 @@ func TestServiceDirectRead(t *testing.T) {
 func TestServiceIconEndToEnd(t *testing.T) {
 	// icon 随 Spec 存进 settings.json，读出后透传到 Opener 接口
 	s, _ := newServiceAt(t, []Spec{
-		{Name: "code", Cmd: "code", Icon: &Icon{Type: IconTypeLucide, Value: "app-window"}},
-		{Name: "plain", Cmd: "plain"},
+		{Name: "code", Commands: map[Role]string{"open-dir": `code`}, Icon: &Icon{Type: IconTypeLucide, Value: "app-window"}},
+		{Name: "plain", Commands: map[Role]string{"open-dir": `plain`}},
 	})
 	o := s.FindByName("code")
 	if o == nil || o.Icon().Value != "app-window" {
@@ -120,7 +120,7 @@ func TestServiceIconEndToEnd(t *testing.T) {
 func TestServiceSaveDelete(t *testing.T) {
 	t.Run("新增后可读回", func(t *testing.T) {
 		s, _ := newServiceAt(t, nil)
-		if err := s.SaveOpener(Spec{Name: "code", Cmd: "code"}); err != nil {
+		if err := s.SaveOpener(Spec{Name: "code", Commands: map[Role]string{"open-dir": `code`}}); err != nil {
 			t.Fatalf("保存失败: %v", err)
 		}
 		if o := s.FindByName("code"); o == nil {
@@ -129,24 +129,24 @@ func TestServiceSaveDelete(t *testing.T) {
 	})
 
 	t.Run("按名替换不重复", func(t *testing.T) {
-		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: "code"}})
-		if err := s.SaveOpener(Spec{Name: "code", Cmd: "code $0"}); err != nil {
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Commands: map[Role]string{"open-dir": `code`}}})
+		if err := s.SaveOpener(Spec{Name: "code", Commands: map[Role]string{"open-dir": `code $0`}}); err != nil {
 			t.Fatalf("保存失败: %v", err)
 		}
 		if got := s.AllOpeners(); len(got) != 1 {
 			t.Fatalf("应仍为 1 条, got %d", len(got))
 		}
-		if o := s.FindByName("code"); o.Summary() != "code $0" {
+		if o := s.FindByName("code"); o.Summary() != "open-dir:code $0" {
 			t.Fatalf("内容应被替换, got %q", o.Summary())
 		}
 	})
 
 	t.Run("坏数据返回中文错误且不落文件", func(t *testing.T) {
 		s, _ := newServiceAt(t, nil)
-		if err := s.SaveOpener(Spec{Name: "bad", Cmd: ""}); err == nil {
+		if err := s.SaveOpener(Spec{Name: "bad", Commands: map[Role]string{"open-dir": ``}}); err == nil {
 			t.Fatal("缺 cmd 应报错")
 		}
-		if err := s.SaveOpener(Spec{Name: "", Cmd: "x"}); err == nil {
+		if err := s.SaveOpener(Spec{Name: "", Commands: map[Role]string{"open-dir": `x`}}); err == nil {
 			t.Fatal("空 name 应报错")
 		}
 		if got := s.AllOpeners(); len(got) != 0 {
@@ -155,7 +155,7 @@ func TestServiceSaveDelete(t *testing.T) {
 	})
 
 	t.Run("删除与不存在报错", func(t *testing.T) {
-		s, _ := newServiceAt(t, []Spec{{Name: "code", Cmd: "code"}})
+		s, _ := newServiceAt(t, []Spec{{Name: "code", Commands: map[Role]string{"open-dir": `code`}}})
 		if err := s.DeleteOpener("code"); err != nil {
 			t.Fatalf("删除失败: %v", err)
 		}
@@ -170,9 +170,9 @@ func TestServiceSaveDelete(t *testing.T) {
 
 func TestServiceReorder(t *testing.T) {
 	newSpecs := []Spec{
-		{Name: "finder", Cmd: "open -a Finder"},
-		{Name: "code", Cmd: "code"},
-		{Name: "stree", Cmd: "stree"},
+		{Name: "finder", Commands: map[Role]string{"open-dir": `open -a Finder`}},
+		{Name: "code", Commands: map[Role]string{"open-dir": `code`}},
+		{Name: "stree", Commands: map[Role]string{"open-dir": `stree`}},
 	}
 
 	t.Run("按名单重排", func(t *testing.T) {

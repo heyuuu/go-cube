@@ -43,6 +43,7 @@ func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiPost(api, "/api/workbench/worktree/add", "新增 worktree", h.worktreeAdd)
 	web.ApiPost(api, "/api/workbench/worktree/remove", "删除 worktree（非 force 预检拒绝返回 denied+reasons）", h.worktreeRemove)
 	web.ApiPost(api, "/api/workbench/worktree/reset", "重置 worktree 到指定分支/commit（可选 hard）", h.worktreeReset)
+	web.ApiPost(api, "/api/workbench/worktree/prune", "清理失效的 worktree 管理记录", h.worktreePrune)
 	web.ApiPost(api, "/api/workbench/branch/add", "新建本地分支（不检出）", h.branchAdd)
 	web.ApiPost(api, "/api/workbench/branch/delete", "删除本地分支", h.branchDelete)
 
@@ -220,6 +221,18 @@ func (h *WorkbenchHandler) worktreeReset(input struct {
 	}
 }) (map[string]any, error) {
 	if err := h.workbenchService.WorktreeReset(input.Body.Path, input.Body.Target, input.Body.Hard); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// worktreePrune 清理已失效的 worktree 管理记录（幂等无损，无需确认）。
+func (h *WorkbenchHandler) worktreePrune(input struct {
+	Body struct {
+		Path string `json:"path"`
+	}
+}) (map[string]any, error) {
+	if err := h.workbenchService.WorktreePrune(input.Body.Path); err != nil {
 		return nil, err
 	}
 	return map[string]any{"ok": true}, nil

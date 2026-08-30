@@ -650,6 +650,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/workbench/worktree/prune': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 清理失效的 worktree 管理记录 */
+    post: operations['workbench.worktreePrune'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/worktree/remove': {
     parameters: {
       query?: never;
@@ -1226,10 +1243,11 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
-      cmd: string;
+      commands: {
+        [key: string]: string;
+      };
       icon: components['schemas']['IconDTO'];
       name: string;
-      roles: string[] | null;
       summary: string;
       title: string;
     };
@@ -1282,14 +1300,14 @@ export interface components {
        * @example https://example.com/schemas/OpenerSaveInputBody.json
        */
       readonly $schema?: string;
-      /** @description 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位 */
-      cmd?: string;
+      /** @description role → 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位 */
+      commands: {
+        [key: string]: string;
+      };
       /** @description 图标声明 */
       icon?: components['schemas']['IconDTO'];
       /** @description opener 名称（唯一标识） */
       name: string;
-      /** @description 业务用途枚举，缺省视为 open-dir */
-      roles?: string[] | null;
       /** @description 展示文案（如「打开所在目录」），缺省由 name 生成 */
       title?: string;
     };
@@ -1448,6 +1466,15 @@ export interface components {
       detached: boolean;
       path: string;
       workspaces: components['schemas']['Workspace'][] | null;
+    };
+    WorktreePruneRequest: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/WorktreePruneRequest.json
+       */
+      readonly $schema?: string;
+      path: string;
     };
     WorktreeRemoveRequest: {
       /**
@@ -2703,6 +2730,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputWorktreeCreatedBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'workbench.worktreePrune': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['WorktreePruneRequest'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

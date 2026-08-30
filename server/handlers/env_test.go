@@ -46,8 +46,8 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	settingsFile := ws.Join("settings.json")
 	if err := settings.SaveSection(settingsFile, "openers", []opener.Spec{
-		{Name: "finder", Cmd: "/usr/bin/open $0", Roles: []string{"open-dir"}},
-		{Name: "broken", Cmd: ""}, // 缺 cmd，解析失败被跳过
+		{Name: "finder", Commands: map[opener.Role]string{"open-dir": "/usr/bin/open $0"}},
+		{Name: "broken"}, // 缺 commands，解析失败被跳过
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
 	}
