@@ -1243,7 +1243,7 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
-      commands: {
+      actions: {
         [key: string]: string;
       };
       icon: components['schemas']['IconDTO'];
@@ -1300,8 +1300,8 @@ export interface components {
        * @example https://example.com/schemas/OpenerSaveInputBody.json
        */
       readonly $schema?: string;
-      /** @description role → 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位 */
-      commands: {
+      /** @description role → 动作串，exec: 命令 / url: 链接，$0/$1 占位路径槽位 */
+      actions: {
         [key: string]: string;
       };
       /** @description 图标声明 */

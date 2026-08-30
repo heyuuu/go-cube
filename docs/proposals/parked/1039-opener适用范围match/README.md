@@ -44,6 +44,15 @@ opener 目前只有 role（能力/槽签名），没有「适用范围」概念�
 - role 枚举整体退役（倾向双轨更乱），`ParseRoles`/roleSlots 随之拆除。
 - 与 match 的关系：两层正交，解析顺序 match 路由 > intent 默认 > 交互；match 谓词同样按 intent 路由，共用 opener 声明。
 
+## actions 动作串（2026-08-31 定稿，已实现）
+
+opener 的 per-role `commands` 进一步升级为 `actions: {role: "<kind>:<模板>"}`：
+
+- **`exec:`** = 原命令形态（sh 风格分词、`$N` 占位符、Executor 子进程），行为不变。
+- **`url:`** = 打开链接：`/` 开头为站内路由（`url: /workbench?path=$0`），服务端拼 baseURL（config `server.port` 装配注入）+ 占位符 query encode 后经系统 opener（darwin `open`）打开——**解决 dev/prod 端口不同导致站内链接无法静态配置的问题**；`http(s)://` 开头为外部 URL，占位符照常替换。
+- 前缀必填（无默认 kind），只认首个冒号，冒号后空格可选；非法 kind / 非法 url 值域 / 占位符越界在构造边界报中文错误。
+- 仍是 `execOpener` 单实现内按 kind 分流（`BuildArgs` 统一返回 bin+args），未新增第二个 Opener 实现。
+
 ## 候选方案（待选型）
 
 ### 方案 A：声明式 match + 复用列表序当优先级（当前倾向）

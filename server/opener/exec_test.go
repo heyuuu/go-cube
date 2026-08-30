@@ -23,7 +23,16 @@ func (f *fakeExecutor) Run(bin string, args ...string) error {
 func mkmk(pairs ...any) map[Role]string {
 	m := map[Role]string{}
 	for i := 0; i+1 < len(pairs); i += 2 {
-		m[pairs[i].(Role)] = pairs[i+1].(string)
+		m[pairs[i].(Role)] = "exec: " + pairs[i+1].(string)
+	}
+	return m
+}
+
+// mkurl 构造 url 动作的 actions（exec 用 mkmk，url 用这个）。
+func mkurl(pairs ...any) map[Role]string {
+	m := map[Role]string{}
+	for i := 0; i+1 < len(pairs); i += 2 {
+		m[pairs[i].(Role)] = "url: " + pairs[i+1].(string)
 	}
 	return m
 }
@@ -61,7 +70,7 @@ func TestRenderArgs(t *testing.T) {
 func TestBuildArgs(t *testing.T) {
 	cases := []struct {
 		name     string
-		commands map[Role]string
+		actions  map[Role]string
 		role     Role
 		paths    []string
 		wantBin  string
@@ -69,7 +78,7 @@ func TestBuildArgs(t *testing.T) {
 	}{
 		{
 			name:     "bin 在前 + 占位符参数",
-			commands: mkmk(RoleOpenDir, "code $0"),
+			actions:  mkmk(RoleOpenDir, "code $0"),
 			role:     RoleOpenDir,
 			paths:    []string{"/p"},
 			wantBin:  "code",
@@ -77,7 +86,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "含空格路径引号包裹",
-			commands: mkmk(RoleOpenDir, `"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" $0`),
+			actions:  mkmk(RoleOpenDir, `"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" $0`),
 			role:     RoleOpenDir,
 			paths:    []string{"/p"},
 			wantBin:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
@@ -85,7 +94,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "token 内嵌占位符",
-			commands: mkmk(RoleOpenDir, "tool --wd=$0"),
+			actions:  mkmk(RoleOpenDir, "tool --wd=$0"),
 			role:     RoleOpenDir,
 			paths:    []string{"/p"},
 			wantBin:  "tool",
@@ -93,7 +102,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "cmd[0] 本身是占位符（用路径作可执行文件）",
-			commands: mkmk(RoleOpenFile, "$0"),
+			actions:  mkmk(RoleOpenFile, "$0"),
 			role:     RoleOpenFile,
 			paths:    []string{"/bin/sh"},
 			wantBin:  "/bin/sh",
@@ -101,7 +110,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "无占位符：路径追加到末尾",
-			commands: mkmk(RoleOpenDir, "code"),
+			actions:  mkmk(RoleOpenDir, "code"),
 			role:     RoleOpenDir,
 			paths:    []string{"/p"},
 			wantBin:  "code",
@@ -109,7 +118,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "对比工具：双槽",
-			commands: mkmk(RoleDiffDir, "bcompare $0 $1", RoleDiffFile, "bcompare $0 $1"),
+			actions:  mkmk(RoleDiffDir, "bcompare $0 $1", RoleDiffFile, "bcompare $0 $1"),
 			role:     RoleDiffDir,
 			paths:    []string{"/a", "/b"},
 			wantBin:  "bcompare",
@@ -117,7 +126,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name: "同 opener 不同 role 不同 cmd（vscode 场景，本次改造核心动机）",
-			commands: mkmk(
+			actions: mkmk(
 				RoleOpenDir, "code $0",
 				RoleDiffFile, "code --diff $0 $1",
 			),
@@ -129,7 +138,7 @@ func TestBuildArgs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitExecOpener(Spec{Name: "t", Commands: c.commands}, &fakeExecutor{})
+			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, &fakeExecutor{}, "")
 			if err != nil {
 				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
@@ -162,7 +171,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitExecOpener(Spec{Name: "t", Commands: mkmk(RoleOpenDir, c.cmd)}, &fakeExecutor{})
+			o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, c.cmd)}, &fakeExecutor{}, "")
 			if err != nil {
 				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
@@ -181,7 +190,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 
 	t.Run("近似名不替换", func(t *testing.T) {
 		for _, bin0 := range []string{"cubed", "cube-x", "mycube", "/bin/cubecase"} {
-			o, err := InitExecOpener(Spec{Name: "t", Commands: mkmk(RoleOpenDir, bin0)}, &fakeExecutor{})
+			o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, bin0)}, &fakeExecutor{}, "")
 			if err != nil {
 				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
@@ -198,28 +207,35 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 
 // ---------- InitExecOpener commands 校验 ----------
 
-func TestInitOpenerCommandsValidation(t *testing.T) {
+func TestInitOpenerActionsValidation(t *testing.T) {
 	cases := []struct {
-		name     string
-		commands map[Role]string
-		wantErr  bool
+		name    string
+		actions map[Role]string
+		wantErr bool
 	}{
-		{"commands 缺失报错", nil, true},
-		{"commands 空报错", map[Role]string{}, true},
+		{"actions 缺失报错", nil, true},
+		{"actions 空报错", map[Role]string{}, true},
+		{"无 kind 前缀报错", map[Role]string{RoleOpenDir: "code $0"}, true},
+		{"未知 kind 报错", map[Role]string{RoleOpenDir: "shell: code $0"}, true},
+		{"前缀后模板为空报错", map[Role]string{RoleOpenDir: "exec:"}, true},
+		{"url 非法值域报错", map[Role]string{RoleOpenDir: "url: ftp://x"}, true},
+		{"站内路由缺 baseURL 报错", map[Role]string{RoleOpenDir: "url: /workbench?path=$0"}, true},
+		{"url 占位符越界报错", map[Role]string{RoleDiffFile: "url: /x?a=$0&b=$1"}, true},
+		{"外部 URL 合法", map[Role]string{RoleOpenDir: "url: https://github.com"}, false},
 		{"未知 role 报错", map[Role]string{"unknown-role": "code"}, true},
 		{"单条 cmd 缺失报错", map[Role]string{RoleOpenDir: ""}, true},
 		{"单条 cmd 纯空白报错", map[Role]string{RoleOpenDir: "   "}, true},
-		{"cmd 引号未闭合报错", map[Role]string{RoleOpenDir: `code "abc`}, true},
-		{"仅可执行文件(无占位符)合法", map[Role]string{RoleOpenDir: "code"}, false},
-		{"占位符不越本 role 槽数合法", map[Role]string{RoleDiffFile: "bcompare $0 $1"}, false},
-		{"占位符越本 role 槽数报错", map[Role]string{RoleOpenDir: "bcompare $0 $1"}, true},
-		{"token 内嵌占位符同样校验越界", map[Role]string{RoleOpenDir: "tool --wd=$1"}, true},
-		{"不同 role 槽数不同可并存（无一致性约束）", map[Role]string{RoleOpenDir: "code $0", RoleDiffFile: "code --diff $0 $1"}, false},
+		{"cmd 引号未闭合报错", map[Role]string{RoleOpenDir: `exec: code "abc`}, true},
+		{"仅可执行文件(无占位符)合法", map[Role]string{RoleOpenDir: "exec: code"}, false},
+		{"占位符不越本 role 槽数合法", map[Role]string{RoleDiffFile: "exec: bcompare $0 $1"}, false},
+		{"占位符越本 role 槽数报错", map[Role]string{RoleOpenDir: "exec: bcompare $0 $1"}, true},
+		{"token 内嵌占位符同样校验越界", map[Role]string{RoleOpenDir: "exec: tool --wd=$1"}, true},
+		{"不同 role 槽数不同可并存（无一致性约束）", map[Role]string{RoleOpenDir: "exec: code $0", RoleDiffFile: "exec: code --diff $0 $1"}, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			spec := Spec{Name: "test", Commands: c.commands}
-			o, err := InitExecOpener(spec, &fakeExecutor{})
+			spec := Spec{Name: "test", Actions: c.actions}
+			o, err := InitExecOpener(spec, &fakeExecutor{}, "")
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("期望报错，实际 o=%+v err=nil", o)
@@ -238,7 +254,7 @@ func TestInitOpenerCommandsValidation(t *testing.T) {
 func TestOpenInvokesExecutor(t *testing.T) {
 	cases := []struct {
 		name     string
-		commands map[Role]string
+		actions  map[Role]string
 		role     Role
 		paths    []string
 		wantBin  string
@@ -246,7 +262,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 	}{
 		{
 			name:     "单槽占位符",
-			commands: mkmk(RoleOpenDir, "code $0"),
+			actions:  mkmk(RoleOpenDir, "code $0"),
 			role:     RoleOpenDir,
 			paths:    []string{"/proj"},
 			wantBin:  "code",
@@ -254,7 +270,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 		},
 		{
 			name:     "无占位符路径追加末尾",
-			commands: mkmk(RoleOpenDir, "code"),
+			actions:  mkmk(RoleOpenDir, "code"),
 			role:     RoleOpenDir,
 			paths:    []string{"/proj"},
 			wantBin:  "code",
@@ -262,7 +278,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 		},
 		{
 			name:     "双槽 diff 工具",
-			commands: mkmk(RoleDiffDir, "bcompare $0 $1"),
+			actions:  mkmk(RoleDiffDir, "bcompare $0 $1"),
 			role:     RoleDiffDir,
 			paths:    []string{"/a", "/b"},
 			wantBin:  "bcompare",
@@ -272,7 +288,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fake := &fakeExecutor{}
-			o, err := InitExecOpener(Spec{Name: "t", Commands: c.commands}, fake)
+			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, fake, "")
 			if err != nil {
 				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
@@ -292,7 +308,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 
 func TestOpenSlotCountMismatch(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "t", Commands: mkmk(RoleOpenDir, "code $0")}, fake)
+	o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, "code $0")}, fake, "")
 	if err != nil {
 		t.Fatalf("InitExecOpener 失败: %v", err)
 	}
@@ -310,7 +326,7 @@ func TestOpenSlotCountMismatch(t *testing.T) {
 
 func TestOpenRoleUnsupported(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "code", Commands: mkmk(RoleOpenDir, "code")}, fake)
+	o, err := InitExecOpener(Spec{Name: "code", Actions: mkmk(RoleOpenDir, "code")}, fake, "")
 	if err != nil {
 		t.Fatalf("InitExecOpener 失败: %v", err)
 	}
@@ -377,4 +393,72 @@ func TestScanPlaceholders(t *testing.T) {
 			t.Fatalf("scanPlaceholders(%q) = %v, want %v", c.token, got, c.want)
 		}
 	}
+}
+
+// ---------- url 动作（站内路由 / 外部 URL） ----------
+
+func TestURLActions(t *testing.T) {
+	const base = "http://127.0.0.1:6001"
+	cases := []struct {
+		name    string
+		actions map[Role]string
+		role    Role
+		paths   []string
+		wantURL string
+	}{
+		{
+			name:    "站内路由：拼 baseURL + 占位符 query encode",
+			actions: map[Role]string{RoleOpenDir: "url:/workbench?path=$0"},
+			role:    RoleOpenDir,
+			paths:   []string{"/Users/x/My Proj"},
+			wantURL: base + "/workbench?path=" + "%2FUsers%2Fx%2FMy+Proj",
+		},
+		{
+			name:    "外部 URL：占位符照常替换（不 encode）",
+			actions: map[Role]string{RoleOpenDir: "url: https://github.com/search?q=$0"},
+			role:    RoleOpenDir,
+			paths:   []string{"/a/b"},
+			wantURL: "https://github.com/search?q=/a/b",
+		},
+		{
+			name:    "外部 URL 无占位符原样打开",
+			actions: map[Role]string{RoleOpenDir: "url: https://github.com"},
+			role:    RoleOpenDir,
+			paths:   []string{"/ignored"},
+			wantURL: "https://github.com",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			fake := &fakeExecutor{}
+			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, fake, base)
+			if err != nil {
+				t.Fatalf("InitExecOpener 失败: %v", err)
+			}
+			if err := o.Open(c.role, c.paths...); err != nil {
+				t.Fatalf("Open 失败: %v", err)
+			}
+			if len(fake.calls) != 1 {
+				t.Fatalf("期望 executor 被调用 1 次，实际 %d 次", len(fake.calls))
+			}
+			call := fake.calls[0]
+			if call.bin != sysOpenBin() {
+				t.Fatalf("bin 应为系统 opener %q, got %q", sysOpenBin(), call.bin)
+			}
+			if len(call.args) != 1 || call.args[0] != c.wantURL {
+				t.Fatalf("args = %v, want [%s]", call.args, c.wantURL)
+			}
+		})
+	}
+
+	t.Run("parseAction 冒号后空格可选", func(t *testing.T) {
+		k, tmpl, err := parseAction("url:  /workbench?path=$0")
+		if err != nil || k != KindURL || tmpl != "/workbench?path=$0" {
+			t.Fatalf("parseAction = (%q,%q,%v)", k, tmpl, err)
+		}
+		k2, tmpl2, err2 := parseAction("exec:open $0")
+		if err2 != nil || k2 != KindExec || tmpl2 != "open $0" {
+			t.Fatalf("parseAction = (%q,%q,%v)", k2, tmpl2, err2)
+		}
+	})
 }

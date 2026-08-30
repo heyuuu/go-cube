@@ -19,11 +19,11 @@ import (
 // --- dto ---
 
 type OpenerDTO struct {
-	Name     string            `json:"name"`
-	Title    string            `json:"title"`    // 展示文案（如「打开所在目录」），缺省由 name 生成
-	Summary  string            `json:"summary"`  // 命令模板展示串（"role:cmd" 拼接）
-	Commands map[string]string `json:"commands"` // role → 命令模板原文（sh 风格字符串，编辑表单回显用）；键集合即声明的 roles
-	Icon     IconDTO           `json:"icon"`     // 恒有值（未配置时后端按主 role 填默认 lucide 图）
+	Name    string            `json:"name"`
+	Title   string            `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
+	Summary string            `json:"summary"` // 动作串展示串（"role:动作串" 拼接）
+	Actions map[string]string `json:"actions"` // role → 动作串原文（`<kind>:<模板>`，编辑表单回显用）；键集合即声明的 roles
+	Icon    IconDTO           `json:"icon"`    // 恒有值（未配置时后端按主 role 填默认 lucide 图）
 }
 
 // IconDTO icon 声明的 API 形态（opener / scanRule 等共用，语义见 util/iconkit）。
@@ -37,17 +37,17 @@ func toOpenerDTO(entity opener.Opener) *OpenerDTO {
 		return nil
 	}
 
-	commands := entity.Commands()
-	dtoCommands := make(map[string]string, len(commands))
-	for r, line := range commands {
-		dtoCommands[string(r)] = line
+	actions := entity.Actions()
+	dtoActions := make(map[string]string, len(actions))
+	for r, raw := range actions {
+		dtoActions[string(r)] = raw
 	}
 	return &OpenerDTO{
-		Name:     entity.Name(),
-		Title:    entity.Title(),
-		Summary:  entity.Summary(),
-		Commands: dtoCommands,
-		Icon:     IconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
+		Name:    entity.Name(),
+		Title:   entity.Title(),
+		Summary: entity.Summary(),
+		Actions: dtoActions,
+		Icon:    IconDTO{Type: entity.Icon().Type, Value: entity.Icon().Value},
 	}
 }
 
@@ -124,22 +124,22 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 // OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
 type OpenerSaveInput struct {
 	Body struct {
-		Name     string            `json:"name" doc:"opener 名称（唯一标识）"`
-		Title    string            `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
-		Commands map[string]string `json:"commands" doc:"role → 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位"`
-		Icon     *IconDTO          `json:"icon,omitempty" doc:"图标声明"`
+		Name    string            `json:"name" doc:"opener 名称（唯一标识）"`
+		Title   string            `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
+		Actions map[string]string `json:"actions" doc:"role → 动作串，exec: 命令 / url: 链接，$0/$1 占位路径槽位"`
+		Icon    *IconDTO          `json:"icon,omitempty" doc:"图标声明"`
 	}
 }
 
 func (h *OpenerHandler) openerSave(input OpenerSaveInput) (map[string]any, error) {
-	commands := make(map[opener.Role]string, len(input.Body.Commands))
-	for r, line := range input.Body.Commands {
-		commands[opener.Role(r)] = line
+	actions := make(map[opener.Role]string, len(input.Body.Actions))
+	for r, raw := range input.Body.Actions {
+		actions[opener.Role(r)] = raw
 	}
 	spec := opener.Spec{
-		Name:     input.Body.Name,
-		Title:    input.Body.Title,
-		Commands: commands,
+		Name:    input.Body.Name,
+		Title:   input.Body.Title,
+		Actions: actions,
 	}
 	if input.Body.Icon != nil {
 		spec.Icon = &opener.Icon{Type: input.Body.Icon.Type, Value: input.Body.Icon.Value}

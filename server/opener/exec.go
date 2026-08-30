@@ -3,10 +3,86 @@ package opener
 import (
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 )
+
+// ActionKind 动作类型：动作串 `<kind>:<模板>` 的前缀（首个冒号前，前后空格可选）。
+type ActionKind string
+
+const (
+	// KindExec 启动子进程执行命令（sh 风格分词 + $N 占位符渲染）。
+	KindExec ActionKind = "exec"
+	// KindURL 打开 URL：`/` 开头为站内路由（拼 baseURL 后打开），`http(s)://` 开头为外部 URL。
+	KindURL ActionKind = "url"
+)
+
+// sysOpenBin 系统默认打开器（打开 URL / 文件）：darwin 用 open，linux 用 xdg-open。
+func sysOpenBin() string {
+	if runtime.GOOS == "darwin" {
+		return "open"
+	}
+	return "xdg-open"
+}
+
+// parseAction 解析动作串 `<kind>:<模板>`：只认首个冒号，冒号后空格可选；
+// 前缀必须是合法 kind（无默认前缀），模板非空。
+func parseAction(raw string) (ActionKind, string, error) {
+	idx := strings.Index(raw, ":")
+	if idx < 0 {
+		return "", "", fmt.Errorf("动作串缺少 kind 前缀（应为 exec: 或 url: 开头）: %q", raw)
+	}
+	kind := ActionKind(strings.TrimSpace(raw[:idx]))
+	switch kind {
+	case KindExec, KindURL:
+	default:
+		return "", "", fmt.Errorf("未知动作前缀 %q（合法值：exec/url）", raw[:idx])
+	}
+	tmpl := strings.TrimSpace(raw[idx+1:])
+	if tmpl == "" {
+		return "", "", fmt.Errorf("动作串 %q 前缀后的模板为空", kind)
+	}
+	return kind, tmpl, nil
+}
+
+// validateURLTemplate 校验 url 动作模板的值域：`/` 开头（站内路由）或 `http(s)://` 开头（外部 URL）。
+func validateURLTemplate(tmpl string) error {
+	if strings.HasPrefix(tmpl, "/") || strings.HasPrefix(tmpl, "http://") || strings.HasPrefix(tmpl, "https://") {
+		return nil
+	}
+	return fmt.Errorf("url 动作模板必须以 /（站内路由）或 http(s)://（外部 URL）开头: %q", tmpl)
+}
+
+// renderURLTemplate 渲染 url 动作模板中的占位符。escape=true（站内路由）时占位符替换值
+// 做 query encode（路径里的 / 与特殊字符转义，路由端 decode 还原）；外部 URL 照常子串替换。
+func renderURLTemplate(tmpl string, paths []string, escape bool) string {
+	var b strings.Builder
+	for i := 0; i < len(tmpl); i++ {
+		if tmpl[i] == '$' && i+1 < len(tmpl) && isDigit(tmpl[i+1]) {
+			j := i + 1
+			for j < len(tmpl) && isDigit(tmpl[j]) {
+				j++
+			}
+			n, _ := strconv.Atoi(tmpl[i+1 : j])
+			if n < len(paths) {
+				if escape {
+					b.WriteString(url.QueryEscape(paths[n]))
+				} else {
+					b.WriteString(paths[n])
+				}
+			} else {
+				b.WriteString(tmpl[i:j])
+			}
+			i = j - 1
+			continue
+		}
+		b.WriteByte(tmpl[i])
+	}
+	return b.String()
+}
 
 // tokenizeCmd sh 风格分词：空白分隔，单/双引号内内容（含空格）为一个 token；
 // 双引号内及裸词态支持反斜杠转义下一个字符。未闭合引号返回中文错误——
@@ -106,33 +182,39 @@ func renderPlaceholders(token string, paths []string) (string, bool) {
 
 func isDigit(b byte) bool { return b >= '0' && b <= '9' }
 
-// commandSpec 单个 role 的命令模板：构造时完成分词与占位符校验。
-type commandSpec struct {
-	line   string   // 命令原文（编辑表单回显用）
-	tokens []string // line 分词结果
+// actionSpec 单个 role 的动作模板：构造时完成前缀解析、值域与占位符校验。
+type actionSpec struct {
+	kind   ActionKind // exec / url
+	raw    string     // 动作串原文（含前缀，编辑表单回显用）
+	tmpl   string     // 前缀后的模板
+	tokens []string   // exec 形态的 tmpl 分词结果（url 形态为 nil）
 }
 
-// execOpener 命令模板形态的打开方式：按 role 各配一条 cmd（sh 风格字符串），
-// token[0]=可执行文件，其余为参数，用 $0/$1... 占位路径槽位（可嵌在 token 内），
-// 经 executor 启动子进程。
+// execOpener 打开方式的唯一实现：按 role 各配一条动作串（`exec:` 命令 / `url:` 链接）。
+// exec 动作：sh 风格分词，token[0]=可执行文件，$0/$1... 占位路径槽位（可嵌在 token 内），
+// 经 executor 启动子进程；url 动作：渲染占位符（站内路由 query encode + 拼 baseURL）
+// 后经系统 opener 打开，同样走 executor（可注入测试）。
 type execOpener struct {
-	name     string               // 应用名, 唯一标识符
-	title    string               // 展示文案，构造时已解析默认值
-	commands map[Role]commandSpec // role → 命令模板；声明了哪些 role 即键集合
-	icon     Icon                 // 图标声明，零值未配置
-	executor Executor             // 启动子进程的执行器（测试可注入 fake）
+	name     string              // 应用名, 唯一标识符
+	title    string              // 展示文案，构造时已解析默认值
+	actions  map[Role]actionSpec // role → 动作模板；声明了哪些 role 即键集合
+	baseURL  string              // 站内路由的基地址（如 http://127.0.0.1:6001），装配注入
+	icon     Icon                // 图标声明，零值未配置
+	executor Executor            // 启动子进程的执行器（测试可注入 fake）
 }
 
 var _ Opener = (*execOpener)(nil)
 
 // InitExecOpener 从存储形状构造 execOpener。
-//   - commands 必填非空：键须为合法 role，值须为可分词出至少一个 token 的 cmd
-//     （token[0] 是可执行文件）；
-//   - 每条 cmd 的占位符索引不得越该 role 的槽个数（逐条局部校验，role 间无一致性约束）；
+//   - actions 必填非空：键须为合法 role；每条动作串须为合法 `<kind>:<模板>`；
+//   - exec 模板须可分词出至少一个 token（token[0] 是可执行文件）；
+//   - url 模板须以 /（站内）或 http(s)://（外部）开头；
+//   - 每条模板的占位符索引不得越该 role 的槽个数（逐条局部校验，role 间无一致性约束）；
+//   - baseURL 供站内路由拼接（空串时站内动作构造报错，装配层负责注入）；
 //   - executor 可选，缺省装 NewDefaultExecutor()（走 os/exec）；测试传 fake 断言命令。
-func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
-	if len(spec.Commands) == 0 {
-		return nil, fmt.Errorf("opener %q 缺少必填字段 commands", spec.Name)
+func InitExecOpener(spec Spec, executor Executor, baseURL string) (*execOpener, error) {
+	if len(spec.Actions) == 0 {
+		return nil, fmt.Errorf("opener %q 缺少必填字段 actions", spec.Name)
 	}
 
 	title := spec.Title
@@ -144,27 +226,41 @@ func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
 		return nil, fmt.Errorf("opener %q icon 解析失败: %w", spec.Name, err)
 	}
 
-	commands := make(map[Role]commandSpec, len(spec.Commands))
-	for role, line := range spec.Commands {
+	actions := make(map[Role]actionSpec, len(spec.Actions))
+	for role, raw := range spec.Actions {
 		slotCount, ok := roleSlotCount(role)
 		if !ok {
 			return nil, fmt.Errorf("opener %q 存在未知 role %q（合法值：%s）", spec.Name, role, RolesString(RoleOrder()))
 		}
-		tokens, err := tokenizeCmd(line)
+		kind, tmpl, err := parseAction(raw)
 		if err != nil {
-			return nil, fmt.Errorf("opener %q role %s cmd 非法: %w", spec.Name, role, err)
+			return nil, fmt.Errorf("opener %q role %s 动作非法: %w", spec.Name, role, err)
 		}
-		if len(tokens) == 0 {
-			return nil, fmt.Errorf("opener %q role %s 缺少 cmd", spec.Name, role)
-		}
-		for _, token := range tokens {
-			for _, n := range scanPlaceholders(token) {
-				if n >= slotCount {
-					return nil, fmt.Errorf("opener %q role %s cmd 占位符 $%d 越界（槽个数=%d，合法索引 0..%d）", spec.Name, role, n, slotCount, slotCount-1)
-				}
+		action := actionSpec{kind: kind, raw: raw, tmpl: tmpl}
+		switch kind {
+		case KindExec:
+			tokens, err := tokenizeCmd(tmpl)
+			if err != nil {
+				return nil, fmt.Errorf("opener %q role %s cmd 非法: %w", spec.Name, role, err)
+			}
+			if len(tokens) == 0 {
+				return nil, fmt.Errorf("opener %q role %s 缺少 cmd", spec.Name, role)
+			}
+			action.tokens = tokens
+		case KindURL:
+			if err := validateURLTemplate(tmpl); err != nil {
+				return nil, fmt.Errorf("opener %q role %s 动作非法: %w", spec.Name, role, err)
+			}
+			if strings.HasPrefix(tmpl, "/") && baseURL == "" {
+				return nil, fmt.Errorf("opener %q role %s 站内路由需要 baseURL（server 装配注入）", spec.Name, role)
 			}
 		}
-		commands[role] = commandSpec{line: line, tokens: tokens}
+		for _, n := range scanPlaceholders(tmpl) {
+			if n >= slotCount {
+				return nil, fmt.Errorf("opener %q role %s 动作占位符 $%d 越界（槽个数=%d，合法索引 0..%d）", spec.Name, role, n, slotCount, slotCount-1)
+			}
+		}
+		actions[role] = action
 	}
 
 	// executor 默认值
@@ -174,7 +270,8 @@ func InitExecOpener(spec Spec, executor Executor) (*execOpener, error) {
 	return &execOpener{
 		name:     spec.Name,
 		title:    title,
-		commands: commands,
+		actions:  actions,
+		baseURL:  baseURL,
 		icon:     icon,
 		executor: executor,
 	}, nil
@@ -184,46 +281,48 @@ func (o *execOpener) Name() string  { return o.name }
 func (o *execOpener) Title() string { return o.title }
 func (o *execOpener) Icon() Icon    { return o.icon }
 
-// Roles 声明的 role 列表（按枚举固定序），= commands 的键集合。
+// Roles 声明的 role 列表（按枚举固定序），= actions 的键集合。
 func (o *execOpener) Roles() []Role {
-	roles := make([]Role, 0, len(o.commands))
+	roles := make([]Role, 0, len(o.actions))
 	for _, r := range RoleOrder() {
-		if _, ok := o.commands[r]; ok {
+		if _, ok := o.actions[r]; ok {
 			roles = append(roles, r)
 		}
 	}
 	return roles
 }
 
-// Commands 各 role 的命令模板原文（编辑表单回显用）。
-func (o *execOpener) Commands() map[Role]string {
-	out := make(map[Role]string, len(o.commands))
-	for r, c := range o.commands {
-		out[r] = c.line
+// Actions 各 role 的动作串原文（编辑表单回显用）。
+func (o *execOpener) Actions() map[Role]string {
+	out := make(map[Role]string, len(o.actions))
+	for r, a := range o.actions {
+		out[r] = a.raw
 	}
 	return out
 }
 
 // Summary 展示串（CLI 表格 / alfred 副标题 / Web DTO）：
-// 按 role 固定序拼接 "role:cmd"。
+// 按 role 固定序拼接 "role:动作串"。
 func (o *execOpener) Summary() string {
-	parts := make([]string, 0, len(o.commands))
+	parts := make([]string, 0, len(o.actions))
 	for _, r := range o.Roles() {
-		parts = append(parts, string(r)+":"+o.commands[r].line)
+		parts = append(parts, string(r)+":"+o.actions[r].raw)
 	}
 	return strings.Join(parts, "; ")
 }
 
 // BuildArgs 构造以指定 role 启动该 opener 的完整命令参数（bin + args）。
 //   - 该 role 必须已声明、参数个数必须等于其槽个数，否则报错；
-//   - cmd 中的 $0/$1... 占位符被对应路径替换；无占位符的参数原样保留；
-//   - 缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 "code" + path 形态；
-//   - bin 自引用替换（见 resolveBin）：cmd[0] 是 cube 时换成当前进程的可执行文件。
+//   - exec 动作：cmd 中的 $0/$1... 占位符被对应路径替换；无占位符的参数原样保留；
+//     缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 "code" + path 形态；
+//     bin 自引用替换（见 resolveBin）：cmd[0] 是 cube 时换成当前进程的可执行文件；
+//   - url 动作：站内路由拼 baseURL + 占位符 query encode；外部 URL 占位符照常替换；
+//     bin 为系统 opener（darwin: open / linux: xdg-open），args 为渲染后的完整 URL。
 //
 // 返回 (bin, args) 供调用方自行启动子进程。
 // Open() 是它的便捷封装（role 校验 + BuildArgs + executor.Run）。
 func (o *execOpener) BuildArgs(role Role, slotArgs ...string) (bin string, args []string, err error) {
-	cmd, ok := o.commands[role]
+	action, ok := o.actions[role]
 	if !ok {
 		return "", nil, fmt.Errorf("opener %s 不支持 %s", o.name, role)
 	}
@@ -232,9 +331,19 @@ func (o *execOpener) BuildArgs(role Role, slotArgs ...string) (bin string, args 
 		return "", nil, fmt.Errorf("opener %s 的 %s 需要 %d 个路径参数，实际传入 %d", o.name, role, slotCount, len(slotArgs))
 	}
 
+	if action.kind == KindURL {
+		var full string
+		if strings.HasPrefix(action.tmpl, "/") {
+			full = o.baseURL + renderURLTemplate(action.tmpl, slotArgs, true)
+		} else {
+			full = renderURLTemplate(action.tmpl, slotArgs, false)
+		}
+		return sysOpenBin(), []string{full}, nil
+	}
+
 	// 先对整条 cmd 渲染占位符（cmd[0] 也可能是占位符，如用路径本身作可执行文件），
 	// 再取 [0] 为 bin、[1:] 为 args。
-	rendered, used := renderArgs(cmd.tokens, slotArgs)
+	rendered, used := renderArgs(action.tokens, slotArgs)
 	// cmd 参数里没有任何占位符时，把路径按顺序追加到末尾（兼容纯 "code" 配置）
 	if used == 0 {
 		rendered = append(rendered, slotArgs...)
@@ -264,7 +373,7 @@ func resolveBin(bin string) string {
 // executor 启动子进程。需要更灵活的启动方式（自定义 stdio、异步、非阻塞等）时，
 // 改用 BuildArgs 自行启动。
 func (o *execOpener) Open(role Role, slotArgs ...string) error {
-	if _, ok := o.commands[role]; !ok {
+	if _, ok := o.actions[role]; !ok {
 		return fmt.Errorf("opener %s 不支持 %s", o.name, role)
 	}
 	bin, args, err := o.BuildArgs(role, slotArgs...)

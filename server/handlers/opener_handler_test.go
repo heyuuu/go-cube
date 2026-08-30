@@ -13,9 +13,9 @@ func TestOpenerList(t *testing.T) {
 	env := newTestEnv(t)
 	var got struct {
 		List []struct {
-			Name     string            `json:"name"`
-			Summary  string            `json:"summary"`
-			Commands map[string]string `json:"commands"`
+			Name    string            `json:"name"`
+			Summary string            `json:"summary"`
+			Actions map[string]string `json:"actions"`
 		} `json:"list"`
 	}
 	decodeData(t, getJSON(t, env.url("/api/opener/list")), &got)
@@ -28,11 +28,11 @@ func TestOpenerList(t *testing.T) {
 	if op.Name != "finder" {
 		t.Errorf("name 应为 finder, got %q", op.Name)
 	}
-	if op.Summary != "open-dir:/usr/bin/open $0" {
+	if op.Summary != "open-dir:exec: /usr/bin/open $0" {
 		t.Errorf("summary 应为 role:cmd 形态, got %q", op.Summary)
 	}
-	if len(op.Commands) != 1 || op.Commands["open-dir"] != "/usr/bin/open $0" {
-		t.Errorf("commands 应含 open-dir 命令, got %v", op.Commands)
+	if len(op.Actions) != 1 || op.Actions["open-dir"] != "exec: /usr/bin/open $0" {
+		t.Errorf("commands 应含 open-dir 命令, got %v", op.Actions)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	}
 
 	// 新增（带 icon），list 应可见且 DTO 带回 icon
-	env1 := postSave(`{"name":"code","commands":{"open-dir": "code $0"},"icon":{"type":"lucide","value":"app-window"}}`)
+	env1 := postSave(`{"name":"code","actions":{"open-dir": "exec: code $0"},"icon":{"type":"lucide","value":"app-window"}}`)
 	if !env1.Ok {
 		t.Fatalf("保存应成功, message=%q", env1.Message)
 	}
@@ -165,9 +165,9 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	}
 
 	// 坏数据（缺 cmd）中文错误、不落文件
-	env2 := postSave(`{"name":"bad","commands":{"open-dir": ""}}`)
-	if env2.Ok || !strings.Contains(env2.Message, "cmd") {
-		t.Fatalf("坏数据应报 cmd 错误, got ok=%v message=%q", env2.Ok, env2.Message)
+	env2 := postSave(`{"name":"bad","actions":{"open-dir": "exec:"}}`)
+	if env2.Ok || !strings.Contains(env2.Message, "模板为空") {
+		t.Fatalf("坏数据应报模板为空错误, got ok=%v message=%q", env2.Ok, env2.Message)
 	}
 
 	// 删除
@@ -258,7 +258,7 @@ func TestOpenerReorder(t *testing.T) {
 	}
 
 	// fixture 预置 finder；再存一条 code，reorder 后 list 顺序应随之变化
-	postJSON("/api/opener/save", `{"name":"code","commands":{"open-dir": "code $0"}}`)
+	postJSON("/api/opener/save", `{"name":"code","actions":{"open-dir": "exec: code $0"}}`)
 	postJSON("/api/opener/reorder", `{"names":["code","finder"]}`)
 
 	list := getJSON(t, env.url("/api/opener/list"))

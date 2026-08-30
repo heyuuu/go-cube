@@ -195,13 +195,13 @@ function MdTreeRow({
             <DropdownMenuItem onClick={() => onExternal(n.path)}>在新页面打开</DropdownMenuItem>
             <DropdownMenuSeparator />
             {openerList
-              .filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.commands ?? {}))
+              .filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {}))
               .map((op) => (
                 <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name)}>
                   {op.name}
                 </DropdownMenuItem>
               ))}
-            {openerList.filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.commands ?? {})).length === 0 && (
+            {openerList.filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {})).length === 0 && (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用 opener</div>
             )}
           </DropdownMenuContent>

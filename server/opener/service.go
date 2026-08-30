@@ -15,11 +15,13 @@ const settingsSection = "openers"
 type Service struct {
 	settingsFile string   // settings.json 路径，每次查询现读（直读不缓存，Web 改完立刻生效）
 	executor     Executor // 逐条构造 execOpener 时注入；nil 时由 InitExecOpener 装默认执行器
+	baseURL      string   // 站内路由基地址（如 http://127.0.0.1:6001），装配注入
 }
 
-// NewService 构造 Service。executor 可选；测试传 fake。
-func NewService(settingsFile string, executor Executor) *Service {
-	return &Service{settingsFile: settingsFile, executor: executor}
+// NewService 构造 Service。executor 可选（测试传 fake）；baseURL 供 url 动作的
+// 站内路由拼接（来自 config 的 server.port，opener 包不 import config，由装配层传值）。
+func NewService(settingsFile string, executor Executor, baseURL string) *Service {
+	return &Service{settingsFile: settingsFile, executor: executor, baseURL: baseURL}
 }
 
 // openers 现读 settings.json 的 openers 节并逐条构造。
@@ -31,7 +33,7 @@ func (s *Service) openers() []Opener {
 
 	list := make([]Opener, 0, len(specs))
 	for _, spec := range specs {
-		o, err := InitExecOpener(spec, s.executor)
+		o, err := InitExecOpener(spec, s.executor, s.baseURL)
 		if err != nil {
 			continue
 		}
@@ -72,7 +74,7 @@ func (s *Service) SaveOpener(spec Spec) error {
 	if spec.Name == "" {
 		return fmt.Errorf("opener name 不得为空")
 	}
-	if _, err := InitExecOpener(spec, s.executor); err != nil {
+	if _, err := InitExecOpener(spec, s.executor, s.baseURL); err != nil {
 		return err
 	}
 

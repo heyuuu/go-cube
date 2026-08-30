@@ -46,7 +46,7 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	settingsFile := ws.Join("settings.json")
 	if err := settings.SaveSection(settingsFile, "openers", []opener.Spec{
-		{Name: "finder", Commands: map[opener.Role]string{"open-dir": "/usr/bin/open $0"}},
+		{Name: "finder", Actions: map[opener.Role]string{"open-dir": "exec: /usr/bin/open $0"}},
 		{Name: "broken"}, // 缺 commands，解析失败被跳过
 	}); err != nil {
 		t.Fatalf("写入测试 settings.json 失败: %v", err)
@@ -65,7 +65,7 @@ func newTestEnv(t *testing.T) *testEnv {
 
 	projSvc := project.NewService(settingsFile, ws.Join("cache"))
 	exec := &fakeExecutor{}
-	openerSvc := opener.NewService(settingsFile, exec)
+	openerSvc := opener.NewService(settingsFile, exec, "http://127.0.0.1:6001")
 	usageSvc := usage.NewService(ws.Join("usage.jsonl"))
 	cfg := &config.Config{
 		DataDir: ws.Join("data"),

@@ -6,7 +6,7 @@ import (
 )
 
 // Role 描述 opener 的参数约束（固定枚举，封闭稳定）：role 决定调用时需要几个
-// 路径参数（槽个数），是 per-role cmd（见 Spec.Commands）占位符 $0/$1 校验的依据。
+// 路径参数（槽个数），是 per-role 动作（见 Spec.Actions）占位符 $0/$1 校验的依据。
 // 「场景/意图」（如终端打开、git 客户端打开）不属于 role——那是 defaults 的键空间，
 // 由 role 之外的映射承载。
 //
