@@ -14,7 +14,7 @@ const settingsSection = "openers"
 
 type Service struct {
 	settingsFile string   // settings.json 路径，每次查询现读（直读不缓存，Web 改完立刻生效）
-	executor     Executor // 逐条构造 execOpener 时注入；nil 时由 InitExecOpener 装默认执行器
+	executor     Executor // 逐条构造 actionOpener 时注入；nil 时由 InitActionOpener 装默认执行器
 	baseURL      string   // 站内路由基地址（如 http://127.0.0.1:6001），装配注入
 }
 
@@ -33,7 +33,7 @@ func (s *Service) openers() []Opener {
 
 	list := make([]Opener, 0, len(specs))
 	for _, spec := range specs {
-		o, err := InitExecOpener(spec, s.executor, s.baseURL)
+		o, err := InitActionOpener(spec, s.executor, s.baseURL)
 		if err != nil {
 			continue
 		}
@@ -74,7 +74,7 @@ func (s *Service) SaveOpener(spec Spec) error {
 	if spec.Name == "" {
 		return fmt.Errorf("opener name 不得为空")
 	}
-	if _, err := InitExecOpener(spec, s.executor, s.baseURL); err != nil {
+	if _, err := InitActionOpener(spec, s.executor, s.baseURL); err != nil {
 		return err
 	}
 

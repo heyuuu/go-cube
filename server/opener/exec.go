@@ -5,7 +5,6 @@ import (
 	"log/slog"
 	"net/url"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -20,13 +19,8 @@ const (
 	KindURL ActionKind = "url"
 )
 
-// sysOpenBin 系统默认打开器（打开 URL / 文件）：darwin 用 open，linux 用 xdg-open。
-func sysOpenBin() string {
-	if runtime.GOOS == "darwin" {
-		return "open"
-	}
-	return "xdg-open"
-}
+// sysOpenBin 系统默认打开器（打开 URL / 文件）。cube 是纯 macOS 工具，恒为 open。
+func sysOpenBin() string { return "open" }
 
 // parseAction 解析动作串 `<kind>:<模板>`：只认首个冒号，冒号后空格可选；
 // 前缀必须是合法 kind（无默认前缀），模板非空。
@@ -190,11 +184,11 @@ type actionSpec struct {
 	tokens []string   // exec 形态的 tmpl 分词结果（url 形态为 nil）
 }
 
-// execOpener 打开方式的唯一实现：按 role 各配一条动作串（`exec:` 命令 / `url:` 链接）。
+// actionOpener 打开方式的唯一实现：按 role 各配一条动作串（`exec:` 命令 / `url:` 链接）。
 // exec 动作：sh 风格分词，token[0]=可执行文件，$0/$1... 占位路径槽位（可嵌在 token 内），
 // 经 executor 启动子进程；url 动作：渲染占位符（站内路由 query encode + 拼 baseURL）
 // 后经系统 opener 打开，同样走 executor（可注入测试）。
-type execOpener struct {
+type actionOpener struct {
 	name     string              // 应用名, 唯一标识符
 	title    string              // 展示文案，构造时已解析默认值
 	actions  map[Role]actionSpec // role → 动作模板；声明了哪些 role 即键集合
@@ -203,16 +197,16 @@ type execOpener struct {
 	executor Executor            // 启动子进程的执行器（测试可注入 fake）
 }
 
-var _ Opener = (*execOpener)(nil)
+var _ Opener = (*actionOpener)(nil)
 
-// InitExecOpener 从存储形状构造 execOpener。
+// InitActionOpener 从存储形状构造 actionOpener。
 //   - actions 必填非空：键须为合法 role；每条动作串须为合法 `<kind>:<模板>`；
 //   - exec 模板须可分词出至少一个 token（token[0] 是可执行文件）；
 //   - url 模板须以 /（站内）或 http(s)://（外部）开头；
 //   - 每条模板的占位符索引不得越该 role 的槽个数（逐条局部校验，role 间无一致性约束）；
 //   - baseURL 供站内路由拼接（空串时站内动作构造报错，装配层负责注入）；
 //   - executor 可选，缺省装 NewDefaultExecutor()（走 os/exec）；测试传 fake 断言命令。
-func InitExecOpener(spec Spec, executor Executor, baseURL string) (*execOpener, error) {
+func InitActionOpener(spec Spec, executor Executor, baseURL string) (*actionOpener, error) {
 	if len(spec.Actions) == 0 {
 		return nil, fmt.Errorf("opener %q 缺少必填字段 actions", spec.Name)
 	}
@@ -267,7 +261,7 @@ func InitExecOpener(spec Spec, executor Executor, baseURL string) (*execOpener, 
 	if executor == nil {
 		executor = NewDefaultExecutor()
 	}
-	return &execOpener{
+	return &actionOpener{
 		name:     spec.Name,
 		title:    title,
 		actions:  actions,
@@ -277,12 +271,12 @@ func InitExecOpener(spec Spec, executor Executor, baseURL string) (*execOpener, 
 	}, nil
 }
 
-func (o *execOpener) Name() string  { return o.name }
-func (o *execOpener) Title() string { return o.title }
-func (o *execOpener) Icon() Icon    { return o.icon }
+func (o *actionOpener) Name() string  { return o.name }
+func (o *actionOpener) Title() string { return o.title }
+func (o *actionOpener) Icon() Icon    { return o.icon }
 
 // Roles 声明的 role 列表（按枚举固定序），= actions 的键集合。
-func (o *execOpener) Roles() []Role {
+func (o *actionOpener) Roles() []Role {
 	roles := make([]Role, 0, len(o.actions))
 	for _, r := range RoleOrder() {
 		if _, ok := o.actions[r]; ok {
@@ -293,7 +287,7 @@ func (o *execOpener) Roles() []Role {
 }
 
 // Actions 各 role 的动作串原文（编辑表单回显用）。
-func (o *execOpener) Actions() map[Role]string {
+func (o *actionOpener) Actions() map[Role]string {
 	out := make(map[Role]string, len(o.actions))
 	for r, a := range o.actions {
 		out[r] = a.raw
@@ -303,7 +297,7 @@ func (o *execOpener) Actions() map[Role]string {
 
 // Summary 展示串（CLI 表格 / alfred 副标题 / Web DTO）：
 // 按 role 固定序拼接 "role:动作串"。
-func (o *execOpener) Summary() string {
+func (o *actionOpener) Summary() string {
 	parts := make([]string, 0, len(o.actions))
 	for _, r := range o.Roles() {
 		parts = append(parts, string(r)+":"+o.actions[r].raw)
@@ -317,11 +311,11 @@ func (o *execOpener) Summary() string {
 //     缺省（cmd 未含占位符时）路径按顺序追加到 args 末尾，兼容 "code" + path 形态；
 //     bin 自引用替换（见 resolveBin）：cmd[0] 是 cube 时换成当前进程的可执行文件；
 //   - url 动作：站内路由拼 baseURL + 占位符 query encode；外部 URL 占位符照常替换；
-//     bin 为系统 opener（darwin: open / linux: xdg-open），args 为渲染后的完整 URL。
+//     bin 为系统 opener（macOS: open），args 为渲染后的完整 URL。
 //
 // 返回 (bin, args) 供调用方自行启动子进程。
 // Open() 是它的便捷封装（role 校验 + BuildArgs + executor.Run）。
-func (o *execOpener) BuildArgs(role Role, slotArgs ...string) (bin string, args []string, err error) {
+func (o *actionOpener) BuildArgs(role Role, slotArgs ...string) (bin string, args []string, err error) {
 	action, ok := o.actions[role]
 	if !ok {
 		return "", nil, fmt.Errorf("opener %s 不支持 %s", o.name, role)
@@ -372,7 +366,7 @@ func resolveBin(bin string) string {
 // Open 用该 opener 以指定用途打开一个或多个路径：校验 role 后构造 args 并委托
 // executor 启动子进程。需要更灵活的启动方式（自定义 stdio、异步、非阻塞等）时，
 // 改用 BuildArgs 自行启动。
-func (o *execOpener) Open(role Role, slotArgs ...string) error {
+func (o *actionOpener) Open(role Role, slotArgs ...string) error {
 	if _, ok := o.actions[role]; !ok {
 		return fmt.Errorf("opener %s 不支持 %s", o.name, role)
 	}
@@ -380,7 +374,7 @@ func (o *execOpener) Open(role Role, slotArgs ...string) error {
 	if err != nil {
 		return err
 	}
-	slog.Debug("execOpener.Open", "bin", bin, "args", args)
+	slog.Debug("actionOpener.Open", "bin", bin, "args", args)
 	return o.executor.Run(bin, args...)
 }
 

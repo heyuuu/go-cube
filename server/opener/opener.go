@@ -1,7 +1,7 @@
 package opener
 
 // Opener 一种「打开方式」的抽象（1016 接口化）。
-// 目前唯一实现是 execOpener（命令模板，见 exec.go）
+// 目前唯一实现是 actionOpener（命令模板，见 exec.go）
 type Opener interface {
 	Name() string
 

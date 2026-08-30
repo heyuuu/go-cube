@@ -138,9 +138,9 @@ func TestBuildArgs(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, &fakeExecutor{}, "")
+			o, err := InitActionOpener(Spec{Name: "t", Actions: c.actions}, &fakeExecutor{}, "")
 			if err != nil {
-				t.Fatalf("InitExecOpener 失败: %v", err)
+				t.Fatalf("InitActionOpener 失败: %v", err)
 			}
 			bin, args, err := o.BuildArgs(c.role, c.paths...)
 			if err != nil {
@@ -171,9 +171,9 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, c.cmd)}, &fakeExecutor{}, "")
+			o, err := InitActionOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, c.cmd)}, &fakeExecutor{}, "")
 			if err != nil {
-				t.Fatalf("InitExecOpener 失败: %v", err)
+				t.Fatalf("InitActionOpener 失败: %v", err)
 			}
 			bin, args, err := o.BuildArgs(RoleOpenDir, "/proj")
 			if err != nil {
@@ -190,9 +190,9 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 
 	t.Run("近似名不替换", func(t *testing.T) {
 		for _, bin0 := range []string{"cubed", "cube-x", "mycube", "/bin/cubecase"} {
-			o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, bin0)}, &fakeExecutor{}, "")
+			o, err := InitActionOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, bin0)}, &fakeExecutor{}, "")
 			if err != nil {
-				t.Fatalf("InitExecOpener 失败: %v", err)
+				t.Fatalf("InitActionOpener 失败: %v", err)
 			}
 			bin, _, err := o.BuildArgs(RoleOpenDir, "/proj")
 			if err != nil {
@@ -205,7 +205,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 	})
 }
 
-// ---------- InitExecOpener commands 校验 ----------
+// ---------- InitActionOpener commands 校验 ----------
 
 func TestInitOpenerActionsValidation(t *testing.T) {
 	cases := []struct {
@@ -235,7 +235,7 @@ func TestInitOpenerActionsValidation(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			spec := Spec{Name: "test", Actions: c.actions}
-			o, err := InitExecOpener(spec, &fakeExecutor{}, "")
+			o, err := InitActionOpener(spec, &fakeExecutor{}, "")
 			if c.wantErr {
 				if err == nil {
 					t.Fatalf("期望报错，实际 o=%+v err=nil", o)
@@ -288,9 +288,9 @@ func TestOpenInvokesExecutor(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fake := &fakeExecutor{}
-			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, fake, "")
+			o, err := InitActionOpener(Spec{Name: "t", Actions: c.actions}, fake, "")
 			if err != nil {
-				t.Fatalf("InitExecOpener 失败: %v", err)
+				t.Fatalf("InitActionOpener 失败: %v", err)
 			}
 			if err := o.Open(c.role, c.paths...); err != nil {
 				t.Fatalf("Open 失败: %v", err)
@@ -308,9 +308,9 @@ func TestOpenInvokesExecutor(t *testing.T) {
 
 func TestOpenSlotCountMismatch(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, "code $0")}, fake, "")
+	o, err := InitActionOpener(Spec{Name: "t", Actions: mkmk(RoleOpenDir, "code $0")}, fake, "")
 	if err != nil {
-		t.Fatalf("InitExecOpener 失败: %v", err)
+		t.Fatalf("InitActionOpener 失败: %v", err)
 	}
 	// open-dir 1 槽但传 2 个路径，应在 BuildArgs 阶段报错，executor 不被调用
 	err = o.Open(RoleOpenDir, "/a", "/b")
@@ -326,9 +326,9 @@ func TestOpenSlotCountMismatch(t *testing.T) {
 
 func TestOpenRoleUnsupported(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "code", Actions: mkmk(RoleOpenDir, "code")}, fake, "")
+	o, err := InitActionOpener(Spec{Name: "code", Actions: mkmk(RoleOpenDir, "code")}, fake, "")
 	if err != nil {
-		t.Fatalf("InitExecOpener 失败: %v", err)
+		t.Fatalf("InitActionOpener 失败: %v", err)
 	}
 	// 用未声明的 role 调 Open 应在实现内报错，且不触达 executor
 	if err := o.Open(RoleDiffDir, "/a"); err == nil {
@@ -431,9 +431,9 @@ func TestURLActions(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			fake := &fakeExecutor{}
-			o, err := InitExecOpener(Spec{Name: "t", Actions: c.actions}, fake, base)
+			o, err := InitActionOpener(Spec{Name: "t", Actions: c.actions}, fake, base)
 			if err != nil {
-				t.Fatalf("InitExecOpener 失败: %v", err)
+				t.Fatalf("InitActionOpener 失败: %v", err)
 			}
 			if err := o.Open(c.role, c.paths...); err != nil {
 				t.Fatalf("Open 失败: %v", err)
