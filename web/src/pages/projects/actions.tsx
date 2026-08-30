@@ -19,22 +19,22 @@ import {
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useProjectOpen } from '@/queries/project';
+import { useIntentDefaultOpener } from '@/queries/opener';
 
 import {
   filterTargets,
   projectTargets,
-  quickOpens,
+  quickIntents,
   tagVariants,
   type ProjectTarget,
-  type QuickOpen,
   type TargetKind,
 } from './shared';
 
-// 行内打开动作：快捷图标（按已配置 opener 过滤）+ 全量下拉。
+// 行内打开动作：快捷图标（intent 槽位 × 默认 opener）+ 全量下拉。
 // 多目标项目（1032 worktrees / 1030 workspaces）：opener 挂子菜单选目标（Base UI 的
 // SubmenuRoot；同弹层内点 item 切内容的做法不可行——item 点击即关菜单）；
-// 单目标点击直达，体验不变。快捷位按 opener 的目标策略筛（stree 只挂仓库根、
-// cube-workbench 只挂主根，见 shared.tsx）；全量「打开方式」下拉不筛（通用 opener 目标语义未知）。
+// 单目标点击直达，体验不变。快捷位 = quickIntents 解析默认 opener（未配默认的槽位
+// 隐藏，不回落），并按目标策略筛（见 shared.tsx）；全量「打开方式」下拉不筛。
 export function ProjectActions({
   p,
   openerList,
@@ -46,8 +46,7 @@ export function ProjectActions({
   open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string, dir?: string) => void;
 }) {
-  const openerByName = new Map(openerList.map((op) => [op.name, op]));
-  const openerNames = new Set(openerList.map((op) => op.name));
+  const defaultOpenerOf = useIntentDefaultOpener();
   const allTargets = projectTargets(p);
   const multiTarget = allTargets.length > 1;
 
@@ -67,28 +66,28 @@ export function ProjectActions({
       </DropdownMenuItem>
     ));
 
-  const quickButton = (q: QuickOpen) => {
-    const op = openerByName.get(q.name);
-    if (!op) return null;
+  const quickButton = (q: (typeof quickIntents)[number]) => {
+    const op = defaultOpenerOf(q.intent);
+    if (!op) return null; // 未配默认的槽位隐藏，不回落
     // 该快捷位实际可选的目标（策略筛过）；筛剩单目标时点击直达
     const targets = filterTargets(allTargets, q.targets);
     if (targets.length === 1) {
       return (
         <Button
-          key={q.name}
+          key={q.intent}
           variant="ghost"
           size="icon-sm"
           title={op.title}
           aria-label={`${op.title}（${p.name}）`}
-          disabled={isPending(q.name)}
-          onClick={() => openTarget(q.name, targets[0].dir)}
+          disabled={isPending(op.name)}
+          onClick={() => openTarget(op.name, targets[0].dir)}
         >
           {renderIcon(op?.icon, null)}
         </Button>
       );
     }
     return (
-      <DropdownMenu key={q.name}>
+      <DropdownMenu key={q.intent}>
         <DropdownMenuTrigger
           render={
             <Button
@@ -96,7 +95,7 @@ export function ProjectActions({
               size="icon-sm"
               title={`${op.title}（选择目标）`}
               aria-label={`${op.title}（${p.name}）`}
-              disabled={isPending(q.name)}
+              disabled={isPending(op.name)}
             >
               {renderIcon(op?.icon, null)}
             </Button>
@@ -106,7 +105,7 @@ export function ProjectActions({
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           <DropdownMenuGroup>
             <DropdownMenuLabel>{op.title} · 选择目标</DropdownMenuLabel>
-            {targetMenuItems(targets, q.name)}
+            {targetMenuItems(targets, op.name)}
           </DropdownMenuGroup>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -115,7 +114,7 @@ export function ProjectActions({
 
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {quickOpens.filter((q) => openerNames.has(q.name)).map(quickButton)}
+      {quickIntents.map(quickButton)}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${p.name}`} />}>
           <Ellipsis className="size-3.5" />
@@ -194,8 +193,8 @@ export function TagBadges({ tags, className }: { tags?: string[] | null; classNa
   );
 }
 
-// 展开的目标子行的动作位：按快捷位策略给该目标内联直达图标
-// （stree 行只出现在仓库根目标上、cube-workbench 只在主根上，策略见 shared.tsx）。
+// 展开的目标子行的动作位：按快捷意图槽位给该目标内联直达图标
+// （git 槽位只出现在仓库根目标上、workbench 只在主根上，策略见 shared.tsx）。
 export function TargetRowActions({
   p,
   target,
@@ -209,25 +208,26 @@ export function TargetRowActions({
   open: ReturnType<typeof useProjectOpen>;
   onOpen: (path: string, opener: string, dir?: string) => void;
 }) {
-  const openerByName = new Map(openerList.map((op) => [op.name, op]));
+  const defaultOpenerOf = useIntentDefaultOpener();
   const isPending = (name: string) =>
     open.isPending && open.variables?.path === p.path && open.variables?.opener === name;
   const dir = target.dir || undefined; // 子行目标都打开自身目录（主根子行 = 项目根）
   return (
     <div className="flex items-center gap-0.5" onClick={(e) => e.stopPropagation()}>
-      {quickOpens
-        .filter((q) => openerByName.has(q.name) && filterTargets([target], q.targets).length > 0)
+      {quickIntents
+        .filter((q) => filterTargets([target], q.targets).length > 0)
         .map((q) => {
-          const op = openerByName.get(q.name)!;
+          const op = defaultOpenerOf(q.intent);
+          if (!op) return null; // 未配默认的槽位隐藏，不回落
           return (
             <Button
-              key={q.name}
+              key={q.intent}
               variant="ghost"
               size="icon-sm"
               title={`${op.title} · ${target.label}`}
               aria-label={`${op.title}（${p.name} ${target.label}）`}
-              disabled={isPending(q.name)}
-              onClick={() => onOpen(p.path, q.name, dir)}
+              disabled={isPending(op.name)}
+              onClick={() => onOpen(p.path, op.name, dir)}
             >
               {renderIcon(op.icon, null)}
             </Button>

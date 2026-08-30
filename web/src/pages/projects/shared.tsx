@@ -50,20 +50,23 @@ export function projectTargets(p: Project): ProjectTarget[] {
   }));
 }
 
-// 快捷打开位的目标策略：并非所有 opener 都需要全部目标——
-//   all        任意目标（目录类 opener，finder 等）
-//   repo-roots 主根 + 各 worktree 根（diff 类 opener：目录对比以仓库为单位，workspace 子目录区分无意义）
+// 快捷打开位（1038 第 4 步）：按「意图」占位，opener 由该 intent 的默认解析
+// （useIntentDefaultOpener），未配默认则该槽位隐藏——特化 intent（workbench/git/terminal）
+// 不回落 dir 默认。目标策略保留（哪个意图的入口出现在哪类目标上）：
+//   all        任意目标（dir / terminal）
+//   repo-roots 主根 + 各 worktree 根（git 客户端以仓库为单位，workspace 子目录区分无意义）
 //   root-only  仅主根（工作台以主仓库为基准，目标区分无意义）
-export type QuickOpen = { name: string; targets: 'all' | 'repo-roots' | 'root-only' };
+export type QuickIntent = { intent: string; targets: 'all' | 'repo-roots' | 'root-only' };
 
-export const quickOpens: QuickOpen[] = [
-  { name: 'cube-workbench', targets: 'root-only' },
-  { name: 'stree', targets: 'repo-roots' },
-  { name: 'finder', targets: 'all' },
+export const quickIntents: QuickIntent[] = [
+  { intent: 'workbench', targets: 'root-only' },
+  { intent: 'git', targets: 'repo-roots' },
+  { intent: 'terminal', targets: 'all' },
+  { intent: 'dir', targets: 'all' },
 ];
 
 // 按策略筛目标；根目录恒在（策略不排除主根）。
-export function filterTargets(targets: ProjectTarget[], policy: QuickOpen['targets']): ProjectTarget[] {
+export function filterTargets(targets: ProjectTarget[], policy: QuickIntent['targets']): ProjectTarget[] {
   if (policy === 'all') return targets;
   if (policy === 'root-only') return targets.filter((t) => t.kind === 'root');
   return targets.filter((t) => t.kind !== 'workspace');

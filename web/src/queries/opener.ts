@@ -32,10 +32,25 @@ export function useIntentDefaultDelete() {
   });
 }
 
+// 解析某 intent 的默认 opener（组合 intents + openers 两个查询）。
+// 返回取值函数：未配默认或 opener 失效（读侧已清理，这里兜底）时 undefined——
+// 调用方隐藏入口，不回落其它 intent 的默认。
+export function useIntentDefaultOpener() {
+  const intents = useOpenerIntents();
+  const openers = useOpenerList();
+  return (intent: string): Opener | undefined => {
+    const def = intents.data?.find((i) => i.intent === intent)?.defaultOpener;
+    if (!def) return undefined;
+    return (openers.data?.list ?? []).find((o) => o.name === def);
+  };
+}
+
 // opener 增删改（openers 数据落 settings.json，经 Web API 写，保存即生效）。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { Opener } from '@/api/client';
 import { apiGet, apiPost } from '@/api/client';
+import { useOpenerList } from './project';
 
 export function useOpenerSave() {
   const qc = useQueryClient();

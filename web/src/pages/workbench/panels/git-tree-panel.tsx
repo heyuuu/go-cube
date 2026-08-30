@@ -33,6 +33,7 @@ import { Switch } from '@/components/ui/switch';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
+import { useIntentDefaultOpener } from '@/queries/opener';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -471,34 +472,34 @@ function WorktreeRow({
   );
 }
 
-// 副本行尾的 opener 动作（与 projects 页行内动作同构）：已配置的快捷图标 + 全量下拉。
-// 快捷清单本面板自维护（不含 cube-workbench——已在工作台内，没必要再跳工作台）。
+// 副本行尾的 opener 动作（与 projects 页行内动作同构）：快捷图标（intent 槽位 ×
+// 默认 opener）+ 全量下拉。槽位取 dir（finder 类）与 git（stree 类）意图的默认，
+// 未配默认则隐藏（不回落）；不含 workbench——已在工作台内，没必要再跳工作台。
 // 须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
-const QUICK_OPENS = ['finder', 'stree'];
+const QUICK_INTENTS = ['dir', 'git'];
 
 // onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）
 function WorktreeOpenActions({ path, name, onReset }: { path: string; name: string; onReset?: () => void }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
   const openerList = openers.data?.list ?? [];
-  const openerNames = new Set(openerList.map((op) => op.name));
-  const openerByName = new Map(openerList.map((op) => [op.name, op]));
+  const defaultOpenerOf = useIntentDefaultOpener();
   const onOpen = (opener: string) => open.run(opener, path, true);
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {QUICK_OPENS.filter((openerName) => openerNames.has(openerName)).map((openerName) => {
-        const op = openerByName.get(openerName);
-        if (!op) return null;
+      {QUICK_INTENTS.map((intent) => {
+        const op = defaultOpenerOf(intent);
+        if (!op) return null; // 未配默认的槽位隐藏，不回落
         return (
           <Button
-            key={openerName}
+            key={intent}
             variant="ghost"
             size="icon-sm"
             title={op.title}
             aria-label={`${op.title}（${name}）`}
-            disabled={open.isPending && open.variables?.opener === openerName}
-            onClick={() => onOpen(openerName)}
+            disabled={open.isPending && open.variables?.opener === op.name}
+            onClick={() => onOpen(op.name)}
           >
             {renderIcon(op?.icon, null)}
           </Button>
