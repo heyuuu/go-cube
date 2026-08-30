@@ -19,6 +19,7 @@ import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
+import { tryOpenUrlAction } from '@/lib/opener-action';
 
 // md 渲染页：独立于主应用 Layout（文档查看器，不带业务侧栏）。
 // 路由 /md?path=<abs>，由 `cube md` 命令打开；渲染全在前端（后端只给原文与文件列表）。
@@ -153,7 +154,7 @@ function MdTreeRow({
   onExternal: (path: string) => void;
   openerList: Opener[];
   open: ReturnType<typeof useOpenerOpen>;
-  onOpenNode: (path: string, app: string) => void;
+  onOpenNode: (path: string, app: string, isDir: boolean) => void;
   rowRef?: React.Ref<HTMLDivElement>;
 }) {
   const n = row.node;
@@ -197,7 +198,7 @@ function MdTreeRow({
             {openerList
               .filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {}))
               .map((op) => (
-                <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name)}>
+                <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name, isDir)}>
                   {op.name}
                 </DropdownMenuItem>
               ))}
@@ -459,8 +460,11 @@ export function MdPage() {
     window.addEventListener('mouseup', onUp);
   }
 
-  function openNode(path: string, opener: string) {
+  function openNode(path: string, opener: string, isDir: boolean) {
     setOpenError('');
+    // url 型动作在当前浏览器新 tab 直开（同源 + 不跳出当前浏览器），非 url 走后端
+    const op = (openers.data?.list ?? []).find((o) => o.name === opener);
+    if (op && tryOpenUrlAction(op.actions?.[isDir ? 'open-dir' : 'open-file'], [path])) return;
     open.mutate({ path, opener }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 

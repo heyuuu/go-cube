@@ -36,6 +36,7 @@ import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
+import { tryOpenUrlAction } from '@/lib/opener-action';
 import { useScanRules } from '@/queries/scan-rule';
 
 import { ProjectActions, TargetKindIcon, TargetRowActions, WorktreeCountBadge } from './actions';
@@ -504,6 +505,9 @@ export function ProjectsPage() {
 
   function openProject(path: string, opener: string, dir?: string) {
     setOpenError('');
+    // url 型动作在当前浏览器新 tab 直开（同源 + 不跳出当前浏览器），非 url 走后端
+    const op = (openers.data?.list ?? []).find((o) => o.name === opener);
+    if (op && tryOpenUrlAction(op.actions?.['open-dir'], [dir ?? path])) return;
     open.mutate({ path, opener, dir }, { onError: (e) => setOpenError(`打开失败：${e.message}`) });
   }
 
