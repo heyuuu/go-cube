@@ -246,6 +246,21 @@ func (s *Service) WorktreeRemove(path string, targetPath string, force bool) err
 	return nil
 }
 
+// WorktreePrune 清理已失效的 worktree 管理记录（目录已被外部删除的残留）。
+// 幂等无损——不删任何存在的副本，无需预检。成功后定向刷新主项目快照。
+func (s *Service) WorktreePrune(path string) error {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	mainRoot := mainRootOf(root)
+	if err := git.WorktreePrune(mainRoot); err != nil {
+		return err
+	}
+	s.refreshCache(mainRoot)
+	return nil
+}
+
 // WorktreeReset 把 path 所在副本的 HEAD 重置到 target（分支名/commit/tag）。
 // hard 为 true 时 --hard 丢弃暂存区与工作区改动，并 Clean 清掉未跟踪的新增文件
 // （reset --hard 不碰未跟踪文件）——是调用方弹窗显式确认的选择，此处不做脏工作区预检。

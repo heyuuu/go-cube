@@ -215,6 +215,15 @@ export function useWorktreeReset(path: string) {
   });
 }
 
+// 清理失效的 worktree 管理记录（git worktree prune，幂等无损）
+export function useWorktreePrune(path: string) {
+  const invalidate = useInvalidateWorkbench(path);
+  return useMutation({
+    mutationFn: () => apiPost('/api/workbench/worktree/prune', { path }),
+    onSuccess: invalidate,
+  });
+}
+
 // 新建本地分支（不检出——「建分支并切过去」走 worktree 新建）
 export function useBranchAdd(path: string) {
   const invalidate = useInvalidateWorkbench(path);

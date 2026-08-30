@@ -12,6 +12,7 @@ import {
   RotateCcw,
   Trash2,
   Ellipsis,
+  Eraser,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { useSearchParams } from 'react-router';
@@ -38,6 +39,7 @@ import {
   useWorkbenchRefs,
   useWorkbenchRemotes,
   useWorkbenchWorktrees,
+  useWorktreePrune,
   type CommitEntry,
   type RemoteEntry,
   type WorktreeStatus,
@@ -174,6 +176,8 @@ function WorktreeSection({
 }) {
   const refs = useWorkbenchRefs(path);
   const worktrees = useWorkbenchWorktrees(path);
+  // prune 幂等无损，无需确认弹窗；失败就地展示错误
+  const prune = useWorktreePrune(path);
 
   return (
     <>
@@ -181,17 +185,30 @@ function WorktreeSection({
         title="工作副本"
         icon={<Monitor className="size-3.5" />}
         action={
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            title="新建 worktree"
-            aria-label="新建 worktree"
-            onClick={() => onAddWorktree({})}
-          >
-            <Plus className="size-3.5" />
-          </Button>
+          <div className="flex items-center">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="清理失效的 worktree 记录（prune）"
+              aria-label="清理失效的 worktree 记录"
+              disabled={prune.isPending}
+              onClick={() => prune.mutate()}
+            >
+              <Eraser className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              title="新建 worktree"
+              aria-label="新建 worktree"
+              onClick={() => onAddWorktree({})}
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </div>
         }
       >
+        {prune.isError ? <ErrorBanner message={prune.error.message} /> : null}
         {(worktrees.data ?? []).map((wt) => (
           <WorktreeRow
             key={wt.path}
