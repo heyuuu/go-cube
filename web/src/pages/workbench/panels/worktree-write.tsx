@@ -76,6 +76,7 @@ export function WorktreeAddDialog({
       <Field label="基点" hint="commit / 分支 / tag，留空 = HEAD">
         <Input value={commitish} onChange={(e) => setCommitish(e.target.value)} placeholder="HEAD" />
       </Field>
+      <BranchQuickPicks locals={refs.data?.locals ?? []} value={commitish} onPick={setCommitish} limit={5} />
       <Field label="目标目录" hint="留空 = 仓库同级 <仓库名>.worktrees/<分支名>/">
         <Input value={targetPath} onChange={(e) => setTargetPath(e.target.value)} placeholder="/绝对路径" />
       </Field>
@@ -183,26 +184,7 @@ export function WorktreeResetDialog({
             autoFocus
           />
         </Field>
-        <div className="flex flex-wrap gap-1">
-          {(refs.data?.locals ?? []).map((b) => {
-            const short = refShortName(b);
-            return (
-              <button
-                key={b}
-                type="button"
-                className={cn(
-                  'rounded border px-1.5 py-0.5 text-[10px] font-mono',
-                  short === target.trim()
-                    ? 'border-primary text-primary'
-                    : 'border-muted-foreground/30 text-muted-foreground hover:bg-accent',
-                )}
-                onClick={() => setTarget(short)}
-              >
-                {short}
-              </button>
-            );
-          })}
-        </div>
+        <BranchQuickPicks locals={refs.data?.locals ?? []} value={target} onPick={setTarget} />
         <CheckLine checked={hard} onCheckedChange={setHard} label="--hard（丢弃暂存区与工作区全部改动，不可恢复）" />
         {reset.isError ? <ErrorLine message={reset.error.message} /> : null}
         <DialogActions
@@ -368,6 +350,43 @@ function WriteDialogShell({
         <div className="text-sm font-semibold">{title}</div>
         {children}
       </div>
+    </div>
+  );
+}
+
+function BranchQuickPicks({
+  locals,
+  value,
+  onPick,
+  limit,
+}: {
+  locals: string[]; // refs/heads/... 全名
+  value: string;
+  onPick: (short: string) => void;
+  limit?: number; // 省略 = 全部
+}) {
+  const picks = limit ? locals.slice(0, limit) : locals;
+  if (picks.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {picks.map((b) => {
+        const short = refShortName(b);
+        return (
+          <button
+            key={b}
+            type="button"
+            className={cn(
+              'rounded border px-1.5 py-0.5 text-[10px] font-mono',
+              short === value.trim()
+                ? 'border-primary text-primary'
+                : 'border-muted-foreground/30 text-muted-foreground hover:bg-accent',
+            )}
+            onClick={() => onPick(short)}
+          >
+            {short}
+          </button>
+        );
+      })}
     </div>
   );
 }
