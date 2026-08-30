@@ -12,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { joinCmdLine, tokenizeCmdLine } from '@/lib/cmdline';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
@@ -53,8 +52,8 @@ function fromOpener(op: Opener): Draft {
   return {
     name: op.name,
     title: op.title === `用 ${op.name} 打开` ? '' : op.title,
-    // cmd 是模板原文数组，joinCmdLine 对含空格 token 加引号，保证编辑无损回显
-    cmd: joinCmdLine(op.cmd?.length ? op.cmd : op.summary.split(/\s+/).filter(Boolean)),
+    // cmd 是模板原文（sh 风格字符串），直接回显
+    cmd: op.cmd ?? '',
     roles: op.roles ?? [],
     icon:
       op.icon?.type === 'image'
@@ -74,7 +73,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
       {
         name: form.name.trim(),
         title: form.title.trim() || undefined,
-        cmd: tokenizeCmdLine(form.cmd),
+        cmd: form.cmd,
         roles: form.roles,
         icon: { type: form.icon.type, value: form.icon.value },
       },

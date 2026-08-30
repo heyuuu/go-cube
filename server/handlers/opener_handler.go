@@ -22,7 +22,7 @@ type OpenerDTO struct {
 	Name    string   `json:"name"`
 	Title   string   `json:"title"`   // 展示文案（如「打开所在目录」），缺省由 name 生成
 	Summary string   `json:"summary"` // 命令模板展示串
-	Cmd     []string `json:"cmd"`     // 命令模板原文（编辑表单回显用，token 可含空格）
+	Cmd     string   `json:"cmd"`     // 命令模板原文（sh 风格字符串，编辑表单回显用）
 	Roles   []string `json:"roles"`
 	Icon    IconDTO  `json:"icon"` // 恒有值（未配置时后端按主 role 填默认 lucide 图）
 }
@@ -125,7 +125,7 @@ type OpenerSaveInput struct {
 	Body struct {
 		Name  string   `json:"name" doc:"opener 名称（唯一标识）"`
 		Title string   `json:"title,omitempty" doc:"展示文案（如「打开所在目录」），缺省由 name 生成"`
-		Cmd   []string `json:"cmd,omitempty" doc:"启动命令，$0/$1 占位路径槽位"`
+		Cmd   string   `json:"cmd,omitempty" doc:"启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位"`
 		Roles []string `json:"roles,omitempty" doc:"业务用途枚举，缺省视为 open-dir"`
 		Icon  *IconDTO `json:"icon,omitempty" doc:"图标声明"`
 	}

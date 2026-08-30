@@ -130,7 +130,7 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	}
 
 	// 新增（带 icon），list 应可见且 DTO 带回 icon
-	env1 := postSave(`{"name":"code","cmd":["code","$0"],"roles":["open-dir"],"icon":{"type":"lucide","value":"app-window"}}`)
+	env1 := postSave(`{"name":"code","cmd":"code $0","roles":["open-dir"],"icon":{"type":"lucide","value":"app-window"}}`)
 	if !env1.Ok {
 		t.Fatalf("保存应成功, message=%q", env1.Message)
 	}
@@ -165,7 +165,7 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 	}
 
 	// 坏数据（缺 cmd）中文错误、不落文件
-	env2 := postSave(`{"name":"bad","cmd":[]}`)
+	env2 := postSave(`{"name":"bad","cmd":""}`)
 	if env2.Ok || !strings.Contains(env2.Message, "cmd") {
 		t.Fatalf("坏数据应报 cmd 错误, got ok=%v message=%q", env2.Ok, env2.Message)
 	}
@@ -258,7 +258,7 @@ func TestOpenerReorder(t *testing.T) {
 	}
 
 	// fixture 预置 finder；再存一条 code，reorder 后 list 顺序应随之变化
-	postJSON("/api/opener/save", `{"name":"code","cmd":["code","$0"],"roles":["open-dir"]}`)
+	postJSON("/api/opener/save", `{"name":"code","cmd":"code $0","roles":["open-dir"]}`)
 	postJSON("/api/opener/reorder", `{"names":["code","finder"]}`)
 
 	list := getJSON(t, env.url("/api/opener/list"))

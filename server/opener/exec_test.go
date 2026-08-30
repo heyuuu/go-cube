@@ -20,32 +20,6 @@ func (f *fakeExecutor) Run(bin string, args ...string) error {
 	return nil
 }
 
-// ---------- placeholderIndex ----------
-
-func TestPlaceholderIndex(t *testing.T) {
-	cases := []struct {
-		in     string
-		wantN  int
-		wantOK bool
-	}{
-		{"$0", 0, true},
-		{"$1", 1, true},
-		{"$12", 12, true},
-		{"", 0, false},
-		{"$x", 0, false},
-		{"-old", 0, false},
-		{"file$0", 0, false}, // 占位符必须整体
-		{"$", 0, false},
-		{"  $0", 0, false},
-	}
-	for _, c := range cases {
-		n, ok := placeholderIndex(c.in)
-		if n != c.wantN || ok != c.wantOK {
-			t.Fatalf("placeholderIndex(%q) = (%d,%v), want (%d,%v)", c.in, n, ok, c.wantN, c.wantOK)
-		}
-	}
-}
-
 // ---------- renderArgs ----------
 
 func TestRenderArgs(t *testing.T) {
@@ -61,6 +35,8 @@ func TestRenderArgs(t *testing.T) {
 		{"flag + 占位符混合", []string{"-old", "$0", "-new", "$1"}, []string{"-old", "/a", "-new", "/b"}, 2},
 		{"占位符乱序", []string{"$1", "$0"}, []string{"/b", "/a"}, 2},
 		{"占位符越界保留原样", []string{"$0", "$9"}, []string{"/a", "$9"}, 1},
+		{"token 内嵌占位符", []string{"--wd=$0", "x$1y"}, []string{"--wd=/a", "x/by"}, 2},
+		{"多位数字占位符整体识别", []string{"$10"}, []string{"$10"}, 0},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -77,7 +53,7 @@ func TestRenderArgs(t *testing.T) {
 func TestBuildArgs(t *testing.T) {
 	cases := []struct {
 		name     string
-		cmd      []string
+		cmd      string
 		roles    []string
 		paths    []string
 		wantBin  string
@@ -85,15 +61,31 @@ func TestBuildArgs(t *testing.T) {
 	}{
 		{
 			name:     "bin 在前 + 占位符参数",
-			cmd:      []string{"code", "$0"},
+			cmd:      "code $0",
 			roles:    []string{"open-dir"},
 			paths:    []string{"/p"},
 			wantBin:  "code",
 			wantArgs: []string{"/p"},
 		},
 		{
+			name:     "含空格路径引号包裹",
+			cmd:      `"/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code" $0`,
+			roles:    []string{"open-dir"},
+			paths:    []string{"/p"},
+			wantBin:  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+			wantArgs: []string{"/p"},
+		},
+		{
+			name:     "token 内嵌占位符",
+			cmd:      "tool --wd=$0",
+			roles:    []string{"open-dir"},
+			paths:    []string{"/p"},
+			wantBin:  "tool",
+			wantArgs: []string{"--wd=/p"},
+		},
+		{
 			name:     "cmd[0] 本身是占位符（用路径作可执行文件）",
-			cmd:      []string{"$0"},
+			cmd:      "$0",
 			roles:    []string{"open-file"},
 			paths:    []string{"/bin/sh"},
 			wantBin:  "/bin/sh",
@@ -101,7 +93,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "无占位符：路径追加到末尾",
-			cmd:      []string{"code"},
+			cmd:      "code",
 			roles:    []string{"open-dir"},
 			paths:    []string{"/p"},
 			wantBin:  "code",
@@ -109,7 +101,7 @@ func TestBuildArgs(t *testing.T) {
 		},
 		{
 			name:     "对比工具：双槽",
-			cmd:      []string{"bcompare", "$0", "$1"},
+			cmd:      "bcompare $0 $1",
 			roles:    []string{"diff-dir", "diff-file"},
 			paths:    []string{"/a", "/b"},
 			wantBin:  "bcompare",
@@ -142,12 +134,12 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 	}
 	cases := []struct {
 		name     string
-		cmd      []string
+		cmd      string
 		wantArgs []string
 	}{
-		{"裸名 cube", []string{"cube", "ui", "workbench", "$0"}, []string{"ui", "workbench", "/proj"}},
-		{"绝对路径 cube", []string{"/usr/local/bin/cube", "md"}, []string{"md", "/proj"}},
-		{"相对路径 cube", []string{"tmp/cube", "md"}, []string{"md", "/proj"}},
+		{"裸名 cube", "cube ui workbench $0", []string{"ui", "workbench", "/proj"}},
+		{"绝对路径 cube", "/usr/local/bin/cube md", []string{"md", "/proj"}},
+		{"相对路径 cube", "tmp/cube md", []string{"md", "/proj"}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -160,7 +152,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 				t.Fatalf("BuildArgs 失败: %v", err)
 			}
 			if bin != self {
-				t.Fatalf("cmd[0]=%q 应替换为当前可执行文件 %q, got %q", c.cmd[0], self, bin)
+				t.Fatalf("cmd 应替换为当前可执行文件 %q, got %q", self, bin)
 			}
 			if !reflect.DeepEqual(args, c.wantArgs) {
 				t.Fatalf("args = %v, want %v", args, c.wantArgs)
@@ -170,7 +162,7 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 
 	t.Run("近似名不替换", func(t *testing.T) {
 		for _, bin0 := range []string{"cubed", "cube-x", "mycube", "/bin/cubecase"} {
-			o, err := InitExecOpener(Spec{Name: "t", Cmd: []string{bin0}, Roles: []string{"open-dir"}}, &fakeExecutor{})
+			o, err := InitExecOpener(Spec{Name: "t", Cmd: bin0, Roles: []string{"open-dir"}}, &fakeExecutor{})
 			if err != nil {
 				t.Fatalf("InitExecOpener 失败: %v", err)
 			}
@@ -190,18 +182,20 @@ func TestBuildArgsResolvesSelfCube(t *testing.T) {
 func TestInitOpenerCmdValidation(t *testing.T) {
 	cases := []struct {
 		name    string
-		cmd     []string
+		cmd     string
 		roles   []string
 		wantErr bool
 	}{
-		{"cmd 缺失报错", nil, nil, true},
-		{"cmd 空数组报错", []string{}, nil, true},
-		{"cmd 仅可执行文件(无占位符)合法", []string{"code"}, nil, false},
-		{"cmd 含合法占位符", []string{"bcompare", "$0", "$1"}, []string{"diff-file"}, false},
-		{"cmd 占位符越界报错", []string{"bcompare", "$0", "$1"}, []string{"open-dir"}, true},
-		{"cmd 占位符等于slotCount边界合法", []string{"code", "$0"}, []string{"open-dir"}, false},
-		{"未知 role 报错", []string{"code"}, []string{"unknown-role"}, true},
-		{"slotCount 不一致报错", []string{"code", "$0", "$1"}, []string{"open-dir", "diff-file"}, true},
+		{"cmd 缺失报错", "", nil, true},
+		{"cmd 纯空白报错", "   ", nil, true},
+		{"cmd 引号未闭合报错", `code "abc`, nil, true},
+		{"cmd 仅可执行文件(无占位符)合法", "code", nil, false},
+		{"cmd 含合法占位符", "bcompare $0 $1", []string{"diff-file"}, false},
+		{"cmd 占位符越界报错", "bcompare $0 $1", []string{"open-dir"}, true},
+		{"token 内嵌占位符同样校验越界", "tool --wd=$1", []string{"open-dir"}, true},
+		{"cmd 占位符等于slotCount边界合法", "code $0", []string{"open-dir"}, false},
+		{"未知 role 报错", "code", []string{"unknown-role"}, true},
+		{"slotCount 不一致报错", "code $0 $1", []string{"open-dir", "diff-file"}, true},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -220,18 +214,12 @@ func TestInitOpenerCmdValidation(t *testing.T) {
 	}
 }
 
-// ---------- CanOpenAt glob 匹配 ----------
-//
-// 注：旧的 CanOpenAt(idx, typ, name) 已重构为 SupportTypeAt(idx, typ)（只看声明类型）
-// 与 SupportPathAt(idx, path)（按真实路径 LStat + glob 匹配）。glob 命中/不命中的覆盖
-// 已迁移到 filter_test.go 的 TestForPathValue（用真实临时文件验证），此处不再重复。
-
 // ---------- Open 全链路（注入 fakeExecutor）----------
 
 func TestOpenInvokesExecutor(t *testing.T) {
 	cases := []struct {
 		name     string
-		cmd      []string
+		cmd      string
 		roles    []string
 		paths    []string
 		wantBin  string
@@ -239,7 +227,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 	}{
 		{
 			name:     "单槽占位符",
-			cmd:      []string{"code", "$0"},
+			cmd:      "code $0",
 			roles:    []string{"open-dir"},
 			paths:    []string{"/proj"},
 			wantBin:  "code",
@@ -247,7 +235,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 		},
 		{
 			name:     "无占位符路径追加末尾",
-			cmd:      []string{"code"},
+			cmd:      "code",
 			roles:    []string{"open-dir"},
 			paths:    []string{"/proj"},
 			wantBin:  "code",
@@ -255,7 +243,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 		},
 		{
 			name:     "双槽 diff 工具",
-			cmd:      []string{"bcompare", "$0", "$1"},
+			cmd:      "bcompare $0 $1",
 			roles:    []string{"diff-dir"},
 			paths:    []string{"/a", "/b"},
 			wantBin:  "bcompare",
@@ -289,7 +277,7 @@ func TestOpenInvokesExecutor(t *testing.T) {
 
 func TestOpenSlotCountMismatch(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "t", Cmd: []string{"code", "$0"}, Roles: []string{"open-dir"}}, fake)
+	o, err := InitExecOpener(Spec{Name: "t", Cmd: "code $0", Roles: []string{"open-dir"}}, fake)
 	if err != nil {
 		t.Fatalf("InitExecOpener 失败: %v", err)
 	}
@@ -307,7 +295,7 @@ func TestOpenSlotCountMismatch(t *testing.T) {
 
 func TestOpenRoleUnsupported(t *testing.T) {
 	fake := &fakeExecutor{}
-	o, err := InitExecOpener(Spec{Name: "code", Cmd: []string{"code"}, Roles: []string{"open-dir"}}, fake)
+	o, err := InitExecOpener(Spec{Name: "code", Cmd: "code", Roles: []string{"open-dir"}}, fake)
 	if err != nil {
 		t.Fatalf("InitExecOpener 失败: %v", err)
 	}
@@ -316,6 +304,58 @@ func TestOpenRoleUnsupported(t *testing.T) {
 		t.Fatal("期望 role 不支持报错")
 	}
 	if len(fake.calls) != 0 {
-		t.Fatalf("期望 executor 未被调用，实际 %d 次", len(fake.calls))
+		t.Fatalf("期望 executor 未被调用，实际调用 %d 次", len(fake.calls))
+	}
+}
+
+func TestTokenizeCmd(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+		want []string
+	}{
+		{"空串", "", nil},
+		{"纯空白", "   ", nil},
+		{"空格分隔", "code $0 -n", []string{"code", "$0", "-n"}},
+		{"多空白折叠", "code   $0", []string{"code", "$0"}},
+		{"双引号含空格", `"/Applications/Visual Studio Code.app/bin/code" $0`, []string{"/Applications/Visual Studio Code.app/bin/code", "$0"}},
+		{"单引号含空格", `'a b' c`, []string{"a b", "c"}},
+		{"双引号内转义引号", `"a\"b"`, []string{`a"b`}},
+		{"裸词反斜杠转义", `a\ b`, []string{"a b"}},
+		{"tab 分隔", "a\tb", []string{"a", "b"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := tokenizeCmd(c.line)
+			if err != nil || !reflect.DeepEqual(got, c.want) {
+				t.Fatalf("tokenizeCmd(%q) = (%v,%v), want (%v,nil)", c.line, got, err, c.want)
+			}
+		})
+	}
+	// 引号未闭合应报错（保存/加载边界拦截，不拖到运行期 exec 失败）
+	for _, line := range []string{`"abc`, `'abc`, `a "b c`, `"a\"`} {
+		if _, err := tokenizeCmd(line); err == nil {
+			t.Fatalf("tokenizeCmd(%q) 引号未闭合应报错", line)
+		}
+	}
+}
+
+func TestScanPlaceholders(t *testing.T) {
+	cases := []struct {
+		token string
+		want  []int
+	}{
+		{"$0", []int{0}},
+		{"--wd=$1", []int{1}},
+		{"a$0b$1", []int{0, 1}},
+		{"$12", []int{12}},
+		{"$x", nil},
+		{"no placeholder", nil},
+		{"$", nil},
+	}
+	for _, c := range cases {
+		if got := scanPlaceholders(c.token); !reflect.DeepEqual(got, c.want) {
+			t.Fatalf("scanPlaceholders(%q) = %v, want %v", c.token, got, c.want)
+		}
 	}
 }

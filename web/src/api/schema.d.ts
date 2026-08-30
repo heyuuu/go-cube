@@ -1226,7 +1226,7 @@ export interface components {
       files: string[] | null;
     };
     OpenerDTO: {
-      cmd: string[] | null;
+      cmd: string;
       icon: components['schemas']['IconDTO'];
       name: string;
       roles: string[] | null;
@@ -1282,8 +1282,8 @@ export interface components {
        * @example https://example.com/schemas/OpenerSaveInputBody.json
        */
       readonly $schema?: string;
-      /** @description 启动命令，$0/$1 占位路径槽位 */
-      cmd?: string[] | null;
+      /** @description 启动命令（sh 风格字符串，含空格路径用引号包裹），$0/$1 占位路径槽位 */
+      cmd?: string;
       /** @description 图标声明 */
       icon?: components['schemas']['IconDTO'];
       /** @description opener 名称（唯一标识） */
