@@ -1,5 +1,5 @@
 import { ChevronsLeft, ChevronsRight, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
-import { Fragment, useRef } from 'react';
+import { Fragment, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 
 import {
@@ -28,7 +28,8 @@ import { useWorkbenchLayout } from './workbench-layout';
 // 终端固定底部抽屉，不进主区布局；主区面板同类型单实例（多实例留待后续）。
 export function WorkbenchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const params = readWorkbenchParams(searchParams);
+  // memo 化稳住对象身份：URL 不变则 params 不重建，下游 effect 依赖 params 才不会每渲染都触发
+  const params = useMemo(() => readWorkbenchParams(searchParams), [searchParams]);
   const layout = useWorkbenchLayout();
   const slotsRef = useRef<HTMLDivElement>(null);
   const dragFrom = useRef<number | null>(null);

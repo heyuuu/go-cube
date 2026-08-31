@@ -602,6 +602,8 @@ function CommitGraphSection({
   }, [commits]);
 
   const worktrees = useWorkbenchWorktrees(path);
+  // 虚拟节点（未提交改动）的展示时间 = 本组件挂载时的「当前」，一次取值不随渲染抖动
+  const [nowTs] = useState(() => Math.floor(Date.now() / 1000));
   // 页拼接去重（skip 分页在仓库有新提交时可能边界重复）→ 注入 worktree 虚拟节点/装饰
   // → 本地算泳道布局。布局永远从「当前持有数据」推导，不存在跨快照拼接错位。
   const { rows, wireMap, virtualOriginEnd, dividerRow } = useMemo(() => {
@@ -618,7 +620,6 @@ function CommitGraphSection({
     // worktree 视作一个 ref：dirty → 指向虚拟节点（内容 = 未提交状态，父 = HEAD）；
     // clean → 直接装饰在 HEAD 提交行上。虚拟节点按 worktree 顺序排在最前（时间 = 当前）
     const decorated = list.map((c) => ({ ...c }));
-    const now = Math.floor(Date.now() / 1000);
     const virtual: WorktreeNode[] = [];
     for (const wt of worktrees.data ?? []) {
       if (hiddenWorktrees.has(wt.path)) continue; // 关闭开关的副本不进图（虚拟节点与装饰都不注入）
@@ -630,7 +631,7 @@ function CommitGraphSection({
           shortSha: '-------', // 占位对齐：与真实 commit 的短 sha 同列，列表更整齐
           parents: [wt.head],
           author: '',
-          timestamp: now,
+          timestamp: nowTs,
           refs: [{ name: label, kind: 'worktree' }],
           subject: '',
           worktree: wt,
@@ -663,7 +664,7 @@ function CommitGraphSection({
       virtualOriginEnd.set(i, headRow);
     });
     return { rows: nodes, wireMap: map, virtualOriginEnd, dividerRow };
-  }, [commits.data, worktrees.data, hiddenWorktrees, mode]);
+  }, [commits.data, worktrees.data, hiddenWorktrees, mode, nowTs]);
 
   // 定位/高亮的统一目标行：ref → refs 装饰（短名）所在行；worktree → dirty 的虚拟节点行
   // / clean 的 HEAD 行；commit → 自身。选中态高亮不能只比对 source（ref/worktree 与
@@ -681,7 +682,7 @@ function CommitGraphSection({
       return wt.dirty ? `worktree:${wt.path}` : wt.head;
     }
     return src.id;
-  }, [params.current, rows, worktrees.data]);
+  }, [params, rows, worktrees.data]);
 
   // 点击定位：滚到 focusSha 行；目标行未加载时自动翻页寻找
   // （无限滚动覆盖不到「未滚动就选中」的场景），无更多页则放弃。
@@ -703,7 +704,7 @@ function CommitGraphSection({
     if (commits.hasNextPage && !commits.isFetchingNextPage) {
       void commits.fetchNextPage();
     }
-  }, [params.current, focusSha, focusTick, rows, commits]);
+  }, [params, focusSha, focusTick, rows, commits]);
 
   const maxLane = useMemo(() => {
     let m = 0;
