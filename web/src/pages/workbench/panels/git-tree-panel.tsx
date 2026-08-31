@@ -34,6 +34,7 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import { useIntentDefaultOpener } from '@/queries/opener';
+import { filterTargets, quickIntents, type TargetKind } from '@/pages/projects/shared';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -154,6 +155,9 @@ function loadGraphMode(): 'full' | 'lite' {
 
 // --- 工作副本状态区 ---
 
+// 去尾部斜杠后比较路径（主根判定用，容忍尾斜杠差异）
+const trimSlash = (s: string) => s.replace(/\/+$/, '');
+
 function WorktreeSection({
   path,
   params,
@@ -214,6 +218,7 @@ function WorktreeSection({
           <WorktreeRow
             key={wt.path}
             wt={wt}
+            kind={trimSlash(wt.path) === trimSlash(path) ? 'root' : 'worktree'}
             params={params}
             afterSelect={onBranchPicked}
             hidden={hiddenWorktrees.has(wt.path)}
@@ -359,6 +364,7 @@ function BranchRow({
 
 function WorktreeRow({
   wt,
+  kind,
   params,
   afterSelect,
   hidden,
@@ -366,6 +372,7 @@ function WorktreeRow({
   onRemove,
 }: {
   wt: WorktreeStatus;
+  kind: TargetKind;
   params: WorkbenchParams;
   afterSelect?: () => void;
   hidden: boolean;
@@ -447,7 +454,7 @@ function WorktreeRow({
             <Trash2 className="size-3.5" />
           </Button>
         </div>
-        <WorktreeOpenActions path={wt.path} name={name} onReset={() => setResetOpen(true)} />
+        <WorktreeOpenActions path={wt.path} name={name} kind={kind} onReset={() => setResetOpen(true)} />
       </div>
       {resetOpen ? (
         <WorktreeResetDialog wtPath={wt.path} branch={wt.branch || undefined} onClose={() => setResetOpen(false)} />
@@ -463,7 +470,7 @@ function WorktreeRow({
                 {w.path}
               </span>
               <div className="ml-auto flex shrink-0 items-center">
-                <WorktreeOpenActions path={wsDir} name={w.name} />
+                <WorktreeOpenActions path={wsDir} name={w.name} kind="workspace" />
               </div>
             </div>
           );
@@ -473,13 +480,22 @@ function WorktreeRow({
 }
 
 // 副本行尾的 opener 动作（与 projects 页行内动作同构）：快捷图标（intent 槽位 ×
-// 默认 opener）+ 全量下拉。槽位取 dir（finder 类）与 git（stree 类）意图的默认，
-// 未配默认则隐藏（不回落）；不含 workbench——已在工作台内，没必要再跳工作台。
-// 须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
-const QUICK_INTENTS = ['dir', 'git'];
+// 默认 opener）+ 全量下拉。槽位复用 projects 页的 quickIntents + 目标策略
+// （workbench 仅主根、git 仅仓库根副本、terminal/dir 任意），未配默认则隐藏
+// （不回落）。须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
 
 // onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）
-function WorktreeOpenActions({ path, name, onReset }: { path: string; name: string; onReset?: () => void }) {
+function WorktreeOpenActions({
+  path,
+  name,
+  kind,
+  onReset,
+}: {
+  path: string;
+  name: string;
+  kind: TargetKind;
+  onReset?: () => void;
+}) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
   const openerList = openers.data?.list ?? [];
@@ -488,23 +504,25 @@ function WorktreeOpenActions({ path, name, onReset }: { path: string; name: stri
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {QUICK_INTENTS.map((intent) => {
-        const op = defaultOpenerOf(intent);
-        if (!op) return null; // 未配默认的槽位隐藏，不回落
-        return (
-          <Button
-            key={intent}
-            variant="ghost"
-            size="icon-sm"
-            title={op.title}
-            aria-label={`${op.title}（${name}）`}
-            disabled={open.isPending && open.variables?.opener === op.name}
-            onClick={() => onOpen(op.name)}
-          >
-            {renderIcon(op?.icon, null)}
-          </Button>
-        );
-      })}
+      {quickIntents
+        .filter((q) => filterTargets([{ dir: path, label: name, kind }], q.targets).length > 0)
+        .map((q) => {
+          const op = defaultOpenerOf(q.intent);
+          if (!op) return null; // 未配默认的槽位隐藏，不回落
+          return (
+            <Button
+              key={q.intent}
+              variant="ghost"
+              size="icon-sm"
+              title={op.title}
+              aria-label={`${op.title}（${name}）`}
+              disabled={open.isPending && open.variables?.opener === op.name}
+              onClick={() => onOpen(op.name)}
+            >
+              {renderIcon(op?.icon, null)}
+            </Button>
+          );
+        })}
       <DropdownMenu>
         <DropdownMenuTrigger render={<Button variant="ghost" size="icon-sm" aria-label={`打开 ${name}`} />}>
           <Ellipsis className="size-3.5" />
