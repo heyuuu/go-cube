@@ -29,6 +29,8 @@ const (
 	IntentGit Intent = "git"
 	// IntentWorkbench 在 cube 工作台打开。
 	IntentWorkbench Intent = "workbench"
+	// IntentIde 在 IDE 打开目录。
+	IntentIde Intent = "ide"
 	// IntentDoc 文档查看打开（md 页「作为文档打开」等）。
 	IntentDoc Intent = "doc"
 )
@@ -36,7 +38,7 @@ const (
 // intentOrder intent 的固定展示序。
 var intentOrder = []Intent{
 	IntentDir, IntentFile, IntentDiffDir, IntentDiffFile,
-	IntentTerminal, IntentGit, IntentWorkbench, IntentDoc,
+	IntentTerminal, IntentGit, IntentWorkbench, IntentIde, IntentDoc,
 }
 
 // Intents 返回全部 intent（固定序副本，展示用）。
@@ -51,6 +53,7 @@ var intentRoles = map[Intent]Role{
 	IntentTerminal:  RoleOpenDir,
 	IntentGit:       RoleOpenDir,
 	IntentWorkbench: RoleOpenDir,
+	IntentIde:       RoleOpenDir,
 	IntentDoc:       RoleOpenFile,
 }
 

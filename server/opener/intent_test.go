@@ -23,7 +23,7 @@ func TestIntentRoleMapping(t *testing.T) {
 		IntentDir: RoleOpenDir, IntentFile: RoleOpenFile,
 		IntentDiffDir: RoleDiffDir, IntentDiffFile: RoleDiffFile,
 		IntentTerminal: RoleOpenDir, IntentGit: RoleOpenDir,
-		IntentWorkbench: RoleOpenDir, IntentDoc: RoleOpenFile,
+		IntentWorkbench: RoleOpenDir, IntentIde: RoleOpenDir, IntentDoc: RoleOpenFile,
 	}
 	if len(cases) != len(intentOrder) {
 		t.Fatalf("映射表与枚举数量不一致: %d vs %d", len(cases), len(intentOrder))

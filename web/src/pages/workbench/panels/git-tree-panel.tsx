@@ -34,7 +34,7 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useOpenerList, useOpenerOpen } from '@/queries/project';
 import { useIntentDefaultOpener } from '@/queries/opener';
-import { filterTargets, quickIntents, type TargetKind } from '@/pages/projects/shared';
+import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -464,7 +464,7 @@ function WorktreeRow({
           // 子行不可选中（不是 TreeSource，纯打开入口）：目录名 + 相对路径 + 各自的打开动作
           const wsDir = wt.path.replace(/\/$/, '') + '/' + w.path;
           return (
-            <div key={wsDir} className="flex items-center pl-8 text-xs text-muted-foreground hover:bg-accent">
+            <div key={wsDir} className={cn('flex items-center pl-8 text-xs text-muted-foreground hover:bg-accent', hidden && 'opacity-50')}>
               <span className="shrink-0">{w.name}</span>
               <span className="ml-2 min-w-0 truncate font-mono text-[10px] opacity-70" title={wsDir}>
                 {w.path}
@@ -480,9 +480,17 @@ function WorktreeRow({
 }
 
 // 副本行尾的 opener 动作（与 projects 页行内动作同构）：快捷图标（intent 槽位 ×
-// 默认 opener）+ 全量下拉。槽位复用 projects 页的 quickIntents + 目标策略
+// 默认 opener）+ 全量下拉。槽位同 projects 页 quickIntents 的目标策略
 // （workbench 仅主根、git 仅仓库根副本、terminal/dir 任意），未配默认则隐藏
-// （不回落）。须与 SelectableRow（button）并列——HTML 不允许 button 嵌套 button
+// （不回落）；工作台额外在 dir 后加 ide 槽位。须与 SelectableRow（button）并列
+// ——HTML 不允许 button 嵌套 button
+
+// 工作台副本行的槽位清单：quickIntents + dir 后追加 ide（projects 页不加）
+const workbenchQuickIntents: QuickIntent[] = [
+  ...quickIntents.filter((q) => q.intent !== 'dir'),
+  { intent: 'dir', targets: 'all' },
+  { intent: 'ide', targets: 'all' },
+];
 
 // onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）
 function WorktreeOpenActions({
@@ -504,7 +512,7 @@ function WorktreeOpenActions({
 
   return (
     <div className="flex shrink-0 items-center gap-0.5">
-      {quickIntents
+      {workbenchQuickIntents
         .filter((q) => filterTargets([{ dir: path, label: name, kind }], q.targets).length > 0)
         .map((q) => {
           const op = defaultOpenerOf(q.intent);
