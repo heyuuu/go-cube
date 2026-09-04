@@ -32,6 +32,21 @@ export function useOpenerOpen() {
   return { ...open, run };
 }
 
+// 用指定 opener 对比两个目录（diff-dir 意图场景）。url 型动作当前浏览器新 tab
+// 直开，其余走后端 opener/diff-open（role 由后端按两侧路径类型校验）。
+export function useOpenerDiffOpen() {
+  const openers = useOpenerList();
+  const open = useMutation({
+    mutationFn: (input: { left: string; right: string; opener: string }) => apiPost('/api/opener/diff-open', input),
+  });
+  const run = (opener: string, left: string, right: string, opts?: { onError?: (e: Error) => void }) => {
+    const op = (openers.data?.list ?? []).find((o) => o.name === opener);
+    if (op && tryOpenUrlAction(op.actions?.['diff-dir'], [left, right])) return;
+    open.mutate({ left, right, opener }, { onError: opts?.onError });
+  };
+  return { ...open, run };
+}
+
 // 打开已收录项目（后端记 usage；dir 为目标目录——worktree 归并为项目打开目标，1032）。
 // url 型动作当前浏览器新 tab 直开（注意：此路径不经过后端，不计 usage——已知取舍），
 // 其余走后端 project/open。

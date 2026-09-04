@@ -7,6 +7,7 @@ import {
   Eye,
   EyeOff,
   GitBranch,
+  GitCompare,
   Monitor,
   Plus,
   RotateCcw,
@@ -32,7 +33,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useOpenerList, useOpenerOpen } from '@/queries/project';
+import { useOpenerDiffOpen, useOpenerList, useOpenerOpen } from '@/queries/project';
 import { useIntentDefaultOpener } from '@/queries/opener';
 import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
 import {
@@ -219,6 +220,7 @@ function WorktreeSection({
             key={wt.path}
             wt={wt}
             kind={trimSlash(wt.path) === trimSlash(path) ? 'root' : 'worktree'}
+            rootPath={path}
             params={params}
             afterSelect={onBranchPicked}
             hidden={hiddenWorktrees.has(wt.path)}
@@ -365,6 +367,7 @@ function BranchRow({
 function WorktreeRow({
   wt,
   kind,
+  rootPath,
   params,
   afterSelect,
   hidden,
@@ -373,6 +376,7 @@ function WorktreeRow({
 }: {
   wt: WorktreeStatus;
   kind: TargetKind;
+  rootPath: string;
   params: WorkbenchParams;
   afterSelect?: () => void;
   hidden: boolean;
@@ -454,7 +458,13 @@ function WorktreeRow({
             <Trash2 className="size-3.5" />
           </Button>
         </div>
-        <WorktreeOpenActions path={wt.path} name={name} kind={kind} onReset={() => setResetOpen(true)} />
+        <WorktreeOpenActions
+          path={wt.path}
+          name={name}
+          kind={kind}
+          diffBase={kind === 'worktree' ? rootPath : undefined}
+          onReset={() => setResetOpen(true)}
+        />
       </div>
       {resetOpen ? (
         <WorktreeResetDialog wtPath={wt.path} branch={wt.branch || undefined} onClose={() => setResetOpen(false)} />
@@ -492,22 +502,28 @@ const workbenchQuickIntents: QuickIntent[] = [
   { intent: 'ide', targets: 'all' },
 ];
 
-// onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）
+// onReset 仅 worktree 行传入（reset 作用于整个副本，workspace 子目录不适用）；
+// diffBase 仅 worktree 行传入（主目录路径，「与主目录对比」入口，diff-dir 意图
+// 默认 opener 承载——未配默认则隐藏，不回落）
 function WorktreeOpenActions({
   path,
   name,
   kind,
+  diffBase,
   onReset,
 }: {
   path: string;
   name: string;
   kind: TargetKind;
+  diffBase?: string;
   onReset?: () => void;
 }) {
   const openers = useOpenerList();
   const open = useOpenerOpen();
+  const diffOpen = useOpenerDiffOpen();
   const openerList = openers.data?.list ?? [];
   const defaultOpenerOf = useIntentDefaultOpener();
+  const diffOp = diffBase ? defaultOpenerOf('diff-dir') : undefined;
   const onOpen = (opener: string) => open.run(opener, path, true);
 
   return (
@@ -548,6 +564,14 @@ function WorktreeOpenActions({
                 重置到指定位置
               </DropdownMenuItem>
             </>
+          ) : null}
+          {diffBase && diffOp ? (
+            <DropdownMenuItem
+              onClick={() => diffOpen.run(diffOp.name, diffBase, path)}
+            >
+              <GitCompare className="mr-1 size-3" />
+              与主目录对比
+            </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
           {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}

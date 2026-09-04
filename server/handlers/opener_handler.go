@@ -68,6 +68,7 @@ func (h *OpenerHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/opener/intents", "获取打开意图清单（intent → 默认 opener + 候选）", h.openerIntents)
 	web.ApiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
 	web.ApiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
+	web.ApiPost(api, "/api/opener/diff-open", "用指定 opener 对比两个路径（diff-dir/diff-file）", h.openerDiffOpen)
 	web.ApiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
 	web.ApiPost(api, "/api/opener/delete", "按名删除 opener", h.openerDelete)
 	web.ApiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
@@ -140,6 +141,58 @@ func (h *OpenerHandler) openerOpen(input OpenerOpenInput) (map[string]any, error
 		return nil, fmt.Errorf("打开失败: %w", err)
 	}
 	return map[string]any{"ok": true}, nil
+}
+
+// OpenerDiffOpenInput diff-open 接口入参。
+type OpenerDiffOpenInput struct {
+	Body struct {
+		Left   string `json:"left" doc:"左侧路径（文件或目录）绝对路径"`
+		Right  string `json:"right" doc:"右侧路径（文件或目录）绝对路径"`
+		Opener string `json:"opener" doc:"opener 名称"`
+	}
+}
+
+// openerDiffOpen 用指定 opener 对比两个路径。role 按两侧实际类型推导且须同类
+// （两侧都是目录 → diff-dir，都是文件 → diff-file，混合报错）。
+func (h *OpenerHandler) openerDiffOpen(input OpenerDiffOpenInput) (map[string]any, error) {
+	left, right := input.Body.Left, input.Body.Right
+	for _, p := range []string{left, right} {
+		if !filepath.IsAbs(p) {
+			return nil, errors.New("路径必须是绝对路径: " + p)
+		}
+	}
+	leftDir, err := isDirPath(left)
+	if err != nil {
+		return nil, fmt.Errorf("读取路径失败: %w", err)
+	}
+	rightDir, err := isDirPath(right)
+	if err != nil {
+		return nil, fmt.Errorf("读取路径失败: %w", err)
+	}
+	if leftDir != rightDir {
+		return nil, errors.New("两侧路径类型不一致（一边是目录一边是文件），无法对比")
+	}
+
+	o := h.service.FindByName(input.Body.Opener)
+	if o == nil {
+		return nil, fmt.Errorf("未找到指定 opener: %s", input.Body.Opener)
+	}
+	role := opener.RoleDiffFile
+	if leftDir {
+		role = opener.RoleDiffDir
+	}
+	if err := o.Open(role, left, right); err != nil {
+		return nil, fmt.Errorf("打开失败: %w", err)
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+func isDirPath(p string) (bool, error) {
+	info, err := os.Stat(p)
+	if err != nil {
+		return false, err
+	}
+	return info.IsDir(), nil
 }
 
 // OpenerSaveInput save 接口入参（字段与 opener.Spec 对齐）。
