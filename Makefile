@@ -17,10 +17,14 @@ LDFLAGS := \
 
 ZSH_COMPLETION_FILE := ~/.config/cube/zsh.sh
 
+# dist 即完整产物，touch 补 .keep 后直接整体 mv 换入（同文件系统 mv 是原子 rename）：
+# 任何时刻 web/ui 要么旧要么新，没有半成品窗口；.keep 是提交进仓库的（保 embed 可编译
+# 的空目录兜底），在 dist 里补回就不会弄脏 git 工作区。代价：web/dist 被消费，下次构建重建
 build-ui:
-	rm -rf ./server/web/ui
 	pnpm -C ./web build
-	cp -r ./web/dist ./server/web/ui
+	touch ./web/dist/.keep
+	rm -rf ./server/web/ui
+	mv ./web/dist ./server/web/ui
 
 build: build-ui
 	@echo "==> go build ($(VERSION) @ $(COMMIT))"

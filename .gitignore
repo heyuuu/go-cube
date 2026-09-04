@@ -1,6 +1,8 @@
 tmp
 runtime
-server/web/ui
+# web/ui 是构建产物（make build-ui 拷入），仅 .keep 提交——保证空目录存在，go:embed all:ui 才能编译
+server/web/ui/*
+!server/web/ui/.keep
 openapi.json
 
 #

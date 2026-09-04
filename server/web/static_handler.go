@@ -10,10 +10,14 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 )
 
-// uiFS 前端构建产物（make build-ui 把 web/dist 的内容拷到这里，go:embed 嵌入）
+// uiFS 前端构建产物（make build-ui 把 web/dist 的内容拷到这里，go:embed 嵌入）。
+// 目录常驻一个提交进仓库的空 .keep（gitignore 例外）——纯后端开发时 ui 无产物也能编译；
 //
-//go:embed ui/*
+//go:embed all:ui
 var uiFS embed.FS
+
+// placeholderText 纯后端模式的页面响应文案（ui 无构建产物时兜底，纯提示不需要完整 HTML）
+const placeholderText = "纯后端模式：web/ui 未构建，未嵌入前端 UI，API 正常可用。\n需要前端请执行 make build-ui 后重启。\n"
 
 type staticHandler struct{}
 
@@ -28,15 +32,24 @@ func newStaticHandler() *staticHandler {
 //   - /api/*、/docs、/openapi.json 的未命中**不走 fallback**，按 404 处理——
 //     否则 API 打错路径会拿到 HTML 200，错误被吞成莫名的解析失败
 func (h *staticHandler) Register(api huma.API, mux *http.ServeMux) {
-	indexFile, err := fs.ReadFile(uiFS, "ui/index.html")
-	if err != nil {
-		slog.Error("ui assets 为空，无法挂载静态资源", "err", err)
-		return
-	}
-
 	rootFS, err := fs.Sub(uiFS, "ui")
 	if err != nil {
 		slog.Error("无法进入 ui 子目录", "err", err)
+		return
+	}
+
+	// 纯后端模式（ui 只有 .keep）：不挂静态资源，所有页面路径回纯文本提示
+	indexFile, err := fs.ReadFile(rootFS, "index.html")
+	if err != nil {
+		slog.Info("web/ui 未构建，前端未嵌入，仅提供 API（需要前端执行 make build-ui 后重启）")
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if isNonFallbackPath(r.URL.Path) || !(r.Method == http.MethodGet || r.Method == http.MethodHead) {
+				http.NotFound(w, r)
+				return
+			}
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			_, _ = w.Write([]byte(placeholderText))
+		})
 		return
 	}
 
