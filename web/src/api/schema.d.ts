@@ -72,6 +72,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/opener/diff-open': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 用指定 opener 对比两个路径（diff-dir/diff-file） */
+    post: operations['opener.diffOpen'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/opener/extract-icon': {
     parameters: {
       query?: never;
@@ -1348,6 +1365,20 @@ export interface components {
       /** @description opener 名称 */
       name: string;
     };
+    OpenerDiffOpenInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/OpenerDiffOpenInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 左侧路径（文件或目录）绝对路径 */
+      left: string;
+      /** @description opener 名称 */
+      opener: string;
+      /** @description 右侧路径（文件或目录）绝对路径 */
+      right: string;
+    };
     OpenerExtractIconInputBody: {
       /**
        * Format: uri
@@ -1723,6 +1754,39 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['OpenerDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'opener.diffOpen': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['OpenerDiffOpenInputBody'];
       };
     };
     responses: {
