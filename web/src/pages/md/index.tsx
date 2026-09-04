@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, ArrowLeft, Ellipsis, Folder, FileText } from
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import Markdown from 'react-markdown';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import remarkFrontmatter from 'remark-frontmatter';
 import remarkGfm from 'remark-gfm';
 
 import type { Opener } from '@/api/client';
@@ -15,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { parseFrontmatter, type FrontMatterEntry } from '@/lib/frontmatter';
 import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
@@ -197,7 +199,11 @@ function MdTreeRow({
             {openerList
               .filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {}))
               .map((op) => (
-                <DropdownMenuItem key={op.name} disabled={open.isPending} onClick={() => onOpenNode(n.path, op.name, isDir)}>
+                <DropdownMenuItem
+                  key={op.name}
+                  disabled={open.isPending}
+                  onClick={() => onOpenNode(n.path, op.name, isDir)}
+                >
                   {op.name}
                 </DropdownMenuItem>
               ))}
@@ -207,6 +213,21 @@ function MdTreeRow({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+    </div>
+  );
+}
+
+// front-matter 元信息区：文档头 --- 块解析出的扁平字段（title/date/tags 等）以键值
+// 展示在正文前；源码视图保持原文（front-matter 本就是源码的一部分）
+function FrontMatterBlock({ entries }: { entries: FrontMatterEntry[] }) {
+  return (
+    <div className="mb-6 rounded-lg border bg-muted/30 px-4 py-2 font-mono text-xs">
+      {entries.map((e) => (
+        <div key={e.key} className="flex gap-3 py-1">
+          <span className="w-24 shrink-0 text-muted-foreground">{e.key}</span>
+          <span className="min-w-0 break-words whitespace-pre-line">{e.value}</span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -228,6 +249,7 @@ function MdContent({
 }) {
   const themeLabel = mdThemes.find((t) => t.id === theme)?.label ?? theme;
   const q = useMdContent(file ?? '');
+  const fm = q.data ? parseFrontmatter(q.data.content) : [];
 
   // 分栏滚动同步：两边按滚动比例互相跟随（渲染段落与源码行无一一对应，
   // 只能做到近似对照——这是 diff 工具对非等高内容的通行做法）
@@ -304,6 +326,7 @@ function MdContent({
       </header>
       {q.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
       {q.error && <ErrorBanner message={`读取失败：${q.error.message}`} />}
+      {q.data && viewMode === 'render' && fm.length > 0 && <FrontMatterBlock entries={fm} />}
       {q.data && viewMode === 'render' && (
         <article
           className={cn(
@@ -312,7 +335,7 @@ function MdContent({
           )}
         >
           <Markdown
-            remarkPlugins={[remarkGfm]}
+            remarkPlugins={[remarkGfm, remarkFrontmatter]}
             components={{
               a: ({ href, children }) => (
                 <MdLink href={href} base={file} onNavigate={onNavigate}>
@@ -337,6 +360,7 @@ function MdContent({
             onScroll={() => syncScroll('render')}
             className="max-h-[calc(100dvh-11rem)] overflow-y-auto pr-1"
           >
+            {fm.length > 0 && <FrontMatterBlock entries={fm} />}
             <article
               className={cn(
                 'prose prose-sm max-w-none',
@@ -344,7 +368,7 @@ function MdContent({
               )}
             >
               <Markdown
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkFrontmatter]}
                 components={{
                   a: ({ href, children }) => (
                     <MdLink href={href} base={file} onNavigate={onNavigate}>
