@@ -18,8 +18,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useProjectOpen } from '@/queries/project';
 import { useIntentDefaultOpener } from '@/queries/opener';
+import { useProjectOpen } from '@/queries/project';
 
 import {
   filterTargets,

@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronDown } from 'lucide-react';
 import type { UseQueryResult } from '@tanstack/react-query';
+import { ChevronDown } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import type { components } from '@/api/schema';
@@ -42,13 +42,45 @@ export type ContentMode = 'preview' | 'source' | 'diff';
 type PreviewKind = 'md' | 'html' | 'image' | 'binary' | null;
 const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'];
 const BINARY_EXTS = [
-  '.zip', '.tar', '.gz', '.bz2', '.xz', '.rar', '.7z',
-  '.pdf', '.psd', '.ai', '.sketch',
-  '.woff', '.woff2', '.ttf', '.otf', '.eot',
-  '.exe', '.dll', '.so', '.dylib', '.class', '.jar', '.wasm',
-  '.sqlite', '.db',
-  '.mp3', '.wav', '.flac', '.ogg', '.mp4', '.mov', '.avi', '.webm',
-  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.bz2',
+  '.xz',
+  '.rar',
+  '.7z',
+  '.pdf',
+  '.psd',
+  '.ai',
+  '.sketch',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.otf',
+  '.eot',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.class',
+  '.jar',
+  '.wasm',
+  '.sqlite',
+  '.db',
+  '.mp3',
+  '.wav',
+  '.flac',
+  '.ogg',
+  '.mp4',
+  '.mov',
+  '.avi',
+  '.webm',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.ppt',
+  '.pptx',
 ];
 export function previewKindOf(file: string): PreviewKind {
   const dot = file.lastIndexOf('.');
@@ -326,7 +358,12 @@ export function FileContentArea({
                   <span className={cn(isEditing && 'font-medium text-foreground')}>编辑</span>
                 </span>
                 {isEditing ? (
-                  <Button size="sm" className="h-6 px-2 text-xs" disabled={!dirty || editing.saving} onClick={() => editing.setConfirmSave(true)}>
+                  <Button
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    disabled={!dirty || editing.saving}
+                    onClick={() => editing.setConfirmSave(true)}
+                  >
                     保存
                   </Button>
                 ) : null}

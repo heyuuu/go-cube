@@ -15,7 +15,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useIntentDefaultDelete, useIntentDefaultSave, useOpenerDelete, useOpenerReorder, useOpenerSave, useOpenerIntents } from '@/queries/opener';
+import {
+  useIntentDefaultDelete,
+  useIntentDefaultSave,
+  useOpenerDelete,
+  useOpenerReorder,
+  useOpenerSave,
+  useOpenerIntents,
+} from '@/queries/opener';
 import { useOpenerList } from '@/queries/project';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
@@ -72,8 +79,7 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
   const save = useOpenerSave();
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) => setForm((f) => ({ ...f, [key]: value }));
 
-  const setAction = (role: string, raw: string) =>
-    setForm((f) => ({ ...f, actions: { ...f.actions, [role]: raw } }));
+  const setAction = (role: string, raw: string) => setForm((f) => ({ ...f, actions: { ...f.actions, [role]: raw } }));
   const toggleRole = (role: string, on: boolean) =>
     setForm((f) => {
       const actions = { ...f.actions };
@@ -118,15 +124,13 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
 
           <div className="flex flex-col gap-2">
             <span className="text-xs text-muted-foreground">
-              actions（每个用途一条动作串：exec: 命令 / url: 链接；$0/$1 占位路径槽位，站内路由如 url: /workbench?path=$0）
+              actions（每个用途一条动作串：exec: 命令 / url: 链接；$0/$1 占位路径槽位，站内路由如 url:
+              /workbench?path=$0）
             </span>
             {ALL_ROLES.map((r) => (
               <div key={r} className="flex items-center gap-2">
                 <label className="flex items-center gap-1.5 text-xs">
-                  <Checkbox
-                    checked={r in form.actions}
-                    onCheckedChange={(v) => toggleRole(r, v === true)}
-                  />
+                  <Checkbox checked={r in form.actions} onCheckedChange={(v) => toggleRole(r, v === true)} />
                   {r}
                 </label>
                 {r in form.actions && (
@@ -154,7 +158,11 @@ function OpenerForm({ draft, onClose }: { draft: Draft; onClose: () => void }) {
             <Button size="sm" variant="outline" onClick={onClose}>
               取消
             </Button>
-            <Button size="sm" disabled={save.isPending || !form.name.trim() || Object.keys(form.actions).length === 0} onClick={submit}>
+            <Button
+              size="sm"
+              disabled={save.isPending || !form.name.trim() || Object.keys(form.actions).length === 0}
+              onClick={submit}
+            >
               保存
             </Button>
           </div>
@@ -188,10 +196,7 @@ function IntentSection() {
       )}
       <div className="flex flex-col divide-y rounded-lg border">
         {(intents.data ?? []).map((it) => (
-          <label
-            key={it.intent}
-            className="grid grid-cols-[6rem_14rem_1fr] items-center gap-3 px-3 py-1.5 text-sm"
-          >
+          <label key={it.intent} className="grid grid-cols-[6rem_14rem_1fr] items-center gap-3 px-3 py-1.5 text-sm">
             <span className="font-mono text-xs/relaxed">{it.intent}</span>
             <div className="relative">
               <select

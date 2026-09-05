@@ -33,9 +33,9 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useOpenerDiffOpen, useOpenerList, useOpenerOpen } from '@/queries/project';
-import { useIntentDefaultOpener } from '@/queries/opener';
 import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
+import { useIntentDefaultOpener } from '@/queries/opener';
+import { useOpenerDiffOpen, useOpenerList, useOpenerOpen } from '@/queries/project';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,
@@ -474,7 +474,13 @@ function WorktreeRow({
           // 子行不可选中（不是 TreeSource，纯打开入口）：目录名 + 相对路径 + 各自的打开动作
           const wsDir = wt.path.replace(/\/$/, '') + '/' + w.path;
           return (
-            <div key={wsDir} className={cn('flex items-center pl-8 text-xs text-muted-foreground hover:bg-accent', hidden && 'opacity-50')}>
+            <div
+              key={wsDir}
+              className={cn(
+                'flex items-center pl-8 text-xs text-muted-foreground hover:bg-accent',
+                hidden && 'opacity-50',
+              )}
+            >
               <span className="shrink-0">{w.name}</span>
               <span className="ml-2 min-w-0 truncate font-mono text-[10px] opacity-70" title={wsDir}>
                 {w.path}
@@ -566,9 +572,7 @@ function WorktreeOpenActions({
             </>
           ) : null}
           {diffBase && diffOp ? (
-            <DropdownMenuItem
-              onClick={() => diffOpen.run(diffOp.name, diffBase, path)}
-            >
+            <DropdownMenuItem onClick={() => diffOpen.run(diffOp.name, diffBase, path)}>
               <GitCompare className="mr-1 size-3" />
               与主目录对比
             </DropdownMenuItem>
