@@ -103,11 +103,11 @@ export function useWorkbenchTree(path: string, src: TreeSource) {
   });
 }
 
-export function useWorkbenchFile(path: string, src: TreeSource, file: string) {
+export function useWorkbenchFile(path: string, src: TreeSource, file: string, enabled = true) {
   return useQuery({
     queryKey: ['workbench', 'file', path, toUri(src), file],
     queryFn: () => apiGet('/api/workbench/file', { path, ...sourceQuery(src), file }),
-    enabled: path !== '' && !!src && file !== '',
+    enabled: path !== '' && !!src && file !== '' && enabled,
   });
 }
 

@@ -15,7 +15,7 @@ import {
 import { sourceLabel, toUri, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
 import { CommitDetailPane } from './commit-detail';
-import { FileContentArea, useFileEditing, type ContentMode } from './file-content';
+import { FileContentArea, previewKindOf, useFileEditing, type ContentMode } from './file-content';
 import { SourcePanelShell, useTreePanePrefs } from './tree-pane';
 
 // 内容面板（code + diff 合并）：统一为「current [+ base]」视图模型——
@@ -85,7 +85,9 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const fileMissing = !!treeList && !!file && !treeList.includes(file) && !deletedPaths.has(file);
   const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
 
-  const content = useWorkbenchFile(path, src, activeFile);
+  // 图片（直连 raw）与已知二进制扩展名不读文本内容；源码/预览模式行为一致
+  const fileKind = previewKindOf(activeFile);
+  const content = useWorkbenchFile(path, src, activeFile, fileKind !== 'image' && fileKind !== 'binary');
   // 图片预览直连 raw 端点（原始字节 + 按扩展名的 Content-Type）
   const rawFileUrl = `/api/workbench/file/raw?path=${encodeURIComponent(path)}&source=${encodeURIComponent(toUri(src))}&file=${encodeURIComponent(activeFile)}`;
   // rename 条目基准侧路径不同：未改内容的 rename 两侧字节相同，diff 应显示「内容一致」

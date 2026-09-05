@@ -38,15 +38,26 @@ import type { TreeSource } from '../params';
 
 export type ContentMode = 'preview' | 'source' | 'diff';
 
-// 预览格式按扩展名判定；null = 无富预览，等同源码模式
-type PreviewKind = 'md' | 'html' | 'image' | null;
-function previewKindOf(file: string): PreviewKind {
+// 文件形态按扩展名判定（图片/已知二进制不读内容）；null = 文本，读内容渲染
+type PreviewKind = 'md' | 'html' | 'image' | 'binary' | null;
+const IMAGE_EXTS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'];
+const BINARY_EXTS = [
+  '.zip', '.tar', '.gz', '.bz2', '.xz', '.rar', '.7z',
+  '.pdf', '.psd', '.ai', '.sketch',
+  '.woff', '.woff2', '.ttf', '.otf', '.eot',
+  '.exe', '.dll', '.so', '.dylib', '.class', '.jar', '.wasm',
+  '.sqlite', '.db',
+  '.mp3', '.wav', '.flac', '.ogg', '.mp4', '.mov', '.avi', '.webm',
+  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+];
+export function previewKindOf(file: string): PreviewKind {
   const dot = file.lastIndexOf('.');
   if (dot < 0) return null;
   const ext = file.slice(dot).toLowerCase();
+  if (IMAGE_EXTS.includes(ext)) return 'image';
+  if (BINARY_EXTS.includes(ext)) return 'binary';
   if (ext === '.md' || ext === '.markdown') return 'md';
   if (ext === '.html' || ext === '.htm') return 'html';
-  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext)) return 'image';
   return null;
 }
 
@@ -181,9 +192,13 @@ export function FileContentArea({
     localStorage.setItem(MD_THEME_KEY, t);
   };
 
-  const previewKind = mode === 'preview' ? previewKindOf(file) : null;
-  // 实际渲染源码编辑器的形态：源码模式 + 预览模式的无富预览回落（编辑能力随之保留）
-  const isSourceView = mode === 'source' || (mode === 'preview' && previewKind === null);
+  const kind = previewKindOf(file);
+  const previewKind = mode === 'preview' ? kind : null;
+  // 图片预览/源码模式一致（都渲染图片）；已知二进制（扩展名或后端检测结果）两模式都只显示话术
+  const isImage = kind === 'image';
+  const isBinaryFile = kind === 'binary' || !!contentQuery.data?.binary;
+  // 实际渲染源码编辑器的形态：源码模式 + 无富预览回落（编辑能力随之保留）
+  const isSourceView = mode === 'source' && !isImage && !isBinaryFile;
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -199,8 +214,8 @@ export function FileContentArea({
             已删除
           </Badge>
         ) : null}
-        {mode !== 'diff' && contentQuery.data?.binary ? (
-          <Badge variant="outline">二进制 {contentQuery.data.size}B</Badge>
+        {mode !== 'diff' && isBinaryFile ? (
+          <Badge variant="outline">二进制{contentQuery.data ? ` ${contentQuery.data.size}B` : ''}</Badge>
         ) : null}
         {isSourceView && dirty ? <Badge variant="destructive">未保存</Badge> : null}
         <div className="ml-auto flex items-center gap-1.5">
@@ -255,13 +270,13 @@ export function FileContentArea({
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             在左侧选择一个文件
           </div>
-        ) : contentQuery.isPending ? (
+        ) : contentQuery.isPending && contentQuery.fetchStatus === 'fetching' ? (
           <div className="p-3 text-xs text-muted-foreground">读取中…</div>
         ) : contentQuery.data?.deleted ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             该文件已从工作区删除（diff 模式可查看删除前的内容）
           </div>
-        ) : previewKind === 'image' ? (
+        ) : isImage ? (
           // 图片预览：直连 raw 端点取原始字节（文本 API 对二进制只给标记不给内容）
           <div className="flex h-full items-center justify-center overflow-auto bg-muted/30 p-4">
             <img src={rawFileUrl} alt={file} className="max-h-full max-w-full object-contain" />
@@ -270,8 +285,9 @@ export function FileContentArea({
           // sandbox 只放开脚本：允许 AI 生成页交互，不带 allow-same-origin 防读本地文件/cookie
           <iframe title={file} srcDoc={fileContent} sandbox="allow-scripts" className="h-full w-full border-0" />
         ) : previewKind === 'md' ? (
-          <div className="relative h-full overflow-auto p-4">
-            <div className="absolute top-2 right-2 z-10">
+          // 主题选择固定顶部不随滚动；正文单独滚动
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="flex shrink-0 justify-end border-b border-border px-2 py-1">
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-6 px-2 text-xs" />}>
                   主题：{mdThemes.find((t) => t.id === mdTheme)?.label ?? mdTheme}
@@ -286,11 +302,13 @@ export function FileContentArea({
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
-            <MarkdownView content={fileContent} className={mdThemeCls(mdTheme)} />
+            <div className="min-h-0 flex-1 overflow-auto p-4">
+              <MarkdownView content={fileContent} className={mdThemeCls(mdTheme)} />
+            </div>
           </div>
-        ) : contentQuery.data?.binary ? (
+        ) : isBinaryFile ? (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            二进制文件不支持预览（{contentQuery.data.size} 字节）
+            二进制文件不支持预览{contentQuery.data ? `（${contentQuery.data.size} 字节）` : ''}
           </div>
         ) : (
           // 编辑开关/保存浮动在代码区右上角（不占标题栏，标题栏元素随模式稳定）
