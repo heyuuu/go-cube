@@ -57,6 +57,9 @@ func newRootCmd(a *app.App) *cobra.Command {
 	cmd.AddCommand(newOpenPathCmd(a))
 	cmd.AddCommand(newDiffCmd(a))
 
+	// forge（git 托管平台配置，1040）
+	cmd.AddCommand(newForgeCmd(a))
+
 	// git 相关
 	cmd.AddCommand(newPushCmd(a))
 	cmd.AddCommand(newPullCmd(a))

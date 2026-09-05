@@ -16,7 +16,7 @@
 
 **ID 分配规则（硬约束）**：提案 ID 全局唯一、不得重复，三个目录（顶层 / `parked/` / `archived/`）共用一套编号空间。**新建提案前必须先执行 `make last-proposal` 获取当前最大 ID，新提案 ID = 最大 ID + 1**，不得凭记忆或猜测取号。
 
-- [`1040-forge管理/`](proposals/1040-forge管理/) — forge（git 托管平台实例）配置管理：`Forge { host, kind, icon }` 存 settings `forges` 节，settings 页增删改，repo remote URL→host 前端匹配展示 icon；forge 系列地基（1041/1042 依赖）
+- [`archived/1040-forge管理/`](proposals/archived/1040-forge管理/) — ✅ 已实现（2026-09-05）：forge（git 托管平台实例）配置管理——`Forge{host,kind,icon}` 存 settings `forges` 节（host 归一化唯一键、kind 四值枚举 github/gitea/gitee/generic），CLI `forge list`、Web settings Forge 分区增删改、API list/save/delete；repo→forge 匹配在前端（repoUrl 解析 host 查表，projects 列表/树名称旁展示 icon），不写 git.json 快照
 - [`1041-forge-account/`](proposals/1041-forge-account/) — forge account（`{ forgeHost, username, token }`）管理与 github/gitea/gitee 三方言拉取账号下仓库列表（手动触发 + easycache 缓存，不进 projcache 采集），与本地项目按 clone URL 对账（未 clone / 本地孤儿 / 已 clone+本地状态）；暂不做 owner/org 区分
 - [`1042-forge页/`](proposals/1042-forge页/) — 前台 forge 页：以 forge 上仓库为入口的列表视图（类项目列表页、无 tree 模式），展示对账状态、未 clone 可一键 clone（复用 cloneRules）；数据获取/筛选/排序细节开工前另行讨论定稿
 - [`archived/1038-opener默认/`](proposals/archived/1038-opener默认/) — ✅ 已实现（2026-08-31）：cmd 字符串化 → per-role actions 动作串（exec:/url:，站内路由拼 BaseURL）→ intent 8 值枚举 + `openerIntents` 节（默认 opener + 候选）→ CLI `-o` 三态（无=默认 / 裸=交互 / name=模糊）→ 前端快捷位意图化 + url 动作当前浏览器直开；已知取舍：url 前端直开不计 usage

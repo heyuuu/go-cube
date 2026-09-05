@@ -3,6 +3,7 @@ package app
 import (
 	"cube/config"
 	"cube/create"
+	"cube/forge"
 	"cube/handlers"
 	"cube/opener"
 	"cube/project"
@@ -25,6 +26,7 @@ type App struct {
 	openerService    *opener.Service
 	usageService     *usage.Service
 	createService    *create.Service
+	forgeService     *forge.Service
 }
 
 func New(cfg *config.Config) (*App, error) {
@@ -36,7 +38,8 @@ func New(cfg *config.Config) (*App, error) {
 	usageService := usage.NewService(paths.UsageFile())
 	workbenchService := workbench.NewService(projectService.RefreshGitInfo)
 	createService := create.NewService(cfg.Create)
-	services := []any{projectService, openerService, usageService, workbenchService, createService}
+	forgeService := forge.NewService(paths.SettingsFile())
+	services := []any{projectService, openerService, usageService, workbenchService, createService, forgeService}
 
 	// 组装 web server
 	configHandler := handlers.NewConfigHandler(cfg)
@@ -44,6 +47,7 @@ func New(cfg *config.Config) (*App, error) {
 	openerHandler := handlers.NewOpenerHandler(openerService)
 	mdHandler := handlers.NewMdHandler()
 	workbenchHandler := handlers.NewWorkbenchHandler(workbenchService)
+	forgeHandler := handlers.NewForgeHandler(forgeService)
 	server := web.NewServer(
 		cfg.Server,
 		[]web.Handler{
@@ -52,6 +56,7 @@ func New(cfg *config.Config) (*App, error) {
 			openerHandler,
 			mdHandler,
 			workbenchHandler,
+			forgeHandler,
 		},
 	)
 
@@ -66,6 +71,7 @@ func New(cfg *config.Config) (*App, error) {
 		openerService:    openerService,
 		usageService:     usageService,
 		createService:    createService,
+		forgeService:     forgeService,
 	}, nil
 }
 
@@ -77,6 +83,7 @@ func (a *App) WorkbenchService() *workbench.Service { return a.workbenchService 
 func (a *App) OpenerService() *opener.Service       { return a.openerService }
 func (a *App) UsageService() *usage.Service         { return a.usageService }
 func (a *App) CreateService() *create.Service       { return a.createService }
+func (a *App) ForgeService() *forge.Service         { return a.forgeService }
 
 // StartBackgroundJobs 启动常驻进程的后台任务（分发到各 service 的 OnServerStart 钩子）。
 // 仅常驻 server 调用；CLI 短命进程不调用。

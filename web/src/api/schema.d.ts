@@ -21,6 +21,57 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/forge/delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按 host 删除 forge */
+    post: operations['forge.delete'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/forge/list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取 forge 列表 */
+    get: operations['forge.list'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/forge/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 新增或按 host 替换 forge */
+    post: operations['forge.save'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/md/content': {
     parameters: {
       query?: never;
@@ -889,6 +940,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputListResultForgeBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultForgeBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultForge'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputListResultOpenerDTOBody: {
       /**
        * Format: uri
@@ -1277,6 +1339,35 @@ export interface components {
       path: string;
       source: string;
     };
+    Forge: {
+      host: string;
+      icon?: components['schemas']['Icon'];
+      kind: string;
+    };
+    ForgeDeleteInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ForgeDeleteInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 规则唯一键 */
+      host: string;
+    };
+    ForgeSaveInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ForgeSaveInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 域名（可带端口），如 github.com */
+      host: string;
+      /** @description 平台图标（可选：lucide 图名或 base64 PNG） */
+      icon?: components['schemas']['IconDTO'];
+      /** @description API 方言：github / gitea / gitee / generic */
+      kind: string;
+    };
     Hunk: {
       lines: components['schemas']['DiffLine'][] | null;
       /** Format: int64 */
@@ -1324,6 +1415,9 @@ export interface components {
     };
     ListResultCloneRule: {
       list: components['schemas']['CloneRule'][] | null;
+    };
+    ListResultForge: {
+      list: components['schemas']['Forge'][] | null;
     };
     ListResultOpenerDTO: {
       list: components['schemas']['OpenerDTO'][] | null;
@@ -1669,6 +1763,101 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputConfigBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.delete': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ForgeDeleteInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.list': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultForgeBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ForgeSaveInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

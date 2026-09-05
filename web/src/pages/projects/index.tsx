@@ -29,12 +29,14 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { repoHostOf } from '@/lib/forge';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { guessHome, prettyPath } from '@/lib/path';
 import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
+import { useForges } from '@/queries/forge';
 import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
@@ -242,12 +244,24 @@ function LastUsedTime({ iso }: { iso: string }) {
   );
 }
 
+// 项目 forge 图标：repo remote URL 的 host 匹配到已配置 forge 时展示其 icon（1040）；
+// 未配置 forge 或 forge 未配 icon 时不展示（无兜底图标）
+function ForgeIcon({ match }: { match: { host: string; icon: IconDecl } | undefined }) {
+  if (!match) return null;
+  return (
+    <span className="flex shrink-0 items-center text-muted-foreground" title={`forge：${match.host}`}>
+      {renderIcon(match.icon, null)}
+    </span>
+  );
+}
+
 // 树行：目录行整行点击折叠/展开；项目行带 tags / git 信息与打开动作（根行显示 ~ 缩写路径）
 function TreeRowView({
   row,
   home,
   openerList,
   open,
+  forgeOf,
   onOpen,
   onToggle,
   onFilterGit,
@@ -258,6 +272,7 @@ function TreeRowView({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
+  forgeOf: (p: Project) => { host: string; icon: IconDecl } | undefined;
   onOpen: (path: string, opener: string, dir?: string) => void;
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
@@ -306,6 +321,7 @@ function TreeRowView({
       )}
       {p && (
         <>
+          <ForgeIcon match={forgeOf(p)} />
           {(p.tags ?? []).map((t) => (
             <ClickBadge
               key={t}
@@ -333,6 +349,7 @@ export function ProjectsPage() {
   const openers = useOpenerList();
   const open = useProjectOpen();
   const scanRules = useScanRules();
+  const forges = useForges();
 
   const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [openError, setOpenError] = useState('');
@@ -407,6 +424,17 @@ export function ProjectsPage() {
       .filter((r) => r.icon?.value)
       .map((r) => [r.group, { type: r.icon!.type, value: r.icon!.value }]),
   );
+  // host → forge icon 映射 + 项目匹配器（repo URL 解析 host 后查表；1040）
+  const forgeIcons = new Map<string, IconDecl>(
+    (forges.data?.list ?? [])
+      .filter((f) => f.icon?.value)
+      .map((f) => [f.host, { type: f.icon!.type, value: f.icon!.value }]),
+  );
+  const forgeOf = (p: Project) => {
+    const host = repoHostOf(p.gitInfo?.repoUrl);
+    const icon = host ? forgeIcons.get(host) : undefined;
+    return icon ? { host, icon } : undefined;
+  };
   const tags = [...new Set(projects.flatMap((p) => p.tags ?? []))].sort();
 
   const filtered = projects.filter((p) => {
@@ -705,6 +733,7 @@ export function ProjectsPage() {
                   home={home}
                   openerList={openerList}
                   open={open}
+                  forgeOf={forgeOf}
                   onOpen={openProject}
                   onToggle={toggleTreeNode}
                   onFilterGit={toggleGitSolo}
@@ -782,6 +811,7 @@ export function ProjectsPage() {
                               >
                                 {p.name}
                               </button>
+                              <ForgeIcon match={forgeOf(p)} />
                               {(p.tags ?? []).map((t) => (
                                 <ClickBadge
                                   key={t}
