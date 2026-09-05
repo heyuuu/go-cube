@@ -1,6 +1,6 @@
-// icon 声明编辑字段：类型切换（lucide / image）+ lucide 搜索点选 + .app 提取 + PNG 上传。
-// 从 Opener 表单的 inline 块抽出泛化（opener / scanRules 共用）：
-//   - allowEmpty=true：icon 可选（scanRules），显示「清除」按钮，无默认值；
+// icon 声明编辑字段：类型切换（lucide / image）+ lucide 搜索点选 + 路径/URL 提取 + PNG 上传。
+// 从 Opener 表单的 inline 块抽出泛化（opener / scanRules / forge 共用）：
+//   - allowEmpty=true：icon 可选（scanRules / forge），显示「清除」按钮，无默认值；
 //   - allowEmpty=false：icon 必有值（opener），切回 lucide 时回落 defaultLucide。
 import { useState } from 'react';
 
@@ -22,7 +22,7 @@ interface IconFieldProps {
 
 export function IconField({ value, onChange, allowEmpty = false, defaultLucide }: IconFieldProps) {
   const extract = useIconExtract();
-  const [appPath, setAppPath] = useState('');
+  const [source, setSource] = useState('');
   const type = value?.type ?? 'lucide';
 
   const switchType = (t: IconDecl['type']) => {
@@ -71,12 +71,16 @@ export function IconField({ value, onChange, allowEmpty = false, defaultLucide }
             <img src={`data:image/png;base64,${value.value}`} alt="icon 预览" className="size-8 rounded" />
           )}
           <div className="flex items-center gap-2">
-            <Input value={appPath} onChange={(e) => setAppPath(e.target.value)} placeholder="/Applications/Xxx.app" />
+            <Input
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="/Applications/Xxx.app、图片路径或 https://gitee.com/favicon.ico"
+            />
             <Button
               size="sm"
               variant="outline"
-              disabled={!appPath || extract.isPending}
-              onClick={() => extract.mutate(appPath, { onSuccess: (v) => onChange({ type: 'image', value: v }) })}
+              disabled={!source || extract.isPending}
+              onClick={() => extract.mutate(source, { onSuccess: (v) => onChange({ type: 'image', value: v }) })}
             >
               提取
             </Button>

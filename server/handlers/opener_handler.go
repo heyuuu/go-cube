@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -11,7 +10,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 
 	"cube/opener"
-	"cube/util/iconkit"
 	"cube/util/slicekit"
 	"cube/web"
 )
@@ -74,7 +72,6 @@ func (h *OpenerHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiPost(api, "/api/opener/reorder", "按名重排 opener 顺序", h.openerReorder)
 	web.ApiPost(api, "/api/opener/intent-default/save", "设置某 intent 的默认 opener", h.intentDefaultSave)
 	web.ApiPost(api, "/api/opener/intent-default/delete", "清除某 intent 的默认 opener", h.intentDefaultDelete)
-	web.ApiPost(api, "/api/opener/extract-icon", "从本地 .app 提取图标（64px PNG，base64）", h.openerExtractIcon)
 }
 
 func (h *OpenerHandler) openerList(_ struct{}) (web.ListResult[*OpenerDTO], error) {
@@ -251,21 +248,6 @@ func (h *OpenerHandler) openerReorder(input OpenerReorderInput) (map[string]any,
 		return nil, err
 	}
 	return map[string]any{"ok": true}, nil
-}
-
-// OpenerExtractIconInput extract-icon 接口入参。
-type OpenerExtractIconInput struct {
-	Body struct {
-		Path string `json:"path" doc:".app 目录绝对路径"`
-	}
-}
-
-func (h *OpenerHandler) openerExtractIcon(input OpenerExtractIconInput) (map[string]any, error) {
-	pngData, err := iconkit.ExtractAppIcon(input.Body.Path)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{"value": base64.StdEncoding.EncodeToString(pngData)}, nil
 }
 
 // IntentDefaultSaveInput intent-default/save 接口入参。

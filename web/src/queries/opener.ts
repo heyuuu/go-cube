@@ -78,13 +78,3 @@ export function useOpenerReorder() {
     onError: () => void qc.invalidateQueries({ queryKey: ['opener', 'list'] }),
   });
 }
-
-// 从本地 .app 提取图标：返回 base64 PNG 字符串
-export function useIconExtract() {
-  return useMutation({
-    mutationFn: async (path: string): Promise<string> => {
-      const data = await apiPost('/api/opener/extract-icon', { path });
-      return (data as { value: string }).value;
-    },
-  });
-}

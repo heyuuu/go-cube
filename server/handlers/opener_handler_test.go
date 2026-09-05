@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -192,50 +191,6 @@ func TestOpenerSaveAndDelete(t *testing.T) {
 		if o.Name == "code" {
 			t.Fatal("code 应已被删除")
 		}
-	}
-}
-
-func TestOpenerExtractIcon(t *testing.T) {
-	env := newTestEnv(t)
-	// 造一个带 icns 的 .app（复用 iconkit 的容器格式）
-	png1x1 := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d, 'I', 'H', 'D', 'R'}
-	// 1x1 PNG 无法缩放路径（≤64 原样返回），但解码要求完整 IHDR/IDAT/IEND——直接用最小合法 PNG
-	png1x1 = []byte{
-		0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a,
-		0, 0, 0, 0x0d, 'I', 'H', 'D', 'R',
-		0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 0x1f, 0x15, 0xc4, 0x89,
-		0, 0, 0, 0x0a, 'I', 'D', 'A', 'T', 0x78, 0x9c, 0x63, 0, 1, 0, 0, 5, 0, 1, 0x0d, 0x0a, 0x2d, 0xb4,
-		0, 0, 0, 0, 'I', 'E', 'N', 'D', 0xae, 0x42, 0x60, 0x82,
-	}
-	entry := make([]byte, 8+len(png1x1))
-	copy(entry, "ic07")
-	entry[4], entry[5], entry[6], entry[7] = byte(len(entry)>>24), byte(len(entry)>>16), byte(len(entry)>>8), byte(len(entry))
-	copy(entry[8:], png1x1)
-	headerLen := 8 + len(entry)
-	icns := append([]byte("icns"), byte(headerLen>>24), byte(headerLen>>16), byte(headerLen>>8), byte(headerLen))
-	icns = append(icns, entry...)
-	env.ws.Mkdir("Fake.app", "Contents", "Resources")
-	env.ws.WriteFile("Fake.app/Contents/Resources/Fake.icns", icns)
-
-	body := `{"path":"` + env.ws.Join("Fake.app") + `"}`
-	resp, err := http.Post(env.url("/api/opener/extract-icon"), "application/json", bytes.NewReader([]byte(body)))
-	if err != nil {
-		t.Fatalf("POST extract-icon 失败: %v", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("extract-icon 应为 200, got %d", resp.StatusCode)
-	}
-	var out struct {
-		Data struct {
-			Value string `json:"value"`
-		} `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("解码失败: %v", err)
-	}
-	if dec, err := base64.StdEncoding.DecodeString(out.Data.Value); err != nil || len(dec) == 0 {
-		t.Fatalf("value 应为合法 base64 PNG, err=%v len=%d", err, len(dec))
 	}
 }
 

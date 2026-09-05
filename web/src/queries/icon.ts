@@ -1,13 +1,14 @@
-// icon 辅助请求（.app 图标提取）。端点暂挂 opener 路由下，语义通用，后续可迁中性路由。
+// icon 辅助请求：图标提取（IconField「提取」入口）。
+// source 三形态由后端分发：本地图片文件 / .app 目录（icns）/ http(s) URL（favicon.ico 等）。
 import { useMutation } from '@tanstack/react-query';
 
 import { apiPost } from '@/api/client';
 
-// 从本地 .app 提取图标：返回 base64 PNG 字符串
+// 提取图标（统一 64px PNG）：返回 base64 字符串
 export function useIconExtract() {
   return useMutation({
-    mutationFn: async (path: string): Promise<string> => {
-      const data = await apiPost('/api/opener/extract-icon', { path });
+    mutationFn: async (source: string): Promise<string> => {
+      const data = await apiPost('/api/icon/extract', { source });
       return (data as { value: string }).value;
     },
   });

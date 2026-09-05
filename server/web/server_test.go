@@ -244,8 +244,8 @@ func TestServerPortAndURL(t *testing.T) {
 	if srv.Port() != 6101 {
 		t.Errorf("Port() = %d, want 6101", srv.Port())
 	}
-	if got := srv.ServerURL(); got != "http://127.0.0.1:6101/" {
-		t.Errorf("ServerURL() = %q, want http://127.0.0.1:6101/", got)
+	if got := srv.ServerURL(); got != "http://localhost:6101/" {
+		t.Errorf("ServerURL() = %q, want http://localhost:6101/", got)
 	}
 }
 

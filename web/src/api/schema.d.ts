@@ -72,6 +72,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/icon/extract': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 从本地路径（.app 目录或图片文件）或 http(s) URL 提取图标（64px PNG，base64） */
+    post: operations['icon.extract'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/md/content': {
     parameters: {
       query?: never;
@@ -134,23 +151,6 @@ export interface paths {
     put?: never;
     /** 用指定 opener 对比两个路径（diff-dir/diff-file） */
     post: operations['opener.diffOpen'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/opener/extract-icon': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 从本地 .app 提取图标（64px PNG，base64） */
-    post: operations['opener.extractIcon'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1387,6 +1387,16 @@ export interface components {
       type: string;
       value: string;
     };
+    IconExtractInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/IconExtractInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 图标来源：本地路径（.app 目录或图片文件）或 http(s) URL（如 https://gitee.com/favicon.ico） */
+      source: string;
+    };
     Info: {
       defaultBranch: string;
       root: string;
@@ -1472,16 +1482,6 @@ export interface components {
       opener: string;
       /** @description 右侧路径（文件或目录）绝对路径 */
       right: string;
-    };
-    OpenerExtractIconInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/OpenerExtractIconInputBody.json
-       */
-      readonly $schema?: string;
-      /** @description .app 目录绝对路径 */
-      path: string;
     };
     OpenerIntentDTO: {
       defaultOpener?: string;
@@ -1871,6 +1871,39 @@ export interface operations {
       };
     };
   };
+  'icon.extract': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['IconExtractInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'md.content': {
     parameters: {
       query: {
@@ -1976,39 +2009,6 @@ export interface operations {
     requestBody: {
       content: {
         'application/json': components['schemas']['OpenerDiffOpenInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'opener.extractIcon': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['OpenerExtractIconInputBody'];
       };
     };
     responses: {

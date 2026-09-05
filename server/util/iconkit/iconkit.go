@@ -1,8 +1,9 @@
-// Package iconkit 从 macOS .app 包提取图标（.app → icns → PNG），
-// 供 opener 配置页「从本地 .app 选图」入口使用（1016）。
+// Package iconkit 图标提取与声明（1016 起 .app → icns → PNG；1040 增补任意源
+// 提取：本地图片文件 / http(s) URL 含 favicon.ico，见 source.go），供配置页
+// 「提取」入口使用。
 //
 // 提取结果是缩放到 ≤64px 的 PNG 字节，调用方 base64 后存入 icon 声明。
-// 纯函数、无环境副作用：只依赖入参路径与字节运算。
+// 纯函数、无环境副作用：只依赖入参路径/URL 与字节运算（URL 提取按入参显式外呼）。
 // 非 macOS 平台的 .app 包结构相同，本包同样可用（「darwin-only」指使用场景，
 // 无需 build tag）。
 package iconkit
@@ -11,7 +12,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"image"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -96,29 +96,8 @@ func ScalePng(data []byte, max int) ([]byte, error) {
 		return nil, fmt.Errorf("解码 PNG 失败: %w", err)
 	}
 	b := img.Bounds()
-	w, h := b.Dx(), b.Dy()
-	if w <= max && h <= max {
+	if b.Dx() <= max && b.Dy() <= max {
 		return data, nil
 	}
-
-	// 等比缩到最长边 = max
-	nw, nh := w, h
-	if w >= h {
-		nw, nh = max, max*h/w
-	} else {
-		nw, nh = max*w/h, max
-	}
-	dst := image.NewRGBA(image.Rect(0, 0, nw, nh))
-	for y := 0; y < nh; y++ {
-		sy := b.Min.Y + y*h/nh
-		for x := 0; x < nw; x++ {
-			sx := b.Min.X + x*w/nw
-			dst.Set(x, y, img.At(sx, sy))
-		}
-	}
-	var out bytes.Buffer
-	if err := png.Encode(&out, dst); err != nil {
-		return nil, fmt.Errorf("编码 PNG 失败: %w", err)
-	}
-	return out.Bytes(), nil
+	return EncodeImageScaled(img, max)
 }
