@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { repoHostOf } from '@/lib/forge';
+import { matchForgeFilter, repoHostOf } from '@/lib/forge';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { guessHome, prettyPath } from '@/lib/path';
@@ -381,6 +381,13 @@ export function ProjectsPage() {
   const tagFilter = searchParams.get('tag') ?? 'all';
   const wtFilter = searchParams.get('wt') === '1';
   const wsFilter = searchParams.get('ws') === '1';
+  const forgeList = forges.data?.list ?? [];
+  // forge 筛选单选值：all / none / other / 已配置 forge host；非法值回落 all
+  const forgeParam = searchParams.get('forge');
+  const forgeFilter =
+    forgeParam && (forgeParam === 'none' || forgeParam === 'other' || forgeList.some((f) => f.host === forgeParam))
+      ? forgeParam
+      : 'all';
 
   // 搜索输入本地 state + 300ms debounce 后投影到 URL；URL 侧变化（后退/重置）回灌输入
   const [keywordInput, setKeywordInput] = useState(keyword);
@@ -445,6 +452,14 @@ export function ProjectsPage() {
     if (tagFilter !== 'all' && !(p.tags ?? []).includes(tagFilter)) return false;
     if (wtFilter && (p.gitInfo?.worktrees?.length ?? 0) === 0) return false;
     if (wsFilter && countWorkspaces(p) === 0) return false;
+    if (
+      !matchForgeFilter(
+        p.gitInfo?.repoUrl,
+        forgeFilter,
+        forgeList.map((f) => f.host),
+      )
+    )
+      return false;
     return true;
   });
 
@@ -499,13 +514,17 @@ export function ProjectsPage() {
     updateParams({ ws: on ? '1' : null });
   }
 
+  function setForgeFilterValue(v: string) {
+    updateParams({ forge: v === 'all' ? null : v });
+  }
+
   function setTagFilterValue(t: string) {
     updateParams({ tag: t === 'all' ? null : t });
   }
 
   function resetFilters() {
     setKeywordInput('');
-    updateParams({ q: null, group: null, git: null, tag: null, wt: null, ws: null, sort: null });
+    updateParams({ q: null, group: null, git: null, tag: null, wt: null, ws: null, forge: null, sort: null });
   }
 
   function toggleSelect(path: string) {
@@ -675,6 +694,28 @@ export function ProjectsPage() {
             </Chip>
           ))}
         </div>
+        {forgeList.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <FilterLabel label="forge" mode="单选" />
+            <Chip active={forgeFilter === 'all'} onClick={() => setForgeFilterValue('all')}>
+              全部
+            </Chip>
+            {forgeList.map((f) => (
+              <Chip key={f.host} active={forgeFilter === f.host} onClick={() => setForgeFilterValue(f.host)}>
+                <span className="flex items-center gap-1">
+                  {renderIcon(f.icon ? { type: f.icon.type, value: f.icon.value } : undefined, null)}
+                  {f.host}
+                </span>
+              </Chip>
+            ))}
+            <Chip active={forgeFilter === 'other'} onClick={() => setForgeFilterValue('other')}>
+              其他forge
+            </Chip>
+            <Chip active={forgeFilter === 'none'} onClick={() => setForgeFilterValue('none')}>
+              无forge
+            </Chip>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-1.5">
           <FilterLabel label="worktree" mode="单选" />
           <Chip active={!wtFilter} onClick={() => setWtFilter(false)}>
