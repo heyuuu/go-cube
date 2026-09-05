@@ -20,7 +20,7 @@ cube 的项目全是 git 项目，每个项目的 remote URL 都指向某个 git
 - **kind 四值**：`github` / `gitea` / `gitee` / `generic`。kind 决定 1041 account 拉取的 API 方言；generic = 无 API 仅展示。
 - **五处加法落地**：`forge` 领域包（`types.go` 纯函数 + `service.go` 直读不缓存 / 写侧校验，模式同 scan/clone 规则）、`cmd/forge.go`（裸跑 = `forge list` 表格输出）、`handlers/forge_handler.go`（list / save / delete 三端点）、`app.go` 装配。无 config.json 节（无端口类配置需求）。
 - **repo→forge 匹配放前端**：前端从 settings API 拿 forge 列表，按项目快照 `gitInfo.repoUrl` 解析 host 查表（后端 `forge.RepoHost` 纯函数，前端 `lib/forge.ts` 的 `repoHostOf` 同语义复刻，均有表驱动测试）；projects 列表与树两模式在项目名称旁展示 forge icon（悬停 title=host）。**不把 forge 信息写进 git.json 快照**，读路径零改动；未匹配 host / forge 未配 icon 不展示（无兜底图标）。
-- **前端**：settings 页新增 Forge 分区（Sheet 抽屉表单 + 删除确认，模板沿用扫描规则分区；kind 用 chip 单选；无顺序语义不做拖拽）。
+- **前端**：settings 页新增 Forge 分区（Sheet 抽屉表单 + 删除确认 + grip 拖拽排序，模板沿用扫描规则分区；kind 用 chip 单选；顺序供 1042 forge 页沿用）。
 - **IconField 提取入口泛化**（随本提案补全）：原「.app 提取」升级为「路径 / URL 提取」——`POST /api/icon/extract`（中性 icon 路由，替代 opener/extract-icon）：本地图片文件、.app 目录（icns）、http(s) URL（favicon.ico / png / jpg / gif）三形态统一 64px PNG base64；ICO 容器由 iconkit 手解（favicon 主流形态标准库不支持）。
 
 ## 已知取舍

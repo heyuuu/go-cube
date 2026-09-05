@@ -23,6 +23,7 @@ func (h *ForgeHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/forge/list", "获取 forge 列表", h.forgeList)
 	web.ApiPost(api, "/api/forge/save", "新增或按 host 替换 forge", h.forgeSave)
 	web.ApiPost(api, "/api/forge/delete", "按 host 删除 forge", h.forgeDelete)
+	web.ApiPost(api, "/api/forge/reorder", "按 host 重排 forge 顺序", h.forgeReorder)
 }
 
 func (h *ForgeHandler) forgeList(_ struct{}) (web.ListResult[forge.Forge], error) {
@@ -58,6 +59,20 @@ type ForgeDeleteInput struct {
 
 func (h *ForgeHandler) forgeDelete(input ForgeDeleteInput) (map[string]any, error) {
 	if err := h.forgeService.DeleteForge(input.Body.Host); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
+}
+
+// ForgeReorderInput forge/reorder 接口入参（整表按目标顺序提交 host 名单）。
+type ForgeReorderInput struct {
+	Body struct {
+		Hosts []string `json:"hosts" doc:"按目标顺序排列的 host 名单"`
+	}
+}
+
+func (h *ForgeHandler) forgeReorder(input ForgeReorderInput) (map[string]any, error) {
+	if err := h.forgeService.ReorderForges(input.Body.Hosts); err != nil {
 		return nil, err
 	}
 	return map[string]any{"ok": true}, nil

@@ -73,3 +73,25 @@ func TestForgeWrite(t *testing.T) {
 		t.Fatalf("删不存在应报中文错误, message=%q", r2.Message)
 	}
 }
+
+// TestForgeReorder reorder 出口契约：重排生效 + 未知 host 中文错误。
+func TestForgeReorder(t *testing.T) {
+	env := newTestEnv(t)
+	postJSON(t, env.url("/api/forge/save"), `{"host":"github.com","kind":"github"}`)
+	postJSON(t, env.url("/api/forge/save"), `{"host":"gitee.com","kind":"gitee"}`)
+
+	if r := postJSON(t, env.url("/api/forge/reorder"), `{"hosts":["gitee.com","github.com"]}`); !r.Ok {
+		t.Fatalf("reorder 应成功, message=%q", r.Message)
+	}
+	got := getJSON(t, env.url("/api/forge/list"))
+	var out web.ListResult[forge.Forge]
+	decodeData(t, got, &out)
+	if len(out.List) != 2 || out.List[0].Host != "gitee.com" {
+		t.Fatalf("重排后顺序不符: %+v", out.List)
+	}
+
+	bad := postJSON(t, env.url("/api/forge/reorder"), `{"hosts":["unknown.com"]}`)
+	if bad.Ok || !strings.Contains(bad.Message, "未找到") {
+		t.Fatalf("未知 host 应报中文错误, message=%q", bad.Message)
+	}
+}

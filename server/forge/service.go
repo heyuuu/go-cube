@@ -71,6 +71,42 @@ func (s *Service) SaveForge(f Forge) error {
 	return settings.SaveSection(s.settingsFile, forgesSection, specs)
 }
 
+// ReorderForges 按 hosts 顺序重排 forges 节（顺序即展示序，1042 forge 页沿用）。
+// 未列出的条目保持原相对顺序排在末尾，不丢数据；未知或重复 host 返回中文错误。
+func (s *Service) ReorderForges(hosts []string) error {
+	specs := s.Forges()
+	byHost := make(map[string]Forge, len(specs))
+	for _, spec := range specs {
+		h := NormalizeHost(spec.Host)
+		if _, dup := byHost[h]; dup {
+			return fmt.Errorf("settings.json 存在重复 host 的 forge，无法重排")
+		}
+		byHost[h] = spec
+	}
+	seen := make(map[string]bool, len(hosts))
+	for _, raw := range hosts {
+		h := NormalizeHost(raw)
+		if _, ok := byHost[h]; !ok {
+			return fmt.Errorf("未找到指定 forge: %s", h)
+		}
+		if seen[h] {
+			return fmt.Errorf("重排名单存在重复 forge: %s", h)
+		}
+		seen[h] = true
+	}
+
+	ordered := make([]Forge, 0, len(specs))
+	for _, raw := range hosts {
+		ordered = append(ordered, byHost[NormalizeHost(raw)])
+	}
+	for _, spec := range specs {
+		if !seen[NormalizeHost(spec.Host)] {
+			ordered = append(ordered, spec)
+		}
+	}
+	return settings.SaveSection(s.settingsFile, forgesSection, ordered)
+}
+
 // DeleteForge 按 host 删除一条 forge；不存在时返回中文错误。
 func (s *Service) DeleteForge(host string) error {
 	host = NormalizeHost(host)

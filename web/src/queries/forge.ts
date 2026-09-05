@@ -24,3 +24,13 @@ export function useForgeDelete() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
   });
 }
+
+// 拖拽排序：提交按目标顺序排列的全量名单（乐观更新在调用方，失败时 invalidate 回滚）
+export function useForgeReorder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof apiPost<'/api/forge/reorder'>>[1]) => apiPost('/api/forge/reorder', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+    onError: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}

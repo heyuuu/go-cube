@@ -1,6 +1,7 @@
-// settings 页「Forge」分区：git 托管平台实例（host 级）配置的增删改（提案 1040）。
+// settings 页「Forge」分区：git 托管平台实例（host 级）配置的增删改与拖拽排序（提案 1040）。
 // 数据源 /api/forge/list（settings.json forges 节），保存即生效。
-// 交互模板沿用扫描规则分区：Sheet 抽屉编辑、删除前确认；forge 数量少、无顺序语义，不做拖拽排序。
+// 交互模板沿用扫描规则分区：Sheet 抽屉编辑、删除前确认、grip 拖拽排序（顺序即展示序，1042 forge 页沿用）。
+import { GripVertical } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Forge } from '@/api/client';
@@ -15,7 +16,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
-import { useForgeDelete, useForgeSave, useForges } from '@/queries/forge';
+import { useForgeDelete, useForgeReorder, useForgeSave, useForges } from '@/queries/forge';
+
+import { STICKY_LEFT, STICKY_RIGHT, useDragOrder } from './drag-order';
 
 interface ForgeDraft {
   host: string;
@@ -123,17 +126,24 @@ function ForgeForm({ draft, onClose }: { draft: ForgeDraft; onClose: () => void 
 export function ForgeSection() {
   const forges = useForges();
   const del = useForgeDelete();
+  const reorder = useForgeReorder();
   const [editing, setEditing] = useState<ForgeDraft | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const list = forges.data?.list ?? [];
+  const d = useDragOrder(
+    (f: Forge) => f.host,
+    list,
+    (rows) => reorder.mutate({ hosts: rows.map((r) => r.host) }),
+  );
 
   return (
     <section>
       <div className="mb-2 flex items-baseline gap-2">
         <h2 className="text-sm font-medium">Forge（git 托管平台）</h2>
         <span className="text-xs text-muted-foreground">
-          host 级平台实例（github.com / 自建 gitea 等）；项目按 repo host 匹配展示图标，account 拉取（1041）依赖 kind
+          host 级平台实例（github.com / 自建 gitea 等）；项目按 repo host 匹配展示图标，account 拉取（1041）依赖
+          kind；拖动 ⠿ 排序
         </span>
         <Button size="sm" variant="outline" className="ml-auto" onClick={() => setEditing(EMPTY_FORGE_DRAFT)}>
           新增
@@ -141,27 +151,29 @@ export function ForgeSection() {
       </div>
       {forges.error && <ErrorBanner message={`加载失败：${forges.error.message}`} />}
       {del.error && <ErrorBanner message={`删除失败：${del.error.message}`} />}
+      {reorder.error && <ErrorBanner message={`排序失败：${reorder.error.message}`} />}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>forge</TableHead>
+              <TableHead className={STICKY_LEFT}>forge</TableHead>
               <TableHead>kind</TableHead>
-              <TableHead className="text-right">操作</TableHead>
+              <TableHead className={`${STICKY_RIGHT} text-right`}>操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {list.length === 0 && (
+            {d.rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={3} className="text-xs text-muted-foreground">
                   暂无 forge 配置
                 </TableCell>
               </TableRow>
             )}
-            {list.map((f: Forge) => (
-              <TableRow key={f.host}>
-                <TableCell className="font-medium">
+            {d.rows.map((f: Forge, i) => (
+              <TableRow key={f.host} {...d.rowProps(f, i)}>
+                <TableCell className={`${STICKY_LEFT} font-medium`}>
                   <span className="flex items-center gap-1.5">
+                    <GripVertical {...d.gripProps(f)} />
                     {renderIcon(f.icon ? { type: f.icon.type, value: f.icon.value } : undefined, null)}
                     <span className="font-mono text-xs">{f.host}</span>
                   </span>
@@ -171,7 +183,7 @@ export function ForgeSection() {
                     {f.kind}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className={`${STICKY_RIGHT} text-right`}>
                   <Button
                     size="sm"
                     variant="ghost"

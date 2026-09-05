@@ -55,6 +55,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/forge/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按 host 重排 forge 顺序 */
+    post: operations['forge.reorder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/forge/save': {
     parameters: {
       query?: never;
@@ -1354,6 +1371,16 @@ export interface components {
       /** @description 规则唯一键 */
       host: string;
     };
+    ForgeReorderInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ForgeReorderInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 按目标顺序排列的 host 名单 */
+      hosts: string[] | null;
+    };
     ForgeSaveInputBody: {
       /**
        * Format: uri
@@ -1825,6 +1852,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultForgeBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ForgeReorderInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

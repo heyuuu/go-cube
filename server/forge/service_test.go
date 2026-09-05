@@ -110,3 +110,32 @@ func TestForges_SkipBadEntries(t *testing.T) {
 		t.Fatalf("坏条目应跳过，只留合法条目: %v", got)
 	}
 }
+
+// TestReorderForges 按 host 重排：未列出条目原序殿后、未知/重复报中文错误。
+func TestReorderForges(t *testing.T) {
+	s, _ := newService(t)
+	for _, f := range []Forge{
+		{Host: "github.com", Kind: KindGithub},
+		{Host: "gitee.com", Kind: KindGitee},
+		{Host: "gitea.example.com", Kind: KindGitea},
+	} {
+		if err := s.SaveForge(f); err != nil {
+			t.Fatalf("保存失败: %v", err)
+		}
+	}
+
+	if err := s.ReorderForges([]string{"gitee.com", "gitea.example.com"}); err != nil {
+		t.Fatalf("重排失败: %v", err)
+	}
+	got := s.Forges()
+	if got[0].Host != "gitee.com" || got[1].Host != "gitea.example.com" || got[2].Host != "github.com" {
+		t.Fatalf("未列出的 github 应原序殿后: %v", got)
+	}
+
+	if err := s.ReorderForges([]string{"unknown.com"}); err == nil || !strings.Contains(err.Error(), "未找到") {
+		t.Fatalf("未知 host 应报中文错误, got %v", err)
+	}
+	if err := s.ReorderForges([]string{"gitee.com", "GITEE.com"}); err == nil || !strings.Contains(err.Error(), "重复") {
+		t.Fatalf("重复 host（归一化后）应报中文错误, got %v", err)
+	}
+}
