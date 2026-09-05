@@ -12,7 +12,7 @@ import {
   useWorkbenchTree,
 } from '@/queries/workbench';
 
-import { sourceLabel, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
+import { sourceLabel, toUri, writeFileParam, type TreeSource, type WorkbenchParams } from '../params';
 
 import { CommitDetailPane } from './commit-detail';
 import { FileContentArea, useFileEditing, type ContentMode } from './file-content';
@@ -43,16 +43,20 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   // 内容模式默认随双选态：双选进 diff、单选进单文件；用户手动切换后保留并持久化
   // （刷新恢复），双选↔单选切换时重置（render 期 setState 的派生重置模式）
   const baseKey = viewBase ? `${viewBase.type}:${viewBase.id}` : '';
+  // 旧版模式值 'file'（单文件）迁移为 'source'；无保存值时单选态默认 preview
+  // （无富预览格式的文件自动等同源码，行为无损）
   const defaultMode = (): ContentMode => {
     const saved = localStorage.getItem(MODE_KEY);
-    if (saved === 'diff' || saved === 'file') return saved;
-    return viewBase ? 'diff' : 'file';
+    if (saved === 'diff') return 'diff';
+    if (saved === 'preview' || saved === 'source') return saved;
+    if (saved === 'file') return 'source';
+    return viewBase ? 'diff' : 'preview';
   };
   const [mode, setMode] = useState<ContentMode>(defaultMode);
   const [prevBaseKey, setPrevBaseKey] = useState(baseKey);
   if (prevBaseKey !== baseKey) {
     setPrevBaseKey(baseKey);
-    const next: ContentMode = viewBase ? 'diff' : 'file';
+    const next: ContentMode = viewBase ? 'diff' : 'preview';
     setMode(next);
     localStorage.setItem(MODE_KEY, next);
   }
@@ -82,6 +86,8 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
   const activeFile = !fileMissing ? file : treeList?.includes('README.md') ? 'README.md' : '';
 
   const content = useWorkbenchFile(path, src, activeFile);
+  // 图片预览直连 raw 端点（原始字节 + 按扩展名的 Content-Type）
+  const rawFileUrl = `/api/workbench/file/raw?path=${encodeURIComponent(path)}&source=${encodeURIComponent(toUri(src))}&file=${encodeURIComponent(activeFile)}`;
   // rename 条目基准侧路径不同：未改内容的 rename 两侧字节相同，diff 应显示「内容一致」
   // 而非「一侧全文」（左侧按旧路径读）；改了内容则呈现真实的行级差异
   const renameOldPath = changeList.find((e) => e.path === activeFile && e.status === 'renamed')?.oldPath ?? '';
@@ -191,6 +197,7 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
         editing={editing}
         contentQuery={content}
         fileDiffQuery={fileDiff}
+        rawFileUrl={rawFileUrl}
         headerLeading={headerLeading}
       />
     </SourcePanelShell>

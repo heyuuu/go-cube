@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { ChevronDown } from 'lucide-react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
 
@@ -6,8 +7,15 @@ import type { components } from '@/api/schema';
 import { CodeEditor } from '@/components/code-editor';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorBanner } from '@/components/error-banner';
+import { loadMdTheme, mdThemeCls, mdThemes, MarkdownView, type MdThemeId } from '@/components/markdown-render';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { splitInlineDiff, type InlineSegment } from '@/lib/inline-diff';
 import { cn } from '@/lib/utils';
@@ -16,18 +24,34 @@ import type { FileDiffResult, FileResult } from '@/queries/workbench';
 
 import type { TreeSource } from '../params';
 
-// 内容区公共组件（code / diff 面板共用）：单文件模式（CodeMirror，worktree 源可确认式轻编辑）
-// 与 diff 模式（side-by-side 双栏 hunks）可切换。code 面板由此获得 diff 展示，
-// diff 面板在右侧源为 worktree 时获得编辑能力。
+// 内容区公共组件（code / diff 面板共用）：预览 / 源码 / diff 三模式可切换。
+// 源码 = CodeMirror（worktree 源可确认式轻编辑），diff = side-by-side 双栏 hunks，
+// 预览 = 按扩展名的富预览（md 渲染 / html iframe / 图片），无对应预览格式的文件
+// 等同源码模式（含编辑能力）。
+//
+// 标题栏只放模式按钮组（元素不随模式增减，切换时布局稳定）；
+// 源码模式的编辑开关/保存浮动在代码区右上角，diff 恒显示行号。
 //
 // 编辑态建模：editState 带「源+文件」键，源/文件变化后旧 editState 自动失效
 // （guardSwitch 已阻断带未保存改动的切换，此处只兜底直接改 URL 的场景），
 // 不用 effect 重置（React Compiler 禁止 effect 内同步 setState）。
 
-export type ContentMode = 'file' | 'diff';
+export type ContentMode = 'preview' | 'source' | 'diff';
 
-// diff 视图行号开关持久化键（默认开：长行自动换行后靠行号区分行边界）
-const DIFF_LINENO_KEY = 'cube.workbench.diff.linenumbers';
+// 预览格式按扩展名判定；null = 无富预览，等同源码模式
+type PreviewKind = 'md' | 'html' | 'image' | null;
+function previewKindOf(file: string): PreviewKind {
+  const dot = file.lastIndexOf('.');
+  if (dot < 0) return null;
+  const ext = file.slice(dot).toLowerCase();
+  if (ext === '.md' || ext === '.markdown') return 'md';
+  if (ext === '.html' || ext === '.htm') return 'html';
+  if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg'].includes(ext)) return 'image';
+  return null;
+}
+
+// md 预览主题持久化键（与 /md 页的主题偏好各自独立，浏览场景不同）
+const MD_THEME_KEY = 'cube.workbench.content.mdtheme';
 
 type EditState = { key: string; draft: string };
 
@@ -135,6 +159,7 @@ export function FileContentArea({
   editing,
   contentQuery,
   fileDiffQuery,
+  rawFileUrl,
   headerLeading,
 }: {
   mode: ContentMode;
@@ -145,39 +170,45 @@ export function FileContentArea({
   editing: EditingController;
   contentQuery: UseQueryResult<FileResult>;
   fileDiffQuery: UseQueryResult<FileDiffResult>;
+  rawFileUrl: string; // /api/workbench/file/raw 地址（图片预览；面板从 path/src/file 组装）
   headerLeading: ReactNode; // 面板专属徽标（源徽标/文件名等）
 }) {
   const fileContent = contentQuery.data?.content ?? '';
   const { editing: isEditing, draft, dirty } = editing;
-  const [showLineNumbers, setShowLineNumbers] = useState(() => localStorage.getItem(DIFF_LINENO_KEY) !== '0');
-  const toggleLineNumbers = (on: boolean) => {
-    setShowLineNumbers(on);
-    localStorage.setItem(DIFF_LINENO_KEY, on ? '1' : '0');
+  const [mdTheme, setMdTheme] = useState<MdThemeId>(() => loadMdTheme(MD_THEME_KEY));
+  const switchMdTheme = (t: MdThemeId) => {
+    setMdTheme(t);
+    localStorage.setItem(MD_THEME_KEY, t);
   };
+
+  const previewKind = mode === 'preview' ? previewKindOf(file) : null;
+  // 实际渲染源码编辑器的形态：源码模式 + 预览模式的无富预览回落（编辑能力随之保留）
+  const isSourceView = mode === 'source' || (mode === 'preview' && previewKind === null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-1.5 text-xs">
         {headerLeading}
-        {mode === 'file' && fileMissing ? (
+        {mode !== 'diff' && fileMissing ? (
           <Badge variant="outline" className="shrink-0 text-amber-600 dark:text-amber-400">
             原文件不存在，已回退
           </Badge>
         ) : null}
-        {mode === 'file' && contentQuery.data?.deleted ? (
+        {mode !== 'diff' && contentQuery.data?.deleted ? (
           <Badge variant="outline" className="shrink-0 text-red-600 dark:text-red-400">
             已删除
           </Badge>
         ) : null}
-        {mode === 'file' && contentQuery.data?.binary ? (
+        {mode !== 'diff' && contentQuery.data?.binary ? (
           <Badge variant="outline">二进制 {contentQuery.data.size}B</Badge>
         ) : null}
-        {mode === 'file' && dirty ? <Badge variant="destructive">未保存</Badge> : null}
+        {isSourceView && dirty ? <Badge variant="destructive">未保存</Badge> : null}
         <div className="ml-auto flex items-center gap-1.5">
           <div className="flex overflow-hidden rounded-md border border-border text-[10px]">
             {(
               [
-                ['file', '单文件'],
+                ['preview', '预览'],
+                ['source', '源码'],
                 ['diff', 'diff'],
               ] as const
             ).map(([m, label]) => (
@@ -189,81 +220,100 @@ export function FileContentArea({
                   mode === m ? 'bg-primary/15 font-medium text-primary' : 'text-muted-foreground hover:bg-accent',
                 )}
                 onClick={() => editing.guardSwitch(() => onMode(m))}
-                title={m === 'file' ? '单文件内容（worktree 源可编辑）' : '与基准/另一源的行级对比'}
+                title={
+                  m === 'preview'
+                    ? '富预览（md 渲染 / html 页面 / 图片；其余格式等同源码）'
+                    : m === 'source'
+                      ? '源码内容（worktree 源可编辑）'
+                      : '与基准/另一源的行级对比'
+                }
               >
                 {label}
               </button>
             ))}
           </div>
-          {mode === 'diff' ? (
-            <div
-              className="flex overflow-hidden rounded-md border border-border text-[10px]"
-              title="diff 视图行号显示（长行自动换行后靠行号区分行边界）"
-            >
-              {(
-                [
-                  [true, '开'],
-                  [false, '关'],
-                ] as const
-              ).map(([v, label]) => (
-                <button
-                  key={label}
-                  type="button"
-                  className={cn(
-                    'px-1.5 py-0.5 transition-colors',
-                    showLineNumbers === v
-                      ? 'bg-primary/15 font-medium text-primary'
-                      : 'text-muted-foreground hover:bg-accent',
-                  )}
-                  onClick={() => toggleLineNumbers(v)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          ) : null}
-          {mode === 'file' && canEdit ? (
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground" title="预览 / 编辑切换">
-              <span className={cn(!isEditing && 'font-medium text-foreground')}>预览</span>
-              <Switch
-                checked={isEditing}
-                disabled={!file || !!contentQuery.data?.binary || !!contentQuery.data?.deleted}
-                aria-label="切换预览/编辑"
-                onCheckedChange={(checked) => editing.requestEdit(checked)}
-              />
-              <span className={cn(isEditing && 'font-medium text-foreground')}>编辑</span>
-            </div>
-          ) : null}
-          {mode === 'file' && isEditing ? (
-            <Button size="sm" disabled={!dirty || editing.saving} onClick={() => editing.setConfirmSave(true)}>
-              保存
-            </Button>
-          ) : null}
         </div>
       </div>
-      {contentQuery.isError && mode === 'file' ? <ErrorBanner message={contentQuery.error.message} /> : null}
+      {contentQuery.isError && mode !== 'diff' ? <ErrorBanner message={contentQuery.error.message} /> : null}
       {editing.saveError ? <ErrorBanner message={editing.saveError} /> : null}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {mode === 'file' ? (
-          fileMissing && !file ? (
+        {mode === 'diff' ? (
+          !file ? (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              当前文件在所选目标中不存在
+              在左侧选择一个变更文件查看双栏对比
             </div>
-          ) : !file ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              在左侧选择一个文件
-            </div>
-          ) : contentQuery.isPending ? (
-            <div className="p-3 text-xs text-muted-foreground">读取中…</div>
-          ) : contentQuery.data?.deleted ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              该文件已从工作区删除（diff 模式可查看删除前的内容）
-            </div>
-          ) : contentQuery.data?.binary ? (
-            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-              二进制文件不支持预览（{contentQuery.data.size} 字节）
-            </div>
+          ) : fileDiffQuery.isPending ? (
+            <div className="p-3 text-xs text-muted-foreground">计算 diff…</div>
+          ) : fileDiffQuery.isError ? (
+            <ErrorBanner message={fileDiffQuery.error.message} />
+          ) : fileDiffQuery.data?.binary ? (
+            <div className="flex h-full items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
           ) : (
+            <SideBySideHunks hunks={fileDiffQuery.data?.hunks ?? []} />
+          )
+        ) : !file ? (
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            在左侧选择一个文件
+          </div>
+        ) : contentQuery.isPending ? (
+          <div className="p-3 text-xs text-muted-foreground">读取中…</div>
+        ) : contentQuery.data?.deleted ? (
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            该文件已从工作区删除（diff 模式可查看删除前的内容）
+          </div>
+        ) : previewKind === 'image' ? (
+          // 图片预览：直连 raw 端点取原始字节（文本 API 对二进制只给标记不给内容）
+          <div className="flex h-full items-center justify-center overflow-auto bg-muted/30 p-4">
+            <img src={rawFileUrl} alt={file} className="max-h-full max-w-full object-contain" />
+          </div>
+        ) : previewKind === 'html' ? (
+          // sandbox 只放开脚本：允许 AI 生成页交互，不带 allow-same-origin 防读本地文件/cookie
+          <iframe title={file} srcDoc={fileContent} sandbox="allow-scripts" className="h-full w-full border-0" />
+        ) : previewKind === 'md' ? (
+          <div className="relative h-full overflow-auto p-4">
+            <div className="absolute top-2 right-2 z-10">
+              <DropdownMenu>
+                <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="h-6 px-2 text-xs" />}>
+                  主题：{mdThemes.find((t) => t.id === mdTheme)?.label ?? mdTheme}
+                  <ChevronDown className="size-3" />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {mdThemes.map((t) => (
+                    <DropdownMenuItem key={t.id} onClick={() => switchMdTheme(t.id)}>
+                      {t.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+            <MarkdownView content={fileContent} className={mdThemeCls(mdTheme)} />
+          </div>
+        ) : contentQuery.data?.binary ? (
+          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
+            二进制文件不支持预览（{contentQuery.data.size} 字节）
+          </div>
+        ) : (
+          // 编辑开关/保存浮动在代码区右上角（不占标题栏，标题栏元素随模式稳定）
+          <div className="relative h-full">
+            {canEdit ? (
+              <div className="absolute top-2 right-3 z-10 flex items-center gap-2 rounded-md border border-border bg-background/80 px-2 py-1 text-xs backdrop-blur-sm">
+                <span className="text-muted-foreground" title="预览 / 编辑切换">
+                  <span className={cn(!isEditing && 'font-medium text-foreground')}>预览</span>
+                  <Switch
+                    checked={isEditing}
+                    disabled={!file || !!contentQuery.data?.binary || !!contentQuery.data?.deleted}
+                    aria-label="切换预览/编辑"
+                    onCheckedChange={(checked) => editing.requestEdit(checked)}
+                  />
+                  <span className={cn(isEditing && 'font-medium text-foreground')}>编辑</span>
+                </span>
+                {isEditing ? (
+                  <Button size="sm" className="h-6 px-2 text-xs" disabled={!dirty || editing.saving} onClick={() => editing.setConfirmSave(true)}>
+                    保存
+                  </Button>
+                ) : null}
+              </div>
+            ) : null}
             <CodeEditor
               key={file}
               value={isEditing ? draft : fileContent}
@@ -275,19 +325,7 @@ export function FileContentArea({
               }}
               className="h-full"
             />
-          )
-        ) : !file ? (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            在左侧选择一个变更文件查看双栏对比
           </div>
-        ) : fileDiffQuery.isPending ? (
-          <div className="p-3 text-xs text-muted-foreground">计算 diff…</div>
-        ) : fileDiffQuery.isError ? (
-          <ErrorBanner message={fileDiffQuery.error.message} />
-        ) : fileDiffQuery.data?.binary ? (
-          <div className="flex h-full items-center justify-center text-xs text-muted-foreground">二进制文件差异</div>
-        ) : (
-          <SideBySideHunks hunks={fileDiffQuery.data?.hunks ?? []} showLineNumbers={showLineNumbers} />
         )}
       </div>
       {editing.dialogs}
@@ -295,14 +333,9 @@ export function FileContentArea({
   );
 }
 
-// side-by-side 双栏渲染：del 进左栏、add 进右栏、ctx 两侧同步；连续 del/add 块按行配对
-function SideBySideHunks({
-  hunks,
-  showLineNumbers,
-}: {
-  hunks: components['schemas']['Hunk'][];
-  showLineNumbers: boolean;
-}) {
+// side-by-side 双栏渲染：del 进左栏、add 进右栏、ctx 两侧同步；连续 del/add 块按行配对。
+// 恒显示行号（长行自动换行后靠行号区分行边界）
+function SideBySideHunks({ hunks }: { hunks: components['schemas']['Hunk'][] }) {
   if (hunks.length === 0) {
     return <div className="flex flex-1 items-center justify-center text-xs text-muted-foreground">两侧内容一致</div>;
   }
@@ -313,14 +346,14 @@ function SideBySideHunks({
           <div className="bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
             @@ -{h.oldStart},{h.oldCount} +{h.newStart},{h.newCount} @@
           </div>
-          <HunkRows hunk={h} showLineNumbers={showLineNumbers} />
+          <HunkRows hunk={h} />
         </div>
       ))}
     </div>
   );
 }
 
-function HunkRows({ hunk, showLineNumbers }: { hunk: components['schemas']['Hunk']; showLineNumbers: boolean }) {
+function HunkRows({ hunk }: { hunk: components['schemas']['Hunk'] }) {
   // 连续 del 块与 add 块逐行配对（左删右增同行对照）为 mod 行，剩余各自单侧展示；
   // 同时按 hunk 起始行推算每行的 old/new 行号（del 只占 old、add 只占 new）
   type Row = { left?: string; right?: string; kind: 'del' | 'add' | 'mod' | 'ctx'; oldNo?: number; newNo?: number };
@@ -369,7 +402,7 @@ function HunkRows({ hunk, showLineNumbers }: { hunk: components['schemas']['Hunk
           const gutterCls = 'w-10 select-none text-right align-top text-[10px] leading-5 text-muted-foreground/60';
           return (
             <tr key={i}>
-              {showLineNumbers ? <td className={gutterCls}>{r.oldNo ?? ''}</td> : null}
+              <td className={gutterCls}>{r.oldNo ?? ''}</td>
               <td
                 className={cn(
                   'whitespace-pre-wrap break-all border-r border-border px-2 align-top',
@@ -378,7 +411,7 @@ function HunkRows({ hunk, showLineNumbers }: { hunk: components['schemas']['Hunk
               >
                 {inline ? <InlineSegments segs={inline.left} tone="del" /> : (r.left ?? '')}
               </td>
-              {showLineNumbers ? <td className={gutterCls}>{r.newNo ?? ''}</td> : null}
+              <td className={gutterCls}>{r.newNo ?? ''}</td>
               <td
                 className={cn(
                   'whitespace-pre-wrap break-all px-2 align-top',

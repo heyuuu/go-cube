@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
@@ -286,6 +288,58 @@ func TestWorkbenchTreeAndFile(t *testing.T) {
 	// 路径逃逸被拒
 	if r := getJSON(t, env.url("/api/workbench/file?path="+repo+"&source="+urlQueryEscape("worktree://"+repo)+"&file=../../etc/hosts")); r.Ok {
 		t.Error("路径逃逸应报错")
+	}
+}
+
+func TestWorkbenchFileRaw(t *testing.T) {
+	env := newTestEnv(t)
+	repo := env.ws.Join("g1/proj1")
+	png := []byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x01}
+	env.ws.WriteFile("g1/proj1/a.txt", []byte("hello"))
+	env.ws.WriteFile("g1/proj1/pic.png", png)
+	_ = exec.Command("git", "-C", repo, "add", "-A").Run()
+	if err := git.Commit(repo, "raw test"); err != nil {
+		t.Fatalf("提交失败: %v", err)
+	}
+
+	// worktree 源返回原始字节与按扩展名的 Content-Type（不走 envelope）
+	url := env.url("/api/workbench/file/raw?path=" + repo + "&source=" + urlQueryEscape("worktree://"+repo) + "&file=pic.png")
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET raw 失败: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("raw 应为 200, got %d", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "image/png" {
+		t.Errorf("Content-Type 应为 image/png, got %q", ct)
+	}
+	got, _ := io.ReadAll(resp.Body)
+	if !bytes.Equal(got, png) {
+		t.Errorf("原始字节不符: %v", got)
+	}
+
+	// commit 源同样可读
+	head := gitHead(t, repo)
+	url = env.url("/api/workbench/file/raw?path=" + repo + "&source=commit://" + head + "&file=a.txt")
+	resp2, err := http.Get(url)
+	if err != nil {
+		t.Fatalf("GET raw(commit) 失败: %v", err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != http.StatusOK || resp2.Header.Get("Content-Type") != "text/plain; charset=utf-8" {
+		t.Errorf("commit raw 应为 200 + text/plain, got %d %q", resp2.StatusCode, resp2.Header.Get("Content-Type"))
+	}
+
+	// 路径逃逸被拒
+	resp3, err := http.Get(env.url("/api/workbench/file/raw?path=" + repo + "&source=" + urlQueryEscape("worktree://"+repo) + "&file=../../etc/hosts"))
+	if err != nil {
+		t.Fatalf("GET raw 失败: %v", err)
+	}
+	defer resp3.Body.Close()
+	if resp3.StatusCode != http.StatusBadRequest {
+		t.Errorf("路径逃逸应 400, got %d", resp3.StatusCode)
 	}
 }
 

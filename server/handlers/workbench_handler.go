@@ -3,8 +3,11 @@ package handlers
 import (
 	"errors"
 	"log/slog"
+	"mime"
 	"net/http"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/coder/websocket"
 
@@ -49,6 +52,9 @@ func (h *WorkbenchHandler) Register(api huma.API, mux *http.ServeMux) {
 
 	// 注册 WebSocket 路由（upgrade 不走 huma）
 	mux.HandleFunc("GET /api/workbench/pty", h.ptyWs)
+	// raw 文件读取：响应是原始字节 + 按扩展名的 Content-Type（图片预览用），
+	// 不套 ApiOutput envelope，故同 pty 一样直挂 mux 不走 huma
+	mux.HandleFunc("GET /api/workbench/file/raw", h.fileRaw)
 }
 
 func (h *WorkbenchHandler) info(input struct {
@@ -262,6 +268,29 @@ func (h *WorkbenchHandler) branchDelete(input struct {
 		return nil, err
 	}
 	return map[string]any{"ok": true}, nil
+}
+
+// fileRaw 直挂 mux 的原始字节读取：Content-Type 按扩展名推导（mime 包），
+// 未知扩展名兜底 application/octet-stream（浏览器按下载处理，不至于误渲染）。
+func (h *WorkbenchHandler) fileRaw(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	src, err := workbench.ParseTreeSource(q.Get("source"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	data, err := h.workbenchService.ReadFileRaw(q.Get("path"), src, q.Get("file"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	ctype := mime.TypeByExtension(strings.ToLower(filepath.Ext(q.Get("file"))))
+	if ctype == "" {
+		ctype = "application/octet-stream"
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Cache-Control", "no-store") // 内容随源切换实时变，不做缓存
+	_, _ = w.Write(data)
 }
 
 func (h *WorkbenchHandler) ptyWs(w http.ResponseWriter, r *http.Request) {

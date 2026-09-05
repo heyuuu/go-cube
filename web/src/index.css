@@ -135,7 +135,11 @@
   }
 }
 
-/* md 渲染主题：通过覆盖 typography 的 --tw-prose-* 变量实现（GitHub 配色取自 Primer 设计系统） */
+/* md 渲染主题：通过覆盖 typography 的 --tw-prose-* 变量实现；每个主题一套
+   亮色变量 + `.dark` 下的一套暗色变量，跟随整站亮暗切换（调色板取自各家官方规范：
+   Primer / Solarized / Gruvbox / Nord） */
+
+/* GitHub（Primer 配色） */
 .md-theme-github {
   --tw-prose-body: #1f2328;
   --tw-prose-headings: #1f2328;
@@ -154,26 +158,7 @@
   --tw-prose-captions: #59636e;
 }
 
-/* GitHub 特有形态：链接不常驻下划线（hover 才有）、行内代码胶囊底、代码块圆角描边、表头灰底 */
-.md-theme-github :where(a):not(:hover) {
-  text-decoration: none;
-}
-.md-theme-github :where(code):not(:where(pre code)) {
-  border-radius: 6px;
-  padding: 0.15em 0.4em;
-  background-color: rgba(175, 184, 193, 0.25);
-  font-weight: 500;
-}
-.md-theme-github :where(pre) {
-  border: 1px solid #d1d9e0;
-  border-radius: 6px;
-}
-.md-theme-github :where(th) {
-  background-color: #f6f8fa;
-}
-
-/* GitHub Dark（Primer dark 调色板） */
-.md-theme-github-dark {
+.dark .md-theme-github {
   --tw-prose-body: #e6edf3;
   --tw-prose-headings: #e6edf3;
   --tw-prose-bold: #e6edf3;
@@ -190,103 +175,36 @@
   --tw-prose-td-borders: #3d444d;
   --tw-prose-captions: #8c959f;
 }
-.md-theme-github-dark :where(a):not(:hover) {
+
+/* GitHub 特有形态：链接不常驻下划线（hover 才有）、行内代码胶囊底、代码块圆角描边、表头灰底 */
+.md-theme-github :where(a):not(:hover) {
   text-decoration: none;
 }
-.md-theme-github-dark :where(code):not(:where(pre code)) {
+.md-theme-github :where(code):not(:where(pre code)) {
   border-radius: 6px;
   padding: 0.15em 0.4em;
-  background-color: rgba(110, 118, 129, 0.4);
+  background-color: rgba(175, 184, 193, 0.25);
   font-weight: 500;
 }
-.md-theme-github-dark :where(pre) {
-  border: 1px solid #3d444d;
+.dark .md-theme-github :where(code):not(:where(pre code)) {
+  background-color: rgba(110, 118, 129, 0.4);
+}
+.md-theme-github :where(pre) {
+  border: 1px solid #d1d9e0;
   border-radius: 6px;
 }
-.md-theme-github-dark :where(th) {
+.dark .md-theme-github :where(pre) {
+  border-color: #3d444d;
+}
+.md-theme-github :where(th) {
+  background-color: #f6f8fa;
+}
+.dark .md-theme-github :where(th) {
   background-color: #151b23;
 }
 
-/* One Dark（Atom 官方调色板） */
-.md-theme-one-dark {
-  --tw-prose-body: #abb2bf;
-  --tw-prose-headings: #dcdfe4;
-  --tw-prose-bold: #e5e5e5;
-  --tw-prose-counters: #abb2bf;
-  --tw-prose-bullets: #61afef;
-  --tw-prose-links: #61afef;
-  --tw-prose-quotes: #7f848e;
-  --tw-prose-quote-borders: #3e4451;
-  --tw-prose-hr: #3e4451;
-  --tw-prose-code: #d19a66;
-  --tw-prose-pre-code: #abb2bf;
-  --tw-prose-pre-bg: #282c34;
-  --tw-prose-th-borders: #3e4451;
-  --tw-prose-td-borders: #3e4451;
-  --tw-prose-captions: #7f848e;
-}
-.md-theme-one-dark :where(pre) {
-  border: 1px solid #3e4451;
-  border-radius: 8px;
-}
-.md-theme-one-dark :where(th) {
-  background-color: #2c313a;
-}
-
-/* Dracula（官方调色板） */
-.md-theme-dracula {
-  --tw-prose-body: #f8f8f2;
-  --tw-prose-headings: #f8f8f2;
-  --tw-prose-bold: #bd93f9;
-  --tw-prose-counters: #bd93f9;
-  --tw-prose-bullets: #ff79c6;
-  --tw-prose-links: #8be9fd;
-  --tw-prose-quotes: #bd93f9;
-  --tw-prose-quote-borders: #44475a;
-  --tw-prose-hr: #44475a;
-  --tw-prose-code: #ff79c6;
-  --tw-prose-pre-code: #f8f8f2;
-  --tw-prose-pre-bg: #21222c;
-  --tw-prose-th-borders: #44475a;
-  --tw-prose-td-borders: #44475a;
-  --tw-prose-captions: #6272a4;
-}
-.md-theme-dracula :where(pre) {
-  border: 1px solid #44475a;
-  border-radius: 8px;
-}
-.md-theme-dracula :where(th) {
-  background-color: #343746;
-}
-
-/* Nord（官方 Polar Night / Frost / Aurora 调色板） */
-.md-theme-nord {
-  --tw-prose-body: #d8dee9;
-  --tw-prose-headings: #eceff4;
-  --tw-prose-bold: #eceff4;
-  --tw-prose-counters: #d8dee9;
-  --tw-prose-bullets: #81a1c1;
-  --tw-prose-links: #88c0d0;
-  --tw-prose-quotes: #a3be8c;
-  --tw-prose-quote-borders: #434c5e;
-  --tw-prose-hr: #434c5e;
-  --tw-prose-code: #ebcb8b;
-  --tw-prose-pre-code: #d8dee9;
-  --tw-prose-pre-bg: #2e3440;
-  --tw-prose-th-borders: #434c5e;
-  --tw-prose-td-borders: #434c5e;
-  --tw-prose-captions: #7b88a1;
-}
-.md-theme-nord :where(pre) {
-  border: 1px solid #434c5e;
-  border-radius: 8px;
-}
-.md-theme-nord :where(th) {
-  background-color: #3b4252;
-}
-
-/* Solarized Light（官方 Ethan Schoonover 调色板） */
-.md-theme-solarized-light {
+/* Solarized（Ethan Schoonover 调色板：Light / Dark） */
+.md-theme-solarized {
   --tw-prose-body: #657b83;
   --tw-prose-headings: #586e75;
   --tw-prose-bold: #073642;
@@ -303,16 +221,41 @@
   --tw-prose-td-borders: #eee8d5;
   --tw-prose-captions: #93a1a1;
 }
-.md-theme-solarized-light :where(pre) {
+
+.dark .md-theme-solarized {
+  --tw-prose-body: #839496;
+  --tw-prose-headings: #93a1a1;
+  --tw-prose-bold: #eee8d5;
+  --tw-prose-counters: #93a1a1;
+  --tw-prose-bullets: #2aa198;
+  --tw-prose-links: #268bd2;
+  --tw-prose-quotes: #657b83;
+  --tw-prose-quote-borders: #586e75;
+  --tw-prose-hr: #586e75;
+  --tw-prose-code: #b58900;
+  --tw-prose-pre-code: #839496;
+  --tw-prose-pre-bg: #073642;
+  --tw-prose-th-borders: #586e75;
+  --tw-prose-td-borders: #586e75;
+  --tw-prose-captions: #586e75;
+}
+
+.md-theme-solarized :where(pre) {
   border: 1px solid #eee8d5;
   border-radius: 8px;
 }
-.md-theme-solarized-light :where(th) {
+.dark .md-theme-solarized :where(pre) {
+  border-color: #586e75;
+}
+.md-theme-solarized :where(th) {
   background-color: #eee8d5;
 }
+.dark .md-theme-solarized :where(th) {
+  background-color: #073642;
+}
 
-/* Gruvbox Light（官方调色板） */
-.md-theme-gruvbox-light {
+/* Gruvbox（官方 Light / Dark 调色板） */
+.md-theme-gruvbox {
   --tw-prose-body: #3c3836;
   --tw-prose-headings: #282828;
   --tw-prose-bold: #282828;
@@ -329,16 +272,41 @@
   --tw-prose-td-borders: #d5c4a1;
   --tw-prose-captions: #7c6f64;
 }
-.md-theme-gruvbox-light :where(pre) {
+
+.dark .md-theme-gruvbox {
+  --tw-prose-body: #ebdbb2;
+  --tw-prose-headings: #fbf1c7;
+  --tw-prose-bold: #fbf1c7;
+  --tw-prose-counters: #ebdbb2;
+  --tw-prose-bullets: #d79921;
+  --tw-prose-links: #83a598;
+  --tw-prose-quotes: #a89984;
+  --tw-prose-quote-borders: #504945;
+  --tw-prose-hr: #504945;
+  --tw-prose-code: #fb4934;
+  --tw-prose-pre-code: #ebdbb2;
+  --tw-prose-pre-bg: #32302f;
+  --tw-prose-th-borders: #504945;
+  --tw-prose-td-borders: #504945;
+  --tw-prose-captions: #a89984;
+}
+
+.md-theme-gruvbox :where(pre) {
   border: 1px solid #d5c4a1;
   border-radius: 8px;
 }
-.md-theme-gruvbox-light :where(th) {
+.dark .md-theme-gruvbox :where(pre) {
+  border-color: #504945;
+}
+.md-theme-gruvbox :where(th) {
   background-color: #ebdbb2;
 }
+.dark .md-theme-gruvbox :where(th) {
+  background-color: #3c3836;
+}
 
-/* Nord Light（Snow Storm 调色板） */
-.md-theme-nord-light {
+/* Nord（Snow Storm 亮色 / Polar Night 暗色） */
+.md-theme-nord {
   --tw-prose-body: #2e3440;
   --tw-prose-headings: #2e3440;
   --tw-prose-bold: #2e3440;
@@ -355,12 +323,37 @@
   --tw-prose-td-borders: #d8dee9;
   --tw-prose-captions: #4c566a;
 }
-.md-theme-nord-light :where(pre) {
+
+.dark .md-theme-nord {
+  --tw-prose-body: #d8dee9;
+  --tw-prose-headings: #eceff4;
+  --tw-prose-bold: #eceff4;
+  --tw-prose-counters: #d8dee9;
+  --tw-prose-bullets: #81a1c1;
+  --tw-prose-links: #88c0d0;
+  --tw-prose-quotes: #a3be8c;
+  --tw-prose-quote-borders: #434c5e;
+  --tw-prose-hr: #434c5e;
+  --tw-prose-code: #ebcb8b;
+  --tw-prose-pre-code: #d8dee9;
+  --tw-prose-pre-bg: #2e3440;
+  --tw-prose-th-borders: #434c5e;
+  --tw-prose-td-borders: #434c5e;
+  --tw-prose-captions: #7b88a1;
+}
+
+.md-theme-nord :where(pre) {
   border: 1px solid #d8dee9;
   border-radius: 8px;
 }
-.md-theme-nord-light :where(th) {
+.dark .md-theme-nord :where(pre) {
+  border-color: #434c5e;
+}
+.md-theme-nord :where(th) {
   background-color: #e5e9f0;
+}
+.dark .md-theme-nord :where(th) {
+  background-color: #3b4252;
 }
 
 /* 定位闪烁（git 树分支定位 / 文件树定位共用）：三次渐强脉冲再消退。

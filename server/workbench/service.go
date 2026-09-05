@@ -365,6 +365,15 @@ func (s *Service) ReadFile(path string, src TreeSource, file string) (*FileResul
 	return readFile(root, src, file)
 }
 
+// ReadFileRaw 读某 TreeSource 下 file 的原始字节（图片等二进制预览）。实现在 file.go。
+func (s *Service) ReadFileRaw(path string, src TreeSource, file string) ([]byte, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	return readFileRaw(root, src, file)
+}
+
 // SaveFile 写工作副本文件（提案 1012 唯一落盘写路径）。实现在 file.go。
 func (s *Service) SaveFile(path string, src TreeSource, file string, content string) (*FileResult, error) {
 	return saveFile(path, src, file, content)

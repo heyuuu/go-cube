@@ -1,12 +1,17 @@
 import { ChevronDown, ChevronRight, ArrowLeft, Ellipsis, Folder, FileText } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
-import Markdown from 'react-markdown';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
-import remarkFrontmatter from 'remark-frontmatter';
-import remarkGfm from 'remark-gfm';
 
 import type { Opener } from '@/api/client';
 import { ErrorBanner } from '@/components/error-banner';
+// front-matter 渲染管线与工作台内容面板预览共用（components/markdown-render）
+import {
+  loadMdTheme as loadThemeFrom,
+  mdThemeCls,
+  mdThemes,
+  MarkdownView,
+  type MdThemeId,
+} from '@/components/markdown-render';
 import { TreeToolbar } from '@/components/tree-toolbar';
 import { Button } from '@/components/ui/button';
 import {
@@ -16,7 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { parseFrontmatter, type FrontMatterEntry } from '@/lib/frontmatter';
 import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
@@ -27,29 +31,10 @@ import { useOpenerList, useOpenerOpen } from '@/queries/project';
 // path 为目录时进双栏模式：左侧 md 文件树（无 md 的目录不出现），点文件显示内容、
 // 点目录显示其 README.md（若有）；默认打开 = 点击根目录。path 为文件时单栏无侧栏。
 
-// md 渲染主题：prose 默认 / GitHub（Primer 配色）。新主题 = index.css 加一组
-// --tw-prose-* 变量 + 此处加一个条目，切换 UI 自动带上。
+// md 渲染主题与渲染管线均与工作台内容面板预览共用（components/markdown-render）；
+// 主题持久化键面板与 md 页各自独立（浏览场景不同，不强制同步偏好）。
+// 主题自带亮/暗两套配色，跟随整站亮暗切换（App 根的 useTheme 管 html.dark）。
 const MD_THEME_KEY = 'md.theme';
-// 调色板取自各家官方规范（Primer / Atom / Dracula / Nord）；
-// dark 主题会给页面壳挂 dark 类，整站 token 自动翻色（侧栏/正文背景一起暗）
-const mdThemes = [
-  { id: 'default', label: '默认', dark: false },
-  { id: 'github', label: 'GitHub', dark: false },
-  { id: 'solarized-light', label: 'Solarized Light', dark: false },
-  { id: 'gruvbox-light', label: 'Gruvbox Light', dark: false },
-  { id: 'nord-light', label: 'Nord Light', dark: false },
-  { id: 'default-dark', label: '暗色', dark: true },
-  { id: 'github-dark', label: 'GitHub Dark', dark: true },
-  { id: 'one-dark', label: 'One Dark', dark: true },
-  { id: 'dracula', label: 'Dracula', dark: true },
-  { id: 'nord', label: 'Nord', dark: true },
-] as const;
-type MdThemeId = (typeof mdThemes)[number]['id'];
-
-function loadMdTheme(): MdThemeId {
-  const v = localStorage.getItem(MD_THEME_KEY);
-  return mdThemes.some((t) => t.id === v) ? (v as MdThemeId) : 'default';
-}
 
 // 正文视图模式：渲染 / 源码 / 分栏（左渲染右源码对照）。持久化同主题。
 const MD_VIEW_KEY = 'md.viewMode';
@@ -217,21 +202,6 @@ function MdTreeRow({
   );
 }
 
-// front-matter 元信息区：文档头 --- 块解析出的扁平字段（title/date/tags 等）以键值
-// 展示在正文前；源码视图保持原文（front-matter 本就是源码的一部分）
-function FrontMatterBlock({ entries }: { entries: FrontMatterEntry[] }) {
-  return (
-    <div className="mb-6 rounded-lg border bg-muted/30 px-4 py-2 font-mono text-xs">
-      {entries.map((e) => (
-        <div key={e.key} className="flex gap-3 py-1">
-          <span className="w-24 shrink-0 text-muted-foreground">{e.key}</span>
-          <span className="min-w-0 break-words whitespace-pre-line">{e.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function MdContent({
   file,
   theme,
@@ -249,7 +219,7 @@ function MdContent({
 }) {
   const themeLabel = mdThemes.find((t) => t.id === theme)?.label ?? theme;
   const q = useMdContent(file ?? '');
-  const fm = q.data ? parseFrontmatter(q.data.content) : [];
+  const themeCls = mdThemeCls(theme);
 
   // 分栏滚动同步：两边按滚动比例互相跟随（渲染段落与源码行无一一对应，
   // 只能做到近似对照——这是 diff 工具对非等高内容的通行做法）
@@ -306,47 +276,28 @@ function MdContent({
             <ChevronDown className="size-3" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            {mdThemes
-              .filter((t) => !t.dark)
-              .map((t) => (
-                <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
-                  {t.label}
-                </DropdownMenuItem>
-              ))}
-            <DropdownMenuSeparator />
-            {mdThemes
-              .filter((t) => t.dark)
-              .map((t) => (
-                <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
-                  {t.label}
-                </DropdownMenuItem>
-              ))}
+            {mdThemes.map((t) => (
+              <DropdownMenuItem key={t.id} onClick={() => onThemeChange(t.id)}>
+                {t.label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </header>
       {q.isPending && <div className="text-xs text-muted-foreground">加载中…</div>}
       {q.error && <ErrorBanner message={`读取失败：${q.error.message}`} />}
-      {q.data && viewMode === 'render' && fm.length > 0 && <FrontMatterBlock entries={fm} />}
       {q.data && viewMode === 'render' && (
-        <article
-          className={cn(
-            'prose prose-sm mb-10 max-w-none',
-            theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
-          )}
-        >
-          <Markdown
-            remarkPlugins={[remarkGfm, remarkFrontmatter]}
-            components={{
-              a: ({ href, children }) => (
-                <MdLink href={href} base={file} onNavigate={onNavigate}>
-                  {children}
-                </MdLink>
-              ),
-            }}
-          >
-            {q.data.content}
-          </Markdown>
-        </article>
+        <MarkdownView
+          content={q.data.content}
+          className={cn('mb-10', themeCls)}
+          components={{
+            a: ({ href, children }) => (
+              <MdLink href={href} base={file} onNavigate={onNavigate}>
+                {children}
+              </MdLink>
+            ),
+          }}
+        />
       )}
       {q.data && viewMode === 'source' && (
         <pre className="mb-10 rounded-lg border bg-muted/30 p-4 font-mono text-xs break-words whitespace-pre-wrap">
@@ -360,26 +311,17 @@ function MdContent({
             onScroll={() => syncScroll('render')}
             className="max-h-[calc(100dvh-11rem)] overflow-y-auto pr-1"
           >
-            {fm.length > 0 && <FrontMatterBlock entries={fm} />}
-            <article
-              className={cn(
-                'prose prose-sm max-w-none',
-                theme === 'default' || theme === 'default-dark' ? 'dark:prose-invert' : `md-theme-${theme}`,
-              )}
-            >
-              <Markdown
-                remarkPlugins={[remarkGfm, remarkFrontmatter]}
-                components={{
-                  a: ({ href, children }) => (
-                    <MdLink href={href} base={file} onNavigate={onNavigate}>
-                      {children}
-                    </MdLink>
-                  ),
-                }}
-              >
-                {q.data.content}
-              </Markdown>
-            </article>
+            <MarkdownView
+              content={q.data.content}
+              className={themeCls}
+              components={{
+                a: ({ href, children }) => (
+                  <MdLink href={href} base={file} onNavigate={onNavigate}>
+                    {children}
+                  </MdLink>
+                ),
+              }}
+            />
           </div>
           <div
             ref={sourceRef}
@@ -418,7 +360,7 @@ export function MdPage() {
   // 缺省/失效时回落根 README（与「默认打开 = 点根目录」语义一致）
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sidebarW, setSidebarW] = useState(loadSidebarWidth);
-  const [theme, setTheme] = useState(loadMdTheme);
+  const [theme, setTheme] = useState<MdThemeId>(() => loadThemeFrom(MD_THEME_KEY));
   const [viewMode, setViewMode] = useState(loadMdView);
 
   function switchTheme(t: MdThemeId) {
@@ -564,8 +506,6 @@ export function MdPage() {
 
   const listError = list.error ? `读取路径失败：${list.error.message}` : '';
 
-  const themeDark = mdThemes.find((t) => t.id === theme)?.dark === true;
-
   const backButton = canBack ? (
     <Button variant="ghost" size="sm" className="h-6 shrink-0 px-2 text-xs" onClick={() => navigate(-1)}>
       <ArrowLeft className="size-3" />
@@ -574,7 +514,7 @@ export function MdPage() {
   ) : null;
 
   return (
-    <div className={cn('flex h-dvh bg-background text-foreground', themeDark && 'dark')}>
+    <div className="flex h-dvh bg-background text-foreground">
       {dirMode && (
         <>
           <aside className="shrink-0 overflow-y-auto border-r p-3" style={{ width: sidebarW - 4 }}>
