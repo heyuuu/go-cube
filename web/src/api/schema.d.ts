@@ -1525,6 +1525,7 @@ export interface components {
       currentBranch: string;
       defaultBranch: string;
       dirty: boolean;
+      remotes: components['schemas']['RemoteInfo'][] | null;
       repoUrl: string;
       workspaces: components['schemas']['Workspace'][] | null;
       worktrees: components['schemas']['WorktreeInfo'][] | null;
@@ -1933,6 +1934,10 @@ export interface components {
       name: string;
       url: string;
       webUrl: string;
+    };
+    RemoteInfo: {
+      name: string;
+      url: string;
     };
     RemoteRepo: {
       cloneUrl: string;

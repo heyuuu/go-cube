@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { matchForgeFilter, repoHostOf } from '@/lib/forge';
+import { matchForgeFilter, repoHostsOf } from '@/lib/forge';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { guessHome, prettyPath } from '@/lib/path';
@@ -244,13 +244,17 @@ function LastUsedTime({ iso }: { iso: string }) {
   );
 }
 
-// 项目 forge 图标：repo remote URL 的 host 匹配到已配置 forge 时展示其 icon（1040）；
-// 未配置 forge 或 forge 未配 icon 时不展示（无兜底图标）
-function ForgeIcon({ match }: { match: { host: string; icon: IconDecl } | undefined }) {
-  if (!match) return null;
+// 项目 forge 图标：remote host 匹配到已配置 forge 时展示其 icon（1040）；
+// 多 remote 项目可同时展示多个（1042 修）；未配置 forge 或 forge 未配 icon 时不展示（无兜底图标）
+function ForgeIcon({ matches }: { matches: { host: string; icon: IconDecl }[] }) {
+  if (matches.length === 0) return null;
   return (
-    <span className="flex shrink-0 items-center text-muted-foreground" title={`forge：${match.host}`}>
-      {renderIcon(match.icon, null)}
+    <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
+      {matches.map((m) => (
+        <span key={m.host} title={`forge：${m.host}`}>
+          {renderIcon(m.icon, null)}
+        </span>
+      ))}
     </span>
   );
 }
@@ -272,7 +276,7 @@ function TreeRowView({
   home: string;
   openerList: Opener[];
   open: ReturnType<typeof useProjectOpen>;
-  forgeOf: (p: Project) => { host: string; icon: IconDecl } | undefined;
+  forgeOf: (p: Project) => { host: string; icon: IconDecl }[];
   onOpen: (path: string, opener: string, dir?: string) => void;
   onToggle: (path: string) => void;
   onFilterGit: (s: GitStatus) => void;
@@ -321,7 +325,7 @@ function TreeRowView({
       )}
       {p && (
         <>
-          <ForgeIcon match={forgeOf(p)} />
+          <ForgeIcon matches={forgeOf(p)} />
           {(p.tags ?? []).map((t) => (
             <ClickBadge
               key={t}
@@ -437,11 +441,11 @@ export function ProjectsPage() {
       .filter((f) => f.icon?.value)
       .map((f) => [f.host, { type: f.icon!.type, value: f.icon!.value }]),
   );
-  const forgeOf = (p: Project) => {
-    const host = repoHostOf(p.gitInfo?.repoUrl);
-    const icon = host ? forgeIcons.get(host) : undefined;
-    return icon ? { host, icon } : undefined;
-  };
+  // 多 remote 项目可命中多个 forge——全部返回，逐个渲染 icon（1042 修）
+  const forgeOf = (p: Project) =>
+    repoHostsOf(p.gitInfo)
+      .map((host) => ({ host, icon: forgeIcons.get(host) }))
+      .filter((m): m is { host: string; icon: IconDecl } => Boolean(m.icon));
   const tags = [...new Set(projects.flatMap((p) => p.tags ?? []))].sort();
 
   const filtered = projects.filter((p) => {
@@ -454,7 +458,7 @@ export function ProjectsPage() {
     if (wsFilter && countWorkspaces(p) === 0) return false;
     if (
       !matchForgeFilter(
-        p.gitInfo?.repoUrl,
+        repoHostsOf(p.gitInfo),
         forgeFilter,
         forgeList.map((f) => f.host),
       )
@@ -852,7 +856,7 @@ export function ProjectsPage() {
                               >
                                 {p.name}
                               </button>
-                              <ForgeIcon match={forgeOf(p)} />
+                              <ForgeIcon matches={forgeOf(p)} />
                               {(p.tags ?? []).map((t) => (
                                 <ClickBadge
                                   key={t}

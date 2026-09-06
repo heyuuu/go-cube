@@ -3,6 +3,7 @@ package projcache
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -135,6 +136,31 @@ func TestCollectEntry_RealRepo(t *testing.T) {
 	}
 	if e.CurrentBranch != "main" {
 		t.Fatalf("CurrentBranch = %q，期望 main", e.CurrentBranch)
+	}
+}
+
+// TestCollectEntry_Remotes 全部 remote 进快照（多 remote 项目的 forge 匹配依赖此数据）。
+func TestCollectEntry_Remotes(t *testing.T) {
+	ws := testfixture.NewWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main", RemoteUrl: "git@github.com:heyuuu/repo.git"})
+	// 补一个非 origin remote（指向另一 host）
+	if out, err := exec.Command("git", "-C", repo, "remote", "add", "gitee", "git@gitee.com:heyuuu/repo.git").CombinedOutput(); err != nil {
+		t.Fatalf("添加 gitee remote 失败: %v %s", err, out)
+	}
+
+	e, err := collectEntry(repo)
+	if err != nil || e == nil {
+		t.Fatalf("collectEntry 失败: %v", err)
+	}
+	if e.RepoUrl != "git@github.com:heyuuu/repo.git" {
+		t.Fatalf("RepoUrl = %q（origin 口径不变）", e.RepoUrl)
+	}
+	hosts := make([]string, 0, len(e.Remotes))
+	for _, r := range e.Remotes {
+		hosts = append(hosts, r.Name+"="+r.Url)
+	}
+	if len(e.Remotes) != 2 || e.Remotes[0].Name != "gitee" || e.Remotes[1].Name != "origin" {
+		t.Fatalf("应含 gitee 与 origin 两条 remote（按名排序）: %v", hosts)
 	}
 }
 

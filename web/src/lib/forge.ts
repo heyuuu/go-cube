@@ -11,19 +11,38 @@ export function repoHostOf(raw: string | null | undefined): string {
   return m ? m[1].toLowerCase().replace(/\.$/, '') : '';
 }
 
-// forge 筛选谓词（单选，与页面 git 筛选同语义层级）：
+// 项目 git 快照中参与 forge 匹配的 remote 形态（ProjectDTO.gitInfo 的子结构）。
+interface GitRemoteLike {
+  name?: string;
+  url: string;
+}
+
+interface GitInfoLike {
+  repoUrl?: string | null;
+  remotes?: GitRemoteLike[] | null;
+}
+
+// 项目的全部 forge host（1042 修：多 remote 项目同时匹配多个 forge）——
+// repoUrl（origin）在前，其余 remotes 按序去重；无法解析的 URL 产生空串由调用方忽略。
+export function repoHostsOf(gitInfo: GitInfoLike | null | undefined): string[] {
+  if (!gitInfo) return [];
+  const urls = [gitInfo.repoUrl, ...(gitInfo.remotes ?? []).map((r) => r.url)];
+  const hosts: string[] = [];
+  for (const u of urls) {
+    const h = repoHostOf(u);
+    if (h && !hosts.includes(h)) hosts.push(h);
+  }
+  return hosts;
+}
+
+// forge 筛选谓词（单选，入参为项目全部 remote host，语义与单 remote 版一致）：
 //   - 'all'：全部；
-//   - 具体 forge host：只看「本 repo 的 host 是否等于该 forge」，不涉及其它 repo / 其它 forge 的匹配情况；
-//   - 'other'：有 remote 但 host 未命中任何已配置 forge（含无法解析的 URL）；
+//   - 具体 forge host：项目任一 remote host 等于该 forge；
+//   - 'other'：有 remote 但没有任何 host 命中已配置 forge（含无法解析的 URL）；
 //   - 'none'：无 remote（含未采集 gitInfo）。
-export function matchForgeFilter(
-  repoUrl: string | null | undefined,
-  filter: string,
-  forgeHosts: readonly string[],
-): boolean {
+export function matchForgeFilter(hosts: readonly string[], filter: string, forgeHosts: readonly string[]): boolean {
   if (filter === 'all') return true;
-  if (filter === 'none') return !repoUrl;
-  const host = repoHostOf(repoUrl);
-  if (filter === 'other') return !!repoUrl && !forgeHosts.includes(host);
-  return host === filter;
+  if (filter === 'none') return hosts.length === 0;
+  if (filter === 'other') return hosts.length > 0 && !hosts.some((h) => forgeHosts.includes(h));
+  return hosts.includes(filter);
 }
