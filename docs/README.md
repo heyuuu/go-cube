@@ -39,6 +39,7 @@
 - [`1027-工作台暂存区分组展示/`](proposals/parked/1027-工作台暂存区分组展示/) — 工作台变更清单按暂存区/未暂存分组展示 + stage/unstage（SourceTree 式）
 - [`1028-desktop壳与wails评估/`](proposals/parked/1028-desktop壳与wails评估/) — 不做 desktop 壳；wails 与「本地 server + 通用 HTTP API」结构性不匹配（私有 RPC vs 开放 API），个人工具线转投 Swift/SwiftUI
 - [`1035-opener排序策略/`](proposals/parked/1035-opener排序策略/) — opener 按最近使用排序对「固定组合开多个 opener」场景反向轮转；候选方案已收集（滑动窗口频次 / frecency / n-gram 条件预测 / 显式分层等），待选型讨论
+- [`1043-独立diff页/`](proposals/parked/1043-独立diff页/) — Beyond Compare 式独立 diff 页（多源：本地目录/sftp/git commit+子目录；渐进式懒对比；文件对比与监听）：是否独立成单独工具、sftp 是否进 v1 均未定，解挂时先定场景与架构归属
 - [`parked/1039-opener适用范围match/`](proposals/parked/1039-opener适用范围match/) — opener 适用范围谓词（仓库根 vs 普通目录 / 文件后缀 / 项目语言）：已定不进 role、open-path 按普通目录、语言粒度到 workspace；intent 拆分已随 1038 落地，match 本体挂起——且方向可能转为「调用点按目标属性选更细 intent」，解挂时先重估前提
 - [`1037-desktop薄壳重新评估/`](proposals/parked/1037-desktop薄壳重新评估/) — 壳需求重新成立（快捷键与浏览器冲突为硬需求，pty 保持已由超时独立解决）；前提收敛为自用/macOS 独占/薄壳（连已有 server，不动 1036 生命周期）；wails v2 功能不匹配（全局快捷键/多窗口系 v3 独有）、对 wails 整体持保留意见，候选路线对比已定倾向：**Swift 原生通用参数化壳**（`--url --hotkey`，零 cube 逻辑、独立仓库，与个人 Swift 工具线合流；Swift > Tauri ≈ Wails v3 > Electron）；解挂主条件为 Swift 工具线推进到成熟
 
