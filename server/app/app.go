@@ -1,6 +1,8 @@
 package app
 
 import (
+	"path/filepath"
+
 	"cube/config"
 	"cube/create"
 	"cube/forge"
@@ -38,7 +40,7 @@ func New(cfg *config.Config) (*App, error) {
 	usageService := usage.NewService(paths.UsageFile())
 	workbenchService := workbench.NewService(projectService.RefreshGitInfo)
 	createService := create.NewService(cfg.Create)
-	forgeService := forge.NewService(paths.SettingsFile())
+	forgeService := forge.NewService(paths.SettingsFile(), filepath.Join(paths.CacheDir(), "forge-repos.json"))
 	services := []any{projectService, openerService, usageService, workbenchService, createService, forgeService}
 
 	// 组装 web server

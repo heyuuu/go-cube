@@ -2,6 +2,8 @@ import createClient, { type ClientPathsWithMethod, type MethodResponse } from 'o
 
 import type { components, paths } from './schema';
 
+export type { components };
+
 // --- 类型（schema 直取，gen:api 后随契约自动更新） ---
 
 export type Config = components['schemas']['Config'];
@@ -13,6 +15,7 @@ export type Forge = components['schemas']['Forge'];
 export type ForgeAccount = components['schemas']['Account'];
 export type ForgeNamespace = components['schemas']['Namespace'];
 export type ReconcileResult = components['schemas']['ReconcileResult'];
+export type ForgeOverview = components['schemas']['Overview'];
 export type ProjectInfoResult = components['schemas']['ProjectInfoResult'];
 export type ProjectListResult = components['schemas']['ProjectListResult'];
 

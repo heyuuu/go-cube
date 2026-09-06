@@ -208,6 +208,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/forge/overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** forge 页聚合：全部 namespace 对账行 + 拉取元信息（只读缓存不外呼） */
+    get: operations['forge.overview'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/forge/reorder': {
     parameters: {
       query?: never;
@@ -1262,6 +1279,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputOverviewBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputOverviewBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['Overview'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputProjectInfoResultBody: {
       /**
        * Format: uri
@@ -1762,6 +1790,15 @@ export interface components {
       /** @description personal / org */
       type: string;
     };
+    NsMeta: {
+      /** Format: date-time */
+      fetchedAt: string;
+      forgeHost: string;
+      path: string;
+      /** Format: int64 */
+      repoCount: number;
+      type: string;
+    };
     OpenerDTO: {
       actions: {
         [key: string]: string;
@@ -1840,6 +1877,10 @@ export interface components {
       /** @description 展示文案（如「打开所在目录」），缺省由 name 生成 */
       title?: string;
     };
+    Overview: {
+      namespaces: components['schemas']['NsMeta'][] | null;
+      rows: components['schemas']['RepoRow'][] | null;
+    };
     ProjectDTO: {
       gitInfo: components['schemas']['Entry'];
       group: string;
@@ -1904,6 +1945,13 @@ export interface components {
     RepoPair: {
       local: components['schemas']['LocalRepo'];
       remote: components['schemas']['RemoteRepo'];
+    };
+    RepoRow: {
+      forgeHost: string;
+      local?: components['schemas']['LocalRepo'];
+      nsPath: string;
+      repo: components['schemas']['RemoteRepo'];
+      status: string;
     };
     ScanRule: {
       group: string;
@@ -2444,6 +2492,35 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.overview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputOverviewBody'];
         };
       };
       /** @description Error */

@@ -17,8 +17,9 @@
 **ID 分配规则（硬约束）**：提案 ID 全局唯一、不得重复，三个目录（顶层 / `parked/` / `archived/`）共用一套编号空间。**新建提案前必须先执行 `make last-proposal` 获取当前最大 ID，新提案 ID = 最大 ID + 1**，不得凭记忆或猜测取号。
 
 - [`archived/1040-forge管理/`](proposals/archived/1040-forge管理/) — ✅ 已实现（2026-09-05）：forge（git 托管平台实例）配置管理——`Forge{host,kind,icon}` 存 settings `forges` 节（host 归一化唯一键、kind 四值枚举 github/gitea/gitee/generic），CLI `forge list`、Web settings Forge 分区增删改、API list/save/delete；repo→forge 匹配在前端（repoUrl 解析 host 查表，projects 列表/树名称旁展示 icon），不写 git.json 快照
-- [`1041-forge-account/`](proposals/1041-forge-account/) — forge account（`{ forgeHost, username, token }`）管理与 github/gitea/gitee 三方言拉取账号下仓库列表（手动触发 + easycache 缓存，不进 projcache 采集），与本地项目按 clone URL 对账（未 clone / 本地孤儿 / 已 clone+本地状态）；暂不做 owner/org 区分
-- [`1042-forge页/`](proposals/1042-forge页/) — 前台 forge 页：以 forge 上仓库为入口的列表视图（类项目列表页、无 tree 模式），展示对账状态、未 clone 可一键 clone（复用 cloneRules）；数据获取/筛选/排序细节开工前另行讨论定稿
+
+- [`archived/1041-forge-account/`](proposals/archived/1041-forge-account/) — ✅ 已实现（2026-09-06）：forge account / namespace 与远端拉取对账——Account（纯 API 凭证，token 打码）+ Namespace（personal/org、可选挂 account）存 settings 两节；API 客户端沉淀 `util/gitapi`（github/gitea/gitee 三方言）；拉取手动出站 + easycache，探测 detect；对账纯函数三分（未 clone/孤儿/已 clone）；9 个 API，settings Forge 分区下挂两子表
+- [`1042-forge页/`](proposals/1042-forge页/) — 前台 forge 页：以 forge 上仓库为入口的列表视图（类项目列表页、无 tree 模式），展示对账状态、未 clone 复制 clone 命令（不做 clone 执行）；拉取结果落盘 + fetchedAt 前端展示，数据获取/筛选/排序已定稿
 - [`archived/1038-opener默认/`](proposals/archived/1038-opener默认/) — ✅ 已实现（2026-08-31）：cmd 字符串化 → per-role actions 动作串（exec:/url:，站内路由拼 BaseURL）→ intent 8 值枚举 + `openerIntents` 节（默认 opener + 候选）→ CLI `-o` 三态（无=默认 / 裸=交互 / name=模糊）→ 前端快捷位意图化 + url 动作当前浏览器直开；已知取舍：url 前端直开不计 usage
 - [`1036-server进程管理定调/`](proposals/archived/1036-server进程管理定调/) — 移除 `start -d` 自 fork 后台（argv 不透传 + 启动失败无声的结构性 bug，常驻由 launchd/air 承担后无消费者）+ whoami instance 实例标识（stop 按 instance 判旧实例下线，launchctl 保活占回端口不误判）+ daemon 设计定调（零参数发现配置 / 可管理性三条件 / supervisor-ready 六条 / 桌面 app helper 的 socket 重连与 pipe 生命线）；`server reload` 搁置（解挂条件在提案内）
 - [`1030-monorepo-workspace/`](proposals/archived/1030-monorepo-workspace/) — monorepo 子目录打开支持：`.cube/cube.json`（workspaces 显式声明 / workspaceScanRule 探测正选，文件格式层独立 `project/cubefile`），workspace 进 projcache 采集与 `OpenTargets`（gitcache 更名 projcache）；CLI `workspace init`、Web 下拉/展开行/编辑弹窗、工作台副本行 workspace 子行

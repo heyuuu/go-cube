@@ -174,3 +174,33 @@ func TestForgeNamespaceApi(t *testing.T) {
 		t.Fatalf("删除应成功: %s", r.Message)
 	}
 }
+
+// TestForgeOverviewApi overview 出口契约：空缓存时 rows 为 []（nil 序列化）且 namespaces 含未拉取元信息。
+func TestForgeOverviewApi(t *testing.T) {
+	env := newTestEnv(t)
+	postJSON(t, env.url("/api/forge/save"), `{"host":"github.com","kind":"github"}`)
+	postJSON(t, env.url("/api/forge/namespace/save"), `{"forgeHost":"github.com","path":"heyuuu","type":"personal"}`)
+
+	env2 := envelope{}
+	resp, err := http.Get(env.url("/api/forge/overview"))
+	if err != nil {
+		t.Fatalf("overview 请求失败: %v", err)
+	}
+	defer resp.Body.Close()
+	if err := json.NewDecoder(resp.Body).Decode(&env2); err != nil {
+		t.Fatalf("overview 响应解码失败: %v", err)
+	}
+	if !env2.Ok {
+		t.Fatalf("overview 应成功: %s", env2.Message)
+	}
+	var out forge.Overview
+	if err := json.Unmarshal(env2.Data, &out); err != nil {
+		t.Fatalf("overview.data 解码失败: %v", err)
+	}
+	if out.Rows == nil || len(out.Rows) != 0 {
+		t.Fatalf("空缓存 rows 应为空数组: %+v", out.Rows)
+	}
+	if len(out.Namespaces) != 1 || !out.Namespaces[0].FetchedAt.IsZero() {
+		t.Fatalf("namespaces 应含未拉取元信息: %+v", out.Namespaces)
+	}
+}

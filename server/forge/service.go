@@ -6,9 +6,9 @@ import (
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"cube/settings"
-	"cube/util/easycache"
 	"cube/util/gitapi"
 	"cube/util/iconkit"
 )
@@ -20,18 +20,21 @@ const forgesSection = "forges"
 type clientFactory func(kind, host, token string) (gitapi.Client, error)
 
 // Service forge 配置管理：settings.json forges / forgeAccounts / forgeNamespaces 三节的
-// 读写（直读不缓存，保存即生效），以及 namespace 远端拉取的编排（结果经 easycache 缓存）。
+// 读写（直读不缓存，保存即生效），以及 namespace 远端拉取的编排（结果落盘 cacheFile，
+// 内存为一级缓存，写穿；见 persist.go）。
 type Service struct {
 	settingsFile string
+	cacheFile    string // 拉取结果落盘文件（cache/forge-repos.json）；空 = 不落盘（测试）
 
 	cacheMu sync.Mutex
-	caches  map[string]*easycache.Item[[]gitapi.RemoteRepo] // nsCacheKey(host,path) → 该 namespace 的远端仓库缓存
+	mem     map[string]NsCacheEntry // nsCacheKey(host/path) → 快照（内存一级缓存）
+	loaded  bool                    // mem 是否已从落盘文件加载过（懒加载一次）
 
 	newClient clientFactory // 可注入（测试）；nil 用 gitapi.NewClient
 }
 
-func NewService(settingsFile string) *Service {
-	return &Service{settingsFile: settingsFile}
+func NewService(settingsFile, cacheFile string) *Service {
+	return &Service{settingsFile: settingsFile, cacheFile: cacheFile}
 }
 
 // Forges 读全部 forge（直读不缓存）。坏条目（host 空 / kind 未知 / icon 非法）跳过不阻断。
@@ -235,25 +238,34 @@ func (s *Service) DeleteNamespace(forgeHost, path string) error {
 }
 
 // FetchNamespace 拉取 namespace 下的远端仓库列表（force=true 跳过缓存强制重拉）。
-// 出站 API 调用是慢操作，手动/低频触发；结果经 easycache 缓存，读路径零开销。
+// 出站 API 调用是慢操作，手动/低频触发；成功结果写穿内存缓存与落盘文件（含 fetchedAt），
+// 失败直接上抛（调用方展示错误，不影响既有缓存）。
 func (s *Service) FetchNamespace(forgeHost, path string, force bool) ([]gitapi.RemoteRepo, error) {
-	item, err := s.cacheItem(forgeHost, path)
+	ns := findNamespace(loadNamespaces(s.settingsFile), forgeHost, path)
+	if ns == nil {
+		return nil, fmt.Errorf("未找到指定 namespace: %s@%s", NormalizeNsPath(path), NormalizeHost(forgeHost))
+	}
+	key := nsCacheKey(ns.ForgeHost, ns.Path)
+	if !force {
+		if entry, ok := s.cachedEntry(key); ok {
+			return entry.Repos, nil
+		}
+	}
+	repos, err := s.loadRepos(key)
 	if err != nil {
 		return nil, err
 	}
-	if force {
-		return item.Reload(), nil
-	}
-	return item.Get(), nil
+	s.storeEntry(key, NsCacheEntry{FetchedAt: time.Now(), Repos: repos})
+	return repos, nil
 }
 
-// CachedNamespaceRepos 读 namespace 的拉取结果缓存，从未拉取过返回 false（不触发外呼）。
-func (s *Service) CachedNamespaceRepos(forgeHost, path string) ([]gitapi.RemoteRepo, bool) {
-	item, ok := s.peekCache(forgeHost, path)
-	if !ok {
-		return nil, false
+// CachedNamespaceRepos 读 namespace 的拉取快照（含 fetchedAt），从未拉取过返回 false（不触发外呼）。
+func (s *Service) CachedNamespaceRepos(forgeHost, path string) (NsCacheEntry, bool) {
+	ns := findNamespace(loadNamespaces(s.settingsFile), forgeHost, path)
+	if ns == nil {
+		return NsCacheEntry{}, false
 	}
-	return item.Peek()
+	return s.cachedEntry(nsCacheKey(ns.ForgeHost, ns.Path))
 }
 
 // DetectNamespaceType 探测 path 在该 forge 上是个人空间还是组织空间（探测端点匿名可调）。
@@ -276,7 +288,7 @@ func (s *Service) ReconcileNamespace(forgeHost, path string, local []LocalRepo) 
 	if ns == nil {
 		return nil, fmt.Errorf("未找到指定 namespace: %s@%s", NormalizeNsPath(path), NormalizeHost(forgeHost))
 	}
-	remote, ok := s.CachedNamespaceRepos(ns.ForgeHost, ns.Path)
+	entry, ok := s.CachedNamespaceRepos(ns.ForgeHost, ns.Path)
 	if !ok {
 		return nil, fmt.Errorf("namespace %s@%s 尚未拉取，请先执行拉取", ns.Path, ns.ForgeHost)
 	}
@@ -286,8 +298,17 @@ func (s *Service) ReconcileNamespace(forgeHost, path string, local []LocalRepo) 
 			scoped = append(scoped, l)
 		}
 	}
-	result := Reconcile(scoped, remote)
+	result := Reconcile(scoped, entry.Repos)
 	return &result, nil
+}
+
+// Overview 聚合全部 namespace 的对账行与拉取元信息（forge 页数据源，1042）。
+// 只读既有缓存，不触发外呼；未拉取的 namespace 在 Namespaces 元信息中 FetchedAt 为零值。
+func (s *Service) Overview(local []LocalRepo) *Overview {
+	namespaces := loadNamespaces(s.settingsFile)
+	return buildOverview(namespaces, func(ns Namespace) (NsCacheEntry, bool) {
+		return s.CachedNamespaceRepos(ns.ForgeHost, ns.Path)
+	}, local)
 }
 
 // retainAccounts 按谓词保留 account（DeleteForge 级联清理用）。
@@ -321,6 +342,7 @@ func (s *Service) retainNamespaces(keep func(Namespace) bool) error {
 }
 
 // factory 返回客户端工厂（未注入时用真实实现，httpClient 默认）。
+
 func (s *Service) factory() clientFactory {
 	if s.newClient != nil {
 		return s.newClient
@@ -330,55 +352,7 @@ func (s *Service) factory() clientFactory {
 	}
 }
 
-// cacheItem 取（或创建）namespace 的远端仓库缓存。
-func (s *Service) cacheItem(forgeHost, path string) (*easycache.Item[[]gitapi.RemoteRepo], error) {
-	key, err := s.resolveCacheKey(forgeHost, path)
-	if err != nil {
-		return nil, err
-	}
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
-	if s.caches == nil {
-		s.caches = make(map[string]*easycache.Item[[]gitapi.RemoteRepo])
-	}
-	if item, ok := s.caches[key]; ok {
-		return item, nil
-	}
-	// loader 不捕获配置快照——配置随时可改，执行时现读（service 本身直读不缓存）
-	item := easycache.NewItem(func() []gitapi.RemoteRepo {
-		repos, err := s.loadRepos(key)
-		if err != nil {
-			slog.Warn("拉取 namespace 仓库列表失败", "key", key, "err", err)
-			return nil
-		}
-		return repos
-	})
-	s.caches[key] = item
-	return item, nil
-}
-
-// peekCache 只读查找 namespace 缓存（不存在不创建）。
-func (s *Service) peekCache(forgeHost, path string) (*easycache.Item[[]gitapi.RemoteRepo], bool) {
-	key, err := s.resolveCacheKey(forgeHost, path)
-	if err != nil {
-		return nil, false
-	}
-	s.cacheMu.Lock()
-	defer s.cacheMu.Unlock()
-	item, ok := s.caches[key]
-	return item, ok
-}
-
-// resolveCacheKey 校验 namespace 存在并产出缓存键。
-func (s *Service) resolveCacheKey(forgeHost, path string) (string, error) {
-	ns := findNamespace(loadNamespaces(s.settingsFile), forgeHost, path)
-	if ns == nil {
-		return "", fmt.Errorf("未找到指定 namespace: %s@%s", NormalizeNsPath(path), NormalizeHost(forgeHost))
-	}
-	return nsCacheKey(ns.ForgeHost, ns.Path), nil
-}
-
-// loadRepos 按 namespace 键现读配置并执行一次真实拉取（easycache loader）。
+// loadRepos 按 namespace 键现读配置并执行一次真实拉取（内存缓存未命中时调用）。
 func (s *Service) loadRepos(key string) ([]gitapi.RemoteRepo, error) {
 	h, p := key2ns(key)
 	ns := findNamespace(loadNamespaces(s.settingsFile), h, p)
@@ -390,6 +364,44 @@ func (s *Service) loadRepos(key string) ([]gitapi.RemoteRepo, error) {
 		return nil, fmt.Errorf("namespace 所属 forge 未配置: %s", ns.ForgeHost)
 	}
 	return fetchRepos(*f, *ns, s.Accounts(), s.factory())
+}
+
+// cachedEntry 读内存缓存（懒加载落盘文件一次）。
+func (s *Service) cachedEntry(key string) (NsCacheEntry, bool) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.ensureLoadedLocked()
+	entry, ok := s.mem[key]
+	return entry, ok
+}
+
+// storeEntry 更新内存缓存并写穿落盘文件（落盘失败只记日志——缓存语义，下次拉取会重写）。
+func (s *Service) storeEntry(key string, entry NsCacheEntry) {
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	s.ensureLoadedLocked()
+	s.mem[key] = entry
+	if s.cacheFile == "" {
+		return
+	}
+	disk := loadDiskCache(s.cacheFile)
+	disk.Namespaces[key] = entry
+	if err := saveDiskCache(s.cacheFile, disk); err != nil {
+		slog.Warn("forge 拉取缓存落盘失败", "file", s.cacheFile, "err", err)
+	}
+}
+
+// ensureLoadedLocked 首次访问时把落盘文件加载进内存（调用方须持 cacheMu）。
+func (s *Service) ensureLoadedLocked() {
+	if s.loaded {
+		return
+	}
+	s.loaded = true
+	if s.cacheFile == "" {
+		s.mem = map[string]NsCacheEntry{}
+		return
+	}
+	s.mem = loadDiskCache(s.cacheFile).Namespaces
 }
 
 // nsCacheKey namespace 缓存键。

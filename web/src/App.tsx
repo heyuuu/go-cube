@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router';
 import { Layout } from './components/layout';
 import { useTheme } from './hooks/use-theme';
 import { NotFoundPage } from './pages/errors/not-found';
+import { ForgesPage } from './pages/forges';
 import { MdPage } from './pages/md';
 import { ProjectsPage } from './pages/projects';
 import { SettingsPage } from './pages/settings';
@@ -20,6 +21,7 @@ function App() {
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="projects" element={<ProjectsPage />} />
         {/* 工作台挂进全局壳（提案 1023）：Layout 按此前缀切铺满型 main，不吃 max-w 收敛 */}
+        <Route path="forges" element={<ForgesPage />} />
         <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

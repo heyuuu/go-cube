@@ -37,6 +37,7 @@ func (h *ForgeHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiPost(api, "/api/forge/namespace/fetch", "拉取 namespace 下远端仓库列表", h.namespaceFetch)
 	web.ApiPost(api, "/api/forge/namespace/detect", "探测 namespace 是个人空间还是组织空间", h.namespaceDetect)
 	web.ApiGet(api, "/api/forge/namespace/reconcile", "对账 namespace（远端缓存 vs 本地项目）", h.namespaceReconcile)
+	web.ApiGet(api, "/api/forge/overview", "forge 页聚合：全部 namespace 对账行 + 拉取元信息（只读缓存不外呼）", h.forgeOverview)
 }
 
 func (h *ForgeHandler) forgeList(_ struct{}) (web.ListResult[forge.Forge], error) {
@@ -217,7 +218,17 @@ type NamespaceReconcileInput struct {
 }
 
 func (h *ForgeHandler) namespaceReconcile(input NamespaceReconcileInput) (*forge.ReconcileResult, error) {
-	var locals []forge.LocalRepo
+	return h.forgeService.ReconcileNamespace(input.ForgeHost, input.Path, h.localRepos())
+}
+
+// forgeOverview forge 页聚合数据源（只读拉取缓存与本地快照，不触发外呼）。
+func (h *ForgeHandler) forgeOverview(_ struct{}) (*forge.Overview, error) {
+	return h.forgeService.Overview(h.localRepos()), nil
+}
+
+// localRepos 把本地项目快照投影为对账用的 LocalRepo 列表。
+func (h *ForgeHandler) localRepos() []forge.LocalRepo {
+	locals := make([]forge.LocalRepo, 0)
 	for _, p := range h.projectService.Projects() {
 		info := forge.LocalRepo{Name: p.Name(), Path: p.Path()}
 		if gi, ok := h.projectService.GitInfo(p.Path()); ok {
@@ -228,5 +239,5 @@ func (h *ForgeHandler) namespaceReconcile(input NamespaceReconcileInput) (*forge
 		}
 		locals = append(locals, info)
 	}
-	return h.forgeService.ReconcileNamespace(input.ForgeHost, input.Path, locals)
+	return locals
 }

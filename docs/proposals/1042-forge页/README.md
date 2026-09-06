@@ -2,7 +2,7 @@
 
 ## 状态
 
-**待实施，实施前需再次讨论**。依赖 1040（forge 配置）+ 1041（account 拉取与对账数据）。全量数据获取方式、筛选、排序、展示形态等细节**在开工前须专门讨论定稿**，本提案只锁方向与边界。
+**已实施**（依赖的 1040 / 1041 均已归档）。讨论定稿结论：独立页 `/forges`；拉取结果落盘 `cache/forge-repos.json` 含 fetchedAt 前端展示新鲜度；不做 clone 执行、missing 行复制 clone 命令；数据源聚合端点 `/api/forge/overview` 纯读缓存。
 
 ## 背景
 
@@ -19,7 +19,7 @@ projects 页是以「本地已 clone 的项目」为入口的视图。forge 系�
 ## 设计要点（已收敛的边界）
 
 - 页面数据源是 1041 的缓存 + 对账结果，**页面浏览不触发外呼**；拉取/刷新是显式动作。
-- 「一键 clone」复用既有 clone 规则（cloneRules）与 `project/clone` 流程，不在 forge 页重造。
+- 「复制 clone 命令」（定稿改为不做 clone 执行）：missing 行复制 `cube clone <cloneUrl>`，clone 规则匹配仍由 CLI 流程承担。
 - 导航入口：全局导航（1023）加一项，与 projects / settings 平级。
 - 具体是独立页面还是 projects 页的筛选维度（「只看 forge 上的」），随开工前讨论定。
 

@@ -98,3 +98,8 @@ export function useForgeNamespaceDetect() {
 export function fetchNamespaceReconcile(forgeHost: string, path: string) {
   return apiGet('/api/forge/namespace/reconcile', { forgeHost, path });
 }
+
+// forge 页聚合（1042）：全部 namespace 对账行 + 拉取元信息（只读缓存，不外呼）
+export function useForgeOverview() {
+  return useQuery({ queryKey: [...FORGE_KEYS, 'overview'], queryFn: () => apiGet('/api/forge/overview') });
+}

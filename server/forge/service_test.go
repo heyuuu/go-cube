@@ -15,7 +15,7 @@ import (
 func newService(t *testing.T) (*Service, *testfixture.Workspace) {
 	t.Helper()
 	ws := testfixture.NewWorkspace(t)
-	return NewService(ws.Join("settings.json")), ws
+	return NewService(ws.Join("settings.json"), ws.Join("cache/forge-repos.json")), ws
 }
 
 // TestSaveForge 新增与按 host 替换（归一化后同键）。
@@ -325,5 +325,37 @@ func TestFetchAndReconcile(t *testing.T) {
 	}
 	if len(result.Synced) != 1 || result.Synced[0].Local.Name != "cube" || len(result.Missing) != 0 || len(result.Orphan) != 0 {
 		t.Fatalf("对账结果不符: %+v", result)
+	}
+}
+
+// TestFetchPersist 拉取结果落盘：重启（新 Service 同配置）后缓存仍命中，不重拉。
+func TestFetchPersist(t *testing.T) {
+	s, ws := newService(t)
+	seedForge(t, s)
+	if err := s.SaveNamespace(Namespace{ForgeHost: "github.com", Path: "heyuuu", Type: "personal"}); err != nil {
+		t.Fatalf("保存 namespace 失败: %v", err)
+	}
+	fake := &fakeClient{repos: []gitapi.RemoteRepo{{Name: "cube", CloneUrl: "https://github.com/heyuuu/cube.git"}}}
+	s.newClient = func(string, string, string) (gitapi.Client, error) { return fake, nil }
+
+	if _, err := s.FetchNamespace("github.com", "heyuuu", false); err != nil {
+		t.Fatalf("拉取失败: %v", err)
+	}
+	if fake.lists != 1 {
+		t.Fatalf("应拉取一次, got %d", fake.lists)
+	}
+
+	// 模拟重启：新 Service 指向同一落盘文件
+	s2 := NewService(ws.Join("settings.json"), ws.Join("cache/forge-repos.json"))
+	s2.newClient = s.newClient
+	entry, ok := s2.CachedNamespaceRepos("github.com", "heyuuu")
+	if !ok || len(entry.Repos) != 1 || entry.FetchedAt.IsZero() {
+		t.Fatalf("重启后应从落盘恢复且带 fetchedAt: %+v ok=%v", entry, ok)
+	}
+	if _, err := s2.FetchNamespace("github.com", "heyuuu", false); err != nil {
+		t.Fatalf("缓存命中拉取失败: %v", err)
+	}
+	if fake.lists != 1 {
+		t.Fatalf("落盘命中不应重拉, lists=%d", fake.lists)
 	}
 }
