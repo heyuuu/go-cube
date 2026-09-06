@@ -34,3 +34,67 @@ export function useForgeReorder() {
     onError: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
   });
 }
+
+// --- account / namespace（提案 1041） ---
+
+export function useForgeAccounts() {
+  return useQuery({ queryKey: [...FORGE_KEYS, 'accounts'], queryFn: () => apiGet('/api/forge/account/list') });
+}
+
+export function useForgeAccountSave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof apiPost<'/api/forge/account/save'>>[1]) =>
+      apiPost('/api/forge/account/save', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}
+
+export function useForgeAccountDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { forgeHost: string; username: string }) => apiPost('/api/forge/account/delete', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}
+
+export function useForgeNamespaces() {
+  return useQuery({ queryKey: [...FORGE_KEYS, 'namespaces'], queryFn: () => apiGet('/api/forge/namespace/list') });
+}
+
+export function useForgeNamespaceSave() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof apiPost<'/api/forge/namespace/save'>>[1]) =>
+      apiPost('/api/forge/namespace/save', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}
+
+export function useForgeNamespaceDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { forgeHost: string; path: string }) => apiPost('/api/forge/namespace/delete', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}
+
+// 拉取：出站 API 调用（慢操作），成功/失败都让调用方感知（返回 count）
+export function useForgeNamespaceFetch() {
+  return useMutation({
+    mutationFn: (input: { forgeHost: string; path: string; force?: boolean }) =>
+      apiPost('/api/forge/namespace/fetch', input),
+  });
+}
+
+// type 探测：配置表单的辅助动作（失败即提示，不阻塞手选）
+export function useForgeNamespaceDetect() {
+  return useMutation({
+    mutationFn: (input: { forgeHost: string; path: string }) => apiPost('/api/forge/namespace/detect', input),
+  });
+}
+
+// 对账：轻量即时查询（跟随拉取动作触发），不进 useQuery 缓存
+export function fetchNamespaceReconcile(forgeHost: string, path: string) {
+  return apiGet('/api/forge/namespace/reconcile', { forgeHost, path });
+}

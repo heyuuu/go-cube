@@ -1,20 +1,33 @@
 package forge
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"cube/settings"
+	"cube/util/easycache"
+	"cube/util/gitapi"
 	"cube/util/iconkit"
 )
 
 // settings.json 中的 forge 域节名。
 const forgesSection = "forges"
 
-// Service forge 配置管理：settings.json forges 节的读写（直读不缓存，保存即生效）。
+// clientFactory 构造平台 API 客户端的工厂签名（测试注入 fake 用）。
+type clientFactory func(kind, host, token string) (gitapi.Client, error)
+
+// Service forge 配置管理：settings.json forges / forgeAccounts / forgeNamespaces 三节的
+// 读写（直读不缓存，保存即生效），以及 namespace 远端拉取的编排（结果经 easycache 缓存）。
 type Service struct {
 	settingsFile string
+
+	cacheMu sync.Mutex
+	caches  map[string]*easycache.Item[[]gitapi.RemoteRepo] // nsCacheKey(host,path) → 该 namespace 的远端仓库缓存
+
+	newClient clientFactory // 可注入（测试）；nil 用 gitapi.NewClient
 }
 
 func NewService(settingsFile string) *Service {
@@ -107,7 +120,8 @@ func (s *Service) ReorderForges(hosts []string) error {
 	return settings.SaveSection(s.settingsFile, forgesSection, ordered)
 }
 
-// DeleteForge 按 host 删除一条 forge；不存在时返回中文错误。
+// DeleteForge 按 host 删除一条 forge，并级联清理该 host 下的 account 与 namespace
+// （孤挂配置对任何功能都不可见，留了就是脏数据）；不存在时返回中文错误。
 func (s *Service) DeleteForge(host string) error {
 	host = NormalizeHost(host)
 	specs := s.Forges()
@@ -120,5 +134,271 @@ func (s *Service) DeleteForge(host string) error {
 	if len(rest) == len(specs) {
 		return fmt.Errorf("未找到指定 forge: %s", host)
 	}
-	return settings.SaveSection(s.settingsFile, forgesSection, rest)
+	if err := settings.SaveSection(s.settingsFile, forgesSection, rest); err != nil {
+		return err
+	}
+	if err := s.retainAccounts(func(a Account) bool { return NormalizeHost(a.ForgeHost) != host }); err != nil {
+		return err
+	}
+	return s.retainNamespaces(func(ns Namespace) bool { return NormalizeHost(ns.ForgeHost) != host })
+}
+
+// Accounts 读全部 account（含 token 原文，供拉取取凭证；对外展示的打码在出口层做）。
+func (s *Service) Accounts() []Account { return loadAccounts(s.settingsFile) }
+
+// SaveAccount 新增或按 forgeHost+username 替换一条 account。
+// token 提交掩码值（TokenMasked）视为「未修改」沿用旧值——前端表单掩码展示的配套语义。
+func (s *Service) SaveAccount(a Account) error {
+	a.ForgeHost = NormalizeHost(a.ForgeHost)
+	a.Username = NormalizeUsername(a.Username)
+	if a.Token == TokenMasked {
+		existing := findAccount(loadAccounts(s.settingsFile), a.ForgeHost, a.Username)
+		if existing == nil {
+			return fmt.Errorf("account %s@%s 不存在，token 不能提交掩码占位值", a.Username, a.ForgeHost)
+		}
+		a.Token = existing.Token
+	}
+	if err := ValidateAccount(a, s.Forges()); err != nil {
+		return err
+	}
+	accounts := loadAccounts(s.settingsFile)
+	replaced := false
+	for i, cur := range accounts {
+		if NormalizeHost(cur.ForgeHost) == a.ForgeHost && NormalizeUsername(cur.Username) == a.Username {
+			accounts[i] = a
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		accounts = append(accounts, a)
+	}
+	return saveAccounts(s.settingsFile, accounts)
+}
+
+// DeleteAccount 按 forgeHost+username 删除一条 account；不存在时返回中文错误。
+func (s *Service) DeleteAccount(forgeHost, username string) error {
+	forgeHost, username = NormalizeHost(forgeHost), NormalizeUsername(username)
+	accounts := loadAccounts(s.settingsFile)
+	rest := make([]Account, 0, len(accounts))
+	for _, cur := range accounts {
+		if NormalizeHost(cur.ForgeHost) != forgeHost || NormalizeUsername(cur.Username) != username {
+			rest = append(rest, cur)
+		}
+	}
+	if len(rest) == len(accounts) {
+		return fmt.Errorf("未找到指定 account: %s@%s", username, forgeHost)
+	}
+	return saveAccounts(s.settingsFile, rest)
+}
+
+// Namespaces 读全部 namespace。
+func (s *Service) Namespaces() []Namespace { return loadNamespaces(s.settingsFile) }
+
+// SaveNamespace 新增或按 forgeHost+path 替换一条 namespace。
+func (s *Service) SaveNamespace(ns Namespace) error {
+	ns.ForgeHost = NormalizeHost(ns.ForgeHost)
+	ns.Path = NormalizeNsPath(ns.Path)
+	ns.AccountUsername = NormalizeUsername(ns.AccountUsername)
+	if err := ValidateNamespace(ns, s.Forges(), s.Accounts()); err != nil {
+		return err
+	}
+	namespaces := loadNamespaces(s.settingsFile)
+	replaced := false
+	for i, cur := range namespaces {
+		if NormalizeHost(cur.ForgeHost) == ns.ForgeHost && strings.EqualFold(cur.Path, ns.Path) {
+			namespaces[i] = ns
+			replaced = true
+			break
+		}
+	}
+	if !replaced {
+		namespaces = append(namespaces, ns)
+	}
+	return saveNamespaces(s.settingsFile, namespaces)
+}
+
+// DeleteNamespace 按 forgeHost+path 删除一条 namespace；不存在时返回中文错误。
+func (s *Service) DeleteNamespace(forgeHost, path string) error {
+	forgeHost = NormalizeHost(forgeHost)
+	namespaces := loadNamespaces(s.settingsFile)
+	rest := make([]Namespace, 0, len(namespaces))
+	for _, cur := range namespaces {
+		if NormalizeHost(cur.ForgeHost) != forgeHost || !strings.EqualFold(cur.Path, path) {
+			rest = append(rest, cur)
+		}
+	}
+	if len(rest) == len(namespaces) {
+		return fmt.Errorf("未找到指定 namespace: %s@%s", path, forgeHost)
+	}
+	return saveNamespaces(s.settingsFile, rest)
+}
+
+// FetchNamespace 拉取 namespace 下的远端仓库列表（force=true 跳过缓存强制重拉）。
+// 出站 API 调用是慢操作，手动/低频触发；结果经 easycache 缓存，读路径零开销。
+func (s *Service) FetchNamespace(forgeHost, path string, force bool) ([]gitapi.RemoteRepo, error) {
+	item, err := s.cacheItem(forgeHost, path)
+	if err != nil {
+		return nil, err
+	}
+	if force {
+		return item.Reload(), nil
+	}
+	return item.Get(), nil
+}
+
+// CachedNamespaceRepos 读 namespace 的拉取结果缓存，从未拉取过返回 false（不触发外呼）。
+func (s *Service) CachedNamespaceRepos(forgeHost, path string) ([]gitapi.RemoteRepo, bool) {
+	item, ok := s.peekCache(forgeHost, path)
+	if !ok {
+		return nil, false
+	}
+	return item.Peek()
+}
+
+// DetectNamespaceType 探测 path 在该 forge 上是个人空间还是组织空间（探测端点匿名可调）。
+func (s *Service) DetectNamespaceType(forgeHost, path string) (gitapi.NamespaceType, error) {
+	f := MatchHost(s.Forges(), forgeHost)
+	if f == nil {
+		return "", fmt.Errorf("未找到指定 forge: %s", NormalizeHost(forgeHost))
+	}
+	client, err := s.factory()(f.Kind, f.Host, "")
+	if err != nil {
+		return "", err
+	}
+	return client.DetectNamespace(context.Background(), NormalizeNsPath(path))
+}
+
+// ReconcileNamespace 对账指定 namespace：远端缓存（须先 FetchNamespace）vs 本地仓库快照
+// （调用方从 project 领域投影为 LocalRepo 列表，此处按 namespace 范围过滤）。
+func (s *Service) ReconcileNamespace(forgeHost, path string, local []LocalRepo) (*ReconcileResult, error) {
+	ns := findNamespace(loadNamespaces(s.settingsFile), forgeHost, path)
+	if ns == nil {
+		return nil, fmt.Errorf("未找到指定 namespace: %s@%s", NormalizeNsPath(path), NormalizeHost(forgeHost))
+	}
+	remote, ok := s.CachedNamespaceRepos(ns.ForgeHost, ns.Path)
+	if !ok {
+		return nil, fmt.Errorf("namespace %s@%s 尚未拉取，请先执行拉取", ns.Path, ns.ForgeHost)
+	}
+	scoped := make([]LocalRepo, 0, len(local))
+	for _, l := range local {
+		if MatchNamespacePath(l.RepoUrl, ns.ForgeHost, ns.Path) {
+			scoped = append(scoped, l)
+		}
+	}
+	result := Reconcile(scoped, remote)
+	return &result, nil
+}
+
+// retainAccounts 按谓词保留 account（DeleteForge 级联清理用）。
+func (s *Service) retainAccounts(keep func(Account) bool) error {
+	accounts := loadAccounts(s.settingsFile)
+	rest := make([]Account, 0, len(accounts))
+	for _, a := range accounts {
+		if keep(a) {
+			rest = append(rest, a)
+		}
+	}
+	if len(rest) == len(accounts) {
+		return nil
+	}
+	return saveAccounts(s.settingsFile, rest)
+}
+
+// retainNamespaces 按谓词保留 namespace（DeleteForge 级联清理用）。
+func (s *Service) retainNamespaces(keep func(Namespace) bool) error {
+	namespaces := loadNamespaces(s.settingsFile)
+	rest := make([]Namespace, 0, len(namespaces))
+	for _, ns := range namespaces {
+		if keep(ns) {
+			rest = append(rest, ns)
+		}
+	}
+	if len(rest) == len(namespaces) {
+		return nil
+	}
+	return saveNamespaces(s.settingsFile, rest)
+}
+
+// factory 返回客户端工厂（未注入时用真实实现，httpClient 默认）。
+func (s *Service) factory() clientFactory {
+	if s.newClient != nil {
+		return s.newClient
+	}
+	return func(kind, host, token string) (gitapi.Client, error) {
+		return gitapi.NewClient(kind, host, token, nil)
+	}
+}
+
+// cacheItem 取（或创建）namespace 的远端仓库缓存。
+func (s *Service) cacheItem(forgeHost, path string) (*easycache.Item[[]gitapi.RemoteRepo], error) {
+	key, err := s.resolveCacheKey(forgeHost, path)
+	if err != nil {
+		return nil, err
+	}
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	if s.caches == nil {
+		s.caches = make(map[string]*easycache.Item[[]gitapi.RemoteRepo])
+	}
+	if item, ok := s.caches[key]; ok {
+		return item, nil
+	}
+	// loader 不捕获配置快照——配置随时可改，执行时现读（service 本身直读不缓存）
+	item := easycache.NewItem(func() []gitapi.RemoteRepo {
+		repos, err := s.loadRepos(key)
+		if err != nil {
+			slog.Warn("拉取 namespace 仓库列表失败", "key", key, "err", err)
+			return nil
+		}
+		return repos
+	})
+	s.caches[key] = item
+	return item, nil
+}
+
+// peekCache 只读查找 namespace 缓存（不存在不创建）。
+func (s *Service) peekCache(forgeHost, path string) (*easycache.Item[[]gitapi.RemoteRepo], bool) {
+	key, err := s.resolveCacheKey(forgeHost, path)
+	if err != nil {
+		return nil, false
+	}
+	s.cacheMu.Lock()
+	defer s.cacheMu.Unlock()
+	item, ok := s.caches[key]
+	return item, ok
+}
+
+// resolveCacheKey 校验 namespace 存在并产出缓存键。
+func (s *Service) resolveCacheKey(forgeHost, path string) (string, error) {
+	ns := findNamespace(loadNamespaces(s.settingsFile), forgeHost, path)
+	if ns == nil {
+		return "", fmt.Errorf("未找到指定 namespace: %s@%s", NormalizeNsPath(path), NormalizeHost(forgeHost))
+	}
+	return nsCacheKey(ns.ForgeHost, ns.Path), nil
+}
+
+// loadRepos 按 namespace 键现读配置并执行一次真实拉取（easycache loader）。
+func (s *Service) loadRepos(key string) ([]gitapi.RemoteRepo, error) {
+	h, p := key2ns(key)
+	ns := findNamespace(loadNamespaces(s.settingsFile), h, p)
+	if ns == nil {
+		return nil, fmt.Errorf("未找到指定 namespace: %s", key)
+	}
+	f := MatchHost(s.Forges(), ns.ForgeHost)
+	if f == nil {
+		return nil, fmt.Errorf("namespace 所属 forge 未配置: %s", ns.ForgeHost)
+	}
+	return fetchRepos(*f, *ns, s.Accounts(), s.factory())
+}
+
+// nsCacheKey namespace 缓存键。
+func nsCacheKey(forgeHost, path string) string {
+	return NormalizeHost(forgeHost) + "/" + strings.ToLower(NormalizeNsPath(path))
+}
+
+// key2ns 从缓存键反解出 forgeHost 与 path。
+func key2ns(key string) (string, string) {
+	h, p, _ := strings.Cut(key, "/")
+	return h, p
 }

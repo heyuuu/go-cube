@@ -10,6 +10,9 @@ export type Project = components['schemas']['ProjectDTO'];
 export type ScanRule = components['schemas']['ScanRule'];
 export type CloneRule = components['schemas']['CloneRule'];
 export type Forge = components['schemas']['Forge'];
+export type ForgeAccount = components['schemas']['Account'];
+export type ForgeNamespace = components['schemas']['Namespace'];
+export type ReconcileResult = components['schemas']['ReconcileResult'];
 export type ProjectInfoResult = components['schemas']['ProjectInfoResult'];
 export type ProjectListResult = components['schemas']['ProjectListResult'];
 

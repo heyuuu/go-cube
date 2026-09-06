@@ -81,7 +81,7 @@ func newTestEnv(t *testing.T) *testEnv {
 			NewConfigHandler(cfg),
 			NewMdHandler(),
 			NewWorkbenchHandler(workbench.NewService(nil)),
-			NewForgeHandler(forgeSvc),
+			NewForgeHandler(forgeSvc, projSvc),
 			NewIconHandler(),
 		},
 	)
