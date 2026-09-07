@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"cube/util/git"
 )
 
 // secureJoin 把 rel 拼进 base 并校验不逃逸（防 file 参数越出目标目录读任意文件）。
@@ -29,4 +31,13 @@ func secureJoin(base string, rel string) (string, error) {
 func isBinary(data []byte) bool {
 	limit := min(len(data), 8192) // 只看头部即可粗判
 	return bytes.IndexByte(data[:limit], 0) >= 0
+}
+
+// repoRoot Service 各读写方法共用的入口守卫：向上探测 git 仓库根，非 git 目录统一报错。
+func repoRoot(path string) (string, error) {
+	root, ok := git.FindGitRoot(path)
+	if !ok {
+		return "", fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	}
+	return root, nil
 }

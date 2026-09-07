@@ -53,9 +53,9 @@ func (s *Service) refreshCache(mainRoot string) {
 
 // Info 读工作台仓库信息：入口目录向上探测仓库根、默认分支。
 func (s *Service) Info(path string) (*Info, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	defaultBranch, _ := git.DefaultBranch(root) // 无 remote 返回空，可接受
 	return &Info{Root: root, DefaultBranch: defaultBranch}, nil
@@ -64,9 +64,9 @@ func (s *Service) Info(path string) (*Info, error) {
 // Refs 分支与 tag 列表（规范全名，见 Refs 注释）+ 当前检出分支，作为 git 树面板 /
 // 双选交互的候选目标。当前分支是 HEAD 状态而非 ref 枚举的一部分，单独取（HeadRef）。
 func (s *Service) Refs(path string) (*Refs, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 
 	head := git.HeadRef(root)
@@ -87,9 +87,9 @@ func (s *Service) Refs(path string) (*Refs, error) {
 // Remotes 列出仓库配置的 remote（名字 + 抓取地址 + 网页地址），git 树面板
 // 「远端」分组展示。url 无法解析成网页地址时 webUrl 为空，前端隐藏跳转按钮。
 func (s *Service) Remotes(path string) ([]RemoteEntry, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	remotes, err := git.Remotes(root)
 	if err != nil {
@@ -108,9 +108,9 @@ func (s *Service) Remotes(path string) ([]RemoteEntry, error) {
 
 // Commits 拉取 commit 日志一页（--all 全分支；纯列表，泳道布局由前端对已持有数据计算）。
 func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	if limit <= 0 || limit > 200 {
 		limit = 50
@@ -138,9 +138,9 @@ func (s *Service) Commits(path string, cursor int, limit int) (*CommitsPageResul
 // CommitInfo 读 ref/commit 源指向提交的完整信息（含 message 正文，内容面板提交详情区）。
 // worktree 源是工作区状态而非单一提交，拒绝。
 func (s *Service) CommitInfo(path string, src TreeSource) (*git.CommitDetail, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	switch src.Type {
 	case SourceTypeCommit, SourceTypeRef:
@@ -157,9 +157,9 @@ func (s *Service) CommitInfo(path string, src TreeSource) (*git.CommitDetail, er
 // WorktreeStatuses 返回全部工作副本的状态快照。工作副本徽标与 commit 图
 // 虚拟节点（前端构造）共用这一份数据——status 只在这里拉，不再分散到各接口。
 func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	worktrees, err := git.WorktreeList(root)
 	if err != nil {
@@ -194,9 +194,9 @@ func (s *Service) WorktreeStatuses(path string) ([]WorktreeStatus, error) {
 // targetPath 为空时按决策 1 预填 <repoName>.worktrees/<分支名>/。成功后返回新副本
 // 信息（供 UI 直接发起 open），并定向刷新主项目快照。
 func (s *Service) WorktreeAdd(path string, branch string, commitish string, targetPath string) (*WorktreeCreated, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	branch = strings.TrimPrefix(branch, "refs/heads/")
 
@@ -219,9 +219,9 @@ func (s *Service) WorktreeAdd(path string, branch string, commitish string, targ
 // （未提交改动 / 未跟踪 / 未推送），有风险项返回 *WorktreeRemoveDenied 由 UI
 // 二次确认升级 force；主仓库工作目录无论 force 均拒绝（那是删仓库本身）。
 func (s *Service) WorktreeRemove(path string, targetPath string, force bool) error {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return err
 	}
 	mainRoot := mainRootOf(root)
 	if targetPath == mainRoot {
@@ -249,9 +249,9 @@ func (s *Service) WorktreeRemove(path string, targetPath string, force bool) err
 // WorktreePrune 清理已失效的 worktree 管理记录（目录已被外部删除的残留）。
 // 幂等无损——不删任何存在的副本，无需预检。成功后定向刷新主项目快照。
 func (s *Service) WorktreePrune(path string) error {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return err
 	}
 	mainRoot := mainRootOf(root)
 	if err := git.WorktreePrune(mainRoot); err != nil {
@@ -266,9 +266,9 @@ func (s *Service) WorktreePrune(path string) error {
 // （reset --hard 不碰未跟踪文件）——是调用方弹窗显式确认的选择，此处不做脏工作区预检。
 // 成功后定向刷新主项目快照。
 func (s *Service) WorktreeReset(path string, target string, hard bool) error {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return err
 	}
 	if target == "" {
 		return errors.New("重置目标不能为空")
@@ -290,9 +290,9 @@ func (s *Service) WorktreeReset(path string, target string, hard bool) error {
 // BranchAdd 新建本地分支（不检出、不切 HEAD——「建分支并切过去」由 WorktreeAdd 覆盖）。
 // branch 支持规范全名或短名；commitish 为基点（空 = HEAD）。成功后刷新主项目快照。
 func (s *Service) BranchAdd(path string, branch string, commitish string) error {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return err
 	}
 	branch = strings.TrimPrefix(branch, "refs/heads/")
 	if err := git.BranchAdd(root, branch, commitish); err != nil {
@@ -303,9 +303,9 @@ func (s *Service) BranchAdd(path string, branch string, commitish string) error 
 }
 
 func (s *Service) BranchDelete(path string, branch string, force bool) error {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return err
 	}
 	list, err := git.WorktreeList(root)
 	if err != nil {
@@ -329,9 +329,9 @@ func (s *Service) BranchDelete(path string, branch string, force bool) error {
 // 统一口径：worktree 源 = tracked + 未跟踪未忽略（ls-files，含已暂存未提交）；
 // commit/ref 源 = 该提交树内的全部文件（ls-tree -r）。被忽略文件在两种源下都不返回。
 func (s *Service) Tree(path string, src TreeSource) (*TreeListResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	switch src.Type {
 	case SourceTypeWorktree:
@@ -358,18 +358,18 @@ func (s *Service) Tree(path string, src TreeSource) (*TreeListResult, error) {
 
 // ReadFile 读某 TreeSource 下 file 的内容。实现在 file.go（二进制检测：前 8KB 含 NUL）。
 func (s *Service) ReadFile(path string, src TreeSource, file string) (*FileResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	return readFile(root, src, file)
 }
 
 // ReadFileRaw 读某 TreeSource 下 file 的原始字节（图片等二进制预览）。实现在 file.go。
 func (s *Service) ReadFileRaw(path string, src TreeSource, file string) ([]byte, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	return readFileRaw(root, src, file)
 }
@@ -382,9 +382,9 @@ func (s *Service) SaveFile(path string, src TreeSource, file string, content str
 // DiffTrees 对比 base → current 两个 TreeSource 的目录树。实现在 diff.go（git 模式 / fs 扫描模式）。
 // 状态/路径筛选在 diff 面板前端本地做（变更清单一次全量返回）。
 func (s *Service) DiffTrees(path string, base TreeSource, current TreeSource) (*DiffTreesResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	if base.Type == SourceTypeWorktree || current.Type == SourceTypeWorktree {
 		result, err := diffTreesFs(root, base, current)
@@ -427,9 +427,9 @@ func changeBase(root string, src TreeSource) (string, error) {
 // （rename 条目与当前侧路径不同，空则同 file）；base 为零值时按「相对基准」对比
 // （worktree vs HEAD、ref/commit vs 父提交，同 Changes）。
 func (s *Service) ReadFileDiff(path string, base TreeSource, current TreeSource, file string, baseFile string) (*FileDiffResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	if base == (TreeSource{}) {
 		baseSha, err := changeBase(root, current)
@@ -447,9 +447,9 @@ func (s *Service) ReadFileDiff(path string, base TreeSource, current TreeSource,
 //
 // 复用 DiffTrees：含 worktree 侧自动走 fs 模式。
 func (s *Service) Changes(path string, src TreeSource) (*DiffTreesResult, error) {
-	root, ok := git.FindGitRoot(path)
-	if !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	root, err := repoRoot(path)
+	if err != nil {
+		return nil, err
 	}
 	base, err := changeBase(root, src)
 	if err != nil {

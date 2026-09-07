@@ -107,8 +107,8 @@ func saveFile(path string, src TreeSource, file string, content string) (*FileRe
 	if src.Type != SourceTypeWorktree {
 		return nil, errors.New("只有 worktree 源（真实文件树）可以编辑保存")
 	}
-	if _, ok := git.FindGitRoot(path); !ok {
-		return nil, fmt.Errorf("path 不是 git 仓库: path=%s", path)
+	if _, err := repoRoot(path); err != nil {
+		return nil, err
 	}
 	full, err := secureJoin(src.Id, file)
 	if err != nil {
