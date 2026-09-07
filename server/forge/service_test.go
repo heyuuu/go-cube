@@ -166,3 +166,35 @@ var (
 	_ = settings.SaveSection
 	_ = iconkit.ValidateIcon
 )
+
+// TestReorderAccounts 按键重排 accounts 节（顺序即 forge 页展示序）；未知/重复键报错。
+func TestReorderAccounts(t *testing.T) {
+	s, _ := newService(t)
+	seedForge(t, s)
+	if err := s.SaveForge(Forge{Host: "gitee.com", Kind: KindGitee}); err != nil {
+		t.Fatalf("seed 失败: %v", err)
+	}
+	for _, a := range []Account{
+		{ForgeHost: "github.com", Username: "a1", Token: "t"},
+		{ForgeHost: "github.com", Username: "a2", Token: "t"},
+		{ForgeHost: "gitee.com", Username: "b1", Token: "t"},
+	} {
+		if err := s.SaveAccount(a); err != nil {
+			t.Fatalf("保存 account 失败: %v", err)
+		}
+	}
+
+	if err := s.ReorderAccounts([]string{"github.com/a2", "gitee.com/b1", "github.com/a1"}); err != nil {
+		t.Fatalf("重排失败: %v", err)
+	}
+	got := s.Accounts()
+	if got[0].Username != "a2" || got[1].Username != "b1" || got[2].Username != "a1" {
+		t.Fatalf("重排后顺序不符: %+v", got)
+	}
+	if err := s.ReorderAccounts([]string{"github.com/ghost"}); err == nil {
+		t.Fatal("未知键应报错")
+	}
+	if err := s.ReorderAccounts([]string{"github.com/a1", "github.com/a1"}); err == nil {
+		t.Fatal("重复键应报错")
+	}
+}

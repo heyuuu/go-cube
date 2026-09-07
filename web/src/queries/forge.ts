@@ -59,6 +59,17 @@ export function useForgeAccountDelete() {
   });
 }
 
+// 拖拽排序：提交按目标顺序排列的全量键名单（host/username）
+export function useForgeAccountReorder() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Parameters<typeof apiPost<'/api/forge/account/reorder'>>[1]) =>
+      apiPost('/api/forge/account/reorder', input),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+    onError: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+  });
+}
+
 // 拉取 account 名下全部仓库：出站 API 调用（慢操作），成功返回 count
 export function useForgeAccountFetch() {
   return useMutation({

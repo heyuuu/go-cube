@@ -1,5 +1,7 @@
-// settings 页 Forge 分区「账号」子表：forge account（纯 API 凭证）的增删改（提案 1041）。
+// settings 页 Forge 分区「账号」子表：forge account（纯 API 凭证）的增删改与拖拽排序（提案 1041/1044）。
 // token 只以掩码形态展示与回传（提交掩码值 = 未修改，沿用旧值）；generic forge 无 API 不可挂账号。
+// 拖动 ⠿ 排序，顺序即 forge 页账号摘要条的展示序。
+import { GripVertical } from 'lucide-react';
 import { useState } from 'react';
 
 import type { Forge, ForgeAccount } from '@/api/client';
@@ -11,7 +13,15 @@ import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
-import { useForgeAccountDelete, useForgeAccountSave, useForgeAccounts, useForges } from '@/queries/forge';
+import {
+  useForgeAccountDelete,
+  useForgeAccountReorder,
+  useForgeAccountSave,
+  useForgeAccounts,
+  useForges,
+} from '@/queries/forge';
+
+import { STICKY_LEFT, STICKY_RIGHT, useDragOrder } from './drag-order';
 
 interface AccountDraft {
   forgeHost: string;
@@ -108,10 +118,16 @@ export function ForgeAccountsSection() {
   const accounts = useForgeAccounts();
   const forgesQ = useForges();
   const del = useForgeAccountDelete();
+  const reorder = useForgeAccountReorder();
   const [editing, setEditing] = useState<AccountDraft | null>(null);
   const [deleting, setDeleting] = useState<ForgeAccount | null>(null);
 
   const list = accounts.data?.list ?? [];
+  const d = useDragOrder(
+    (a: ForgeAccount) => `${a.forgeHost}/${a.username}`,
+    list,
+    (rows) => reorder.mutate({ keys: rows.map((r) => `${r.forgeHost}/${r.username}`) }),
+  );
 
   return (
     <section>
@@ -136,6 +152,7 @@ export function ForgeAccountsSection() {
       </div>
       {accounts.error && <ErrorBanner message={`加载失败：${accounts.error.message}`} />}
       {del.error && <ErrorBanner message={`删除失败：${del.error.message}`} />}
+      {reorder.error && <ErrorBanner message={`排序失败：${reorder.error.message}`} />}
       <div className="rounded-lg border">
         <Table>
           <TableHeader>
@@ -154,16 +171,21 @@ export function ForgeAccountsSection() {
                 </TableCell>
               </TableRow>
             )}
-            {list.map((a: ForgeAccount) => (
-              <TableRow key={`${a.forgeHost}/${a.username}`}>
-                <TableCell className="font-mono text-xs">{a.forgeHost}</TableCell>
+            {d.rows.map((a: ForgeAccount, i) => (
+              <TableRow key={`${a.forgeHost}/${a.username}`} {...d.rowProps(a, i)}>
+                <TableCell className={STICKY_LEFT}>
+                  <span className="flex items-center gap-1.5">
+                    <GripVertical {...d.gripProps(a)} />
+                    <span className="font-mono text-xs">{a.forgeHost}</span>
+                  </span>
+                </TableCell>
                 <TableCell className="font-mono text-xs">{a.username}</TableCell>
                 <TableCell>
                   <Badge variant="outline" className="font-mono">
                     {a.token || '未设置'}
                   </Badge>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className={`${STICKY_RIGHT} text-right`}>
                   <Button
                     size="sm"
                     variant="ghost"

@@ -12,7 +12,7 @@ import { HintTip } from './ui/tooltip';
 // 铺满型页面（工作台多面板）不吃 max-w 收敛——由 fullBleedPrefixes 按路由前缀区分。
 const navItems = [
   { to: '/projects', label: 'Projects', icon: FolderKanban },
-  { to: '/forges', label: 'Forge', icon: Cloud },
+  { to: '/forges', label: 'Forges', icon: Cloud },
   { to: '/workbench', label: '工作台', icon: PanelsTopLeft },
 ];
 const fullBleedPrefixes = ['/workbench'];

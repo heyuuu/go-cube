@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { matchForgeFilter, repoHostOf, repoHostsOf } from './forge';
+import { matchForgeFilter, repoHostOf, repoHostsOf, repoPathOf } from './forge';
 
 // 语义与后端 forge.RepoHost 对齐（见 server/forge/types.go 的 TestRepoHost）
 describe('repoHostOf', () => {
@@ -89,5 +89,19 @@ describe('repoHostsOf', () => {
     expect(repoHostsOf(undefined)).toEqual([]);
     expect(repoHostsOf({})).toEqual([]);
     expect(repoHostsOf({ repoUrl: '', remotes: [] })).toEqual([]);
+  });
+});
+
+describe('repoPathOf', () => {
+  it('解析 ssh / https 形态为 namespace/name', () => {
+    expect(repoPathOf('git@github.com:heyuuu/cube.git')).toBe('heyuuu/cube');
+    expect(repoPathOf('https://gitee.com/ce_lbt/edu-web.git')).toBe('ce_lbt/edu-web');
+    expect(repoPathOf('ssh://git@gitea.example.com:3000/acme/app')).toBe('acme/app');
+  });
+
+  it('空值/无法解析返回空串', () => {
+    expect(repoPathOf(undefined)).toBe('');
+    expect(repoPathOf('')).toBe('');
+    expect(repoPathOf('not a url at all')).toBe('');
   });
 });

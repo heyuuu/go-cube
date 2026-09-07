@@ -31,6 +31,7 @@ func (h *ForgeHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/forge/account/list", "获取 forge account 列表（token 打码）", h.accountList)
 	web.ApiPost(api, "/api/forge/account/save", "新增或按 forgeHost+username 替换 account", h.accountSave)
 	web.ApiPost(api, "/api/forge/account/delete", "按 forgeHost+username 删除 account", h.accountDelete)
+	web.ApiPost(api, "/api/forge/account/reorder", "按键（host/username）重排 account 顺序", h.accountReorder)
 	web.ApiPost(api, "/api/forge/account/fetch", "拉取 account 名下全部远端仓库", h.accountFetch)
 
 	web.ApiGet(api, "/api/forge/overview", "forge 页聚合：全部 account 对账行 + 拉取元信息（只读缓存不外呼）", h.forgeOverview)
@@ -148,6 +149,20 @@ func (h *ForgeHandler) accountFetch(input AccountFetchInput) (map[string]any, er
 		return nil, err
 	}
 	return map[string]any{"ok": true, "count": len(repos)}, nil
+}
+
+// AccountReorderInput account/reorder 接口入参（整表按目标顺序提交键名单）。
+type AccountReorderInput struct {
+	Body struct {
+		Keys []string `json:"keys" doc:"按目标顺序排列的 account 键名单（host/username）"`
+	}
+}
+
+func (h *ForgeHandler) accountReorder(input AccountReorderInput) (map[string]any, error) {
+	if err := h.forgeService.ReorderAccounts(input.Body.Keys); err != nil {
+		return nil, err
+	}
+	return map[string]any{"ok": true}, nil
 }
 
 // forgeOverview forge 页聚合数据源（只读拉取缓存与本地快照，不触发外呼）。

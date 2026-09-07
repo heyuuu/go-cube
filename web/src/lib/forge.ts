@@ -46,3 +46,15 @@ export function matchForgeFilter(hosts: readonly string[], filter: string, forge
   if (filter === 'other') return hosts.length > 0 && !hosts.some((h) => forgeHosts.includes(h));
   return hosts.includes(filter);
 }
+
+// 从 repo remote URL 解析「namespace/name」展示形态（去 scheme/host 与 .git 尾缀），
+// 无法解析返回空串。RepoUrl 列的展示文本用它（host 由 forge icon 承载，不重复显示）。
+export function repoPathOf(raw: string | null | undefined): string {
+  const host = repoHostOf(raw);
+  const s = (raw ?? '').trim();
+  if (!s || !host) return '';
+  const path = s.startsWith('git@')
+    ? s.slice(4 + host.length + 1)
+    : s.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\/[^/]+\//, '');
+  return path.replace(/\.git$/, '').replace(/\/$/, '');
+}

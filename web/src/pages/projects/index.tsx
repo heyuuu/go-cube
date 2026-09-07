@@ -1,8 +1,5 @@
 import {
-  ArrowDown,
   ArrowDownWideNarrow,
-  ArrowUp,
-  ArrowUpDown,
   ChevronRight,
   Folder,
   FolderGit2,
@@ -17,10 +14,10 @@ import { useSearchParams } from 'react-router';
 import type { Opener, Project } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
+import { Chip, FilterRow, SortHead } from '@/components/filter-chips';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -103,35 +100,8 @@ function matchGitFilter(p: Project, filter: GitStatus | 'all'): boolean {
   }
 }
 
-// 筛选行标签：单选/多选标注 + 名称。整块固定宽度（以最长的 workspace 为准），让各行 chips 起点对齐
-function FilterLabel({ label, mode }: { label: string; mode: '单选' | '多选' }) {
-  return (
-    <span className="flex w-24 shrink-0 items-baseline gap-1 text-muted-foreground">
-      <span className="text-[0.625rem] opacity-70">{mode}</span>
-      {label}
-    </span>
-  );
-}
-
-// 筛选 chip（单选/多选由调用方控制 active）
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'rounded-full border px-2.5 py-0.5 text-xs transition-colors',
-        active
-          ? 'border-primary bg-primary text-primary-foreground'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-      )}
-    >
-      {children}
-    </button>
-  );
-}
-
-// 可点击表头：循环 默认(无箭头) → 升序 → 降序 → 默认。排序与筛选分离，不进 chips 区
+// 可点击表头：循环 默认(无箭头) → 升序 → 降序 → 默认。排序与筛选分离，不进 chips 区。
+// SortMode 语义到三态图标的映射，视觉部分复用公共 SortHead。
 function SortableHead({
   k,
   label,
@@ -147,29 +117,13 @@ function SortableHead({
 }) {
   const active = mode === k || mode === `${k}-desc`;
   const desc = mode === `${k}-desc`;
-  const Icon = !active ? ArrowUpDown : desc ? ArrowDown : ArrowUp;
   return (
-    <TableHead className={className}>
-      <button
-        type="button"
-        className={cn(
-          'flex items-center gap-1 hover:text-foreground',
-          active ? 'font-medium text-foreground' : 'text-muted-foreground',
-        )}
-        onClick={() => onSet(!active ? k : desc ? 'default' : `${k}-desc`)}
-      >
-        {label}
-        {/* 激活态：主题色箭头 + 圆形底（类似选中态），与未激活的灰色双向箭头一眼区分。
-            圆 20px / 图标 12px——留足四周 padding，视觉上箭头才在圆心 */}
-        {active ? (
-          <span className="flex size-5 items-center justify-center rounded-full bg-primary/15">
-            <Icon className="size-3 text-primary" />
-          </span>
-        ) : (
-          <Icon className="size-3" />
-        )}
-      </button>
-    </TableHead>
+    <SortHead
+      label={label}
+      className={className}
+      state={active ? (desc ? 'desc' : 'asc') : null}
+      onCycle={() => onSet(!active ? k : desc ? 'default' : `${k}-desc`)}
+    />
   );
 }
 
@@ -355,7 +309,6 @@ export function ProjectsPage() {
   const scanRules = useScanRules();
   const forges = useForges();
 
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
   const [openError, setOpenError] = useState('');
   const [drawer, setDrawer] = useState<Project | null>(null);
   // 筛选状态全部走 URL（?q=&group=&git=&tag=，?view= 同理）：刷新/前进后退/跨页往返均无损
@@ -531,15 +484,6 @@ export function ProjectsPage() {
     updateParams({ q: null, group: null, git: null, tag: null, wt: null, ws: null, forge: null, sort: null });
   }
 
-  function toggleSelect(path: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      return next;
-    });
-  }
-
   function switchMode(next: 'table' | 'tree') {
     updateParams({ view: next === 'tree' ? 'tree' : null });
   }
@@ -612,14 +556,6 @@ export function ProjectsPage() {
         <span className="text-xs text-muted-foreground">
           共 <strong className="text-foreground">{filtered.length}</strong> 个
         </span>
-        {selected.size > 0 && (
-          <span className="text-xs text-muted-foreground">
-            已选 <strong className="text-foreground">{selected.size}</strong> 个
-            <button type="button" className="ml-2 text-primary hover:underline" onClick={() => setSelected(new Set())}>
-              取消
-            </button>
-          </span>
-        )}
         {/* 排序：列表模式走表头点击（SortableHead），树模式无表头、此处提供下拉 */}
         {mode === 'tree' && (
           <DropdownMenu>
@@ -676,8 +612,7 @@ export function ProjectsPage() {
 
       {/* 筛选 chips */}
       <div className="flex flex-col gap-1.5 px-6 pb-3 text-xs">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterLabel label="group" mode="多选" />
+        <FilterRow label="group" mode="多选">
           <Chip active={groupFilter.length === 0} onClick={() => updateParams({ group: null })}>
             全部
           </Chip>
@@ -689,18 +624,16 @@ export function ProjectsPage() {
               </span>
             </Chip>
           ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterLabel label="git" mode="单选" />
+        </FilterRow>
+        <FilterRow label="git" mode="单选">
           {gitFilters.map((s) => (
             <Chip key={s.value} active={gitFilter === s.value} onClick={() => setGitFilterValue(s.value)}>
               {s.label}
             </Chip>
           ))}
-        </div>
+        </FilterRow>
         {forgeList.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <FilterLabel label="forge" mode="单选" />
+          <FilterRow label="forge" mode="单选">
             <Chip active={forgeFilter === 'all'} onClick={() => setForgeFilterValue('all')}>
               全部
             </Chip>
@@ -718,29 +651,26 @@ export function ProjectsPage() {
             <Chip active={forgeFilter === 'none'} onClick={() => setForgeFilterValue('none')}>
               无forge
             </Chip>
-          </div>
+          </FilterRow>
         )}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterLabel label="worktree" mode="单选" />
+        <FilterRow label="worktree" mode="单选">
           <Chip active={!wtFilter} onClick={() => setWtFilter(false)}>
             全部
           </Chip>
           <Chip active={wtFilter} onClick={() => setWtFilter(true)}>
             有 <GitBranch className="ml-0.5 inline size-3" />
           </Chip>
-        </div>
-        <div className="flex flex-wrap items-center gap-1.5">
-          <FilterLabel label="workspace" mode="单选" />
+        </FilterRow>
+        <FilterRow label="workspace" mode="单选">
           <Chip active={!wsFilter} onClick={() => setWsFilter(false)}>
             全部
           </Chip>
           <Chip active={wsFilter} onClick={() => setWsFilter(true)}>
             有 <Layers className="ml-0.5 inline size-3" />
           </Chip>
-        </div>
+        </FilterRow>
         {tags.length > 0 && (
-          <div className="flex flex-wrap items-center gap-1.5">
-            <FilterLabel label="tag" mode="单选" />
+          <FilterRow label="tag" mode="单选">
             <Chip active={tagFilter === 'all'} onClick={() => setTagFilterValue('all')}>
               全部
             </Chip>
@@ -749,7 +679,7 @@ export function ProjectsPage() {
                 {t}
               </Chip>
             ))}
-          </div>
+          </FilterRow>
         )}
       </div>
 
@@ -802,7 +732,6 @@ export function ProjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-9" />
                   <SortableHead
                     k="name"
                     label="name"
@@ -833,18 +762,7 @@ export function ProjectsPage() {
                   const multi = targets.length > 1;
                   const expanded = targetExpanded.has(p.path);
                   return [
-                    <TableRow
-                      key={p.path}
-                      className={cn('cursor-pointer', selected.has(p.path) && 'bg-muted/50')}
-                      onClick={() => setDrawer(p)}
-                    >
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={selected.has(p.path)}
-                          onCheckedChange={() => toggleSelect(p.path)}
-                          aria-label={`选择 ${p.name}`}
-                        />
-                      </TableCell>
+                    <TableRow key={p.path} className="cursor-pointer" onClick={() => setDrawer(p)}>
                       <TableCell>
                         <div className="flex items-center gap-1.5">
                           <div className="min-w-0 flex-1">

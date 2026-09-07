@@ -72,6 +72,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/forge/account/reorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 按键（host/username）重排 account 顺序 */
+    post: operations['forge.accountReorder'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/forge/account/save': {
     parameters: {
       query?: never;
@@ -1003,6 +1020,16 @@ export interface components {
       force?: boolean;
       forgeHost: string;
       username: string;
+    };
+    AccountReorderInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/AccountReorderInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 按目标顺序排列的 account 键名单（host/username） */
+      keys: string[] | null;
     };
     AccountSaveInputBody: {
       /**
@@ -2145,6 +2172,39 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultAccountBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'forge.accountReorder': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AccountReorderInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */

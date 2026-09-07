@@ -177,6 +177,45 @@ func (s *Service) SaveAccount(a Account) error {
 	return saveAccounts(s.settingsFile, accounts)
 }
 
+// ReorderAccounts 按键（host/username）顺序重排 accounts 节（顺序即 forge 页展示序）。
+// 未列出的条目保持原相对顺序排在末尾，不丢数据；未知或重复键返回中文错误。
+func (s *Service) ReorderAccounts(keys []string) error {
+	accounts := loadAccounts(s.settingsFile)
+	byKey := make(map[string]Account, len(accounts))
+	for _, a := range accounts {
+		k := acctCacheKey(a.ForgeHost, a.Username)
+		if _, dup := byKey[k]; dup {
+			return fmt.Errorf("settings.json 存在重复键的 account，无法重排")
+		}
+		byKey[k] = a
+	}
+	seen := make(map[string]bool, len(keys))
+	for _, raw := range keys {
+		h, u := key2acct(raw)
+		h, u = NormalizeHost(h), NormalizeUsername(u)
+		k := acctCacheKey(h, u)
+		if _, ok := byKey[k]; !ok {
+			return fmt.Errorf("未找到指定 account: %s@%s", u, h)
+		}
+		if seen[k] {
+			return fmt.Errorf("重排名单存在重复 account: %s@%s", u, h)
+		}
+		seen[k] = true
+	}
+
+	ordered := make([]Account, 0, len(accounts))
+	for _, raw := range keys {
+		h, u := key2acct(raw)
+		ordered = append(ordered, byKey[acctCacheKey(h, u)])
+	}
+	for _, a := range accounts {
+		if !seen[acctCacheKey(a.ForgeHost, a.Username)] {
+			ordered = append(ordered, a)
+		}
+	}
+	return saveAccounts(s.settingsFile, ordered)
+}
+
 // DeleteAccount 按 forgeHost+username 删除一条 account；不存在时返回中文错误。
 func (s *Service) DeleteAccount(forgeHost, username string) error {
 	forgeHost, username = NormalizeHost(forgeHost), NormalizeUsername(username)

@@ -8,12 +8,15 @@ import { Link, useSearchParams } from 'react-router';
 import type { components, Forge } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
+import { Chip, FilterRow, SortHead } from '@/components/filter-chips';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { repoPathOf } from '@/lib/forge';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
+import { guessHome, prettyPath } from '@/lib/path';
 import { prettyTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
 import { useForgeAccountFetch, useForgeOverview, useForges } from '@/queries/forge';
@@ -34,6 +37,13 @@ const STATUS_META: Record<string, { label: string; className: string }> = {
   orphan: { label: '孤儿', className: 'text-amber-600' },
 };
 
+// 排序键（URL ?sort= 记忆）：默认按更新时间倒序（远端仓库时间）
+type SortMode = 'updated' | 'updated-asc' | 'name' | 'name-desc';
+
+function isSortMode(v: string | null): v is SortMode {
+  return v === 'updated' || v === 'updated-asc' || v === 'name' || v === 'name-desc';
+}
+
 // fetchedAt 超过该天数视为「数据已过期」（页头徽标提示，不自动外呼）
 const STALE_DAYS = 7;
 
@@ -42,19 +52,32 @@ function isStale(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() > STALE_DAYS * 86400_000;
 }
 
-// 行排序：更新时间倒序（远端仓库时间）为默认，可切名称；零值时间（orphan 行）排最后
-function sortRows(rows: RepoRow[], mode: 'updated' | 'name'): RepoRow[] {
+function sortRows(rows: RepoRow[], mode: SortMode): RepoRow[] {
   const sorted = [...rows];
-  if (mode === 'name') {
-    sorted.sort((a, b) => rowName(a).localeCompare(rowName(b)));
-  } else {
-    sorted.sort((a, b) => new Date(b.repo.updatedAt ?? 0).getTime() - new Date(a.repo.updatedAt ?? 0).getTime());
+  const byName = (a: RepoRow, b: RepoRow) => rowDisplay(a).text.localeCompare(rowDisplay(b).text);
+  switch (mode) {
+    case 'name':
+      sorted.sort(byName);
+      break;
+    case 'name-desc':
+      sorted.sort((a, b) => byName(b, a));
+      break;
+    case 'updated-asc':
+      sorted.sort((a, b) => new Date(a.repo.updatedAt ?? 0).getTime() - new Date(b.repo.updatedAt ?? 0).getTime());
+      break;
+    default:
+      sorted.sort((a, b) => new Date(b.repo.updatedAt ?? 0).getTime() - new Date(a.repo.updatedAt ?? 0).getTime());
   }
   return sorted;
 }
 
-function rowName(r: RepoRow): string {
-  return r.local?.name || r.repo.name || '';
+// RepoUrl 列展示文本：owner/name（host 由 forge icon 承载）；孤儿行取本地 remote 的 repo url
+function rowDisplay(r: RepoRow): { text: string; title: string } {
+  if (r.status === 'orphan' && r.local) {
+    return { text: repoPathOf(r.local.repoUrl), title: r.local.repoUrl };
+  }
+  const text = r.repo.fullName || repoPathOf(r.repo.cloneUrl);
+  return { text, title: r.repo.cloneUrl };
 }
 
 export function ForgesPage() {
@@ -72,13 +95,17 @@ export function ForgesPage() {
 
   const forgeFilter = params.get('forge') ?? 'all';
   const statusFilter = params.get('status') ?? 'all';
-  const sort = (params.get('sort') ?? 'updated') as 'updated' | 'name';
-  const setParam = (key: string, value: string) => {
+  const sortParam = params.get('sort');
+  const sortMode: SortMode = isSortMode(sortParam) ? sortParam : 'updated';
+  const setParam = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
-    if (value === 'all' || value === 'updated') next.delete(key);
+    if (value === null) next.delete(key);
     else next.set(key, value);
     setParams(next, { replace: true });
   };
+
+  // 路径展示用 ~ 缩写（与项目页一致）；home 从本地行推导
+  const home = guessHome((overview.data?.rows ?? []).map((r) => r.local?.path ?? '').filter(Boolean));
 
   const accounts = overview.data?.accounts ?? [];
   const fetchedCount = accounts.filter((a) => !a.fetchedAt?.startsWith('0001')).length;
@@ -88,7 +115,7 @@ export function ForgesPage() {
       (r) =>
         (forgeFilter === 'all' || r.forgeHost === forgeFilter) && (statusFilter === 'all' || r.status === statusFilter),
     ),
-    sort,
+    sortMode,
   );
 
   const copy = (label: string, text: string) => {
@@ -100,7 +127,7 @@ export function ForgesPage() {
   return (
     <div className="pb-10">
       <PageHeader
-        title="Forge"
+        title="Forges"
         meta={<span>远端仓库视角（对账缓存，不实时外呼）；clone / 推拉等 git 操作仍走本机凭证与既有流程</span>}
       />
 
@@ -168,44 +195,32 @@ export function ForgesPage() {
         )}
       </div>
 
-      {/* 筛选 chips：forge / 对账状态 / 排序（URL 记忆） */}
-      <div className="mx-6 mb-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">forge</span>
-          {[{ host: 'all', label: '全部' }, ...forges.map((f) => ({ host: f.host, label: f.host }))].map((f) => (
-            <button
-              key={f.host}
-              type="button"
-              onClick={() => setParam('forge', f.host)}
-              className={chipClass(forgeFilter === f.host)}
-            >
-              {f.host !== 'all' && renderIcon(forgeIcon(f.host), null)}
-              {f.label}
-            </button>
+      {/* 筛选 chips（每维一行，标签标注单选/多选，同 Projects 页） */}
+      <div className="mx-6 mb-3 flex flex-col gap-1.5 text-xs">
+        <FilterRow label="forge" mode="单选">
+          <Chip active={forgeFilter === 'all'} onClick={() => setParam('forge', null)}>
+            全部
+          </Chip>
+          {forges.map((f) => (
+            <Chip key={f.host} active={forgeFilter === f.host} onClick={() => setParam('forge', f.host)}>
+              <span className="flex items-center gap-1">
+                {renderIcon(f.icon ? { type: f.icon.type, value: f.icon.value } : undefined, null)}
+                {f.host}
+              </span>
+            </Chip>
           ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">状态</span>
+        </FilterRow>
+        <FilterRow label="状态" mode="单选">
           {STATUS_FILTERS.map((s) => (
-            <button
+            <Chip
               key={s.value}
-              type="button"
-              onClick={() => setParam('status', s.value)}
-              className={chipClass(statusFilter === s.value)}
+              active={statusFilter === s.value}
+              onClick={() => setParam('status', s.value === 'all' ? null : s.value)}
             >
               {s.label}
-            </button>
+            </Chip>
           ))}
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs text-muted-foreground">排序</span>
-          <button type="button" onClick={() => setParam('sort', 'updated')} className={chipClass(sort === 'updated')}>
-            更新时间
-          </button>
-          <button type="button" onClick={() => setParam('sort', 'name')} className={chipClass(sort === 'name')}>
-            名称
-          </button>
-        </div>
+        </FilterRow>
       </div>
 
       {overview.error && <ErrorBanner message={`加载失败：${overview.error.message}`} />}
@@ -215,41 +230,49 @@ export function ForgesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>仓库</TableHead>
-              <TableHead>owner</TableHead>
-              <TableHead>forge</TableHead>
+              <SortHead
+                label="RepoUrl"
+                state={sortMode === 'name' ? 'asc' : sortMode === 'name-desc' ? 'desc' : null}
+                onCycle={() =>
+                  setParam('sort', sortMode === 'name' ? 'name-desc' : sortMode === 'name-desc' ? null : 'name')
+                }
+              />
               <TableHead>状态</TableHead>
               <TableHead>本地</TableHead>
-              <TableHead>更新时间</TableHead>
+              <SortHead
+                label="更新时间"
+                state={sortMode === 'updated' ? 'desc' : sortMode === 'updated-asc' ? 'asc' : null}
+                onCycle={() =>
+                  setParam(
+                    'sort',
+                    sortMode === 'updated' ? 'updated-asc' : sortMode === 'updated-asc' ? null : 'updated',
+                  )
+                }
+              />
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={7} className="text-xs text-muted-foreground">
+                <TableCell colSpan={6} className="text-xs text-muted-foreground">
                   {overview.isLoading ? '加载中…' : '暂无仓库行——先在上方刷新账号拉取'}
                 </TableCell>
               </TableRow>
             )}
             {rows.map((r) => {
               const status = STATUS_META[r.status];
+              const display = rowDisplay(r);
               const cloneCmd = `cube clone ${r.repo.cloneUrl}`;
               return (
-                <TableRow key={`${r.forgeHost}/${r.owner}/${rowName(r)}/${r.status}`}>
+                <TableRow key={`${r.forgeHost}/${r.owner}/${display.text}/${r.status}`}>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
-                      {r.repo.name}
-                      {r.repo.defaultBranch && (
+                      {renderIcon(forgeIcon(r.forgeHost), null)}
+                      <span title={display.title}>{display.text || '—'}</span>
+                      {r.repo.defaultBranch && r.status !== 'orphan' && (
                         <span className="font-mono text-[10px] text-muted-foreground">{r.repo.defaultBranch}</span>
                       )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{r.owner || '—'}</TableCell>
-                  <TableCell>
-                    <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-                      {renderIcon(forgeIcon(r.forgeHost), null)}
-                      {r.forgeHost}
                     </span>
                   </TableCell>
                   <TableCell>
@@ -261,7 +284,7 @@ export function ForgesPage() {
                     {r.local ? (
                       <span className="flex items-center gap-1.5 text-xs">
                         <span className="max-w-48 truncate font-mono text-muted-foreground" title={r.local.path}>
-                          {r.local.path}
+                          {prettyPath(r.local.path, home)}
                         </span>
                         {r.local.dirty && (
                           <Badge variant="outline" className="text-amber-600">
@@ -319,14 +342,5 @@ export function ForgesPage() {
         <EmptyState title="还没有对账数据" sub="点击上方账号摘要的 ↻ 拉取远端仓库列表" />
       )}
     </div>
-  );
-}
-
-function chipClass(active: boolean): string {
-  return cn(
-    'flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-mono text-xs transition-colors',
-    active
-      ? 'border-primary bg-primary text-primary-foreground'
-      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
   );
 }
