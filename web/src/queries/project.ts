@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiPost } from '@/api/client';
 import { tryOpenUrlAction } from '@/lib/opener-action';
+import { useOpenerList } from '@/queries/opener';
 import { useRecordUsage } from '@/queries/usage';
 
 // 30s 轮询：后端 gitcache 由 server 定时刷新，前端只拉快照不触发采集
@@ -11,10 +12,6 @@ export function useProjectList() {
     queryFn: () => apiGet('/api/project/list'),
     refetchInterval: 30_000,
   });
-}
-
-export function useOpenerList() {
-  return useQuery({ queryKey: ['opener', 'list'], queryFn: () => apiGet('/api/opener/list') });
 }
 
 // 用指定 opener 打开任意文件/目录——workbench/md 等通用打开口。

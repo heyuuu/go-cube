@@ -7,9 +7,6 @@ import { apiPost } from '@/api/client';
 // 提取图标（统一 64px PNG）：返回 base64 字符串
 export function useIconExtract() {
   return useMutation({
-    mutationFn: async (source: string): Promise<string> => {
-      const data = await apiPost('/api/icon/extract', { source });
-      return (data as { value: string }).value;
-    },
+    mutationFn: async (source: string): Promise<string> => (await apiPost('/api/icon/extract', { source })).value,
   });
 }

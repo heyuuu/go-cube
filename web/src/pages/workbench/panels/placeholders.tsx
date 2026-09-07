@@ -1,5 +1,3 @@
-import { TerminalSquare } from 'lucide-react';
-
 // 内容区占位：代码阅读（1012）/ diff（1013）按选中态在此切换
 export function ContentPanelPlaceholder({ title }: { title: React.ReactNode }) {
   return (
@@ -10,12 +8,3 @@ export function ContentPanelPlaceholder({ title }: { title: React.ReactNode }) {
   );
 }
 
-// PTY 抽屉占位（完整实现在提案 1014）：默认收起，只留常驻把手提示
-export function TerminalPanelPlaceholder() {
-  return (
-    <div className="flex items-center justify-center border-t border-border bg-muted/30 py-2 text-xs text-muted-foreground">
-      <TerminalSquare className="mr-1.5 size-3.5" />
-      终端面板（1014）待实现
-    </div>
-  );
-}

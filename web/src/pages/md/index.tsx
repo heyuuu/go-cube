@@ -24,7 +24,8 @@ import {
 import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
-import { useOpenerList, useOpenerOpen } from '@/queries/project';
+import { useOpenerList } from '@/queries/opener';
+import { useOpenerOpen } from '@/queries/project';
 
 // md 渲染页：独立于主应用 Layout（文档查看器，不带业务侧栏）。
 // 路由 /md?path=<abs>，由 `cube md` 命令打开；渲染全在前端（后端只给原文与文件列表）。
@@ -145,6 +146,7 @@ function MdTreeRow({
 }) {
   const n = row.node;
   const isDir = n.kind === 'dir';
+  const nodeOpeners = openerList.filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {}));
   return (
     <div
       ref={rowRef}
@@ -181,18 +183,16 @@ function MdTreeRow({
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => onExternal(n.path)}>在新页面打开</DropdownMenuItem>
             <DropdownMenuSeparator />
-            {openerList
-              .filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {}))
-              .map((op) => (
-                <DropdownMenuItem
-                  key={op.name}
-                  disabled={open.isPending}
-                  onClick={() => onOpenNode(n.path, op.name, isDir)}
-                >
-                  {op.name}
-                </DropdownMenuItem>
-              ))}
-            {openerList.filter((op) => (isDir ? 'open-dir' : 'open-file') in (op.actions ?? {})).length === 0 && (
+            {nodeOpeners.map((op) => (
+              <DropdownMenuItem
+                key={op.name}
+                disabled={open.isPending}
+                onClick={() => onOpenNode(n.path, op.name, isDir)}
+              >
+                {op.title}
+              </DropdownMenuItem>
+            ))}
+            {nodeOpeners.length === 0 && (
               <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用 opener</div>
             )}
           </DropdownMenuContent>

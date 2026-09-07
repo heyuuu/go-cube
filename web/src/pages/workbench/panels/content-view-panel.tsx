@@ -174,7 +174,7 @@ export function ContentViewPanel({ params }: { params: WorkbenchParams }) {
         ) : null
       }
       toolbarExtra={
-        !listPending && changeList.length >= 0 && (viewBase || treePrefs.scope === 'diff') ? (
+        !listPending && (viewBase || treePrefs.scope === 'diff') ? (
           <span className="text-[10px] text-muted-foreground">
             {viewBase
               ? `${diff.data?.mode === 'fs' ? '文件系统扫描' : 'git 模式'} · ${entries.length} 项`

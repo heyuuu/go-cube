@@ -1,19 +1,16 @@
 // 打开意图（openerIntents 节，1038）：intent → 默认 opener + 候选清单。
 // 候选缺省 = 声明了对应 role 的全部 opener（读侧合成，openers 数组可覆盖）。
-export interface OpenerIntent {
-  intent: string;
-  defaultOpener?: string;
-  openers: string[];
-}
-
 export function useOpenerIntents() {
   return useQuery({
     queryKey: ['opener', 'intents'],
-    queryFn: async () => {
-      const data = await apiGet('/api/opener/intents');
-      return (data as { list: OpenerIntent[] }).list;
-    },
+    queryFn: async () =>
+        ((await apiGet('/api/opener/intents')).list ?? []).map((i) => ({ ...i, openers: i.openers ?? [] })),
   });
+}
+
+// opener 清单（openers 节）：project / workbench / md 等打开入口共用。
+export function useOpenerList() {
+  return useQuery({ queryKey: ['opener', 'list'], queryFn: () => apiGet('/api/opener/list') });
 }
 
 export function useIntentDefaultSave() {
@@ -50,8 +47,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import type { Opener } from '@/api/client';
 import { apiGet, apiPost } from '@/api/client';
-
-import { useOpenerList } from './project';
 
 export function useOpenerSave() {
   const qc = useQueryClient();

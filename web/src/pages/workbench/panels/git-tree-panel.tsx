@@ -35,7 +35,8 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
 import { useIntentDefaultOpener } from '@/queries/opener';
-import { useOpenerDiffOpen, useOpenerList, useOpenerOpen } from '@/queries/project';
+import { useOpenerList } from '@/queries/opener';
+import { useOpenerDiffOpen, useOpenerOpen } from '@/queries/project';
 import {
   useWorkbenchCommits,
   useWorkbenchInfo,

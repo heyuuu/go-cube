@@ -30,10 +30,15 @@ type IconExtractInput struct {
 	}
 }
 
-func (h *IconHandler) iconExtract(input IconExtractInput) (map[string]any, error) {
+// IconExtractResult icon/extract 接口出参（结构化出参，openapi 类型化供前端推导）。
+type IconExtractResult struct {
+	Value string `json:"value" doc:"64px PNG 的 base64 字符串"`
+}
+
+func (h *IconHandler) iconExtract(input IconExtractInput) (IconExtractResult, error) {
 	pngData, err := iconkit.ExtractFromSource(input.Body.Source)
 	if err != nil {
-		return nil, err
+		return IconExtractResult{}, err
 	}
-	return map[string]any{"value": base64.StdEncoding.EncodeToString(pngData)}, nil
+	return IconExtractResult{Value: base64.StdEncoding.EncodeToString(pngData)}, nil
 }

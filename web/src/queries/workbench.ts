@@ -176,18 +176,17 @@ export function useWorkbenchChanges(path: string, src: TreeSource, enabled: bool
 // 写成功后统一失效 workbench 全部查询（副本/refs/commits/tree 都可能变化）+
 // 项目列表（后端已定向刷新 gitcache 快照，前端重取即可见新目标）
 
-function useInvalidateWorkbench(path: string) {
+function useInvalidateWorkbench() {
   const qc = useQueryClient();
   return () => {
     void qc.invalidateQueries({ queryKey: ['workbench'] });
     void qc.invalidateQueries({ queryKey: ['project', 'list'] });
-    void path;
   };
 }
 
 // 新增 worktree：branch/commitish/targetPath 均可空（服务端定形态与预填路径）
 export function useWorktreeAdd(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: (input: { branch?: string; commitish?: string; targetPath?: string }) =>
       apiPost('/api/workbench/worktree/add', { path, ...input }),
@@ -197,7 +196,7 @@ export function useWorktreeAdd(path: string) {
 
 // 删除 worktree：非 force 被预检拒绝时返回 denied=true + reasons（由 UI 二次确认升级 force）
 export function useWorktreeRemove(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: (input: { targetPath: string; force?: boolean }) =>
       apiPost('/api/workbench/worktree/remove', { path, ...input }),
@@ -207,7 +206,7 @@ export function useWorktreeRemove(path: string) {
 
 // 重置 worktree 到指定分支/commit：hard=true 即 --hard（丢弃暂存区与工作区改动，UI 负责二次确认）
 export function useWorktreeReset(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: (input: { target: string; hard?: boolean }) =>
       apiPost('/api/workbench/worktree/reset', { path, ...input }),
@@ -217,7 +216,7 @@ export function useWorktreeReset(path: string) {
 
 // 清理失效的 worktree 管理记录（git worktree prune，幂等无损）
 export function useWorktreePrune(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: () => apiPost('/api/workbench/worktree/prune', { path }),
     onSuccess: invalidate,
@@ -226,7 +225,7 @@ export function useWorktreePrune(path: string) {
 
 // 新建本地分支（不检出——「建分支并切过去」走 worktree 新建）
 export function useBranchAdd(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: (input: { branch: string; commitish?: string }) =>
       apiPost('/api/workbench/branch/add', { path, ...input }),
@@ -235,7 +234,7 @@ export function useBranchAdd(path: string) {
 }
 
 export function useBranchDelete(path: string) {
-  const invalidate = useInvalidateWorkbench(path);
+  const invalidate = useInvalidateWorkbench();
   return useMutation({
     mutationFn: (input: { branch: string; force?: boolean }) =>
       apiPost('/api/workbench/branch/delete', { path, ...input }),

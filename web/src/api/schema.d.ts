@@ -1119,6 +1119,17 @@ export interface components {
       message: string;
       ok: boolean;
     };
+    ApiOutputIconExtractResultBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputIconExtractResultBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['IconExtractResult'];
+      message: string;
+      ok: boolean;
+    };
     ApiOutputInfoBody: {
       /**
        * Format: uri
@@ -1652,6 +1663,10 @@ export interface components {
       readonly $schema?: string;
       /** @description 图标来源：本地路径（.app 目录或图片文件）或 http(s) URL（如 https://gitee.com/favicon.ico） */
       source: string;
+    };
+    IconExtractResult: {
+      /** @description 64px PNG 的 base64 字符串 */
+      value: string;
     };
     Info: {
       defaultBranch: string;
@@ -2427,7 +2442,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+          'application/json': components['schemas']['ApiOutputIconExtractResultBody'];
         };
       };
       /** @description Error */

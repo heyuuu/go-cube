@@ -3,19 +3,16 @@ import { ChevronsDownUp, ChevronsUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // 目录树通用工具条：展开/折叠全部为内置 icon 按钮（功能描述见 title 悬停提示；
-// 调用方注入回调——数据侧的展开语义各树不同：md 树是内存集合，工作台树要异步逐层加载）；
-// 其余按钮经 extra 注入（如工作台树的「含 ignored」开关）。
-// md 页与工作台代码阅读面板共用，样式统一。
+// 调用方注入回调——数据侧的展开语义各树不同：md 树是内存集合，工作台树为一次全量拉取）；
+// 其余按钮经 extra 注入。md 页与工作台代码阅读面板共用，样式统一。
 export function TreeToolbar({
   onExpandAll,
   onCollapseAll,
-  busy = false,
   leading,
   extra,
 }: {
   onExpandAll: () => void;
   onCollapseAll: () => void;
-  busy?: boolean; // 异步逐层加载中（展开全部可能较慢）
   leading?: React.ReactNode; // 前置按钮（渲染在展开/折叠之前）
   extra?: React.ReactNode;
 }) {
@@ -26,7 +23,6 @@ export function TreeToolbar({
         variant="ghost"
         size="icon-sm"
         className="text-muted-foreground"
-        disabled={busy}
         onClick={onExpandAll}
         title="展开全部目录"
         aria-label="展开全部目录"

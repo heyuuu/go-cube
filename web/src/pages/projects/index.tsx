@@ -34,7 +34,8 @@ import { formatDateTime, prettyTime } from '@/lib/time';
 import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useForges } from '@/queries/forge';
-import { useProjectOpen, useOpenerList, useProjectList } from '@/queries/project';
+import { useOpenerList } from '@/queries/opener';
+import { useProjectOpen, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
 import { ProjectActions, TargetKindIcon, TargetRowActions, WorktreeCountBadge } from './actions';

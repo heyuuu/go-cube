@@ -15,6 +15,7 @@ export type Forge = components['schemas']['Forge'];
 export type ForgeAccount = components['schemas']['Account'];
 export type ForgeOverview = components['schemas']['Overview'];
 export type ProjectInfoResult = components['schemas']['ProjectInfoResult'];
+export type OpenerIntent = components['schemas']['OpenerIntentDTO'];
 export type ProjectListResult = components['schemas']['ProjectListResult'];
 
 export const apiClient = createClient<paths>();

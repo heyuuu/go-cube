@@ -23,7 +23,7 @@ import {
   useOpenerSave,
   useOpenerIntents,
 } from '@/queries/opener';
-import { useOpenerList } from '@/queries/project';
+import { useOpenerList } from '@/queries/opener';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 
