@@ -1,23 +1,20 @@
 import {
   ArrowDownWideNarrow,
   ChevronRight,
-  Folder,
-  FolderGit2,
   GitBranch,
   Layers,
   RefreshCw,
   RotateCcw,
 } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 
-import type { Opener, Project } from '@/api/client';
+import type { Project } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
 import { Chip, CycleSortHead, FilterRow } from '@/components/filter-chips';
 import { usePersistentSet } from '@/hooks/use-local-pref';
 import { PageHeader } from '@/components/page-header';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,7 +29,7 @@ import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { guessHome, prettyPath } from '@/lib/path';
 import { formatDateTime, prettyTime } from '@/lib/time';
-import { buildProjectTree, collectExpandablePaths, flattenTree, type TreeRow } from '@/lib/tree';
+import { buildProjectTree, collectExpandablePaths, flattenTree } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useForges } from '@/queries/forge';
 import { useOpenerList } from '@/queries/opener';
@@ -40,242 +37,21 @@ import { useProjectOpen, useProjectList } from '@/queries/project';
 import { useScanRules } from '@/queries/scan-rule';
 
 import { ProjectActions, TargetKindIcon, TargetRowActions, WorktreeCountBadge } from './actions';
+import { ClickBadge, ForgeIcon, GitCell, LastUsedTime } from './cells';
 import { ProjectDrawer } from './drawer';
+import {
+  countWorkspaces,
+  gitFilters,
+  isSortMode,
+  matchGitFilter,
+  sortKeys,
+  timeOf,
+  type GitStatus,
+  type SortKey,
+  type SortMode,
+} from './filters';
 import { projectTargets, tagVariants } from './shared';
-
-type GitStatus = 'clean' | 'dirty' | 'ahead' | 'behind' | 'none';
-
-// 排序键：default=原始扫描序；其余为 键 / 键-desc（点击表头循环 default → 键 → 键-desc → default）
-type SortKey = 'name' | 'group' | 'recent';
-type SortMode = 'default' | SortKey | `${SortKey}-desc`;
-
-const sortKeys: { value: SortKey; label: string }[] = [
-  { value: 'recent', label: '最近使用' },
-  { value: 'name', label: '名称' },
-  { value: 'group', label: '分组' },
-];
-
-function isSortMode(v: string | null): v is SortMode {
-  if (v === 'default') return true;
-  return sortKeys.some((k) => v === k.value || v === `${k.value}-desc`);
-}
-
-const gitFilters: { value: GitStatus | 'all'; label: string }[] = [
-  { value: 'all', label: '全部' },
-  { value: 'clean', label: 'clean' },
-  { value: 'dirty', label: 'dirty' },
-  { value: 'ahead', label: 'ahead' },
-  { value: 'behind', label: 'behind' },
-  { value: 'none', label: '未采集' },
-];
-
-// workspace 总数：主根 + 各 worktree 下的 workspace 成员合计（列表快照字段，读路径零探测）
-function countWorkspaces(p: Project): number {
-  const g = p.gitInfo;
-  if (!g) return 0;
-  return (g.workspaces?.length ?? 0) + (g.worktrees ?? []).reduce((n, w) => n + (w.workspaces?.length ?? 0), 0);
-}
-
-function timeOf(iso: string | null | undefined): number {
-  if (!iso) return 0;
-  const t = new Date(iso).getTime();
-  return Number.isNaN(t) || t <= 0 ? 0 : t;
-}
-
-// 谓词式匹配（非互斥分桶）：项目可能同时 dirty + ahead，
-// 筛 ahead 应包含所有 ahead > 0 的项目，而不是被 dirty 优先级吞掉。
-function matchGitFilter(p: Project, filter: GitStatus | 'all'): boolean {
-  const g = p.gitInfo;
-  if (filter === 'all') return true;
-  if (!g) return filter === 'none';
-  switch (filter) {
-    case 'none':
-      return false;
-    case 'dirty':
-      return g.dirty;
-    case 'ahead':
-      return g.ahead > 0;
-    case 'behind':
-      return g.behind > 0;
-    case 'clean':
-      return !g.dirty && g.ahead === 0 && g.behind === 0;
-  }
-}
-
-// 可点击 badge：点击将对应筛选定位到该值（已是唯一选中则取消）。激活状态由上方 chips 呈现，此处只做可点提示
-function ClickBadge({
-  variant,
-  title,
-  onClick,
-  children,
-}: {
-  variant?: 'default' | 'secondary' | 'outline' | 'destructive';
-  title: string;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <Badge
-      variant={variant}
-      title={title}
-      onClick={(e) => {
-        e.stopPropagation();
-        onClick();
-      }}
-      className="cursor-pointer hover:ring-2 hover:ring-ring/40"
-    >
-      {children}
-    </Badge>
-  );
-}
-
-function GitCell({ p, onFilter }: { p: Project; onFilter: (s: GitStatus) => void }) {
-  const g = p.gitInfo;
-  if (!g) {
-    return (
-      <ClickBadge variant="outline" title="筛选 git：未采集" onClick={() => onFilter('none')}>
-        未采集
-      </ClickBadge>
-    );
-  }
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="font-mono text-xs text-muted-foreground">⎇ {g.currentBranch || g.defaultBranch || '-'}</span>
-      {g.dirty && (
-        <ClickBadge variant="destructive" title="筛选 git：dirty" onClick={() => onFilter('dirty')}>
-          dirty
-        </ClickBadge>
-      )}
-      {g.ahead > 0 && (
-        <ClickBadge title="筛选 git：ahead" onClick={() => onFilter('ahead')}>
-          ↑{g.ahead}
-        </ClickBadge>
-      )}
-      {g.behind > 0 && (
-        <ClickBadge variant="outline" title="筛选 git：behind" onClick={() => onFilter('behind')}>
-          ↓{g.behind}
-        </ClickBadge>
-      )}
-      {/* clean 是最干净的状态，不展示徽标；筛选仍走上方 chips 的 clean 选项 */}
-    </div>
-  );
-}
-
-// 最近使用时间：muted 等宽小字（刻意区别于 tag badge 的样式语言），悬停见绝对时间
-function LastUsedTime({ iso }: { iso: string }) {
-  return (
-    <span
-      className="shrink-0 font-mono text-[0.6875rem] text-muted-foreground/70"
-      title={`最近使用：${formatDateTime(iso)}`}
-    >
-      {prettyTime(iso)}
-    </span>
-  );
-}
-
-// 项目 forge 图标：remote host 匹配到已配置 forge 时展示其 icon（1040）；
-// 多 remote 项目可同时展示多个（1042 修）；未配置 forge 或 forge 未配 icon 时不展示（无兜底图标）
-function ForgeIcon({ matches }: { matches: { host: string; icon: IconDecl }[] }) {
-  if (matches.length === 0) return null;
-  return (
-    <span className="flex shrink-0 items-center gap-0.5 text-muted-foreground">
-      {matches.map((m) => (
-        <span key={m.host} title={`forge：${m.host}`}>
-          {renderIcon(m.icon, null)}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-// 树行：目录行整行点击折叠/展开；项目行带 tags / git 信息与打开动作（根行显示 ~ 缩写路径）
-function TreeRowView({
-  row,
-  home,
-  openerList,
-  open,
-  forgeOf,
-  onOpen,
-  onToggle,
-  onFilterGit,
-  onFilterTag,
-  onDetail,
-}: {
-  row: TreeRow;
-  home: string;
-  openerList: Opener[];
-  open: ReturnType<typeof useProjectOpen>;
-  forgeOf: (p: Project) => { host: string; icon: IconDecl }[];
-  onOpen: (path: string, opener: string, dir?: string) => void;
-  onToggle: (path: string) => void;
-  onFilterGit: (s: GitStatus) => void;
-  onFilterTag: (t: string) => void;
-  onDetail: (p: Project) => void;
-}) {
-  const n = row.node;
-  const p = n.project;
-  return (
-    <div
-      className={cn(
-        'flex items-center gap-1.5 py-1.5 pr-2',
-        (row.hasChildren || p) && 'cursor-pointer hover:bg-muted/40',
-      )}
-      style={{ paddingLeft: row.depth * 20 + 12 }}
-      onClick={() => {
-        if (p) onDetail(p);
-        else if (row.hasChildren) onToggle(n.path);
-      }}
-    >
-      {row.hasChildren ? (
-        <ChevronRight
-          className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', row.expanded && 'rotate-90')}
-        />
-      ) : (
-        <span className="w-3.5 shrink-0" />
-      )}
-      {p ? (
-        <FolderGit2 className="size-3.5 shrink-0 text-primary" />
-      ) : (
-        <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-      )}
-      {p ? (
-        <button
-          type="button"
-          className="truncate text-left text-xs font-medium hover:underline"
-          title={n.path}
-          onClick={() => onDetail(p)}
-        >
-          {row.isRoot ? prettyPath(n.path, home) : n.name}
-        </button>
-      ) : (
-        <span className="truncate text-xs text-muted-foreground" title={n.path}>
-          {n.name}
-        </span>
-      )}
-      {p && (
-        <>
-          <ForgeIcon matches={forgeOf(p)} />
-          {(p.tags ?? []).map((t) => (
-            <ClickBadge
-              key={t}
-              variant={tagVariants[t] ?? 'outline'}
-              title={`筛选 tag：${t}`}
-              onClick={() => onFilterTag(t)}
-            >
-              {t}
-            </ClickBadge>
-          ))}
-          <WorktreeCountBadge p={p} />
-          <GitCell p={p} onFilter={onFilterGit} />
-          <div className="ml-auto flex items-center gap-2">
-            {p.lastUsedAt && <LastUsedTime iso={p.lastUsedAt} />}
-            <ProjectActions p={p} openerList={openerList} open={open} onOpen={onOpen} />
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
+import { TreeRowView } from './tree-view';
 
 export function ProjectsPage() {
   const list = useProjectList();
