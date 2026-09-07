@@ -41,9 +41,6 @@ var intentOrder = []Intent{
 	IntentTerminal, IntentGit, IntentWorkbench, IntentIde, IntentDoc,
 }
 
-// Intents 返回全部 intent（固定序副本，展示用）。
-func Intents() []Intent { return append([]Intent(nil), intentOrder...) }
-
 // intentRoles intent → role 的唯一映射（多对一）。
 var intentRoles = map[Intent]Role{
 	IntentDir:       RoleOpenDir,

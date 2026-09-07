@@ -50,10 +50,12 @@ func validateURLTemplate(tmpl string) error {
 	return fmt.Errorf("url 动作模板必须以 /（站内路由）或 http(s)://（外部 URL）开头: %q", tmpl)
 }
 
-// renderURLTemplate 渲染 url 动作模板中的占位符。escape=true（站内路由）时占位符替换值
-// 做 query encode（路径里的 / 与特殊字符转义，路由端 decode 还原）；外部 URL 照常子串替换。
-func renderURLTemplate(tmpl string, paths []string, escape bool) string {
+// renderTemplate 渲染模板内所有 $<数字>（索引在 paths 范围内）为对应路径，返回渲染结果
+// 与是否发生替换；越界占位符原样保留。escape=true（url 站内路由）时替换值做 query encode
+// （路由端 decode 还原）；escape=false（exec 分词后）照常子串替换，路径含空格/引号也不会被再次分词。
+func renderTemplate(tmpl string, paths []string, escape bool) (string, bool) {
 	var b strings.Builder
+	used := false
 	for i := 0; i < len(tmpl); i++ {
 		if tmpl[i] == '$' && i+1 < len(tmpl) && isDigit(tmpl[i+1]) {
 			j := i + 1
@@ -67,6 +69,7 @@ func renderURLTemplate(tmpl string, paths []string, escape bool) string {
 				} else {
 					b.WriteString(paths[n])
 				}
+				used = true
 			} else {
 				b.WriteString(tmpl[i:j])
 			}
@@ -75,7 +78,7 @@ func renderURLTemplate(tmpl string, paths []string, escape bool) string {
 		}
 		b.WriteByte(tmpl[i])
 	}
-	return b.String()
+	return b.String(), used
 }
 
 // tokenizeCmd sh 风格分词：空白分隔，单/双引号内内容（含空格）为一个 token；
@@ -151,30 +154,16 @@ func scanPlaceholders(token string) []int {
 // 返回渲染结果与是否发生替换。越界占位符原样保留。替换发生在分词之后，
 // 路径含空格/引号也不会被再次分词。
 func renderPlaceholders(token string, paths []string) (string, bool) {
-	var b strings.Builder
-	used := false
-	for i := 0; i < len(token); i++ {
-		if token[i] == '$' && i+1 < len(token) && isDigit(token[i+1]) {
-			j := i + 1
-			for j < len(token) && isDigit(token[j]) {
-				j++
-			}
-			n, _ := strconv.Atoi(token[i+1 : j])
-			if n < len(paths) {
-				b.WriteString(paths[n])
-				used = true
-			} else {
-				b.WriteString(token[i:j])
-			}
-			i = j - 1
-			continue
-		}
-		b.WriteByte(token[i])
-	}
-	return b.String(), used
+	return renderTemplate(token, paths, false)
 }
 
 func isDigit(b byte) bool { return b >= '0' && b <= '9' }
+
+// mustRender url 模板渲染（不关心 used，url 动作占位符缺失时原样保留即可）。
+func mustRender(tmpl string, paths []string, escape bool) string {
+	s, _ := renderTemplate(tmpl, paths, escape)
+	return s
+}
 
 // actionSpec 单个 role 的动作模板：构造时完成前缀解析、值域与占位符校验。
 type actionSpec struct {
@@ -328,9 +317,9 @@ func (o *actionOpener) BuildArgs(role Role, slotArgs ...string) (bin string, arg
 	if action.kind == KindURL {
 		var full string
 		if strings.HasPrefix(action.tmpl, "/") {
-			full = o.baseURL + renderURLTemplate(action.tmpl, slotArgs, true)
+			full = o.baseURL + mustRender(action.tmpl, slotArgs, true)
 		} else {
-			full = renderURLTemplate(action.tmpl, slotArgs, false)
+			full = mustRender(action.tmpl, slotArgs, false)
 		}
 		return sysOpenBin(), []string{full}, nil
 	}

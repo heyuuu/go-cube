@@ -38,15 +38,3 @@ func TestFilter(t *testing.T) {
 		t.Fatalf("全过滤后应 len=0，实际 %v", got)
 	}
 }
-
-func TestToSet(t *testing.T) {
-	m := ToSet([]string{"a", "b", "a", "c", "b"})
-	want := map[string]bool{"a": true, "b": true, "c": true}
-	if !reflect.DeepEqual(m, want) {
-		t.Fatalf("ToSet 结果 %v，期望 %v", m, want)
-	}
-	// 空切片 → 空 map
-	if m := ToSet([]int{}); len(m) != 0 {
-		t.Fatalf("空切片应返回空 map，实际 %v", m)
-	}
-}

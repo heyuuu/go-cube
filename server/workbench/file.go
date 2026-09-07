@@ -4,6 +4,7 @@ package workbench
 // 写是唯一落盘路径（仅 worktree 源）。入口为 Service.ReadFile / SaveFile 的委托。
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -114,23 +115,11 @@ func saveFile(path string, src TreeSource, file string, content string) (*FileRe
 		return nil, err
 	}
 	data := []byte(content)
-	if old, err := os.ReadFile(full); err == nil && bytesEqual(old, data) {
+	if old, err := os.ReadFile(full); err == nil && bytes.Equal(old, data) {
 		return &FileResult{Size: int64(len(data))}, nil
 	}
 	if err := os.WriteFile(full, data, 0o644); err != nil {
 		return nil, fmt.Errorf("写文件失败: file=%s: %w", file, err)
 	}
 	return &FileResult{Size: int64(len(data))}, nil
-}
-
-func bytesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

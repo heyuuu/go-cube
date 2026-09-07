@@ -81,15 +81,12 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
-func (a *App) Config() *config.Config               { return a.cfg }
-func (a *App) Paths() *Paths                        { return a.paths }
-func (a *App) Server() *web.Server                  { return a.server }
-func (a *App) ProjectService() *project.Service     { return a.projectService }
-func (a *App) WorkbenchService() *workbench.Service { return a.workbenchService }
-func (a *App) OpenerService() *opener.Service       { return a.openerService }
-func (a *App) UsageService() *usage.Service         { return a.usageService }
-func (a *App) CreateService() *create.Service       { return a.createService }
-func (a *App) ForgeService() *forge.Service         { return a.forgeService }
+func (a *App) Server() *web.Server              { return a.server }
+func (a *App) ProjectService() *project.Service { return a.projectService }
+func (a *App) OpenerService() *opener.Service   { return a.openerService }
+func (a *App) UsageService() *usage.Service     { return a.usageService }
+func (a *App) CreateService() *create.Service   { return a.createService }
+func (a *App) ForgeService() *forge.Service     { return a.forgeService }
 
 // StartBackgroundJobs 启动常驻进程的后台任务（分发到各 service 的 OnServerStart 钩子）。
 // 仅常驻 server 调用；CLI 短命进程不调用。

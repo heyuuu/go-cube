@@ -52,22 +52,6 @@ func TestLoadSection(t *testing.T) {
 	}
 }
 
-func TestHasSection(t *testing.T) {
-	file := newFile(t)
-	if HasSection(file, "openers") {
-		t.Fatal("文件不存在应返回 false")
-	}
-	if err := SaveSection(file, "openers", []string{}); err != nil {
-		t.Fatalf("写入节失败: %v", err)
-	}
-	if !HasSection(file, "openers") {
-		t.Fatal("节存在应返回 true")
-	}
-	if HasSection(file, "other") {
-		t.Fatal("节不存在应返回 false")
-	}
-}
-
 func TestSaveSection(t *testing.T) {
 	t.Run("新建文件并创建父目录", func(t *testing.T) {
 		file := newFile(t)
@@ -157,12 +141,10 @@ func TestSaveSectionConcurrent(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
-	if !HasSection(file, "alpha") || !HasSection(file, "beta") {
-		t.Fatal("并发写后应有 alpha 与 beta 两节")
-	}
-	var got []string
-	LoadSection(file, "alpha", &got)
-	if len(got) != 1 || got[0] != "v" {
-		t.Fatalf("alpha 节内容错误: %v", got)
+	var alpha, beta []string
+	LoadSection(file, "alpha", &alpha)
+	LoadSection(file, "beta", &beta)
+	if len(alpha) != 1 || alpha[0] != "v" || len(beta) != 1 || beta[0] != "v" {
+		t.Fatalf("并发写后两节应并存: alpha=%v beta=%v", alpha, beta)
 	}
 }

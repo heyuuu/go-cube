@@ -69,8 +69,7 @@ func NewServer(c config.ServerConfig, handlers []Handler) *Server {
 	}
 }
 
-func (s *Server) Port() int     { return s.port }
-func (s *Server) API() huma.API { return s.api }
+func (s *Server) Port() int { return s.port }
 
 // Handler 返回底层 http.Handler，供 httptest 拉起真实路由做集成测试。
 func (s *Server) Handler() http.Handler { return s.mux }

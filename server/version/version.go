@@ -22,14 +22,6 @@ func Version() string {
 	return version
 }
 
-func Commit() string {
-	return commit
-}
-
-func BuildTime() string {
-	return buildTime
-}
-
 func VersionInfo() string {
 	if IsDev() {
 		return version

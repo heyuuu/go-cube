@@ -190,6 +190,7 @@ func (s *Service) ReorderAccounts(keys []string) error {
 		byKey[k] = a
 	}
 	seen := make(map[string]bool, len(keys))
+	normalized := make([]string, 0, len(keys))
 	for _, raw := range keys {
 		h, u := key2acct(raw)
 		h, u = NormalizeHost(h), NormalizeUsername(u)
@@ -201,12 +202,12 @@ func (s *Service) ReorderAccounts(keys []string) error {
 			return fmt.Errorf("重排名单存在重复 account: %s@%s", u, h)
 		}
 		seen[k] = true
+		normalized = append(normalized, k)
 	}
 
 	ordered := make([]Account, 0, len(accounts))
-	for _, raw := range keys {
-		h, u := key2acct(raw)
-		ordered = append(ordered, byKey[acctCacheKey(h, u)])
+	for _, k := range normalized {
+		ordered = append(ordered, byKey[k])
 	}
 	for _, a := range accounts {
 		if !seen[acctCacheKey(a.ForgeHost, a.Username)] {

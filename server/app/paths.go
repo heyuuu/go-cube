@@ -35,13 +35,12 @@ func NewPaths(dataDir string) *Paths {
 	return &Paths{dataDir: absDataDir}
 }
 
-func (p *Paths) DataDir() string      { return p.dataDir }
 func (p *Paths) SettingsFile() string { return filepath.Join(p.dataDir, settingsFileName) }
 
 // StateDir 运行期状态目录（如 usage.jsonl）：由日常使用产生、非配置非缓存——
 // 丢了可接受但不理想，区别于 cache/ 的「可整体删除且行为不变差」。
 func (p *Paths) StateDir() string  { return filepath.Join(p.dataDir, stateDirName) }
-func (p *Paths) UsageFile() string { return filepath.Join(p.dataDir, stateDirName, usageFileName) }
+func (p *Paths) UsageFile() string { return filepath.Join(p.StateDir(), usageFileName) }
 
 // CacheDir 纯缓存目录（如 git.json）：可整体删除且 cube 行为不变差，随时可重建。
 func (p *Paths) CacheDir() string { return filepath.Join(p.dataDir, cacheDirName) }

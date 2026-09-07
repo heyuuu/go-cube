@@ -42,18 +42,6 @@ func LoadSection(file, section string, dst any) {
 	}
 }
 
-// HasSection 判断 file 中是否存在 section 节（文件不存在 / 坏 JSON → false + 日志）。
-// 供调用方区分「从未写入过」与「写入过但内容为空」。
-func HasSection(file, section string) bool {
-	d, err := readDoc(file)
-	if err != nil {
-		slog.Warn("读取 settings.json 失败，按无该节处理", "file", file, "err", err)
-		return false
-	}
-	_, ok := d[section]
-	return ok
-}
-
 // SaveSection 锁内「读全文档 → 仅替换 section 节 → 原子写回」。
 // 文件为坏 JSON 时拒绝写入，防止静默覆盖掉手工搞坏的其他节；
 // 注意：src 为 nil 会把节写成 "null"，调用方别传 nil（无「删节」语义）。

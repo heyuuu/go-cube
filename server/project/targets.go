@@ -37,9 +37,6 @@ type OpenTarget struct {
 	Flags  TargetFlags // 身位标记（root=0 / FlagWorktree / FlagWorkspace / 组合）
 }
 
-// IsWorktree 目标位于 linked worktree 内（worktree 根或其下）。
-func (t OpenTarget) IsWorktree() bool { return t.Flags&FlagWorktree != 0 }
-
 // IsWorkspace 目标是 workspace 成员子目录。
 func (t OpenTarget) IsWorkspace() bool { return t.Flags&FlagWorkspace != 0 }
 

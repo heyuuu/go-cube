@@ -1,6 +1,7 @@
 package workbench
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -26,18 +27,6 @@ func secureJoin(base string, rel string) (string, error) {
 }
 
 func isBinary(data []byte) bool {
-	limit := len(data)
-	if limit > 8192 {
-		limit = 8192
-	}
-	return bytesContains(data[:limit], 0)
-}
-
-func bytesContains(b []byte, target byte) bool {
-	for _, v := range b {
-		if v == target {
-			return true
-		}
-	}
-	return false
+	limit := min(len(data), 8192) // 只看头部即可粗判
+	return bytes.IndexByte(data[:limit], 0) >= 0
 }

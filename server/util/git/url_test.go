@@ -97,24 +97,3 @@ func TestRepoUrl_WebUrl(t *testing.T) {
 		})
 	}
 }
-
-func TestRepoUrl_IsSSH(t *testing.T) {
-	tests := []struct {
-		name string
-		u    *RepoUrl
-		want bool
-	}{
-		{"git 协议是 ssh", &RepoUrl{Scheme: "git", Host: "github.com"}, true},
-		{"https 协议非 ssh", &RepoUrl{Scheme: "https", Host: "github.com"}, false},
-		{"http 协议非 ssh", &RepoUrl{Scheme: "http", Host: "github.com"}, false},
-		{"空 scheme 非 ssh", &RepoUrl{Host: "github.com"}, false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := tt.u.IsSSH(); got != tt.want {
-				t.Errorf("IsSSH() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}

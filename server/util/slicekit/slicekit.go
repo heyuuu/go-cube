@@ -25,11 +25,3 @@ func Filter[S ~[]E, E any](s S, filter func(E) bool) []E {
 	}
 	return result
 }
-
-func ToSet[S ~[]E, E comparable](s S) map[E]bool {
-	m := make(map[E]bool, len(s))
-	for _, item := range s {
-		m[item] = true
-	}
-	return m
-}
