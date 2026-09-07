@@ -1,4 +1,6 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+
+import { useLocalPref } from '@/hooks/use-local-pref';
 
 import type { TreeSource } from '../params';
 import { PanelSplitter } from '../splitter';
@@ -15,28 +17,22 @@ const MIN_WIDTH = 160;
 const MAX_WIDTH = 640;
 
 export function useTreePanePrefs(storageKey: string, defaultScope: 'all' | 'diff') {
-  const [view, setView] = useState<'tree' | 'flat'>(() =>
-    localStorage.getItem(`${storageKey}.view`) === 'flat' ? 'flat' : 'tree',
+  const [view, setView] = useLocalPref<'tree' | 'flat'>(
+    `${storageKey}.view`,
+    'tree',
+    (raw) => (raw === 'flat' ? 'flat' : 'tree'),
   );
-  const [scope, setScope] = useState<'all' | 'diff'>(() => {
-    const saved = localStorage.getItem(`${storageKey}.scope`);
-    return saved === 'all' || saved === 'diff' ? saved : defaultScope;
-  });
-  const [width, setWidth] = useState(() => {
-    const v = Number(localStorage.getItem(`${storageKey}.width`));
-    return Number.isFinite(v) && v >= MIN_WIDTH && v <= MAX_WIDTH ? v : 240;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(`${storageKey}.view`, view);
-  }, [storageKey, view]);
-  useEffect(() => {
-    localStorage.setItem(`${storageKey}.scope`, scope);
-  }, [storageKey, scope]);
-  useEffect(() => {
-    localStorage.setItem(`${storageKey}.width`, String(width));
-  }, [storageKey, width]);
-
+  const [scope, setScope] = useLocalPref<'all' | 'diff'>(`${storageKey}.scope`, defaultScope, (raw) =>
+    raw === 'all' || raw === 'diff' ? raw : defaultScope,
+  );
+  const [width, setWidth] = useLocalPref<number>(
+    `${storageKey}.width`,
+    240,
+    (raw) => {
+      const v = Number(raw);
+      return Number.isFinite(v) && v >= MIN_WIDTH && v <= MAX_WIDTH ? v : 240;
+    },
+  );
   return { view, setView, scope, setScope, width, setWidth };
 }
 

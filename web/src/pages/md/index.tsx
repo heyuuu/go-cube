@@ -6,7 +6,6 @@ import type { Opener } from '@/api/client';
 import { ErrorBanner } from '@/components/error-banner';
 // front-matter 渲染管线与工作台内容面板预览共用（components/markdown-render）
 import {
-  loadMdTheme as loadThemeFrom,
   mdThemeCls,
   mdThemes,
   MarkdownView,
@@ -25,6 +24,7 @@ import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
 import { OpenWithGroup } from '@/components/open-with-menu';
+import { useLocalPref } from '@/hooks/use-local-pref';
 import { useOpenerList } from '@/queries/opener';
 import { useOpenerOpen } from '@/queries/project';
 
@@ -46,11 +46,6 @@ const mdViews = [
   { id: 'split', label: '分栏' },
 ] as const;
 type MdViewId = (typeof mdViews)[number]['id'];
-
-function loadMdView(): MdViewId {
-  const v = localStorage.getItem(MD_VIEW_KEY);
-  return mdViews.some((t) => t.id === v) ? (v as MdViewId) : 'render';
-}
 
 // 侧栏宽度持久化：localStorage 记住用户拖出来的宽度，刷新不变
 const SIDEBAR_WIDTH_KEY = 'md.sidebarWidth';
@@ -361,18 +356,13 @@ export function MdPage() {
   // 缺省/失效时回落根 README（与「默认打开 = 点根目录」语义一致）
   const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
   const [sidebarW, setSidebarW] = useState(loadSidebarWidth);
-  const [theme, setTheme] = useState<MdThemeId>(() => loadThemeFrom(MD_THEME_KEY));
-  const [viewMode, setViewMode] = useState(loadMdView);
-
-  function switchTheme(t: MdThemeId) {
-    setTheme(t);
-    localStorage.setItem(MD_THEME_KEY, t);
-  }
-
-  function switchView(v: MdViewId) {
-    setViewMode(v);
-    localStorage.setItem(MD_VIEW_KEY, v);
-  }
+  const [theme, switchTheme] = useLocalPref<MdThemeId>(MD_THEME_KEY, 'default', (raw) =>
+    mdThemes.some((t) => t.id === raw) ? (raw as MdThemeId) : 'default',
+  );
+  const [viewMode, switchView] = useLocalPref<MdViewId>(MD_VIEW_KEY, 'render', (raw) => {
+    const hit = mdViews.find((t) => t.id === raw);
+    return hit ? hit.id : 'render';
+  });
   // file 参数支持相对路径（相对当前根，URL 更短）；绝对路径向后兼容
   const fileParamRaw = searchParams.get('file');
   const fileParam = !fileParamRaw

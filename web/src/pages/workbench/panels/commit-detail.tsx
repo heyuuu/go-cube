@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useLocalPref } from '@/hooks/use-local-pref';
 
 import { ErrorBanner } from '@/components/error-banner';
 import { Badge } from '@/components/ui/badge';
@@ -21,13 +21,10 @@ const MAX_HEIGHT = 480;
 
 export function CommitDetailPane({ path, source }: { path: string; source: TreeSource }) {
   const commit = useWorkbenchCommit(path, source);
-  const [height, setHeight] = useState(() => {
-    const v = Number(localStorage.getItem(HEIGHT_KEY));
+  const [height, setHeight] = useLocalPref<number>(HEIGHT_KEY, 200, (raw) => {
+    const v = Number(raw);
     return Number.isFinite(v) && v >= MIN_HEIGHT && v <= MAX_HEIGHT ? v : 200;
   });
-  useEffect(() => {
-    localStorage.setItem(HEIGHT_KEY, String(height));
-  }, [height]);
 
   if (commit.isError) {
     return (

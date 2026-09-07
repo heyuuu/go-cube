@@ -15,6 +15,7 @@ import type { Opener, Project } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
 import { Chip, CycleSortHead, FilterRow } from '@/components/filter-chips';
+import { usePersistentSet } from '@/hooks/use-local-pref';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -336,21 +337,9 @@ export function ProjectsPage() {
   const [treeExpanded, setTreeExpanded] = useState<ReadonlySet<string>>(new Set());
 
   // 多目标项目展开的目标子行（localStorage 持久化，key 收敛项目路径）
-  const [targetExpanded, setTargetExpanded] = useState<ReadonlySet<string>>(() => {
-    try {
-      return new Set<string>(JSON.parse(localStorage.getItem('cube.projects.expanded') ?? '[]'));
-    } catch {
-      return new Set<string>();
-    }
-  });
-  const toggleTargetExpanded = (path: string) =>
-    setTargetExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(path)) next.delete(path);
-      else next.add(path);
-      localStorage.setItem('cube.projects.expanded', JSON.stringify([...next]));
-      return next;
-    });
+  const targetExpandedPrefs = usePersistentSet('cube.projects.expanded');
+  const targetExpanded = targetExpandedPrefs.set;
+  const toggleTargetExpanded = targetExpandedPrefs.toggle;
 
   const projects = list.data?.list ?? [];
   const home = guessHome(projects.map((p) => p.path));

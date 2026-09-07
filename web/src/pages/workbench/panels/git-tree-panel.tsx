@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils';
 import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
 import { useIntentDefaultOpener } from '@/queries/opener';
 import { CopyPathItem, OpenWithGroup } from '@/components/open-with-menu';
+import { useLocalPref, usePersistentSet } from '@/hooks/use-local-pref';
 import { useOpenerList } from '@/queries/opener';
 import { useOpenerDiffOpen, useOpenerOpen } from '@/queries/project';
 import {
@@ -136,13 +137,6 @@ export function GitTreePanel({ params }: { params: WorkbenchParams }) {
 
 // workspace 子行展开态持久化（与 worktree-visibility 同款模式）
 const WS_EXPANDED_KEY = 'cube.workbench.wsExpanded';
-function loadWsExpanded(): Set<string> {
-  try {
-    return new Set<string>(JSON.parse(localStorage.getItem(WS_EXPANDED_KEY) ?? '[]'));
-  } catch {
-    return new Set<string>();
-  }
-}
 
 // commit 图展示模式持久化（与 wsExpanded 同款模式）：
 // full = 全量提交；lite = 轻量拓扑（只留 ref/merge/分叉点，见 simplifyLite）
@@ -150,9 +144,6 @@ function loadWsExpanded(): Set<string> {
 // 调试期常量，方便改小改大看效果）
 const LITE_KEEP_RECENT = 5;
 const GRAPH_MODE_KEY = 'cube.workbench.gitTree.mode';
-function loadGraphMode(): 'full' | 'lite' {
-  return localStorage.getItem(GRAPH_MODE_KEY) === 'lite' ? 'lite' : 'full';
-}
 
 // --- 工作副本状态区 ---
 
@@ -182,6 +173,9 @@ function WorktreeSection({
 }) {
   const refs = useWorkbenchRefs(path);
   const worktrees = useWorkbenchWorktrees(path);
+  // workspace 子行展开态集合在此持有，行组件只读写内存（此前每行渲染期各自
+  // JSON.parse 整份 localStorage，行数 × 渲染次重复解析）
+  const wsExpanded = usePersistentSet(WS_EXPANDED_KEY);
   // prune 幂等无损，无需确认弹窗；失败就地展示错误
   const prune = useWorktreePrune(path);
 
@@ -226,6 +220,8 @@ function WorktreeSection({
             hidden={hiddenWorktrees.has(wt.path)}
             onToggle={() => onToggleWorktree(wt.path)}
             onRemove={() => onRemoveWorktree(wt)}
+            wsExpanded={wsExpanded.set.has(wt.path)}
+            onToggleWs={() => wsExpanded.toggle(wt.path)}
           />
         ))}
       </Section>
@@ -373,6 +369,8 @@ function WorktreeRow({
   hidden,
   onToggle,
   onRemove,
+  wsExpanded,
+  onToggleWs,
 }: {
   wt: WorktreeStatus;
   kind: TargetKind;
@@ -382,23 +380,17 @@ function WorktreeRow({
   hidden: boolean;
   onToggle: () => void;
   onRemove: () => void;
+  wsExpanded: boolean;
+  onToggleWs: () => void;
 }) {
   const src: TreeSource = { type: 'worktree', id: wt.path };
   const name = wt.path.split('/').pop() || wt.path;
   // hover/选中态放整行容器（前后的开关/opener 按钮同属一行，只亮中间段会很碎）
   const selected = sameSource(params.current, src) || sameSource(params.base, src);
 
-  // workspace 子行展开态：与副本显隐开关同款 localStorage 持久化
+  // workspace 子行展开态：集合由 WorktreeSection 持有（usePersistentSet），行只读写内存
   const wsList = wt.workspaces ?? [];
   const [resetOpen, setResetOpen] = useState(false);
-  const [wsExpanded, setWsExpanded] = useState(() => loadWsExpanded().has(wt.path));
-  const toggleWs = () => {
-    const next = new Set(loadWsExpanded());
-    if (next.has(wt.path)) next.delete(wt.path);
-    else next.add(wt.path);
-    localStorage.setItem(WS_EXPANDED_KEY, JSON.stringify([...next]));
-    setWsExpanded(next.has(wt.path));
-  };
 
   return (
     <div className="w-full">
@@ -417,7 +409,7 @@ function WorktreeRow({
             title={wsExpanded ? '收起 workspace' : `展开 ${wsList.length} 个 workspace`}
             aria-label={wsExpanded ? `收起 ${name} 的 workspace` : `展开 ${name} 的 workspace`}
             aria-expanded={wsExpanded}
-            onClick={toggleWs}
+            onClick={onToggleWs}
           >
             <ChevronRight className={cn('size-3.5 transition-transform', wsExpanded && 'rotate-90')} />
           </Button>
@@ -612,12 +604,10 @@ function CommitGraphSection({
 }) {
   const commits = useWorkbenchCommits(path);
   const sentinelRef = useRef<HTMLDivElement>(null);
-  const [mode, setMode] = useState<'full' | 'lite'>(loadGraphMode);
-  const toggleMode = () => {
-    const next = mode === 'full' ? 'lite' : 'full';
-    setMode(next);
-    localStorage.setItem(GRAPH_MODE_KEY, next);
-  };
+  const [mode, toggleModeRaw] = useLocalPref<'full' | 'lite'>(GRAPH_MODE_KEY, 'full', (raw) =>
+    raw === 'lite' ? 'lite' : 'full',
+  );
+  const toggleMode = () => toggleModeRaw(mode === 'full' ? 'lite' : 'full');
 
   // 无限滚动：哨兵进入视口即拉下一页
   useEffect(() => {
