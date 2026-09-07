@@ -57,7 +57,6 @@ func NewProjectHandler(projectService *project.Service, openerService *opener.Se
 
 func (h *ProjectHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/project/list", "获取项目列表", h.projectList)
-	web.ApiGet(api, "/api/project/info", "获取项目详情", h.projectInfo)
 	web.ApiPost(api, "/api/project/open", "用指定 opener 打开已收录项目（记 usage；目标目录选择为 1030/1032 预留）", h.projectOpen)
 	web.ApiGet(api, "/api/project/workspace/get", "获取项目 workspace 状态（生效清单 / 显式声明 / 探测候选）", h.workspaceGet)
 	web.ApiPost(api, "/api/project/workspace/save", "保存显式 workspaces 声明（.cube/cube.json）并即时重采集", h.workspaceSave)
@@ -85,24 +84,6 @@ func (h *ProjectHandler) projectList(_ struct{}) (ProjectListResult, error) {
 	})
 	return ProjectListResult{
 		List:          list,
-		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
-		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
-	}, nil
-}
-
-// ProjectInfoResult 详情接口返回结构：含项目 DTO + 两类刷新时间。
-type ProjectInfoResult struct {
-	Project       *ProjectDTO `json:"project"`
-	ScanUpdatedAt time.Time   `json:"scanUpdatedAt"`
-	GitUpdatedAt  time.Time   `json:"gitUpdatedAt"`
-}
-
-func (h *ProjectHandler) projectInfo(input struct {
-	Path string `query:"path" required:"true"`
-}) (ProjectInfoResult, error) {
-	proj := h.projectService.FindByPath(input.Path)
-	return ProjectInfoResult{
-		Project:       h.toProjectDTO(proj),
 		ScanUpdatedAt: h.projectService.ScanUpdatedAt(),
 		GitUpdatedAt:  h.projectService.GitUpdatedAt(),
 	}, nil

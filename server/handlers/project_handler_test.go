@@ -55,43 +55,6 @@ func TestProjectList(t *testing.T) {
 	}
 }
 
-func TestProjectInfo(t *testing.T) {
-	env := newTestEnv(t)
-
-	var got struct {
-		Project *struct {
-			Name  string `json:"name"`
-			Group string `json:"group"`
-		} `json:"project"`
-	}
-	decodeData(t, getJSON(t, env.url("/api/project/info?path="+env.proj1Path())), &got)
-	if got.Project == nil || got.Project.Name != "g1:proj1" || got.Project.Group != "g1" {
-		t.Errorf("info 应返回 g1:proj1, got %+v", got.Project)
-	}
-
-	// 不存在的 path：ok 仍为 true，data.project 为 null（与列表语义一致）
-	env2 := getJSON(t, env.url("/api/project/info?path=/not/exist"))
-	var got2 struct {
-		Project *struct {
-			Name string `json:"name"`
-		} `json:"project"`
-	}
-	decodeData(t, env2, &got2)
-	if got2.Project != nil {
-		t.Errorf("不存在的项目应为 null, got %+v", got2.Project)
-	}
-
-	// 缺必填 query：huma 参数校验拒绝（422），不应进 handler
-	resp, err := http.Get(env.url("/api/project/info"))
-	if err != nil {
-		t.Fatalf("GET 缺参失败: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode == http.StatusOK {
-		t.Errorf("缺必填 path 应非 200, got %d", resp.StatusCode)
-	}
-}
-
 func TestProjectScanRules(t *testing.T) {
 	env := newTestEnv(t)
 	var got struct {

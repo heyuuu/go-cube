@@ -64,7 +64,6 @@ func NewOpenerHandler(service *opener.Service) *OpenerHandler {
 func (h *OpenerHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/opener/list", "获取 opener 列表", h.openerList)
 	web.ApiGet(api, "/api/opener/intents", "获取打开意图清单（intent → 默认 opener + 候选）", h.openerIntents)
-	web.ApiGet(api, "/api/opener/info", "获取 opener 详情", h.openerInfo)
 	web.ApiPost(api, "/api/opener/open", "用指定 opener 打开任意文件或目录", h.openerOpen)
 	web.ApiPost(api, "/api/opener/diff-open", "用指定 opener 对比两个路径（diff-dir/diff-file）", h.openerDiffOpen)
 	web.ApiPost(api, "/api/opener/save", "新增或更新 opener（按 name 替换）", h.openerSave)
@@ -96,13 +95,6 @@ func (h *OpenerHandler) openerIntents(_ struct{}) (web.ListResult[*OpenerIntentD
 		}
 	})
 	return listResult(list), nil
-}
-
-func (h *OpenerHandler) openerInfo(input struct {
-	Name string `query:"name" required:"true"`
-}) (*OpenerDTO, error) {
-	o := h.service.FindByName(input.Name)
-	return toOpenerDTO(o), nil
 }
 
 // OpenerOpenInput open 接口入参。huma 约定：请求体字段须挂在名为 Body 的子结构上。

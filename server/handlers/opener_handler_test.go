@@ -35,38 +35,6 @@ func TestOpenerList(t *testing.T) {
 	}
 }
 
-func TestOpenerInfo(t *testing.T) {
-	env := newTestEnv(t)
-
-	var got struct {
-		Name string `json:"name"`
-	}
-	decodeData(t, getJSON(t, env.url("/api/opener/info?name=finder")), &got)
-	if got.Name != "finder" {
-		t.Errorf("info 应返回 finder, got %+v", got)
-	}
-
-	// 不存在的 name：data 为 null（与 project info 语义一致）
-	env2 := getJSON(t, env.url("/api/opener/info?name=none"))
-	var got2 *struct {
-		Name string `json:"name"`
-	}
-	decodeData(t, env2, &got2)
-	if got2 != nil {
-		t.Errorf("不存在的 opener 应为 null, got %+v", got2)
-	}
-
-	// 缺必填 query 被参数校验拒绝
-	resp, err := http.Get(env.url("/api/opener/info"))
-	if err != nil {
-		t.Fatalf("GET 缺参失败: %v", err)
-	}
-	resp.Body.Close()
-	if resp.StatusCode == http.StatusOK {
-		t.Errorf("缺必填 name 应非 200, got %d", resp.StatusCode)
-	}
-}
-
 func TestOpenerOpen(t *testing.T) {
 	env := newTestEnv(t)
 	md := env.ws.Join("notes/readme.md")

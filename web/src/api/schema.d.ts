@@ -276,23 +276,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/opener/info': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 获取 opener 详情 */
-    get: operations['opener.info'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/opener/intent-default/delete': {
     parameters: {
       query?: never;
@@ -472,23 +455,6 @@ export interface paths {
     };
     /** 获取 clone 规则 */
     get: operations['project.cloneRules'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/project/info': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 获取项目详情 */
-    get: operations['project.info'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1275,17 +1241,6 @@ export interface components {
       message: string;
       ok: boolean;
     };
-    ApiOutputOpenerDTOBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputOpenerDTOBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['OpenerDTO'];
-      message: string;
-      ok: boolean;
-    };
     ApiOutputOverviewBody: {
       /**
        * Format: uri
@@ -1294,17 +1249,6 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['Overview'];
-      message: string;
-      ok: boolean;
-    };
-    ApiOutputProjectInfoResultBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputProjectInfoResultBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['ProjectInfoResult'];
       message: string;
       ok: boolean;
     };
@@ -1832,13 +1776,6 @@ export interface components {
       name: string;
       path: string;
       tags: string[] | null;
-    };
-    ProjectInfoResult: {
-      /** Format: date-time */
-      gitUpdatedAt: string;
-      project: components['schemas']['ProjectDTO'];
-      /** Format: date-time */
-      scanUpdatedAt: string;
     };
     ProjectListResult: {
       /** Format: date-time */
@@ -2584,37 +2521,6 @@ export interface operations {
       };
     };
   };
-  'opener.info': {
-    parameters: {
-      query: {
-        name: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputOpenerDTOBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
   'opener.intentDefaultDelete': {
     parameters: {
       query?: never;
@@ -2953,37 +2859,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultCloneRuleBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'project.info': {
-    parameters: {
-      query: {
-        path: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputProjectInfoResultBody'];
         };
       };
       /** @description Error */

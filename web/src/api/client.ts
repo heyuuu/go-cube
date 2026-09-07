@@ -14,7 +14,6 @@ export type CloneRule = components['schemas']['CloneRule'];
 export type Forge = components['schemas']['Forge'];
 export type ForgeAccount = components['schemas']['Account'];
 export type ForgeOverview = components['schemas']['Overview'];
-export type ProjectInfoResult = components['schemas']['ProjectInfoResult'];
 export type OpenerIntent = components['schemas']['OpenerIntentDTO'];
 export type ProjectListResult = components['schemas']['ProjectListResult'];
 
@@ -45,7 +44,7 @@ export async function unwrap<T extends Envelope>(
 // 动态分发层：泛型 P 把「路径字面量 → 响应类型」的推导保留到调用点（官方 ClientPathsWithMethod /
 // MethodResponse 工具类型），不再退化成所有端点的 union。
 //   const list = await apiGet('/api/project/list');            // list: ProjectListResult
-//   await apiGet('/api/project/info', { path });              // query 扁平直传
+//   await apiGet('/api/workbench/info', { path });            // query 扁平直传
 //   await apiPost('/api/opener/open', { path, app });          // body 类型来自 OpenerOpenInputBody
 
 type GetPaths = ClientPathsWithMethod<typeof apiClient, 'get'>;

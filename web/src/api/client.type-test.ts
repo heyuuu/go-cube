@@ -21,11 +21,11 @@ export async function typeContractProbe() {
   void apiGet('/api/not-exist');
 
   // GET 的 query 扁平直传：类型来自 op 的 parameters.query 声明
-  await apiGet('/api/project/info', { path: '/x123' });
+  await apiGet('/api/workbench/info', { path: '/x123' });
   // @ts-expect-error path 必填，漏传 query 报错
-  await apiGet('/api/project/info');
+  await apiGet('/api/workbench/info');
   // @ts-expect-error query 字段名错误
-  await apiGet('/api/project/info', { nope: 1 });
+  await apiGet('/api/workbench/info', { nope: 1 });
   // @ts-expect-error 未声明 query 的端点，传 query 报错
   await apiGet('/api/project/list', { name: 'x' });
   // 说明：「query 全可选可省」分支（原 /api/project/tree 探针）在端点移除后暂无真实
