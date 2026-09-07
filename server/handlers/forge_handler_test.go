@@ -133,53 +133,11 @@ func TestForgeAccountApi(t *testing.T) {
 	}
 }
 
-// TestForgeNamespaceApi namespace 出口契约：保存/类型校验/删除/未拉取对账报错。
-func TestForgeNamespaceApi(t *testing.T) {
-	env := newTestEnv(t)
-	postJSON(t, env.url("/api/forge/save"), `{"host":"github.com","kind":"github"}`)
-
-	r := postJSON(t, env.url("/api/forge/namespace/save"), `{"forgeHost":"github.com","path":"/heyuuu/","type":"personal"}`)
-	if !r.Ok {
-		t.Fatalf("保存应成功: %s", r.Message)
-	}
-	var namespaces web.ListResult[forge.Namespace]
-	decodeData(t, getJSON(t, env.url("/api/forge/namespace/list")), &namespaces)
-	nsList := namespaces.List
-	if len(nsList) != 1 || nsList[0].Path != "heyuuu" {
-		t.Fatalf("namespace 应归一化存储: %+v", namespaces)
-	}
-
-	// 坏数据：未知 type
-	r = postJSON(t, env.url("/api/forge/namespace/save"), `{"forgeHost":"github.com","path":"a","type":"team"}`)
-	if r.Ok || r.Message == "" {
-		t.Fatalf("未知 type 应报中文错误: %+v", r)
-	}
-
-	// 未拉取就对账 → 中文错误（不触发外呼）
-	resp, err := http.Get(env.url("/api/forge/namespace/reconcile?forgeHost=github.com&path=heyuuu"))
-	if err != nil {
-		t.Fatalf("reconcile 请求失败: %v", err)
-	}
-	defer resp.Body.Close()
-	var env2 envelope
-	if err := json.NewDecoder(resp.Body).Decode(&env2); err != nil {
-		t.Fatalf("reconcile 响应解码失败: %v", err)
-	}
-	if env2.Ok || env2.Message == "" {
-		t.Fatalf("未拉取应对账失败并提示: %+v", env2)
-	}
-
-	r = postJSON(t, env.url("/api/forge/namespace/delete"), `{"forgeHost":"github.com","path":"heyuuu"}`)
-	if !r.Ok {
-		t.Fatalf("删除应成功: %s", r.Message)
-	}
-}
-
 // TestForgeOverviewApi overview 出口契约：空缓存时 rows 为 []（nil 序列化）且 namespaces 含未拉取元信息。
 func TestForgeOverviewApi(t *testing.T) {
 	env := newTestEnv(t)
 	postJSON(t, env.url("/api/forge/save"), `{"host":"github.com","kind":"github"}`)
-	postJSON(t, env.url("/api/forge/namespace/save"), `{"forgeHost":"github.com","path":"heyuuu","type":"personal"}`)
+	postJSON(t, env.url("/api/forge/account/save"), `{"forgeHost":"github.com","username":"heyuuu","token":"t"}`)
 
 	env2 := envelope{}
 	resp, err := http.Get(env.url("/api/forge/overview"))
@@ -200,7 +158,7 @@ func TestForgeOverviewApi(t *testing.T) {
 	if out.Rows == nil || len(out.Rows) != 0 {
 		t.Fatalf("空缓存 rows 应为空数组: %+v", out.Rows)
 	}
-	if len(out.Namespaces) != 1 || !out.Namespaces[0].FetchedAt.IsZero() {
-		t.Fatalf("namespaces 应含未拉取元信息: %+v", out.Namespaces)
+	if len(out.Accounts) != 1 || !out.Accounts[0].FetchedAt.IsZero() {
+		t.Fatalf("accounts 应含未拉取元信息: %+v", out.Accounts)
 	}
 }

@@ -1,4 +1,5 @@
-// forge 配置增删改（数据落 settings.json forges 节，经 Web API 写，保存即生效）。
+// forge 配置与拉取（数据落 settings.json forges / forgeAccounts 节，经 Web API 写，保存即生效）。
+// 1044 起 namespace 模型移除，account 是 forge 下唯一的关联配置。
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { apiGet, apiPost } from '@/api/client';
@@ -35,7 +36,7 @@ export function useForgeReorder() {
   });
 }
 
-// --- account / namespace（提案 1041） ---
+// --- account（token 掩码语义：list 打码返回，save 提交掩码值 = 未修改） ---
 
 export function useForgeAccounts() {
   return useQuery({ queryKey: [...FORGE_KEYS, 'accounts'], queryFn: () => apiGet('/api/forge/account/list') });
@@ -58,48 +59,15 @@ export function useForgeAccountDelete() {
   });
 }
 
-export function useForgeNamespaces() {
-  return useQuery({ queryKey: [...FORGE_KEYS, 'namespaces'], queryFn: () => apiGet('/api/forge/namespace/list') });
-}
-
-export function useForgeNamespaceSave() {
-  const qc = useQueryClient();
+// 拉取 account 名下全部仓库：出站 API 调用（慢操作），成功返回 count
+export function useForgeAccountFetch() {
   return useMutation({
-    mutationFn: (input: Parameters<typeof apiPost<'/api/forge/namespace/save'>>[1]) =>
-      apiPost('/api/forge/namespace/save', input),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
+    mutationFn: (input: { forgeHost: string; username: string; force?: boolean }) =>
+      apiPost('/api/forge/account/fetch', input),
   });
 }
 
-export function useForgeNamespaceDelete() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { forgeHost: string; path: string }) => apiPost('/api/forge/namespace/delete', input),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: [...FORGE_KEYS] }),
-  });
-}
-
-// 拉取：出站 API 调用（慢操作），成功/失败都让调用方感知（返回 count）
-export function useForgeNamespaceFetch() {
-  return useMutation({
-    mutationFn: (input: { forgeHost: string; path: string; force?: boolean }) =>
-      apiPost('/api/forge/namespace/fetch', input),
-  });
-}
-
-// type 探测：配置表单的辅助动作（失败即提示，不阻塞手选）
-export function useForgeNamespaceDetect() {
-  return useMutation({
-    mutationFn: (input: { forgeHost: string; path: string }) => apiPost('/api/forge/namespace/detect', input),
-  });
-}
-
-// 对账：轻量即时查询（跟随拉取动作触发），不进 useQuery 缓存
-export function fetchNamespaceReconcile(forgeHost: string, path: string) {
-  return apiGet('/api/forge/namespace/reconcile', { forgeHost, path });
-}
-
-// forge 页聚合（1042）：全部 namespace 对账行 + 拉取元信息（只读缓存，不外呼）
+// forge 页聚合（1042/1044）：全部 account 对账行 + 拉取元信息（只读缓存，不外呼）
 export function useForgeOverview() {
   return useQuery({ queryKey: [...FORGE_KEYS, 'overview'], queryFn: () => apiGet('/api/forge/overview') });
 }

@@ -48,14 +48,15 @@ func RepoKey(repoUrl string) string {
 	return NormalizeHost(u.Host) + "/" + path
 }
 
-// MatchNamespacePath 判断 repoUrl 是否属于命名空间（host 相等且 path 前缀匹配，均小写比较）。
-func MatchNamespacePath(repoUrl, forgeHost, nsPath string) bool {
+// RepoNamespacePath 取 repoUrl 的 namespace 段（path 首段，小写），解析失败返回空串。
+func RepoNamespacePath(repoUrl string) string {
 	key := RepoKey(repoUrl)
 	if key == "" {
-		return false
+		return ""
 	}
-	prefix := strings.ToLower(NormalizeHost(forgeHost)) + "/" + strings.ToLower(NormalizeNsPath(nsPath)) + "/"
-	return strings.HasPrefix(key+"/", prefix)
+	_, rest, _ := strings.Cut(key, "/") // 去掉 host 段
+	ns, _, _ := strings.Cut(rest, "/")
+	return ns
 }
 
 // Reconcile 对账纯函数：远端仓库列表 vs 本地仓库快照，按 RepoKey 匹配产出三类。
@@ -87,30 +88,35 @@ func Reconcile(local []LocalRepo, remote []gitapi.RemoteRepo) ReconcileResult {
 		result.Orphan = append(result.Orphan, l)
 	}
 	// map 遍历序随机，按名称排稳定序（展示与测试都受益）
-	slices.SortFunc(result.Missing, func(a, b gitapi.RemoteRepo) int { return strings.Compare(a.Name, b.Name) })
-	slices.SortFunc(result.Orphan, func(a, b LocalRepo) int { return strings.Compare(a.Name, b.Name) })
-	slices.SortFunc(result.Synced, func(a, b RepoPair) int { return strings.Compare(a.Local.Name, b.Local.Name) })
+	sortRepos(result.Missing)
+	sortLocals(result.Orphan)
+	sortPairs(result.Synced)
 	return result
 }
 
-// fetchRepos 实际执行一次远端拉取（作为 easycache loader 调用；失败降级返回空列表只记日志，
-// 但探测/配置类错误向上抛——调用方区分「还没拉过」与「拉了但没数据」靠缓存是否命中）。
-func fetchRepos(f Forge, ns Namespace, accounts []Account, newClient clientFactory) ([]gitapi.RemoteRepo, error) {
-	token := ""
-	if ns.AccountUsername != "" {
-		a := findAccount(accounts, ns.ForgeHost, ns.AccountUsername)
-		if a == nil {
-			return nil, fmt.Errorf("namespace 挂载的 account 未配置: %s@%s", ns.AccountUsername, ns.ForgeHost)
-		}
-		token = a.Token
-	}
-	client, err := newClient(f.Kind, f.Host, token)
+// --- 排序辅助（按名称稳定序） ---
+
+func sortRepos(rs []gitapi.RemoteRepo) {
+	slices.SortFunc(rs, func(a, b gitapi.RemoteRepo) int { return strings.Compare(a.Name, b.Name) })
+}
+
+func sortLocals(ls []LocalRepo) {
+	slices.SortFunc(ls, func(a, b LocalRepo) int { return strings.Compare(a.Name, b.Name) })
+}
+
+func sortPairs(ps []RepoPair) {
+	slices.SortFunc(ps, func(a, b RepoPair) int { return strings.Compare(a.Local.Name, b.Local.Name) })
+}
+
+// fetchRepos 实际执行一次远端拉取（account 维度，认证端点；token 必填）。
+func fetchRepos(f Forge, a Account, newClient clientFactory) ([]gitapi.RemoteRepo, error) {
+	client, err := newClient(f.Kind, f.Host, a.Token)
 	if err != nil {
 		return nil, err
 	}
-	repos, err := client.ListNamespaceRepos(context.Background(), ns.Type, ns.Path)
+	repos, err := client.ListAccountRepos(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("拉取 namespace 仓库列表失败: %s@%s: %w", ns.Path, ns.ForgeHost, err)
+		return nil, fmt.Errorf("拉取账号仓库列表失败: %s@%s: %w", a.Username, a.ForgeHost, err)
 	}
 	return repos, nil
 }

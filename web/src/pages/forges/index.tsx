@@ -1,13 +1,11 @@
-// forge 页（提案 1042）：以 forge 上的远端仓库为入口的列表视图（无 tree 模式）。
-// 数据源 /api/forge/overview（1041 拉取缓存 × 本地项目快照的聚合对账，纯读不外呼）；
-// 拉取/刷新是显式动作（namespace 摘要条的刷新按钮），行内「复制 clone 命令」不做 clone 执行。
+// forge 页（提案 1042，模型 1044）：以 account 拉取的远端仓库为入口的列表视图（无 tree 模式）。
+// 数据源 /api/forge/overview（各 account 拉取缓存 × 本地项目快照的聚合对账，纯读不外呼）；
+// 拉取/刷新是显式动作（account 摘要条的刷新按钮）；owner 从 URL 推导、仅作展示分组维度。
 import { CloudDownload, Copy, ExternalLink, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 
 import type { components, Forge } from '@/api/client';
-
-type RepoRow = components['schemas']['RepoRow'];
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
 import { PageHeader } from '@/components/page-header';
@@ -18,7 +16,9 @@ import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
 import { prettyTime } from '@/lib/time';
 import { cn } from '@/lib/utils';
-import { useForgeNamespaceFetch, useForgeOverview, useForges } from '@/queries/forge';
+import { useForgeAccountFetch, useForgeOverview, useForges } from '@/queries/forge';
+
+type RepoRow = components['schemas']['RepoRow'];
 
 // 对账状态筛选（URL ?status= 记忆）
 const STATUS_FILTERS = [
@@ -60,7 +60,7 @@ function rowName(r: RepoRow): string {
 export function ForgesPage() {
   const overview = useForgeOverview();
   const forgesQ = useForges();
-  const fetchMut = useForgeNamespaceFetch();
+  const fetchMut = useForgeAccountFetch();
   const [params, setParams] = useSearchParams();
   const [copied, setCopied] = useState('');
 
@@ -80,8 +80,8 @@ export function ForgesPage() {
     setParams(next, { replace: true });
   };
 
-  const namespaces = overview.data?.namespaces ?? [];
-  const fetchedCount = namespaces.filter((ns) => !ns.fetchedAt?.startsWith('0001')).length;
+  const accounts = overview.data?.accounts ?? [];
+  const fetchedCount = accounts.filter((a) => !a.fetchedAt?.startsWith('0001')).length;
 
   const rows = sortRows(
     (overview.data?.rows ?? []).filter(
@@ -104,21 +104,21 @@ export function ForgesPage() {
         meta={<span>远端仓库视角（对账缓存，不实时外呼）；clone / 推拉等 git 操作仍走本机凭证与既有流程</span>}
       />
 
-      {/* namespace 摘要条：拉取新鲜度 + 显式刷新入口 */}
+      {/* account 摘要条：拉取新鲜度 + 显式刷新入口 */}
       <div className="mx-6 mb-3 flex flex-wrap items-center gap-2">
-        {namespaces.map((ns) => {
-          const never = !ns.fetchedAt || ns.fetchedAt.startsWith('0001');
-          const stale = !never && isStale(ns.fetchedAt!);
+        {accounts.map((a) => {
+          const never = !a.fetchedAt || a.fetchedAt.startsWith('0001');
+          const stale = !never && isStale(a.fetchedAt!);
           return (
             <span
-              key={`${ns.forgeHost}/${ns.path}`}
+              key={`${a.forgeHost}/${a.username}`}
               className={cn(
                 'flex items-center gap-1.5 rounded-md border px-2 py-1 text-xs',
                 (never || stale) && 'border-amber-500/50 bg-amber-500/5',
               )}
             >
-              {renderIcon(forgeIcon(ns.forgeHost), null)}
-              <span className="font-mono">{ns.path}</span>
+              {renderIcon(forgeIcon(a.forgeHost), null)}
+              <span className="font-mono">{a.username}</span>
               {never ? (
                 <Badge variant="outline" className="text-amber-600">
                   未拉取
@@ -126,7 +126,7 @@ export function ForgesPage() {
               ) : (
                 <>
                   <span className="text-muted-foreground">
-                    {ns.repoCount} 仓库 · 拉取于 {prettyTime(ns.fetchedAt)}
+                    {a.repoCount} 仓库 · 拉取于 {prettyTime(a.fetchedAt)}
                   </span>
                   {stale && (
                     <Badge variant="outline" className="text-amber-600">
@@ -137,12 +137,12 @@ export function ForgesPage() {
               )}
               <button
                 type="button"
-                aria-label={`刷新 ${ns.path}`}
+                aria-label={`刷新 ${a.username}@${a.forgeHost}`}
                 className="text-muted-foreground hover:text-foreground"
                 disabled={fetchMut.isPending}
                 onClick={() =>
                   fetchMut.mutate(
-                    { forgeHost: ns.forgeHost, path: ns.path, force: true },
+                    { forgeHost: a.forgeHost, username: a.username, force: true },
                     { onSuccess: () => void overview.refetch() },
                   )
                 }
@@ -152,18 +152,18 @@ export function ForgesPage() {
             </span>
           );
         })}
-        {namespaces.length === 0 && (
+        {accounts.length === 0 && (
           <span className="text-xs text-muted-foreground">
-            暂无 namespace，先到
+            暂无账号，先到
             <Link to="/settings?section=forge" target="_blank" className="mx-1 underline">
               设置 · Forge
             </Link>
-            配置
+            配置（不配 token 无法拉取）
           </span>
         )}
-        {namespaces.length > 0 && fetchedCount < namespaces.length && (
+        {accounts.length > 0 && fetchedCount < accounts.length && (
           <span className="text-xs text-amber-600">
-            {namespaces.length - fetchedCount} 个 namespace 未拉取，不出现在下方列表
+            {accounts.length - fetchedCount} 个账号未拉取，不出现在下方列表
           </span>
         )}
       </div>
@@ -216,8 +216,8 @@ export function ForgesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>仓库</TableHead>
+              <TableHead>owner</TableHead>
               <TableHead>forge</TableHead>
-              <TableHead>namespace</TableHead>
               <TableHead>状态</TableHead>
               <TableHead>本地</TableHead>
               <TableHead>更新时间</TableHead>
@@ -228,7 +228,7 @@ export function ForgesPage() {
             {rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={7} className="text-xs text-muted-foreground">
-                  {overview.isLoading ? '加载中…' : '暂无仓库行——先在上方刷新 namespace 拉取'}
+                  {overview.isLoading ? '加载中…' : '暂无仓库行——先在上方刷新账号拉取'}
                 </TableCell>
               </TableRow>
             )}
@@ -236,7 +236,7 @@ export function ForgesPage() {
               const status = STATUS_META[r.status];
               const cloneCmd = `cube clone ${r.repo.cloneUrl}`;
               return (
-                <TableRow key={`${r.forgeHost}/${r.nsPath}/${rowName(r)}/${r.status}`}>
+                <TableRow key={`${r.forgeHost}/${r.owner}/${rowName(r)}/${r.status}`}>
                   <TableCell className="font-medium">
                     <span className="flex items-center gap-1.5">
                       {r.repo.name}
@@ -245,13 +245,13 @@ export function ForgesPage() {
                       )}
                     </span>
                   </TableCell>
+                  <TableCell className="font-mono text-xs">{r.owner || '—'}</TableCell>
                   <TableCell>
                     <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
                       {renderIcon(forgeIcon(r.forgeHost), null)}
                       {r.forgeHost}
                     </span>
                   </TableCell>
-                  <TableCell className="font-mono text-xs">{r.nsPath}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className={status?.className}>
                       {status?.label ?? r.status}
@@ -315,8 +315,8 @@ export function ForgesPage() {
           {rows.length} 个仓库{copied && <span className="ml-3 text-emerald-600">已复制：{copied}</span>}
         </div>
       )}
-      {!overview.isLoading && (overview.data?.rows ?? []).length === 0 && namespaces.length > 0 && (
-        <EmptyState title="还没有对账数据" sub="点击上方 namespace 摘要的 ↻ 拉取远端仓库列表" />
+      {!overview.isLoading && (overview.data?.rows ?? []).length === 0 && accounts.length > 0 && (
+        <EmptyState title="还没有对账数据" sub="点击上方账号摘要的 ↻ 拉取远端仓库列表" />
       )}
     </div>
   );

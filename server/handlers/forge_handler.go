@@ -11,7 +11,8 @@ import (
 	"cube/web"
 )
 
-// ForgeHandler forge 配置管理的 HTTP 出口（1040 forge / 1041 account+namespace）。
+// ForgeHandler forge 配置管理的 HTTP 出口（1040 forge / 1041 account / 1042 forge 页）。
+// 1044 起 namespace 模型移除，account 是 forge 下唯一的关联配置。
 type ForgeHandler struct {
 	forgeService   *forge.Service
 	projectService *project.Service // 对账用：本地项目快照投影为 forge.LocalRepo
@@ -30,14 +31,9 @@ func (h *ForgeHandler) Register(api huma.API, mux *http.ServeMux) {
 	web.ApiGet(api, "/api/forge/account/list", "获取 forge account 列表（token 打码）", h.accountList)
 	web.ApiPost(api, "/api/forge/account/save", "新增或按 forgeHost+username 替换 account", h.accountSave)
 	web.ApiPost(api, "/api/forge/account/delete", "按 forgeHost+username 删除 account", h.accountDelete)
+	web.ApiPost(api, "/api/forge/account/fetch", "拉取 account 名下全部远端仓库", h.accountFetch)
 
-	web.ApiGet(api, "/api/forge/namespace/list", "获取 forge namespace 列表", h.namespaceList)
-	web.ApiPost(api, "/api/forge/namespace/save", "新增或按 forgeHost+path 替换 namespace", h.namespaceSave)
-	web.ApiPost(api, "/api/forge/namespace/delete", "按 forgeHost+path 删除 namespace", h.namespaceDelete)
-	web.ApiPost(api, "/api/forge/namespace/fetch", "拉取 namespace 下远端仓库列表", h.namespaceFetch)
-	web.ApiPost(api, "/api/forge/namespace/detect", "探测 namespace 是个人空间还是组织空间", h.namespaceDetect)
-	web.ApiGet(api, "/api/forge/namespace/reconcile", "对账 namespace（远端缓存 vs 本地项目）", h.namespaceReconcile)
-	web.ApiGet(api, "/api/forge/overview", "forge 页聚合：全部 namespace 对账行 + 拉取元信息（只读缓存不外呼）", h.forgeOverview)
+	web.ApiGet(api, "/api/forge/overview", "forge 页聚合：全部 account 对账行 + 拉取元信息（只读缓存不外呼）", h.forgeOverview)
 }
 
 func (h *ForgeHandler) forgeList(_ struct{}) (web.ListResult[forge.Forge], error) {
@@ -136,89 +132,22 @@ func (h *ForgeHandler) accountDelete(input AccountDeleteInput) (map[string]any, 
 	return map[string]any{"ok": true}, nil
 }
 
-// --- namespace ---
-
-func (h *ForgeHandler) namespaceList(_ struct{}) (web.ListResult[forge.Namespace], error) {
-	return listResult(h.forgeService.Namespaces()), nil
-}
-
-// NamespaceSaveInput namespace/save 接口入参。
-type NamespaceSaveInput struct {
-	Body struct {
-		ForgeHost       string `json:"forgeHost" doc:"所属 forge host（唯一键之一）"`
-		Path            string `json:"path" doc:"命名空间路径，如 heyuuu（唯一键之一）"`
-		Type            string `json:"type" doc:"personal / org"`
-		AccountUsername string `json:"accountUsername,omitempty" doc:"拉取私有库用的 account（可选）"`
-	}
-}
-
-func (h *ForgeHandler) namespaceSave(input NamespaceSaveInput) (map[string]any, error) {
-	b := input.Body
-	ns := forge.Namespace{ForgeHost: b.ForgeHost, Path: b.Path, Type: forge.NamespaceType(b.Type), AccountUsername: b.AccountUsername}
-	if err := h.forgeService.SaveNamespace(ns); err != nil {
-		return nil, err
-	}
-	return map[string]any{"ok": true}, nil
-}
-
-// NamespaceDeleteInput namespace/delete 接口入参。
-type NamespaceDeleteInput struct {
+// AccountFetchInput account/fetch 接口入参（出站 API 调用，同步执行）。
+type AccountFetchInput struct {
 	Body struct {
 		ForgeHost string `json:"forgeHost"`
-		Path      string `json:"path"`
-	}
-}
-
-func (h *ForgeHandler) namespaceDelete(input NamespaceDeleteInput) (map[string]any, error) {
-	if err := h.forgeService.DeleteNamespace(input.Body.ForgeHost, input.Body.Path); err != nil {
-		return nil, err
-	}
-	return map[string]any{"ok": true}, nil
-}
-
-// NamespaceFetchInput namespace/fetch 接口入参（出站 API 调用，同步执行）。
-type NamespaceFetchInput struct {
-	Body struct {
-		ForgeHost string `json:"forgeHost"`
-		Path      string `json:"path"`
+		Username  string `json:"username"`
 		Force     bool   `json:"force,omitempty" doc:"跳过缓存强制重拉"`
 	}
 }
 
-func (h *ForgeHandler) namespaceFetch(input NamespaceFetchInput) (map[string]any, error) {
+func (h *ForgeHandler) accountFetch(input AccountFetchInput) (map[string]any, error) {
 	b := input.Body
-	repos, err := h.forgeService.FetchNamespace(b.ForgeHost, b.Path, b.Force)
+	repos, err := h.forgeService.FetchAccount(b.ForgeHost, b.Username, b.Force)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]any{"ok": true, "count": len(repos)}, nil
-}
-
-// NamespaceDetectInput namespace/detect 接口入参。
-type NamespaceDetectInput struct {
-	Body struct {
-		ForgeHost string `json:"forgeHost"`
-		Path      string `json:"path"`
-	}
-}
-
-func (h *ForgeHandler) namespaceDetect(input NamespaceDetectInput) (map[string]any, error) {
-	b := input.Body
-	nsType, err := h.forgeService.DetectNamespaceType(b.ForgeHost, b.Path)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{"ok": true, "type": nsType}, nil
-}
-
-// NamespaceReconcileInput namespace/reconcile 接口入参（query）。
-type NamespaceReconcileInput struct {
-	ForgeHost string `query:"forgeHost" doc:"所属 forge host"`
-	Path      string `query:"path" doc:"命名空间路径"`
-}
-
-func (h *ForgeHandler) namespaceReconcile(input NamespaceReconcileInput) (*forge.ReconcileResult, error) {
-	return h.forgeService.ReconcileNamespace(input.ForgeHost, input.Path, h.localRepos())
 }
 
 // forgeOverview forge 页聚合数据源（只读拉取缓存与本地快照，不触发外呼）。

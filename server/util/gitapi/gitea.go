@@ -18,17 +18,13 @@ type giteaRepo struct {
 	UpdatedAt     time.Time `json:"updated_at"`
 }
 
-func (c *giteaClient) ListNamespaceRepos(ctx context.Context, nsType NamespaceType, path string) ([]RemoteRepo, error) {
-	prefix, err := nsEndpoint(nsType)
-	if err != nil {
-		return nil, err
-	}
-	prefix = "/api/v1" + prefix
+// ListAccountRepos 认证账号名下的全部仓库（含私有库与所属组织仓库，按请求者可见性）。
+func (c *giteaClient) ListAccountRepos(ctx context.Context) ([]RemoteRepo, error) {
 	var repos []RemoteRepo
-	err = listPaged(ctx, func(ctx context.Context, page int) (int, error) {
+	err := listPaged(ctx, func(ctx context.Context, page int) (int, error) {
 		var items []giteaRepo
 		q := url.Values{"limit": {"100"}, "page": {fmt.Sprint(page)}}
-		if err := c.doGet(ctx, prefix+url.PathEscape(path)+"/repos", q, &items); err != nil {
+		if err := c.doGet(ctx, "/api/v1/user/repos", q, &items); err != nil {
 			return 0, err
 		}
 		for _, r := range items {
@@ -43,11 +39,4 @@ func (c *giteaClient) ListNamespaceRepos(ctx context.Context, nsType NamespaceTy
 		return len(items), nil
 	})
 	return repos, err
-}
-
-func (c *giteaClient) DetectNamespace(ctx context.Context, path string) (NamespaceType, error) {
-	return detectByProbe(ctx,
-		func() error { return c.doGet(ctx, "/api/v1/users/"+url.PathEscape(path), nil, nil) },
-		func() error { return c.doGet(ctx, "/api/v1/orgs/"+url.PathEscape(path), nil, nil) },
-	)
 }

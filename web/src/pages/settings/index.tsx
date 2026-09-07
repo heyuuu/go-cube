@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 import { CloneSection } from './clone-section';
 import { ConfigSection } from './config-section';
 import { ForgeAccountsSection } from './forge-accounts';
-import { ForgeNamespacesSection } from './forge-namespaces';
 import { ForgeSection } from './forge-section';
 import { OpenerSection } from './opener-section';
 import { ScanSection } from './scan-section';
@@ -62,7 +61,6 @@ export function SettingsPage() {
             <div className="flex flex-col gap-8">
               <ForgeSection />
               <ForgeAccountsSection />
-              <ForgeNamespacesSection />
             </div>
           )}
         </div>

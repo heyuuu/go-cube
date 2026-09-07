@@ -27,21 +27,21 @@ func TestRepoKey(t *testing.T) {
 	}
 }
 
-// TestMatchNamespacePath namespace 范围判定：host 相等且 path 前缀匹配。
-func TestMatchNamespacePath(t *testing.T) {
+// TestRepoNamespacePath namespace 段推导（owner 归组与孤儿判定的依据）。
+func TestRepoNamespacePath(t *testing.T) {
 	cases := []struct {
-		repoUrl, host, path string
-		want                bool
+		repoUrl string
+		want    string
 	}{
-		{"git@github.com:heyuuu/cube.git", "github.com", "heyuuu", true},
-		{"https://github.com/Heyuuu/Cube", "GitHub.com", "/heyuuu/", true},
-		{"git@github.com:heyuuu-fork/cube.git", "github.com", "heyuuu", false}, // 前缀须按段匹配
-		{"git@gitlab.com:heyuuu/cube.git", "github.com", "heyuuu", false},      // host 不同
-		{"", "github.com", "heyuuu", false},
+		{"git@github.com:heyuuu/cube.git", "heyuuu"},
+		{"https://gitee.com/CE_LBT/edu-web.git", "ce_lbt"},
+		{"https://gitea.example.com:3000/acme/app", "acme"},
+		{"", ""},
+		{"not a url", ""},
 	}
 	for _, c := range cases {
-		if got := MatchNamespacePath(c.repoUrl, c.host, c.path); got != c.want {
-			t.Errorf("MatchNamespacePath(%q,%q,%q) = %v, want %v", c.repoUrl, c.host, c.path, got, c.want)
+		if got := RepoNamespacePath(c.repoUrl); got != c.want {
+			t.Errorf("RepoNamespacePath(%q) = %q, want %q", c.repoUrl, got, c.want)
 		}
 	}
 }
@@ -65,7 +65,7 @@ func TestReconcile(t *testing.T) {
 	if len(got.Missing) != 1 || got.Missing[0].Name != "fresh" {
 		t.Fatalf("missing 不符: %+v", got.Missing)
 	}
-	// 纯函数不做 namespace 过滤（Service 层负责）：host 不同匹配不上的本地库同为孤儿
+	// 纯函数不做 namespace 过滤（buildOverview 负责）：host 不同匹配不上的本地库同为孤儿
 	if len(got.Orphan) != 2 || got.Orphan[0].Name != "gone" {
 		t.Fatalf("orphan 不符: %+v", got.Orphan)
 	}

@@ -38,6 +38,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/forge/account/fetch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 拉取 account 名下全部远端仓库 */
+    post: operations['forge.accountFetch'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/forge/account/list': {
     parameters: {
       query?: never;
@@ -106,108 +123,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/forge/namespace/delete': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 按 forgeHost+path 删除 namespace */
-    post: operations['forge.namespaceDelete'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/forge/namespace/detect': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 探测 namespace 是个人空间还是组织空间 */
-    post: operations['forge.namespaceDetect'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/forge/namespace/fetch': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 拉取 namespace 下远端仓库列表 */
-    post: operations['forge.namespaceFetch'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/forge/namespace/list': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 获取 forge namespace 列表 */
-    get: operations['forge.namespaceList'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/forge/namespace/reconcile': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** 对账 namespace（远端缓存 vs 本地项目） */
-    get: operations['forge.namespaceReconcile'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/forge/namespace/save': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** 新增或按 forgeHost+path 替换 namespace */
-    post: operations['forge.namespaceSave'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/forge/overview': {
     parameters: {
       query?: never;
@@ -215,7 +130,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** forge 页聚合：全部 namespace 对账行 + 拉取元信息（只读缓存不外呼） */
+    /** forge 页聚合：全部 account 对账行 + 拉取元信息（只读缓存不外呼） */
     get: operations['forge.overview'];
     put?: never;
     post?: never;
@@ -718,6 +633,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/usage/recent-paths': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** 获取最近使用的路径清单（去重取最新，最近使用倒序） */
+    get: operations['usage.recentPaths'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/usage/record': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** 补记一条使用记录（web 直开不经过后端记录的场景，如 url 型 opener 动作、workbench 进入） */
+    post: operations['usage.record'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/workbench/branch/add': {
     parameters: {
       query?: never;
@@ -1043,6 +992,18 @@ export interface components {
       forgeHost: string;
       username: string;
     };
+    AccountFetchInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/AccountFetchInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 跳过缓存强制重拉 */
+      force?: boolean;
+      forgeHost: string;
+      username: string;
+    };
     AccountSaveInputBody: {
       /**
        * Format: uri
@@ -1055,6 +1016,14 @@ export interface components {
       /** @description API token；提交掩码值视为未修改 */
       token?: string;
       /** @description 平台用户名（唯一键之一） */
+      username: string;
+    };
+    AcctMeta: {
+      /** Format: date-time */
+      fetchedAt: string;
+      forgeHost: string;
+      /** Format: int64 */
+      repoCount: number;
       username: string;
     };
     ApiOutputCommitDetailBody: {
@@ -1178,17 +1147,6 @@ export interface components {
       message: string;
       ok: boolean;
     };
-    ApiOutputListResultNamespaceBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputListResultNamespaceBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['ListResultNamespace'];
-      message: string;
-      ok: boolean;
-    };
     ApiOutputListResultOpenerDTOBody: {
       /**
        * Format: uri
@@ -1208,6 +1166,17 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['ListResultOpenerIntentDTO'];
+      message: string;
+      ok: boolean;
+    };
+    ApiOutputListResultPathUsageBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/ApiOutputListResultPathUsageBody.json
+       */
+      readonly $schema?: string;
+      data: components['schemas']['ListResultPathUsage'];
       message: string;
       ok: boolean;
     };
@@ -1309,17 +1278,6 @@ export interface components {
        */
       readonly $schema?: string;
       data: components['schemas']['ProjectListResult'];
-      message: string;
-      ok: boolean;
-    };
-    ApiOutputReconcileResultBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/ApiOutputReconcileResultBody.json
-       */
-      readonly $schema?: string;
-      data: components['schemas']['ReconcileResult'];
       message: string;
       ok: boolean;
     };
@@ -1703,14 +1661,14 @@ export interface components {
     ListResultForge: {
       list: components['schemas']['Forge'][] | null;
     };
-    ListResultNamespace: {
-      list: components['schemas']['Namespace'][] | null;
-    };
     ListResultOpenerDTO: {
       list: components['schemas']['OpenerDTO'][] | null;
     };
     ListResultOpenerIntentDTO: {
       list: components['schemas']['OpenerIntentDTO'][] | null;
+    };
+    ListResultPathUsage: {
+      list: components['schemas']['PathUsage'][] | null;
     };
     ListResultScanRule: {
       list: components['schemas']['ScanRule'][] | null;
@@ -1736,69 +1694,6 @@ export interface components {
     MdListResult: {
       dir: boolean;
       files: string[] | null;
-    };
-    Namespace: {
-      accountUsername: string;
-      forgeHost: string;
-      path: string;
-      type: string;
-    };
-    NamespaceDeleteInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/NamespaceDeleteInputBody.json
-       */
-      readonly $schema?: string;
-      forgeHost: string;
-      path: string;
-    };
-    NamespaceDetectInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/NamespaceDetectInputBody.json
-       */
-      readonly $schema?: string;
-      forgeHost: string;
-      path: string;
-    };
-    NamespaceFetchInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/NamespaceFetchInputBody.json
-       */
-      readonly $schema?: string;
-      /** @description 跳过缓存强制重拉 */
-      force?: boolean;
-      forgeHost: string;
-      path: string;
-    };
-    NamespaceSaveInputBody: {
-      /**
-       * Format: uri
-       * @description A URL to the JSON Schema for this object.
-       * @example https://example.com/schemas/NamespaceSaveInputBody.json
-       */
-      readonly $schema?: string;
-      /** @description 拉取私有库用的 account（可选） */
-      accountUsername?: string;
-      /** @description 所属 forge host（唯一键之一） */
-      forgeHost: string;
-      /** @description 命名空间路径，如 heyuuu（唯一键之一） */
-      path: string;
-      /** @description personal / org */
-      type: string;
-    };
-    NsMeta: {
-      /** Format: date-time */
-      fetchedAt: string;
-      forgeHost: string;
-      path: string;
-      /** Format: int64 */
-      repoCount: number;
-      type: string;
     };
     OpenerDTO: {
       actions: {
@@ -1879,8 +1774,13 @@ export interface components {
       title?: string;
     };
     Overview: {
-      namespaces: components['schemas']['NsMeta'][] | null;
+      accounts: components['schemas']['AcctMeta'][] | null;
       rows: components['schemas']['RepoRow'][] | null;
+    };
+    PathUsage: {
+      path: string;
+      /** Format: date-time */
+      time: string;
     };
     ProjectDTO: {
       gitInfo: components['schemas']['Entry'];
@@ -1919,11 +1819,6 @@ export interface components {
       /** @description 项目绝对路径 */
       path: string;
     };
-    ReconcileResult: {
-      missing: components['schemas']['RemoteRepo'][] | null;
-      orphan: components['schemas']['LocalRepo'][] | null;
-      synced: components['schemas']['RepoPair'][] | null;
-    };
     Refs: {
       head: string;
       locals: string[] | null;
@@ -1947,14 +1842,10 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    RepoPair: {
-      local: components['schemas']['LocalRepo'];
-      remote: components['schemas']['RemoteRepo'];
-    };
     RepoRow: {
       forgeHost: string;
       local?: components['schemas']['LocalRepo'];
-      nsPath: string;
+      owner: string;
       repo: components['schemas']['RemoteRepo'];
       status: string;
     };
@@ -2010,6 +1901,20 @@ export interface components {
     };
     TreeListResult: {
       list: string[] | null;
+    };
+    UsageRecordInputBody: {
+      /**
+       * Format: uri
+       * @description A URL to the JSON Schema for this object.
+       * @example https://example.com/schemas/UsageRecordInputBody.json
+       */
+      readonly $schema?: string;
+      /** @description 实际打开的目标目录绝对路径，缺省记项目根 */
+      dir?: string;
+      /** @description opener 名（web 直开的 url 型动作补记时传） */
+      opener?: string;
+      /** @description 项目/目录绝对路径（归并键） */
+      project?: string;
     };
     WhoamiResponse: {
       app: string;
@@ -2191,6 +2096,39 @@ export interface operations {
       };
     };
   };
+  'forge.accountFetch': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AccountFetchInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
   'forge.accountList': {
     parameters: {
       query?: never;
@@ -2302,201 +2240,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputListResultForgeBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceDelete': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['NamespaceDeleteInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceDetect': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['NamespaceDetectInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceFetch': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['NamespaceFetchInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceList': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputListResultNamespaceBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceReconcile': {
-    parameters: {
-      query?: {
-        /** @description 所属 forge host */
-        forgeHost?: string;
-        /** @description 命名空间路径 */
-        path?: string;
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputReconcileResultBody'];
-        };
-      };
-      /** @description Error */
-      default: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/problem+json': components['schemas']['ErrorModel'];
-        };
-      };
-    };
-  };
-  'forge.namespaceSave': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['NamespaceSaveInputBody'];
-      };
-    };
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */
@@ -3449,6 +3192,71 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ApiOutputWhoamiResponseBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'usage.recentPaths': {
+    parameters: {
+      query?: {
+        /** @description 返回条数上限，缺省 5 */
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputListResultPathUsageBody'];
+        };
+      };
+      /** @description Error */
+      default: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ErrorModel'];
+        };
+      };
+    };
+  };
+  'usage.record': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UsageRecordInputBody'];
+      };
+    };
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiOutputMapStringInterface {}Body'];
         };
       };
       /** @description Error */
