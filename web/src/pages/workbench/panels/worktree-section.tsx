@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useCopied } from '@/hooks/use-copied';
 import { usePersistentSet } from '@/hooks/use-local-pref';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
@@ -175,13 +176,7 @@ function RemoteSection({ path }: { path: string }) {
 }
 
 function RemoteRow({ remote }: { remote: RemoteEntry }) {
-  const [copied, setCopied] = useState(false);
-  const copy = () => {
-    void navigator.clipboard.writeText(remote.url).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    });
-  };
+  const { copied, copy } = useCopied();
   return (
     <div className="flex items-center px-2 leading-7 text-xs">
       <span className="shrink-0 font-medium">{remote.name}</span>
@@ -194,7 +189,7 @@ function RemoteRow({ remote }: { remote: RemoteEntry }) {
         className="ml-auto shrink-0"
         title="复制 git 地址"
         aria-label={`复制 ${remote.name} 的地址`}
-        onClick={copy}
+        onClick={() => copy(remote.url)}
       >
         {copied ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}
       </Button>

@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
+import { useCopied } from '@/hooks/use-copied';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -46,16 +47,9 @@ export function ProjectDrawer({
   onOpen: (path: string, opener: string, dir?: string) => void;
   onClose: () => void;
 }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopied();
   const [wsEditOpen, setWsEditOpen] = useState(false);
   const wsState = useWorkspaceState(project?.path ?? null);
-
-  function copyPath(path: string) {
-    navigator.clipboard.writeText(path).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
 
   const g = project?.gitInfo;
 
@@ -107,7 +101,7 @@ export function ProjectDrawer({
             <DrawerSection title="动作">
               <div className="flex items-center gap-2">
                 <ProjectActions p={project} openerList={openerList} open={open} onOpen={onOpen} />
-                <Button variant="outline" size="sm" onClick={() => copyPath(project.path)}>
+                <Button variant="outline" size="sm" onClick={() => copy(project.path)}>
                   {copied ? '已复制' : '复制路径'}
                 </Button>
               </div>

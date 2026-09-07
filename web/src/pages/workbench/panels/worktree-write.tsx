@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'react-router';
 
+import { DialogShell } from '@/components/dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -333,24 +334,10 @@ function WriteDialogShell({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="mx-4 flex w-full max-w-sm flex-col gap-2.5 rounded-lg border border-border bg-background p-4 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-sm font-semibold">{title}</div>
-        {children}
-      </div>
-    </div>
+    <DialogShell title={title} onClose={onClose} className="flex flex-col gap-2.5">
+      {children}
+    </DialogShell>
   );
 }
 

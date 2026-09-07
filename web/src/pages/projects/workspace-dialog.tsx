@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import type { Project } from '@/api/client';
+import { DialogShell } from '@/components/dialog-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useWorkspaceSave, useWorkspaceState } from '@/queries/project';
@@ -54,12 +55,7 @@ export function WorkspaceDialog({ project, onClose }: { project: Project; onClos
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-      <div
-        className="mx-4 flex max-h-[80vh] w-full max-w-lg flex-col rounded-lg border border-border bg-background p-4 shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="text-sm font-semibold">workspace 声明</div>
+    <DialogShell title="workspace 声明" onClose={onClose} className="flex max-h-[80vh] max-w-lg flex-col">
         <div className="mt-1 text-xs text-muted-foreground">
           写入项目内 .cube/cube.json（进 git）。显式声明优先生效；未声明时按探测规则自动生效。
         </div>
@@ -134,7 +130,6 @@ export function WorkspaceDialog({ project, onClose }: { project: Project; onClos
             </div>
           </>
         )}
-      </div>
-    </div>
+    </DialogShell>
   );
 }
