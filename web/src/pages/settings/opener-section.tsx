@@ -14,16 +14,17 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { IconDecl } from '@/lib/icon';
 import { renderIcon } from '@/lib/icon';
-import { cn } from '@/lib/utils';
 import {
   useIntentDefaultDelete,
   useIntentDefaultSave,
   useOpenerDelete,
+  useOpenerList,
   useOpenerReorder,
   useOpenerSave,
   useOpenerIntents,
 } from '@/queries/opener';
-import { useOpenerList } from '@/queries/opener';
+
+import { STICKY_LEFT, STICKY_RIGHT, useDragOrder } from './drag-order';
 
 const ALL_ROLES = ['open-dir', 'open-file', 'diff-dir', 'diff-file'] as const;
 
@@ -33,14 +34,6 @@ const PLACEHOLDER_BY_ROLE: Record<(typeof ALL_ROLES)[number], string> = {
   'diff-dir': 'exec: bcompare $0 $1',
   'diff-file': 'exec: code --diff $0 $1',
 };
-
-// 冻结列：name 贴左、操作贴右，水平滚动时始终可见。实心 bg 遮住下层滑过的单元格，
-// 分隔线用 inset 阴影而非 border（border-collapse 下 border 不随 sticky 单元格移动）；
-// 行 hover 靠 group 保持整行联动（sticky 单元格自身的 bg 会盖掉 tr 的 hover bg）
-const STICKY_LEFT =
-  'sticky left-0 z-10 bg-background group-hover/row:bg-muted/50 shadow-[inset_-1px_0_0_var(--border)]';
-const STICKY_RIGHT =
-  'sticky right-0 z-10 bg-background group-hover/row:bg-muted/50 shadow-[inset_1px_0_0_var(--border)]';
 
 // 与后端 defaultIcon 一致（opener/icon.go）：icon 必有值，新增默认 lucide:app-window-mac
 const DEFAULT_LUCIDE = 'app-window-mac';
@@ -232,37 +225,12 @@ export function OpenerSection() {
   const [editing, setEditing] = useState<Draft | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  // 拖拽排序：armed 记录「按住 grip 的行」——只有 grip 手柄能发起拖拽（整行 draggable 会
-  // 干扰按钮点击与文本选择）；order 是乐观顺序，与服务端名单集合不一致（增删后）即失效回落
   const list = openers.data?.list ?? [];
-  const [order, setOrder] = useState<string[] | null>(null);
-  const [armed, setArmed] = useState<string | null>(null);
-  const [dragIdx, setDragIdx] = useState<number | null>(null);
-  const [overIdx, setOverIdx] = useState<number | null>(null);
-
-  // 个位数列表，重排计算不值得 useMemo（直接算还免去 list 引用不稳的依赖告警）
-  const rows = (() => {
-    if (order === null || order.length !== list.length) return list;
-    const byName = new Map(list.map((op) => [op.name, op] as const));
-    const sorted: typeof list = [];
-    for (const n of order) {
-      const hit = byName.get(n);
-      if (!hit) return list;
-      sorted.push(hit);
-    }
-    return sorted;
-  })();
-
-  const dropTo = (target: number) => {
-    if (dragIdx === null || dragIdx === target) return;
-    const names = rows.map((r) => r.name);
-    // 插入位语义：从上往下拖插到 target 之后、从下往上拖插到 target 之前（与高亮线一致）
-    const insertAt = dragIdx < target ? target + 1 : target;
-    const [moved] = names.splice(dragIdx, 1);
-    names.splice(insertAt, 0, moved);
-    setOrder(names);
-    reorder.mutate({ names });
-  };
+  const d = useDragOrder(
+    (op: Opener) => op.name,
+    list,
+    (rows) => reorder.mutate({ names: rows.map((r) => r.name) }),
+  );
 
   return (
     <section>
@@ -289,53 +257,18 @@ export function OpenerSection() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && (
+            {d.rows.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="text-xs text-muted-foreground">
                   暂无 opener
                 </TableCell>
               </TableRow>
             )}
-            {rows.map((op, i) => (
-              <TableRow
-                key={op.name}
-                className={cn(
-                  'group/row',
-                  i === dragIdx && 'opacity-40',
-                  // 插入位高亮：inset 阴影画线，避免 border 变宽引起行高跳动
-                  dragIdx !== null &&
-                    i === overIdx &&
-                    i !== dragIdx &&
-                    (dragIdx < i ? 'shadow-[inset_0_-2px_0_var(--primary)]' : 'shadow-[inset_0_2px_0_var(--primary)]'),
-                )}
-                draggable={armed === op.name}
-                onDragStart={(e) => {
-                  setDragIdx(i);
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', op.name);
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setOverIdx(i);
-                }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  dropTo(i);
-                }}
-                onDragEnd={() => {
-                  setArmed(null);
-                  setDragIdx(null);
-                  setOverIdx(null);
-                }}
-              >
+            {d.rows.map((op: Opener, i: number) => (
+              <TableRow key={op.name} {...d.rowProps(op, i)}>
                 <TableCell className={`${STICKY_LEFT} font-medium`}>
                   <span className="flex items-center gap-1">
-                    <GripVertical
-                      className="size-3.5 shrink-0 cursor-grab text-muted-foreground/40"
-                      onPointerDown={() => setArmed(op.name)}
-                      onPointerUp={() => setArmed(null)}
-                      aria-label="拖动排序"
-                    />
+                    <GripVertical {...d.gripProps(op)} />
                     {op.name}
                   </span>
                 </TableCell>
