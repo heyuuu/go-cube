@@ -51,7 +51,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 跳过对应交互；--yes 跳过最终确认。单条失败不中断，最后汇总结果。`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 定位项目：query 匹配（规则同 push），以项目根为仓库
+			// 定位项目：query 匹配（规则同 push），以项目根为仓库
 			query := getArg(args, 0)
 			proj, err := pickProject(a.ProjectService(), query)
 			if err != nil {
@@ -59,7 +59,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 			}
 			repoPath := proj.Path()
 
-			// 2. 收集 remote 列表
+			// 收集 remote 列表
 			repoRemotes, err := git.Remotes(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 remote 列表失败: %w", err)
@@ -68,7 +68,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 				return errors.New("仓库未配置任何 remote，无可拉取来源")
 			}
 
-			// 3. 单选来源 remote（flag 优先 → 单 remote 自动 → 多 remote 手选）
+			// 单选来源 remote（flag 优先 → 单 remote 自动 → 多 remote 手选）
 			chosenRemote, err := pickPullRemote(repoRemotes, remote)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
@@ -77,7 +77,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 				return err
 			}
 
-			// 4. 候选分支：与该 remote 同名的本地分支及各自领先/落后数
+			// 候选分支：与该 remote 同名的本地分支及各自领先/落后数
 			currentBranch := git.CurrentBranch(repoPath)
 			candidates, err := pullCandidates(repoPath, chosenRemote.Name)
 			if err != nil {
@@ -87,7 +87,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 				return fmt.Errorf("remote %s 上没有与本地同名的分支，无可拉取项", chosenRemote.Name)
 			}
 
-			// 5. 多选分支（flag 优先，默认勾选远端领先的分支）
+			// 多选分支（flag 优先，默认勾选远端领先的分支）
 			chosenBranches, err := pickPullBranches(candidates, currentBranch, refs)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
@@ -99,7 +99,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 				return errors.New("未选择任何分支")
 			}
 
-			// 6. 展示拉取计划 + 二次确认
+			// 展示拉取计划 + 二次确认
 			if !yes {
 				ok, err := confirmPullPlan(repoPath, chosenRemote, chosenBranches, currentBranch)
 				if err != nil {
@@ -113,7 +113,7 @@ remote 选择：仅 1 个 remote 时自动选中；多个 remote 时交互单选
 				}
 			}
 
-			// 7. 执行：逐条快进更新并汇总结果
+			// 执行：逐条快进更新并汇总结果
 			return runPull(repoPath, chosenRemote.Name, chosenBranches, currentBranch)
 		},
 	}

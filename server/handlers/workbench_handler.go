@@ -18,9 +18,8 @@ import (
 	"cube/workbench"
 )
 
-// 工作台基座（提案 docs/proposals/1010-workbench基座）。
-// 本文件先落 info / refs 两个接口；tree / file / diff / file-diff / commits
-// 的契约在提案中定死，由 1011-1013 各自注册实现。
+// 工作台基座（提案 docs/proposals/1010-1013 系列）：repo 信息 / refs / tree /
+// file / diff / commits / worktree / branch / pty 等端点的 HTTP 出口。
 
 type WorkbenchHandler struct {
 	workbenchService *workbench.Service

@@ -105,8 +105,8 @@ func (s *Server) Start() error {
 		Addr:              addr,
 		Handler:           s.mux,
 		ReadHeaderTimeout: 5 * time.Second,
-		//ReadTimeout:       10 * time.Second,
-		//WriteTimeout:      30 * time.Second,
+		// 不设 Read/WriteTimeout：PTY WebSocket 与大文件上传都是长连接，
+		// 整体超时会把合法会话掐断（慢客户端由 IdleTimeout 兜底）
 		IdleTimeout: 120 * time.Second,
 	}
 

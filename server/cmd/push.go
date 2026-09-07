@@ -44,7 +44,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 --yes 跳过最终确认。单条 push 失败不中断，最后汇总结果。`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// 1. 定位项目：query 匹配（规则同 info），以项目根为仓库
+			// 定位项目：query 匹配（规则同 info），以项目根为仓库
 			query := getArg(args, 0)
 			proj, err := pickProject(a.ProjectService(), query)
 			if err != nil {
@@ -52,7 +52,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 			}
 			repoPath := proj.Path()
 
-			// 2. 收集 remote / refs 候选
+			// 收集 remote / refs 候选
 			repoRemotes, err := git.Remotes(repoPath)
 			if err != nil {
 				return fmt.Errorf("读取 remote 列表失败: %w", err)
@@ -67,7 +67,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return fmt.Errorf("读取 ref 列表失败: %w", err)
 			}
 
-			// 3. 选择 remote（flag 优先，否则 TUI 多选，默认全选）
+			// 选择 remote（flag 优先，否则 TUI 多选，默认全选）
 			chosenRemotes, err := pickRemotes(repoRemotes, remotes)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
@@ -79,7 +79,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return errors.New("未选择任何 remote")
 			}
 
-			// 4. 选择 ref（flag 优先，否则 TUI 多选，默认当前分支；标签带各 remote 的真实 ahead/behind）
+			// 选择 ref（flag 优先，否则 TUI 多选，默认当前分支；标签带各 remote 的真实 ahead/behind）
 			chosenRefs, err := pickRefs(repoPath, repoRefs, headRef, chosenRemotes, refs)
 			if err != nil {
 				if errors.Is(err, tui.ErrUserAborted) {
@@ -91,7 +91,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				return errors.New("未选择任何分支/tag")
 			}
 
-			// 5. 展示推送计划 + 二次确认
+			// 展示推送计划 + 二次确认
 			if !yes {
 				ok, err := confirmPlan(repoPath, chosenRemotes, chosenRefs, force)
 				if err != nil {
@@ -105,7 +105,7 @@ ref 默认勾选当前分支；执行前展示推送计划并二次确认。
 				}
 			}
 
-			// 6. 执行：remote 外层、ref 内层，逐条 push 并汇总结果
+			// 执行：remote 外层、ref 内层，逐条 push 并汇总结果
 			return runPush(repoPath, chosenRemotes, chosenRefs, force)
 		},
 	}

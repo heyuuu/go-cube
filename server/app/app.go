@@ -81,7 +81,10 @@ func New(cfg *config.Config) (*App, error) {
 	}, nil
 }
 
-func (a *App) Server() *web.Server              { return a.server }
+func (a *App) Server() *web.Server { return a.server }
+
+// OpenAPIJSON 转发 server 的 spec 导出（cmd 层不直接依赖 web）。
+func (a *App) OpenAPIJSON() ([]byte, error)     { return a.server.OpenAPIJSON() }
 func (a *App) ProjectService() *project.Service { return a.projectService }
 func (a *App) OpenerService() *opener.Service   { return a.openerService }
 func (a *App) UsageService() *usage.Service     { return a.usageService }

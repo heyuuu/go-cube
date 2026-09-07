@@ -10,7 +10,6 @@ import (
 	"github.com/spf13/cobra"
 
 	"cube/app"
-	"cube/web"
 )
 
 func newOpenapiCmd(a *app.App) *cobra.Command {
@@ -27,7 +26,7 @@ func newOpenapiCmd(a *app.App) *cobra.Command {
 -o 可指定输出路径（所在目录不存在会自动创建）。`,
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return writeOpenAPIFile(a.Server(), outPath)
+			return writeOpenAPIFile(a, outPath)
 		},
 	}
 
@@ -36,14 +35,13 @@ func newOpenapiCmd(a *app.App) *cobra.Command {
 }
 
 // writeOpenAPIFile 生成 OpenAPI 3.1 spec，格式化后写入 outPath。
-func writeOpenAPIFile(server *web.Server, outPath string) error {
-	// --- 生成 ---
-	data, err := server.OpenAPIJSON()
+func writeOpenAPIFile(a *app.App, outPath string) error {
+	data, err := a.OpenAPIJSON()
 	if err != nil {
 		return fmt.Errorf("生成 OpenAPI 失败: %w", err)
 	}
 
-	// --- 格式化（2 空格缩进，便于人工检查；HTTP 端点仍用 compact）---
+	// 2 空格缩进便于人工检查（HTTP 端点仍用 compact）
 	var pretty bytes.Buffer
 	if err := json.Indent(&pretty, data, "", "  "); err != nil {
 		return fmt.Errorf("格式化 OpenAPI JSON 失败: %w", err)
@@ -51,7 +49,6 @@ func writeOpenAPIFile(server *web.Server, outPath string) error {
 	pretty.WriteByte('\n')
 	data = pretty.Bytes()
 
-	// --- 准备输出路径 ---
 	outPath, err = filepath.Abs(outPath)
 	if err != nil {
 		return fmt.Errorf("解析输出文件绝对路径失败: %w", err)
@@ -60,7 +57,6 @@ func writeOpenAPIFile(server *web.Server, outPath string) error {
 		return fmt.Errorf("创建输出目录失败: %w", err)
 	}
 
-	// --- 写入 ---
 	if err := os.WriteFile(outPath, data, 0644); err != nil {
 		return fmt.Errorf("写入文件失败: %w", err)
 	}
