@@ -3,8 +3,6 @@ package git
 import (
 	"os/exec"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 func TestParseLogFields(t *testing.T) {
@@ -32,8 +30,8 @@ func TestParseLogFields(t *testing.T) {
 }
 
 func TestCommitsPage(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main", EmptyCommitCount: 5})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "main", EmptyCommitCount: 5})
 
 	all, err := CommitsPage(repo, 0, 3)
 	if err != nil {
@@ -59,8 +57,8 @@ func TestCommitsPage(t *testing.T) {
 }
 
 func TestCommitDetailAt(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "main"})
 	// 多行 message：标题 + 正文（AI 时代典型形态，详情区就是为它而设）
 	cmd := exec.Command("git", "-C", repo, "commit", "--allow-empty", "-m", "标题行", "-m", "正文一\n正文二")
 	if out, err := cmd.CombinedOutput(); err != nil {

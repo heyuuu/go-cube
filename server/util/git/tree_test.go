@@ -7,8 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // wantBlobSha 测试内独立计算 git blob sha（sha1("blob <len>\0" + 内容)），
@@ -22,7 +20,7 @@ func wantBlobSha(content string) string {
 
 // TestFileShasAtRef 递归平铺的路径与 blob sha 均正确（含中文名与子目录）。
 func TestFileShasAtRef(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	files := map[string]string{
@@ -68,7 +66,7 @@ func TestFileShasAtRef(t *testing.T) {
 // TestListFilesUnder 子目录视角的全量列举：结果限定在子目录内、绝对路径、
 // 仓库根 .gitignore 的忽略链对子目录生效、目录自身被忽略时返回 nil 降级。
 func TestListFilesUnder(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 	ws.WriteFile("repo/.gitignore", []byte("node_modules/\n"))
 	ws.WriteFile("repo/docs/a.md", []byte("a"))

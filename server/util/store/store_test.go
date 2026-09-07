@@ -7,19 +7,17 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 func TestWriteFileAtomic(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	path := ws.Join("sub", "data.json")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sub", "data.json")
 
 	if err := WriteFileAtomic(path, []byte("hello"), 0644); err != nil {
 		t.Fatalf("首次原子写失败: %v", err)
 	}
 	// 深层目录不存在时自动递归创建
-	deep := filepath.Join(ws.Dir, "a", "b", "c", "d.json")
+	deep := filepath.Join(dir, "a", "b", "c", "d.json")
 	if err := WriteFileAtomic(deep, []byte("x"), 0644); err != nil {
 		t.Fatalf("深层目录自动创建失败: %v", err)
 	}
@@ -53,8 +51,8 @@ func TestWriteFileAtomic(t *testing.T) {
 }
 
 func TestSaveAndLoadJson(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	path := ws.Join("cfg.json")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cfg.json")
 
 	type conf struct {
 		Name string `json:"name"`
@@ -88,8 +86,8 @@ func TestSaveAndLoadJson(t *testing.T) {
 }
 
 func TestAppendAndLoadJsonl(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	path := ws.Join("usage.jsonl")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "usage.jsonl")
 
 	type record struct {
 		Path string `json:"path"`
@@ -139,7 +137,7 @@ func TestAppendAndLoadJsonl(t *testing.T) {
 }
 
 func TestIterJsonl(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	dir := t.TempDir()
 
 	type record struct {
 		Seq int `json:"seq"`
@@ -147,7 +145,7 @@ func TestIterJsonl(t *testing.T) {
 
 	// 缺失文件：静默结束，不 panic
 	n := 0
-	for range IterJsonl[record](ws.Join("none.jsonl")) {
+	for range IterJsonl[record](filepath.Join(dir, "none.jsonl")) {
 		n++
 	}
 	if n != 0 {
@@ -155,7 +153,7 @@ func TestIterJsonl(t *testing.T) {
 	}
 
 	// 坏行占行号、空行占行号
-	path := ws.Join("it.jsonl")
+	path := filepath.Join(dir, "it.jsonl")
 	os.WriteFile(path, []byte(`{"seq":1}`+"\n\n"+`{bad`+"\n"+`{"seq":2}`+"\n"), 0644)
 
 	var seqs []int
@@ -183,7 +181,7 @@ func TestIterJsonl(t *testing.T) {
 }
 
 func TestIterJsonlReverse(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	dir := t.TempDir()
 
 	type record struct {
 		Seq int `json:"seq"`
@@ -191,7 +189,7 @@ func TestIterJsonlReverse(t *testing.T) {
 
 	// 缺失文件：静默结束
 	n := 0
-	for range IterJsonlReverse[record](ws.Join("none.jsonl")) {
+	for range IterJsonlReverse[record](filepath.Join(dir, "none.jsonl")) {
 		n++
 	}
 	if n != 0 {
@@ -213,7 +211,7 @@ func TestIterJsonlReverse(t *testing.T) {
 
 	for _, trailingNL := range []bool{true, false} {
 		_, data := buildLines(trailingNL)
-		path := ws.Join("rev.jsonl")
+		path := filepath.Join(dir, "rev.jsonl")
 		os.WriteFile(path, data, 0644)
 
 		var seqs []int
@@ -241,7 +239,7 @@ func TestIterJsonlReverse(t *testing.T) {
 	}
 
 	// 超过分块大小（>64KB）：验证跨块拼接
-	path := ws.Join("big.jsonl")
+	path := filepath.Join(dir, "big.jsonl")
 	var sb strings.Builder
 	want := 2000
 	for i := range want {
@@ -265,22 +263,22 @@ func TestIterJsonlReverse(t *testing.T) {
 
 // 统一契约：所有写操作自动递归创建父目录
 func TestWriteOpsCreateParentDir(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	dir := t.TempDir()
 
-	if err := AppendJsonl(ws.Join("a/b/c/usage.jsonl"), map[string]int{"x": 1}); err != nil {
+	if err := AppendJsonl(filepath.Join(dir, "a/b/c/usage.jsonl"), map[string]int{"x": 1}); err != nil {
 		t.Fatalf("AppendJsonl 应自动建父目录: %v", err)
 	}
-	if err := SaveJson(ws.Join("d/e/config.json"), map[string]int{"x": 1}); err != nil {
+	if err := SaveJson(filepath.Join(dir, "d/e/config.json"), map[string]int{"x": 1}); err != nil {
 		t.Fatalf("SaveJson 应自动建父目录: %v", err)
 	}
-	if err := WriteFileAtomic(ws.Join("f/g/raw.bin"), []byte("x"), 0644); err != nil {
+	if err := WriteFileAtomic(filepath.Join(dir, "f/g/raw.bin"), []byte("x"), 0644); err != nil {
 		t.Fatalf("WriteFileAtomic 应自动建父目录: %v", err)
 	}
 }
 
 func TestWriteJsonl(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	path := ws.Join("a/b/usage.jsonl") // 父目录不存在，验证自动创建
+	dir := t.TempDir()
+	path := filepath.Join(dir, "a/b/usage.jsonl") // 父目录不存在，验证自动创建
 
 	items := []map[string]int{{"x": 1}, {"x": 2}}
 	if err := WriteJsonl(path, items); err != nil {

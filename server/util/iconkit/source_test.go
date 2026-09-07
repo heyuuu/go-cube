@@ -12,8 +12,6 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // makeColorPng 生成 size×size 的指定色 PNG，供容器类测试当 payload（makePng 是固定色的既有版本）。
@@ -149,9 +147,9 @@ func TestDecodeImage_Unsupported(t *testing.T) {
 
 // TestExtractFromSource 本地图片文件与目录（.app）分发、非存在路径报错。
 func TestExtractFromSource(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	dir := t.TempDir()
 
-	pngPath := filepath.Join(ws.Dir, "icon.png")
+	pngPath := filepath.Join(dir, "icon.png")
 	if err := os.WriteFile(pngPath, makeColorPng(t, 100, color.RGBA{G: 255, A: 255}), 0o644); err != nil {
 		t.Fatalf("写测试图片失败: %v", err)
 	}
@@ -168,7 +166,7 @@ func TestExtractFromSource(t *testing.T) {
 	}
 
 	// .app 目录分发：走 ExtractAppIcon（容器合法性由其自身测试覆盖，此处验证分发）
-	resDir := ws.Join("Fake.app", "Contents", "Resources")
+	resDir := filepath.Join(dir, "Fake.app", "Contents", "Resources")
 	if err := os.MkdirAll(resDir, 0o755); err != nil {
 		t.Fatalf("建目录失败: %v", err)
 	}
@@ -176,7 +174,7 @@ func TestExtractFromSource(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(resDir, "Fake.icns"), icns, 0o644); err != nil {
 		t.Fatalf("写 icns 失败: %v", err)
 	}
-	if _, err := ExtractFromSource(ws.Join("Fake.app")); err != nil {
+	if _, err := ExtractFromSource(filepath.Join(dir, "Fake.app")); err != nil {
 		t.Fatalf(".app 目录应分发到 icns 提取: %v", err)
 	}
 

@@ -7,14 +7,12 @@ import (
 	"reflect"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // TestCurrentBranch 当前检出分支短名：attached 剥前缀返回；detached、非仓库为空。
 func TestCurrentBranch(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "develop"})
 	if got := CurrentBranch(dir); got != "develop" {
 		t.Fatalf("CurrentBranch = %q，期望 develop", got)
 	}
@@ -30,8 +28,8 @@ func TestCurrentBranch(t *testing.T) {
 // TestCurrentBranch_HeadOnTag HEAD 被 symbolic-ref 挂到 heads 外（tag）时为空，
 // 不得把 refs/tags/* 整串误当分支名（git branch --show-current 同口径输出空）。
 func TestCurrentBranch_HeadOnTag(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Tags: []string{"v1.0"}})
 	directGit(t, dir, "symbolic-ref", "HEAD", "refs/tags/v1.0")
 	if got := CurrentBranch(dir); got != "" {
 		t.Fatalf("HEAD 挂在 refs/tags/* 时应为空，实际 %q", got)
@@ -94,8 +92,8 @@ func TestBuildRef(t *testing.T) {
 // TestRefs 全量 ref 清单：三类 namespace 的 Ref 值对象 + 远端 HEAD 符号指针剔除。
 // current 属 HEAD 状态，由 TestHeadRef 单独覆盖。
 func TestRefs(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{
 		Branch: "develop",
 		Tags:   []string{"v1.0"},
 	})
@@ -125,7 +123,7 @@ func TestRefs(t *testing.T) {
 
 // TestRefs_NonRepo 非仓库目录返回零值不报错（降级约定）。
 func TestRefs_NonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	refs, err := Refs(ws.Mkdir("empty"))
 	if err != nil {
 		t.Fatalf("非仓库 Refs 不应报错: %v", err)
@@ -137,8 +135,8 @@ func TestRefs_NonRepo(t *testing.T) {
 
 // TestHeadRef attached → refs/heads 全名；detached / 非仓库 → 空串。
 func TestHeadRef(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "develop"})
 	if got := HeadRef(dir); got != "refs/heads/develop" {
 		t.Fatalf("HeadRef = %q，期望 refs/heads/develop", got)
 	}
@@ -153,8 +151,8 @@ func TestHeadRef(t *testing.T) {
 
 // TestDefaultBranch_OriginHEAD origin/HEAD 已设置时直接取其指向的分支。
 func TestDefaultBranch_OriginHEAD(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "develop"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "develop"})
 	directGit(t, dir, "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/develop")
 
 	db, err := DefaultBranch(dir)
@@ -168,8 +166,8 @@ func TestDefaultBranch_OriginHEAD(t *testing.T) {
 
 // TestDefaultBranch_NoOriginRemote 无 origin remote 时按本地 master/main 兜底。
 func TestDefaultBranch_NoOriginRemote(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "main"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "main"})
 
 	db, err := DefaultBranch(dir)
 	if err != nil {
@@ -182,7 +180,7 @@ func TestDefaultBranch_NoOriginRemote(t *testing.T) {
 
 // TestDefaultBranch_NonRepo 非仓库返回空不报错。
 func TestDefaultBranch_NonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.Mkdir("empty")
 	db, err := DefaultBranch(dir)
 	if err != nil || db != "" {
@@ -192,7 +190,7 @@ func TestDefaultBranch_NonRepo(t *testing.T) {
 
 // TestAheadBehindRemote_NoRemote 无 remote 时（origin/xxx ref 不存在）返回 (0,0,nil)。
 func TestAheadBehindRemote_NoRemote(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 	ahead, behind, err := AheadBehindRemote(dir, "master", "origin", "master")
 	if err != nil {
@@ -205,8 +203,8 @@ func TestAheadBehindRemote_NoRemote(t *testing.T) {
 
 // TestAheadBehindRemote_Diverged 分叉场景：ahead/behind 方向正确（本地独有 / 远端独有）。
 func TestAheadBehindRemote_Diverged(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "master"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "master"})
 
 	// 同步点 → 本地 master 加 1 commit；base 分支上加另 1 commit 当作远端状态
 	directGit(t, dir, "update-ref", "refs/remotes/origin/master", "refs/heads/master")
@@ -230,8 +228,8 @@ func TestAheadBehindRemote_Diverged(t *testing.T) {
 // 本地领先 remote 2 个 commit；同时验证 Refs 对斜杠远程分支的解析
 // （info -v 分支同步宽表按短名交集 + 每格调 AheadBehindRemote，依赖这两个行为）。
 func TestAheadBehindRemote_SlashBranch(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Branch: "master"})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{Branch: "master"})
 
 	// remote 跟踪引用停在 master 当前位置，本地 feature/fix-bug 在其上追加 2 commit
 	directGit(t, dir, "branch", "feature/fix-bug")
@@ -329,8 +327,8 @@ func TestFirstLine(t *testing.T) {
 
 // TestHeadSha 返回 HEAD 完整 sha；非仓库降级为空值。
 func TestHeadSha(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{EmptyCommitCount: 2})
 
 	sha, err := HeadSha(dir)
 	if err != nil {
@@ -347,8 +345,8 @@ func TestHeadSha(t *testing.T) {
 
 // TestParentSha 父提交解析正确；根提交无父时报错（调用方决定降级）。
 func TestParentSha(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{EmptyCommitCount: 2})
 
 	head, err := HeadSha(dir)
 	if err != nil {
@@ -369,8 +367,8 @@ func TestParentSha(t *testing.T) {
 
 // Clean：删除未跟踪文件与目录；.gitignore 忽略的文件保留。
 func TestClean(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 1})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{EmptyCommitCount: 1})
 
 	untracked := ws.Join("repo", "new.txt")
 	untrackedDir := ws.Join("repo", "newdir", "inner.txt")
@@ -397,8 +395,8 @@ func TestClean(t *testing.T) {
 
 // BranchDelete：未合并非 force 拒绝（中文原因）、force 成功；已合并分支直接删。
 func TestBranchDelete(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{EmptyCommitCount: 2})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{EmptyCommitCount: 2})
 
 	// 建分支并在其上追加 commit → 相对 HEAD 未合并（祖先方向的分支算已合并）
 	runGit(t, repo, "branch", "old")
@@ -424,8 +422,8 @@ func TestBranchDelete(t *testing.T) {
 
 // BranchAdd：建分支（HEAD/tag 基点）、重名/非法名/基点不存在的中文拒绝。
 func TestBranchAdd(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{Tags: []string{"v1.0"}})
 
 	if err := BranchAdd(repo, "feat", ""); err != nil {
 		t.Fatalf("以 HEAD 为基点建分支应成功: %v", err)

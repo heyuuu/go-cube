@@ -2,12 +2,10 @@ package git
 
 import (
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 func TestFindGitRoot_AtRoot(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 
 	root, ok := FindGitRoot(repo)
@@ -20,7 +18,7 @@ func TestFindGitRoot_AtRoot(t *testing.T) {
 }
 
 func TestFindGitRoot_InSubdir(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 	sub := ws.Mkdir("repo/src/deep/nested")
 
@@ -45,7 +43,7 @@ func TestFindGitRoot_NotARepo(t *testing.T) {
 
 func TestFindGitRoot_WorktreeStyleDotGitFile(t *testing.T) {
 	// .git 是文件（worktree），FindGitRoot 只看 .git 存在与否，应能识别
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.Mkdir("wt")
 	ws.WriteFile("wt/.git", []byte("gitdir: /somewhere"))
 

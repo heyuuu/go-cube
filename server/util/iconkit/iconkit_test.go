@@ -6,9 +6,9 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"os"
+	"path/filepath"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // makePng 生成 w×h 的纯色 PNG。
@@ -101,13 +101,22 @@ func TestScalePng(t *testing.T) {
 }
 
 func TestExtractAppIcon(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	ws.Mkdir("Foo.app", "Contents", "Resources")
-	appDir := ws.Join("Foo.app")
+	dir := t.TempDir()
+	resDir := filepath.Join(dir, "Foo.app", "Contents", "Resources")
+	if err := os.MkdirAll(resDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	appDir := filepath.Join(dir, "Foo.app")
+
+	writeIcns := func(name string, data []byte) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(resDir, name), data, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	t.Run("正常提取并缩放", func(t *testing.T) {
-		ws.WriteFile("Foo.app/Contents/Resources/AppIcon.icns", makeIcns(t,
-			map[string][]byte{"ic08": makePng(t, 256, 256)}))
+		writeIcns("AppIcon.icns", makeIcns(t, map[string][]byte{"ic08": makePng(t, 256, 256)}))
 		got, err := ExtractAppIcon(appDir)
 		if err != nil {
 			t.Fatalf("提取失败: %v", err)
@@ -122,10 +131,8 @@ func TestExtractAppIcon(t *testing.T) {
 	})
 
 	t.Run("多个 icns 取最大文件", func(t *testing.T) {
-		ws.WriteFile("Foo.app/Contents/Resources/Small.icns", makeIcns(t,
-			map[string][]byte{"ic07": makePng(t, 128, 128)}))
-		ws.WriteFile("Foo.app/Contents/Resources/Big.icns", makeIcns(t,
-			map[string][]byte{"ic10": makePng(t, 512, 512)}))
+		writeIcns("Small.icns", makeIcns(t, map[string][]byte{"ic07": makePng(t, 128, 128)}))
+		writeIcns("Big.icns", makeIcns(t, map[string][]byte{"ic10": makePng(t, 512, 512)}))
 		got, err := ExtractAppIcon(appDir)
 		if err != nil {
 			t.Fatalf("提取失败: %v", err)
@@ -136,8 +143,11 @@ func TestExtractAppIcon(t *testing.T) {
 	})
 
 	t.Run("无 icns 报错", func(t *testing.T) {
-		ws.Mkdir("Bar.app", "Contents", "Resources")
-		if _, err := ExtractAppIcon(ws.Join("Bar.app")); err == nil {
+		barRes := filepath.Join(dir, "Bar.app", "Contents", "Resources")
+		if err := os.MkdirAll(barRes, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ExtractAppIcon(filepath.Join(dir, "Bar.app")); err == nil {
 			t.Fatal("无 icns 应报错")
 		}
 	})

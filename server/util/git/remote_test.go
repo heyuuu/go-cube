@@ -4,13 +4,11 @@ package git
 import (
 	"reflect"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // TestRemoteUrl_NonRepo 非仓库目录返回空值不报错（降级约定）。
 func TestRemoteUrl_NonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.Mkdir("not-a-repo")
 	url, err := RemoteUrl(dir)
 	if err != nil || url != "" {
@@ -20,9 +18,9 @@ func TestRemoteUrl_NonRepo(t *testing.T) {
 
 // TestRemoteUrl_WithRemote 有 origin remote 的仓库能读出 URL。
 func TestRemoteUrl_WithRemote(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	// remote 指向另一个本地路径（合法的本地 remote）
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{
 		RemoteUrl: "/tmp/some-remote.git",
 	})
 	url, err := RemoteUrl(dir)
@@ -36,7 +34,7 @@ func TestRemoteUrl_WithRemote(t *testing.T) {
 
 // TestRemoteUrl_NoOrigin 无 origin remote 时返回空值不报错。
 func TestRemoteUrl_NoOrigin(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 	url, err := RemoteUrl(dir)
 	if err != nil || url != "" {
@@ -46,9 +44,9 @@ func TestRemoteUrl_NoOrigin(t *testing.T) {
 
 // TestRemotes_WithMultipleRemotes 多 remote 仓库返回全部，按名字排序。
 func TestRemotes_WithMultipleRemotes(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	// 先建仓库，再加额外 remote
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{
 		RemoteUrl: "https://github.com/a/b.git",
 	})
 	// fixture 只支持 origin，upstream 用 git 命令直接加
@@ -76,8 +74,8 @@ func TestRemotes_WithMultipleRemotes(t *testing.T) {
 
 // TestRemotes_SeparatePushUrl 配置独立 pushurl 时 Fetch 与 Push 不同。
 func TestRemotes_SeparatePushUrl(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	dir := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{
+	ws := newTestWorkspace(t)
+	dir := ws.MakeGitRepoWith("repo", GitRepoSpec{
 		RemoteUrl: "https://github.com/a/b.git",
 	})
 	directGit(t, dir, "remote", "set-url", "--push", "origin", "git@github.com:a/b.git")

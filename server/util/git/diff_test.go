@@ -5,13 +5,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // TestDiffFiles 覆盖 added / modified / deleted / renamed 四种状态与排序。
 func TestDiffFiles(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	writeAbsFile := func(name, content string) {
@@ -69,7 +67,7 @@ func TestDiffFiles(t *testing.T) {
 
 // TestDiffFiles_RefMissing ref 不存在时报错（不静默返回空）。
 func TestDiffFiles_RefMissing(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 	if _, err := DiffFiles(dir, "no-such-ref", "HEAD"); err == nil {
 		t.Error("ref 不存在时应返回错误")
@@ -78,7 +76,7 @@ func TestDiffFiles_RefMissing(t *testing.T) {
 
 // TestDiffNoIndex 有差异时退出码为 1 属正常语义，输出必须完整返回。
 func TestDiffNoIndex(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	a := filepath.Join(ws.Dir, "a.txt")
 	b := filepath.Join(ws.Dir, "b.txt")
 	if err := os.WriteFile(a, []byte("line1\nline2\n"), 0644); err != nil {
@@ -112,7 +110,7 @@ func TestDiffNoIndex(t *testing.T) {
 
 // TestNumstat 覆盖 modified 增删计数、rename 新路径入 map、二进制标记、工作区模式。
 func TestNumstat(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	writeAbsFile := func(name, content string) {

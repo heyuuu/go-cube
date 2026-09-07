@@ -3,19 +3,17 @@ package settings
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // newFile 返回该测试专属的 settings.json 路径（初始不存在）。
 func newFile(t *testing.T) string {
 	t.Helper()
-	ws := testfixture.NewWorkspace(t)
-	return ws.Join("settings.json")
+	return filepath.Join(t.TempDir(), "settings.json")
 }
 
 func TestLoadSection(t *testing.T) {

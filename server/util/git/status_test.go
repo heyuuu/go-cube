@@ -6,15 +6,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-
-	"cube/internal/testfixture"
 )
 
 // TestLoadRepoStatus 汇总状态：分支 / sha / dirty / 分类计数；非仓库降级为零值。
 func TestLoadRepoStatus(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	// clean 仓库
-	cleanDir := ws.MakeGitRepoWith("clean", testfixture.GitRepoSpec{Branch: "develop"})
+	cleanDir := ws.MakeGitRepoWith("clean", GitRepoSpec{Branch: "develop"})
 	st, err := LoadRepoStatus(cleanDir)
 	if err != nil {
 		t.Fatalf("clean LoadRepoStatus 出错: %v", err)
@@ -30,7 +28,7 @@ func TestLoadRepoStatus(t *testing.T) {
 	}
 
 	// dirty 仓库（MakeDirty=true 留未跟踪文件）
-	dirtyDir := ws.MakeGitRepoWith("dirty", testfixture.GitRepoSpec{MakeDirty: true})
+	dirtyDir := ws.MakeGitRepoWith("dirty", GitRepoSpec{MakeDirty: true})
 	st, err = LoadRepoStatus(dirtyDir)
 	if err != nil {
 		t.Fatalf("dirty LoadRepoStatus 出错: %v", err)
@@ -72,7 +70,7 @@ func TestLoadRepoStatus(t *testing.T) {
 // 未跟踪 / 暂存新增 / 暂存删除，以及按路径排序。
 // （工作区修改 " M" 场景由 TestLoadRepoStatus_Files_WorktreeModified 覆盖。）
 func TestLoadRepoStatus_Files_States(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	// 先提交一个已跟踪文件，再制造各类工作区状态
@@ -123,7 +121,7 @@ func TestLoadRepoStatus_Files_States(t *testing.T) {
 
 // TestLoadRepoStatus_Files_Rename 已暂存改名（git mv）合并为单条 R 行，展示 "旧 -> 新"。
 func TestLoadRepoStatus_Files_Rename(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	if err := os.WriteFile(filepath.Join(dir, "old.txt"), []byte("v1"), 0644); err != nil {
@@ -145,7 +143,7 @@ func TestLoadRepoStatus_Files_Rename(t *testing.T) {
 
 // TestLoadRepoStatus_Files_WorktreeModified 已跟踪文件被修改但未暂存时，工作区列为 M（" M"）。
 func TestLoadRepoStatus_Files_WorktreeModified(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	if err := os.WriteFile(filepath.Join(dir, "tracked.txt"), []byte("v1"), 0644); err != nil {
@@ -169,7 +167,7 @@ func TestLoadRepoStatus_Files_WorktreeModified(t *testing.T) {
 
 // TestLoadRepoStatus_Files_CleanAndNonRepo 干净仓库与非仓库目录都返回空不报错（降级约定）。
 func TestLoadRepoStatus_Files_CleanAndNonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 
 	cleanDir := ws.MakeGitRepo("clean")
 	st, err := LoadRepoStatus(cleanDir)
@@ -189,7 +187,7 @@ func TestLoadRepoStatus_Files_CleanAndNonRepo(t *testing.T) {
 // 原生 git 子进程继承测试进程环境，通过 HOME / XDG_CONFIG_HOME 指向测试目录
 // 隔离真实用户配置。
 func TestLoadRepoStatus_Files_GlobalIgnore(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 
 	// --- 场景一：~/.gitconfig 显式配置 core.excludesFile ---
@@ -284,7 +282,7 @@ func TestParseStatusV2_Files(t *testing.T) {
 
 // TestLoadIgnored 忽略目录与文件分开收集，路径相对仓库根。
 func TestLoadIgnored(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	dir := ws.MakeGitRepo("repo")
 	writeAbsFile := func(name, content string) {
 		t.Helper()
@@ -323,7 +321,7 @@ func TestLoadIgnored(t *testing.T) {
 
 // TestLoadIgnored_NonRepo 非仓库目录返回空集合不报错（降级约定）。
 func TestLoadIgnored_NonRepo(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	ig, err := LoadIgnored(ws.Mkdir("not-a-repo"))
 	if err != nil || len(ig.Dirs) != 0 || len(ig.Files) != 0 {
 		t.Fatalf("非仓库应返回空集合，实际 (%v, %v)", ig, err)

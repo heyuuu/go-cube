@@ -2,23 +2,10 @@ package git
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	"cube/internal/testfixture"
 )
-
-// runGit 测试内直接执行 git（建仓/造状态；规则 14 允许测试绕过封装）。
-func runGit(t *testing.T, dir string, args ...string) {
-	t.Helper()
-	cmd := exec.Command("git", args...)
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("git %s 失败: %v\n%s", strings.Join(args, " "), err, out)
-	}
-}
 
 func TestParseWorktreePorcelain(t *testing.T) {
 	tests := []struct {
@@ -67,7 +54,7 @@ func TestParseWorktreePorcelain(t *testing.T) {
 }
 
 func TestWorktreeList(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 
 	// 加一个 linked worktree（独立分支避免与主目录检出冲突）
@@ -106,7 +93,7 @@ func TestWorktreeList(t *testing.T) {
 // 从 worktree 目录内调用应得到与主目录一致的列表（1032 归并链路依赖：
 // 命中 worktree 目录时顺藤定位主仓库、枚举全部目标）。
 func TestWorktreeListFromWorktreeDir(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 	wtDir := ws.MakeWorktree(repo, "wt-feat", "feat")
 
@@ -130,7 +117,7 @@ func TestWorktreeListFromWorktreeDir(t *testing.T) {
 
 // WorktreePrune 清理目录已删的 worktree 元数据记录（幂等、不碰现存 worktree）。
 func TestWorktreePrune(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 	ws.MakeWorktree(repo, "wt-hot", "hotfix")
 	ws.MakeWorktree(repo, "wt-gone", "gone")
@@ -154,8 +141,8 @@ func TestWorktreePrune(t *testing.T) {
 
 // WorktreeAdd 三种形态：新建分支 / 检出已有分支 / detached。
 func TestWorktreeAdd(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
-	repo := ws.MakeGitRepoWith("repo", testfixture.GitRepoSpec{Tags: []string{"v1.0"}})
+	ws := newTestWorkspace(t)
+	repo := ws.MakeGitRepoWith("repo", GitRepoSpec{Tags: []string{"v1.0"}})
 	runGit(t, repo, "branch", "existing")
 
 	cases := []struct {
@@ -192,7 +179,7 @@ func TestWorktreeAdd(t *testing.T) {
 
 // 已被检出的分支（主目录或其它 worktree）不允许再建 worktree 检出。
 func TestWorktreeAddCheckedOutRefused(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo") // 主目录检出默认分支
 	def := CurrentBranch(repo)
 
@@ -210,7 +197,7 @@ func TestWorktreeAddCheckedOutRefused(t *testing.T) {
 
 // WorktreeRemove：干净副本直接删；脏副本非 force 拒绝、force 删净。
 func TestWorktreeRemove(t *testing.T) {
-	ws := testfixture.NewWorkspace(t)
+	ws := newTestWorkspace(t)
 	repo := ws.MakeGitRepo("repo")
 
 	clean := ws.MakeWorktree(repo, "wt-clean", "clean")
