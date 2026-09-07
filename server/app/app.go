@@ -51,6 +51,7 @@ func New(cfg *config.Config) (*App, error) {
 	iconHandler := handlers.NewIconHandler()
 	workbenchHandler := handlers.NewWorkbenchHandler(workbenchService)
 	forgeHandler := handlers.NewForgeHandler(forgeService, projectService)
+	usageHandler := handlers.NewUsageHandler(usageService)
 	server := web.NewServer(
 		cfg.Server,
 		[]web.Handler{
@@ -60,6 +61,7 @@ func New(cfg *config.Config) (*App, error) {
 			mdHandler,
 			workbenchHandler,
 			forgeHandler,
+			usageHandler,
 			iconHandler,
 		},
 	)

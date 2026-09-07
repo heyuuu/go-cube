@@ -11,3 +11,9 @@ type Record struct {
 	Opener  string    `json:"opener,omitempty"` // opener 名（settings openers 节的 key）
 	Dir     string    `json:"dir,omitempty"`    // 实际打开的目标目录绝对路径（主项目根打开时省略；worktree / monorepo workspace 子目录时为其绝对路径，见 1032/1030）
 }
+
+// PathUsage 去重后的一条最近路径（RecentPaths 输出条目）。
+type PathUsage struct {
+	Path string    `json:"path"`
+	Time time.Time `json:"time"` // 该路径最近一次使用时间
+}

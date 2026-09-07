@@ -82,6 +82,32 @@ func (s *Service) LatestOpeners(project string, limit int) []string {
 	return openers
 }
 
+// RecentPaths 按 path 去重取最新，返回按最近使用倒序的路径清单（limit 截断）。
+// 服务于 workbench 入口的「最近打开」列表——任意 git 目录（含未收录项目）都算。
+func (s *Service) RecentPaths(limit int) []PathUsage {
+	latest := map[string]time.Time{}
+	for _, rec := range s.load() {
+		if rec.Project == "" {
+			continue
+		}
+		latest[rec.Project] = rec.Time
+	}
+	paths := make([]PathUsage, 0, len(latest))
+	for p, t := range latest {
+		paths = append(paths, PathUsage{Path: p, Time: t})
+	}
+	slices.SortFunc(paths, func(a, b PathUsage) int {
+		if c := b.Time.Compare(a.Time); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Path, b.Path)
+	})
+	if len(paths) > limit {
+		paths = paths[:limit]
+	}
+	return paths
+}
+
 // load 全量读取记录。文件缺失视为空（新环境/首次启动），坏行由 store 层跳过。
 func (s *Service) load() []Record {
 	recs, err := store.LoadJsonl[Record](s.usageFilePath)

@@ -2,6 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 
 import { apiGet, apiPost } from '@/api/client';
 import { tryOpenUrlAction } from '@/lib/opener-action';
+import { useRecordUsage } from '@/queries/usage';
 
 // 30s 轮询：后端 gitcache 由 server 定时刷新，前端只拉快照不触发采集
 export function useProjectList() {
@@ -18,15 +19,20 @@ export function useOpenerList() {
 
 // 用指定 opener 打开任意文件/目录——workbench/md 等通用打开口。
 // url 型动作当前浏览器新 tab 直开（同源 + 不跳出当前浏览器），其余走后端
-// opener/open（role 由后端按路径类型校验）。
+// opener/open（role 由后端按路径类型校验）。url 直开不经过后端打开链路，
+// 目录打开靠 usage/record 触发接口补记（文件打开不记，usage 口径是项目/目录打开）。
 export function useOpenerOpen() {
   const openers = useOpenerList();
+  const record = useRecordUsage();
   const open = useMutation({
     mutationFn: (input: { path: string; opener: string }) => apiPost('/api/opener/open', input),
   });
   const run = (opener: string, path: string, isDir: boolean, opts?: { onError?: (e: Error) => void }) => {
     const op = (openers.data?.list ?? []).find((o) => o.name === opener);
-    if (op && tryOpenUrlAction(op.actions?.[isDir ? 'open-dir' : 'open-file'], [path])) return;
+    if (op && tryOpenUrlAction(op.actions?.[isDir ? 'open-dir' : 'open-file'], [path])) {
+      if (isDir) record.mutate({ project: path, opener });
+      return;
+    }
     open.mutate({ path, opener }, { onError: opts?.onError });
   };
   return { ...open, run };
@@ -48,16 +54,21 @@ export function useOpenerDiffOpen() {
 }
 
 // 打开已收录项目（后端记 usage；dir 为目标目录——worktree 归并为项目打开目标，1032）。
-// url 型动作当前浏览器新 tab 直开（注意：此路径不经过后端，不计 usage——已知取舍），
+// url 型动作当前浏览器新 tab 直开——此路径不经过后端，靠 usage/record 触发接口补记
+// （入参口径与后端 projectOpen 一致：project 恒主项目路径，dir 直接传目标目录），
 // 其余走后端 project/open。
 export function useProjectOpen() {
   const openers = useOpenerList();
+  const record = useRecordUsage();
   const open = useMutation({
     mutationFn: (input: { path: string; opener: string; dir?: string }) => apiPost('/api/project/open', input),
   });
   const run = (opener: string, path: string, dir?: string, opts?: { onError?: (e: Error) => void }) => {
     const op = (openers.data?.list ?? []).find((o) => o.name === opener);
-    if (op && tryOpenUrlAction(op.actions?.['open-dir'], [dir ?? path])) return;
+    if (op && tryOpenUrlAction(op.actions?.['open-dir'], [dir ?? path])) {
+      record.mutate({ project: path, opener, dir });
+      return;
+    }
     open.mutate({ path, opener, dir }, { onError: opts?.onError });
   };
   return { ...open, run };

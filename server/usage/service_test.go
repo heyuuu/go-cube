@@ -176,3 +176,37 @@ func TestRecordOpen_DirEqualsProjectNormalizedToEmpty(t *testing.T) {
 		t.Fatalf("dir 归一异常: %+v", recs)
 	}
 }
+
+func TestRecentPaths(t *testing.T) {
+	s := newTestService(t)
+
+	s.RecordOpen("/p/a", "idea", "")
+	s.RecordOpen("/p/b", "code", "")
+	s.RecordOpen("/p/a", "code", "") // a 去重取最新，仍排前
+	s.RecordOpen("/p/c", "code", "/p/c/wt")
+
+	got := s.RecentPaths(2)
+	if len(got) != 2 {
+		t.Fatalf("limit 截断应剩 2 条: %+v", got)
+	}
+	// 写入顺序 a → b → a → c，最新一条是 c，其后是 a 的更新
+	if got[0].Path != "/p/c" || got[1].Path != "/p/a" {
+		t.Fatalf("应按最近使用倒序: %+v", got)
+	}
+	if got[0].Time.IsZero() {
+		t.Fatalf("应带最近使用时间: %+v", got[0])
+	}
+}
+
+func TestRecentPaths_EmptyAndBlankProject(t *testing.T) {
+	s := newTestService(t)
+	if got := s.RecentPaths(5); len(got) != 0 {
+		t.Fatalf("空文件应返回空: %+v", got)
+	}
+	if err := s.RecordOpen("", "code", ""); err != nil {
+		t.Fatalf("RecordOpen 失败: %v", err)
+	}
+	if got := s.RecentPaths(5); len(got) != 0 {
+		t.Fatalf("空 project 不应进最近路径: %+v", got)
+	}
+}

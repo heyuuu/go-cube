@@ -1,5 +1,5 @@
 import { ChevronsLeft, ChevronsRight, GripVertical, LayoutGrid, Plus, RotateCcw, X } from 'lucide-react';
-import { Fragment, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router';
 
 import {
@@ -8,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useRecordUsage } from '@/queries/usage';
 import { useWorkbenchInfo } from '@/queries/workbench';
 
 import { ContentViewPanel } from './panels/content-view-panel';
@@ -36,6 +37,13 @@ export function WorkbenchPage() {
   // path 合法性守门：非 git 目录退回入口页展示错误（与 git 树面板共用同一 query key，
   // 校验通过后面板直接复用缓存）
   const info = useWorkbenchInfo(params.path);
+  const { mutate: recordUsageMutate } = useRecordUsage();
+
+  // 进入成功补记 usage（workbench 打开不走后端打开链路，靠触发接口补信号；
+  // opener 留空——不参与 opener 偏好统计，只贡献项目最近使用）
+  useEffect(() => {
+    if (params.path && info.isSuccess) recordUsageMutate({ project: params.path });
+  }, [params.path, info.isSuccess, recordUsageMutate]);
 
   const submitPath = (value: string) => {
     const next = new URLSearchParams(searchParams);
