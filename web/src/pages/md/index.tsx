@@ -24,6 +24,7 @@ import {
 import { buildFileTree, flattenFileTree, type FileTreeRow } from '@/lib/tree';
 import { cn } from '@/lib/utils';
 import { useMdContent, useMdList } from '@/queries/md';
+import { OpenWithGroup } from '@/components/open-with-menu';
 import { useOpenerList } from '@/queries/opener';
 import { useOpenerOpen } from '@/queries/project';
 
@@ -183,18 +184,18 @@ function MdTreeRow({
           <DropdownMenuContent align="start">
             <DropdownMenuItem onClick={() => onExternal(n.path)}>在新页面打开</DropdownMenuItem>
             <DropdownMenuSeparator />
-            {nodeOpeners.map((op) => (
-              <DropdownMenuItem
-                key={op.name}
-                disabled={open.isPending}
-                onClick={() => onOpenNode(n.path, op.name, isDir)}
-              >
-                {op.title}
-              </DropdownMenuItem>
-            ))}
-            {nodeOpeners.length === 0 && (
-              <div className="px-2 py-1.5 text-xs text-muted-foreground">无可用 opener</div>
-            )}
+            <OpenWithGroup
+              openerList={nodeOpeners}
+              renderItem={(op) => (
+                <DropdownMenuItem
+                  key={op.name}
+                  disabled={open.isPending}
+                  onClick={() => onOpenNode(n.path, op.name, isDir)}
+                >
+                  {op.title}
+                </DropdownMenuItem>
+              )}
+            />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

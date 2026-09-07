@@ -1,5 +1,5 @@
 // Projects 页共用部件：行内打开动作 + tag 徽标。表格行、树项目行、详情抽屉三处使用。
-import { Copy, Ellipsis, Folder, GitBranch, Layers } from 'lucide-react';
+import { Ellipsis, Folder, GitBranch, Layers } from 'lucide-react';
 
 import type { Opener, Project } from '@/api/client';
 import { Badge } from '@/components/ui/badge';
@@ -16,6 +16,7 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { CopyPathItem, OpenWithGroup } from '@/components/open-with-menu';
 import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { useIntentDefaultOpener } from '@/queries/opener';
@@ -120,15 +121,11 @@ export function ProjectActions({
           <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
-          {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
-          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(p.path)}>
-            <Copy className="mr-1 size-3" />
-            复制绝对路径
-          </DropdownMenuItem>
+          <CopyPathItem path={p.path} />
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-            {openerList.map((op) =>
+          <OpenWithGroup
+            openerList={openerList}
+            renderItem={(op) =>
               multiTarget ? (
                 <DropdownMenuSub key={op.name}>
                   <DropdownMenuSubTrigger disabled={isPending(op.name)}>
@@ -144,10 +141,9 @@ export function ProjectActions({
                   {renderIcon(op?.icon, null)}
                   {op.title}
                 </DropdownMenuItem>
-              ),
-            )}
-            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
-          </DropdownMenuGroup>
+              )
+            }
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
@@ -238,14 +234,11 @@ export function TargetRowActions({
           <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
-          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(target.dir || p.path)}>
-            <Copy className="mr-1 size-3" />
-            复制绝对路径
-          </DropdownMenuItem>
+          <CopyPathItem path={target.dir || p.path} />
           <DropdownMenuSeparator />
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-            {openerList.map((op) => (
+          <OpenWithGroup
+            openerList={openerList}
+            renderItem={(op) => (
               <DropdownMenuItem
                 key={op.name}
                 disabled={isPending(op.name)}
@@ -254,9 +247,8 @@ export function TargetRowActions({
                 {renderIcon(op?.icon, null)}
                 {op.title}
               </DropdownMenuItem>
-            ))}
-            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
-          </DropdownMenuGroup>
+            )}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

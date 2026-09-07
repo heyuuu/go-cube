@@ -24,9 +24,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -35,6 +33,7 @@ import { renderIcon } from '@/lib/icon';
 import { cn } from '@/lib/utils';
 import { filterTargets, quickIntents, type QuickIntent, type TargetKind } from '@/pages/projects/shared';
 import { useIntentDefaultOpener } from '@/queries/opener';
+import { CopyPathItem, OpenWithGroup } from '@/components/open-with-menu';
 import { useOpenerList } from '@/queries/opener';
 import { useOpenerDiffOpen, useOpenerOpen } from '@/queries/project';
 import {
@@ -559,10 +558,7 @@ function WorktreeOpenActions({
           <Ellipsis className="size-3.5" />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
-          <DropdownMenuItem onClick={() => void navigator.clipboard.writeText(path)}>
-            <Copy className="mr-1 size-3" />
-            复制绝对路径
-          </DropdownMenuItem>
+          <CopyPathItem path={path} />
           {onReset ? (
             <>
               <DropdownMenuSeparator />
@@ -579,17 +575,15 @@ function WorktreeOpenActions({
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
-          {/* Base UI 的 GroupLabel 必须包在 Group 内，否则运行时抛 MenuGroupContext missing */}
-          <DropdownMenuGroup>
-            <DropdownMenuLabel>打开方式</DropdownMenuLabel>
-            {openerList.map((op) => (
+          <OpenWithGroup
+            openerList={openerList}
+            renderItem={(op) => (
               <DropdownMenuItem key={op.name} onClick={() => onOpen(op.name)}>
                 {renderIcon(op?.icon, null)}
                 {op.title}
               </DropdownMenuItem>
-            ))}
-            {openerList.length === 0 && <div className="px-2 py-1.5 text-xs text-muted-foreground">未配置 opener</div>}
-          </DropdownMenuGroup>
+            )}
+          />
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
