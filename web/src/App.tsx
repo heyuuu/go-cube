@@ -20,8 +20,8 @@ function App() {
       <Route path="/" element={<Layout />}>
         <Route index element={<Navigate to="/projects" replace />} />
         <Route path="projects" element={<ProjectsPage />} />
-        {/* 工作台挂进全局壳（提案 1023）：Layout 按此前缀切铺满型 main，不吃 max-w 收敛 */}
         <Route path="forges" element={<ForgesPage />} />
+        {/* 工作台挂进全局壳（提案 1023）：Layout 按此前缀切铺满型 main，不吃 max-w 收敛 */}
         <Route path="workbench" element={<WorkbenchPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

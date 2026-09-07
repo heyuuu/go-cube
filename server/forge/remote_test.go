@@ -46,12 +46,10 @@ func TestRepoNamespacePath(t *testing.T) {
 	}
 }
 
-// TestReconcile 对账三分：未 clone / 孤儿 / 已 clone；孤儿含本地状态。
+// TestReconcile 对账二分：未 clone / 已 clone；孤儿判定在 buildOverview（namespace 口径），不走此函数。
 func TestReconcile(t *testing.T) {
 	local := []LocalRepo{
 		{Name: "cube", Path: "~/src/cube", RepoUrl: "git@github.com:heyuuu/cube.git", Dirty: true, Ahead: 2, Behind: 1},
-		{Name: "gone", Path: "~/src/gone", RepoUrl: "https://github.com/heyuuu/gone.git"},
-		{Name: "other-host", Path: "~/src/x", RepoUrl: "git@gitlab.com:a/b.git"},
 	}
 	remote := []gitapi.RemoteRepo{
 		{Name: "cube", CloneUrl: "https://github.com/heyuuu/cube.git"},
@@ -65,16 +63,12 @@ func TestReconcile(t *testing.T) {
 	if len(got.Missing) != 1 || got.Missing[0].Name != "fresh" {
 		t.Fatalf("missing 不符: %+v", got.Missing)
 	}
-	// 纯函数不做 namespace 过滤（buildOverview 负责）：host 不同匹配不上的本地库同为孤儿
-	if len(got.Orphan) != 2 || got.Orphan[0].Name != "gone" {
-		t.Fatalf("orphan 不符: %+v", got.Orphan)
-	}
 }
 
 // TestReconcileEmpty 空输入零值安全（nil 序列化 [] 由 web 层统一处理）。
 func TestReconcileEmpty(t *testing.T) {
 	got := Reconcile(nil, nil)
-	if got.Missing != nil || got.Orphan != nil || got.Synced != nil {
+	if got.Missing != nil || got.Synced != nil {
 		t.Fatalf("空输入应产出空结果: %+v", got)
 	}
 }

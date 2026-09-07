@@ -93,7 +93,7 @@ describe('repoHostsOf', () => {
 });
 
 describe('repoPathOf', () => {
-  it('解析 ssh / https 形态为 namespace/name', () => {
+    it('解析 ssh / https 形态为 owner/name', () => {
     expect(repoPathOf('git@github.com:heyuuu/cube.git')).toBe('heyuuu/cube');
     expect(repoPathOf('https://gitee.com/ce_lbt/edu-web.git')).toBe('ce_lbt/edu-web');
     expect(repoPathOf('ssh://git@gitea.example.com:3000/acme/app')).toBe('acme/app');

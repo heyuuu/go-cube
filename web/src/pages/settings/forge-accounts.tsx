@@ -90,7 +90,7 @@ function AccountForm({ draft, forges, onClose }: { draft: AccountDraft; forges: 
           </label>
 
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-muted-foreground">token（留空 = 仅公开数据；编辑时保持掩码 = 未修改）</span>
+            <span className="text-xs text-muted-foreground">token（拉取必填；编辑时保持掩码 = 未修改）</span>
             <Input
               type="password"
               value={form.token}
@@ -134,7 +134,7 @@ export function ForgeAccountsSection() {
       <div className="mb-2 flex items-baseline gap-2">
         <h2 className="text-sm font-medium">Forge 账号（API 凭证）</h2>
         <span className="text-xs text-muted-foreground">
-          平台账号的 API token，供 namespace 拉取私有库；一个 forge 可挂多个账号
+          平台账号的 API token，用于拉取该账号名下仓库列表（含私有库）；一个 forge 可挂多个账号
         </span>
         <Button
           size="sm"
@@ -167,7 +167,7 @@ export function ForgeAccountsSection() {
             {list.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} className="text-xs text-muted-foreground">
-                  暂无账号（不配 token 也能拉取公开 namespace）
+                  暂无账号（拉取需要账号 token，1044 起不再支持无凭证的公开拉取）
                 </TableCell>
               </TableRow>
             )}
@@ -205,7 +205,7 @@ export function ForgeAccountsSection() {
       <ConfirmDialog
         open={deleting !== null}
         title="删除账号"
-        message={`确定删除「${deleting?.username}@${deleting?.forgeHost}」吗？挂载它的 namespace 将退化为仅拉取公开数据。`}
+        message={`确定删除「${deleting?.username}@${deleting?.forgeHost}」吗？forge 页将不再展示该账号名下仓库的对账信息。`}
         confirmText="删除"
         danger
         onConfirm={() => {

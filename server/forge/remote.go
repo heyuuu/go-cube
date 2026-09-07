@@ -26,10 +26,10 @@ type RepoPair struct {
 	Remote gitapi.RemoteRepo `json:"remote"`
 }
 
-// ReconcileResult 远端仓库与本地项目的对账三分结果（纯数据，纯函数产出）。
+// ReconcileResult 远端仓库与本地项目的对账二分结果（纯数据，纯函数产出）。
+// 孤儿不走此口径（1044）：孤儿 = 同 namespace 不在拉取结果，判定收敛在 buildOverview。
 type ReconcileResult struct {
 	Missing []gitapi.RemoteRepo `json:"missing"` // 未 clone 的远端库
-	Orphan  []LocalRepo         `json:"orphan"`  // 本地孤儿（远端已无）
 	Synced  []RepoPair          `json:"synced"`  // 已 clone
 }
 
@@ -59,7 +59,7 @@ func RepoNamespacePath(repoUrl string) string {
 	return ns
 }
 
-// Reconcile 对账纯函数：远端仓库列表 vs 本地仓库快照，按 RepoKey 匹配产出三类。
+// Reconcile 对账纯函数：远端仓库列表 vs 本地仓库快照，按 RepoKey 匹配产出 missing / synced。
 func Reconcile(local []LocalRepo, remote []gitapi.RemoteRepo) ReconcileResult {
 	remoteByKey := make(map[string]gitapi.RemoteRepo, len(remote))
 	for _, r := range remote {
@@ -82,14 +82,9 @@ func Reconcile(local []LocalRepo, remote []gitapi.RemoteRepo) ReconcileResult {
 			continue
 		}
 		result.Synced = append(result.Synced, RepoPair{Local: l, Remote: r})
-		delete(localByKey, k)
-	}
-	for _, l := range localByKey {
-		result.Orphan = append(result.Orphan, l)
 	}
 	// map 遍历序随机，按名称排稳定序（展示与测试都受益）
 	sortRepos(result.Missing)
-	sortLocals(result.Orphan)
 	sortPairs(result.Synced)
 	return result
 }
@@ -98,10 +93,6 @@ func Reconcile(local []LocalRepo, remote []gitapi.RemoteRepo) ReconcileResult {
 
 func sortRepos(rs []gitapi.RemoteRepo) {
 	slices.SortFunc(rs, func(a, b gitapi.RemoteRepo) int { return strings.Compare(a.Name, b.Name) })
-}
-
-func sortLocals(ls []LocalRepo) {
-	slices.SortFunc(ls, func(a, b LocalRepo) int { return strings.Compare(a.Name, b.Name) })
 }
 
 func sortPairs(ps []RepoPair) {
