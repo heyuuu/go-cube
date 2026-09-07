@@ -14,7 +14,7 @@ import { useSearchParams } from 'react-router';
 import type { Opener, Project } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
-import { Chip, FilterRow, SortHead } from '@/components/filter-chips';
+import { Chip, CycleSortHead, FilterRow } from '@/components/filter-chips';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -99,33 +99,6 @@ function matchGitFilter(p: Project, filter: GitStatus | 'all'): boolean {
     case 'clean':
       return !g.dirty && g.ahead === 0 && g.behind === 0;
   }
-}
-
-// 可点击表头：循环 默认(无箭头) → 升序 → 降序 → 默认。排序与筛选分离，不进 chips 区。
-// SortMode 语义到三态图标的映射，视觉部分复用公共 SortHead。
-function SortableHead({
-  k,
-  label,
-  mode,
-  onSet,
-  className,
-}: {
-  k: SortKey;
-  label: string;
-  mode: SortMode;
-  onSet: (m: SortMode) => void;
-  className?: string;
-}) {
-  const active = mode === k || mode === `${k}-desc`;
-  const desc = mode === `${k}-desc`;
-  return (
-    <SortHead
-      label={label}
-      className={className}
-      state={active ? (desc ? 'desc' : 'asc') : null}
-      onCycle={() => onSet(!active ? k : desc ? 'default' : `${k}-desc`)}
-    />
-  );
 }
 
 // 可点击 badge：点击将对应筛选定位到该值（已是唯一选中则取消）。激活状态由上方 chips 呈现，此处只做可点提示
@@ -733,25 +706,28 @@ export function ProjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <SortableHead
-                    k="name"
+                  <CycleSortHead
                     label="name"
-                    mode={sortMode}
-                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                    mode={sortMode === 'default' ? null : sortMode}
+                    asc="name"
+                    desc="name-desc"
+                    onSet={(m) => updateParams({ sort: m ?? 'default' })}
                   />
-                  <SortableHead
-                    k="group"
+                  <CycleSortHead
                     label="group"
-                    mode={sortMode}
-                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                    mode={sortMode === 'default' ? null : sortMode}
+                    asc="group"
+                    desc="group-desc"
+                    onSet={(m) => updateParams({ sort: m ?? 'default' })}
                     className="w-24"
                   />
                   <TableHead className="w-64">git</TableHead>
-                  <SortableHead
-                    k="recent"
+                  <CycleSortHead
                     label="最近使用"
-                    mode={sortMode}
-                    onSet={(m) => updateParams({ sort: m === 'recent' ? null : m })}
+                    mode={sortMode === 'default' ? null : sortMode}
+                    asc="recent"
+                    desc="recent-desc"
+                    onSet={(m) => updateParams({ sort: m ?? 'default' })}
                     className="w-32"
                   />
                   <TableHead className="w-32" />

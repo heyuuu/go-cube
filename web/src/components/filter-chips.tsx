@@ -2,6 +2,8 @@
 // FilterRow：一行 = 固定宽度标签（标注单选/多选，让各行 chips 起点对齐）+ chips 容器。
 // Chip：圆形筛选 chip（单选/多选语义由调用方控制 active）。
 // SortHead：可点击表头，state='asc'|'desc'|null 三态图标，点击触发 onCycle（循环语义归调用方）。
+// CycleSortHead：SortHead 的循环语义封装——mode 命中 asc/desc 值时点亮对应图标，
+// 点击按「无 → first 方向 → 反向 → 无」循环并把下一个排序值回传 onSet（null = 回默认）。
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -81,5 +83,33 @@ export function SortHead({
         )}
       </button>
     </TableHead>
+  );
+}
+
+export function CycleSortHead<M extends string>({
+  label,
+  mode,
+  asc,
+  desc,
+  first = 'asc',
+  onSet,
+  className,
+}: {
+  label: string;
+  mode: M | null;
+  asc: M;
+  desc: M;
+  first?: 'asc' | 'desc';
+  onSet: (m: M | null) => void;
+  className?: string;
+}) {
+  const state = mode === asc ? 'asc' : mode === desc ? 'desc' : null;
+  return (
+    <SortHead
+      label={label}
+      className={className}
+      state={state}
+      onCycle={() => onSet(state === null ? (first === 'asc' ? asc : desc) : state === first ? (first === 'asc' ? desc : asc) : null)}
+    />
   );
 }

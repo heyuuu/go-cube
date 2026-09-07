@@ -8,7 +8,7 @@ import { Link, useSearchParams } from 'react-router';
 import type { components, Forge } from '@/api/client';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorBanner } from '@/components/error-banner';
-import { Chip, FilterRow, SortHead } from '@/components/filter-chips';
+import { Chip, CycleSortHead, FilterRow } from '@/components/filter-chips';
 import { PageHeader } from '@/components/page-header';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -230,24 +230,22 @@ export function ForgesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortHead
+              <CycleSortHead
                 label="RepoUrl"
-                state={sortMode === 'name' ? 'asc' : sortMode === 'name-desc' ? 'desc' : null}
-                onCycle={() =>
-                  setParam('sort', sortMode === 'name' ? 'name-desc' : sortMode === 'name-desc' ? null : 'name')
-                }
+                mode={sortMode}
+                asc="name"
+                desc="name-desc"
+                onSet={(m) => setParam('sort', m)}
               />
               <TableHead>状态</TableHead>
               <TableHead>本地</TableHead>
-              <SortHead
+              <CycleSortHead
                 label="更新时间"
-                state={sortMode === 'updated' ? 'desc' : sortMode === 'updated-asc' ? 'asc' : null}
-                onCycle={() =>
-                  setParam(
-                    'sort',
-                    sortMode === 'updated' ? 'updated-asc' : sortMode === 'updated-asc' ? null : 'updated',
-                  )
-                }
+                mode={sortMode}
+                asc="updated-asc"
+                desc="updated"
+                first="desc"
+                onSet={(m) => setParam('sort', m)}
               />
               <TableHead className="text-right">操作</TableHead>
             </TableRow>
