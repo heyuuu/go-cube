@@ -72,17 +72,7 @@ func (s *Service) SaveForge(f Forge) error {
 	}
 
 	specs := s.Forges()
-	replaced := false
-	for i, cur := range specs {
-		if NormalizeHost(cur.Host) == f.Host {
-			specs[i] = f
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		specs = append(specs, f)
-	}
+	specs = settings.UpsertKeyed(specs, func(cur Forge) string { return NormalizeHost(cur.Host) }, f)
 	return settings.SaveSection(s.settingsFile, forgesSection, specs)
 }
 
@@ -90,34 +80,13 @@ func (s *Service) SaveForge(f Forge) error {
 // 未列出的条目保持原相对顺序排在末尾，不丢数据；未知或重复 host 返回中文错误。
 func (s *Service) ReorderForges(hosts []string) error {
 	specs := s.Forges()
-	byHost := make(map[string]Forge, len(specs))
-	for _, spec := range specs {
-		h := NormalizeHost(spec.Host)
-		if _, dup := byHost[h]; dup {
-			return fmt.Errorf("settings.json 存在重复 host 的 forge，无法重排")
-		}
-		byHost[h] = spec
+	keys := make([]string, len(hosts))
+	for i, raw := range hosts {
+		keys[i] = NormalizeHost(raw)
 	}
-	seen := make(map[string]bool, len(hosts))
-	for _, raw := range hosts {
-		h := NormalizeHost(raw)
-		if _, ok := byHost[h]; !ok {
-			return fmt.Errorf("未找到指定 forge: %s", h)
-		}
-		if seen[h] {
-			return fmt.Errorf("重排名单存在重复 forge: %s", h)
-		}
-		seen[h] = true
-	}
-
-	ordered := make([]Forge, 0, len(specs))
-	for _, raw := range hosts {
-		ordered = append(ordered, byHost[NormalizeHost(raw)])
-	}
-	for _, spec := range specs {
-		if !seen[NormalizeHost(spec.Host)] {
-			ordered = append(ordered, spec)
-		}
+	ordered, err := settings.ReorderKeyed(specs, func(cur Forge) string { return NormalizeHost(cur.Host) }, keys, "forge", func(k string) string { return k })
+	if err != nil {
+		return err
 	}
 	return settings.SaveSection(s.settingsFile, forgesSection, ordered)
 }
@@ -127,13 +96,8 @@ func (s *Service) ReorderForges(hosts []string) error {
 func (s *Service) DeleteForge(host string) error {
 	host = NormalizeHost(host)
 	specs := s.Forges()
-	rest := make([]Forge, 0, len(specs))
-	for _, cur := range specs {
-		if NormalizeHost(cur.Host) != host {
-			rest = append(rest, cur)
-		}
-	}
-	if len(rest) == len(specs) {
+	rest, removed := settings.RemoveKeyed(specs, func(cur Forge) string { return NormalizeHost(cur.Host) }, host)
+	if !removed {
 		return fmt.Errorf("未找到指定 forge: %s", host)
 	}
 	if err := settings.SaveSection(s.settingsFile, forgesSection, rest); err != nil {
@@ -163,17 +127,7 @@ func (s *Service) SaveAccount(a Account) error {
 		return err
 	}
 	accounts := loadAccounts(s.settingsFile)
-	replaced := false
-	for i, cur := range accounts {
-		if NormalizeHost(cur.ForgeHost) == a.ForgeHost && NormalizeUsername(cur.Username) == a.Username {
-			accounts[i] = a
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		accounts = append(accounts, a)
-	}
+	accounts = settings.UpsertKeyed(accounts, accountKey, a)
 	return saveAccounts(s.settingsFile, accounts)
 }
 
@@ -181,38 +135,14 @@ func (s *Service) SaveAccount(a Account) error {
 // 未列出的条目保持原相对顺序排在末尾，不丢数据；未知或重复键返回中文错误。
 func (s *Service) ReorderAccounts(keys []string) error {
 	accounts := loadAccounts(s.settingsFile)
-	byKey := make(map[string]Account, len(accounts))
-	for _, a := range accounts {
-		k := acctCacheKey(a.ForgeHost, a.Username)
-		if _, dup := byKey[k]; dup {
-			return fmt.Errorf("settings.json 存在重复键的 account，无法重排")
-		}
-		byKey[k] = a
-	}
-	seen := make(map[string]bool, len(keys))
-	normalized := make([]string, 0, len(keys))
-	for _, raw := range keys {
+	normalized := make([]string, len(keys))
+	for i, raw := range keys {
 		h, u := key2acct(raw)
-		h, u = NormalizeHost(h), NormalizeUsername(u)
-		k := acctCacheKey(h, u)
-		if _, ok := byKey[k]; !ok {
-			return fmt.Errorf("未找到指定 account: %s@%s", u, h)
-		}
-		if seen[k] {
-			return fmt.Errorf("重排名单存在重复 account: %s@%s", u, h)
-		}
-		seen[k] = true
-		normalized = append(normalized, k)
+		normalized[i] = acctCacheKey(NormalizeHost(h), NormalizeUsername(u))
 	}
-
-	ordered := make([]Account, 0, len(accounts))
-	for _, k := range normalized {
-		ordered = append(ordered, byKey[k])
-	}
-	for _, a := range accounts {
-		if !seen[acctCacheKey(a.ForgeHost, a.Username)] {
-			ordered = append(ordered, a)
-		}
+	ordered, err := settings.ReorderKeyed(accounts, accountKey, normalized, "account", formatAccountKey)
+	if err != nil {
+		return err
 	}
 	return saveAccounts(s.settingsFile, ordered)
 }
@@ -221,13 +151,8 @@ func (s *Service) ReorderAccounts(keys []string) error {
 func (s *Service) DeleteAccount(forgeHost, username string) error {
 	forgeHost, username = NormalizeHost(forgeHost), NormalizeUsername(username)
 	accounts := loadAccounts(s.settingsFile)
-	rest := make([]Account, 0, len(accounts))
-	for _, cur := range accounts {
-		if NormalizeHost(cur.ForgeHost) != forgeHost || NormalizeUsername(cur.Username) != username {
-			rest = append(rest, cur)
-		}
-	}
-	if len(rest) == len(accounts) {
+	rest, removed := settings.RemoveKeyed(accounts, accountKey, acctCacheKey(forgeHost, username))
+	if !removed {
 		return fmt.Errorf("未找到指定 account: %s@%s", username, forgeHost)
 	}
 	return saveAccounts(s.settingsFile, rest)
@@ -363,3 +288,7 @@ func key2acct(key string) (string, string) {
 	h, u, _ := strings.Cut(key, "/")
 	return h, u
 }
+
+// accountKey / formatAccountKey account 的节内操作键（settings 三原语用）与错误文案渲染。
+func accountKey(a Account) string      { return acctCacheKey(a.ForgeHost, a.Username) }
+func formatAccountKey(k string) string { h, u := key2acct(k); return u + "@" + h }

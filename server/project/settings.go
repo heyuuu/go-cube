@@ -65,6 +65,10 @@ type CloneRuleKey struct {
 	RepoPrefix string `json:"repoPrefix"`
 }
 
+// cloneRuleKey / formatCloneRuleKey clone 规则的节内操作键（settings 三原语用）与错误文案渲染。
+func cloneRuleKey(r CloneRule) CloneRuleKey    { return CloneRuleKey{r.RepoHost, r.RepoPrefix} }
+func formatCloneRuleKey(k CloneRuleKey) string { return k.RepoHost + k.RepoPrefix }
+
 // saveScanRule 新增或按 path 替换一条 scan 规则（path 原串是规则唯一键——
 // 编辑 path 等价于删旧存新，前端按此语义提交）。
 func saveScanRule(settingsFile string, rule ScanRule) error {
@@ -87,17 +91,7 @@ func saveScanRule(settingsFile string, rule ScanRule) error {
 
 	var specs []ScanRule
 	settings.LoadSection(settingsFile, scanRulesSection, &specs)
-	replaced := false
-	for i, cur := range specs {
-		if cur.Path == rule.Path {
-			specs[i] = rule
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		specs = append(specs, rule)
-	}
+	specs = settings.UpsertKeyed(specs, func(cur ScanRule) string { return cur.Path }, rule)
 	return settings.SaveSection(settingsFile, scanRulesSection, specs)
 }
 
@@ -105,13 +99,8 @@ func saveScanRule(settingsFile string, rule ScanRule) error {
 func deleteScanRule(settingsFile, path string) error {
 	var specs []ScanRule
 	settings.LoadSection(settingsFile, scanRulesSection, &specs)
-	rest := make([]ScanRule, 0, len(specs))
-	for _, cur := range specs {
-		if cur.Path != path {
-			rest = append(rest, cur)
-		}
-	}
-	if len(rest) == len(specs) {
+	rest, removed := settings.RemoveKeyed(specs, func(cur ScanRule) string { return cur.Path }, path)
+	if !removed {
 		return fmt.Errorf("未找到指定 scan 规则: %s", path)
 	}
 	return settings.SaveSection(settingsFile, scanRulesSection, rest)
@@ -122,33 +111,9 @@ func deleteScanRule(settingsFile, path string) error {
 func reorderScanRules(settingsFile string, paths []string) error {
 	var specs []ScanRule
 	settings.LoadSection(settingsFile, scanRulesSection, &specs)
-
-	byPath := make(map[string]ScanRule, len(specs))
-	for _, spec := range specs {
-		if _, dup := byPath[spec.Path]; dup {
-			return fmt.Errorf("settings.json 存在重复路径的 scan 规则，无法按路径重排")
-		}
-		byPath[spec.Path] = spec
-	}
-	seen := make(map[string]bool, len(paths))
-	for _, p := range paths {
-		if _, ok := byPath[p]; !ok {
-			return fmt.Errorf("未找到指定 scan 规则: %s", p)
-		}
-		if seen[p] {
-			return fmt.Errorf("重排名单存在重复路径: %s", p)
-		}
-		seen[p] = true
-	}
-
-	ordered := make([]ScanRule, 0, len(specs))
-	for _, p := range paths {
-		ordered = append(ordered, byPath[p])
-	}
-	for _, spec := range specs {
-		if !seen[spec.Path] {
-			ordered = append(ordered, spec)
-		}
+	ordered, err := settings.ReorderKeyed(specs, func(cur ScanRule) string { return cur.Path }, paths, "scan 规则", func(k string) string { return k })
+	if err != nil {
+		return err
 	}
 	return settings.SaveSection(settingsFile, scanRulesSection, ordered)
 }
@@ -167,17 +132,7 @@ func saveCloneRule(settingsFile string, rule CloneRule) error {
 
 	var specs []CloneRule
 	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
-	replaced := false
-	for i, cur := range specs {
-		if cur.RepoHost == rule.RepoHost && cur.RepoPrefix == rule.RepoPrefix {
-			specs[i] = rule
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		specs = append(specs, rule)
-	}
+	specs = settings.UpsertKeyed(specs, cloneRuleKey, rule)
 	return settings.SaveSection(settingsFile, cloneRulesSection, specs)
 }
 
@@ -185,13 +140,8 @@ func saveCloneRule(settingsFile string, rule CloneRule) error {
 func deleteCloneRule(settingsFile string, key CloneRuleKey) error {
 	var specs []CloneRule
 	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
-	rest := make([]CloneRule, 0, len(specs))
-	for _, cur := range specs {
-		if cur.RepoHost != key.RepoHost || cur.RepoPrefix != key.RepoPrefix {
-			rest = append(rest, cur)
-		}
-	}
-	if len(rest) == len(specs) {
+	rest, removed := settings.RemoveKeyed(specs, cloneRuleKey, key)
+	if !removed {
 		return fmt.Errorf("未找到指定 clone 规则: %s%s", key.RepoHost, key.RepoPrefix)
 	}
 	return settings.SaveSection(settingsFile, cloneRulesSection, rest)
@@ -202,35 +152,9 @@ func deleteCloneRule(settingsFile string, key CloneRuleKey) error {
 func reorderCloneRules(settingsFile string, keys []CloneRuleKey) error {
 	var specs []CloneRule
 	settings.LoadSection(settingsFile, cloneRulesSection, &specs)
-
-	keyOf := func(r CloneRule) CloneRuleKey { return CloneRuleKey{r.RepoHost, r.RepoPrefix} }
-	byKey := make(map[CloneRuleKey]CloneRule, len(specs))
-	for _, spec := range specs {
-		k := keyOf(spec)
-		if _, dup := byKey[k]; dup {
-			return fmt.Errorf("settings.json 存在重复 host+prefix 的 clone 规则，无法重排")
-		}
-		byKey[k] = spec
-	}
-	seen := make(map[CloneRuleKey]bool, len(keys))
-	for _, k := range keys {
-		if _, ok := byKey[k]; !ok {
-			return fmt.Errorf("未找到指定 clone 规则: %s%s", k.RepoHost, k.RepoPrefix)
-		}
-		if seen[k] {
-			return fmt.Errorf("重排名单存在重复 clone 规则: %s%s", k.RepoHost, k.RepoPrefix)
-		}
-		seen[k] = true
-	}
-
-	ordered := make([]CloneRule, 0, len(specs))
-	for _, k := range keys {
-		ordered = append(ordered, byKey[k])
-	}
-	for _, spec := range specs {
-		if !seen[keyOf(spec)] {
-			ordered = append(ordered, spec)
-		}
+	ordered, err := settings.ReorderKeyed(specs, cloneRuleKey, keys, "clone 规则", formatCloneRuleKey)
+	if err != nil {
+		return err
 	}
 	return settings.SaveSection(settingsFile, cloneRulesSection, ordered)
 }

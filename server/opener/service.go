@@ -85,17 +85,7 @@ func (s *Service) SaveOpener(spec Spec) error {
 
 	var specs []Spec
 	settings.LoadSection(s.settingsFile, settingsSection, &specs)
-	replaced := false
-	for i, cur := range specs {
-		if cur.Name == spec.Name {
-			specs[i] = spec
-			replaced = true
-			break
-		}
-	}
-	if !replaced {
-		specs = append(specs, spec)
-	}
+	specs = settings.UpsertKeyed(specs, func(cur Spec) string { return cur.Name }, spec)
 	return settings.SaveSection(s.settingsFile, settingsSection, specs)
 }
 
@@ -103,13 +93,8 @@ func (s *Service) SaveOpener(spec Spec) error {
 func (s *Service) DeleteOpener(name string) error {
 	var specs []Spec
 	settings.LoadSection(s.settingsFile, settingsSection, &specs)
-	rest := make([]Spec, 0, len(specs))
-	for _, cur := range specs {
-		if cur.Name != name {
-			rest = append(rest, cur)
-		}
-	}
-	if len(rest) == len(specs) {
+	rest, removed := settings.RemoveKeyed(specs, func(cur Spec) string { return cur.Name }, name)
+	if !removed {
 		return fmt.Errorf("未找到指定 opener: %s", name)
 	}
 	if err := settings.SaveSection(s.settingsFile, settingsSection, rest); err != nil {
@@ -145,33 +130,9 @@ func (s *Service) DeleteOpener(name string) error {
 func (s *Service) ReorderOpeners(names []string) error {
 	var specs []Spec
 	settings.LoadSection(s.settingsFile, settingsSection, &specs)
-
-	byName := make(map[string]Spec, len(specs))
-	for _, spec := range specs {
-		byName[spec.Name] = spec
-	}
-	if len(byName) != len(specs) {
-		return fmt.Errorf("settings.json 存在重名 opener，无法按名重排")
-	}
-	seen := make(map[string]bool, len(names))
-	for _, name := range names {
-		if _, ok := byName[name]; !ok {
-			return fmt.Errorf("未找到指定 opener: %s", name)
-		}
-		if seen[name] {
-			return fmt.Errorf("重排名单存在重复 opener: %s", name)
-		}
-		seen[name] = true
-	}
-
-	ordered := make([]Spec, 0, len(specs))
-	for _, name := range names {
-		ordered = append(ordered, byName[name])
-	}
-	for _, spec := range specs {
-		if !seen[spec.Name] {
-			ordered = append(ordered, spec)
-		}
+	ordered, err := settings.ReorderKeyed(specs, func(cur Spec) string { return cur.Name }, names, "opener", func(k string) string { return k })
+	if err != nil {
+		return err
 	}
 	return settings.SaveSection(s.settingsFile, settingsSection, ordered)
 }
